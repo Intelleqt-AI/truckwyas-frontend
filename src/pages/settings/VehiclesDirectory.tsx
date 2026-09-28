@@ -34,10 +34,10 @@ interface Vehicle {
 
 const STATUS_COLOR: Record<string, string> = {
   AVAILABLE: 'var(--accent-primary)',
-  MAINTENANCE: 'var(--status-warning)',
+  MAINTENANCE: 'var(--status-warning-text, var(--status-warning))',
   IN_USE: 'var(--accent-primary)',
   IN_TRANSIT: 'var(--accent-primary)',
-  OUT_OF_SERVICE: 'var(--status-danger)',
+  OUT_OF_SERVICE: 'var(--status-danger-text, var(--status-danger))',
 };
 
 // Presentation-only labels for known status payload values — unknown strings
@@ -108,7 +108,7 @@ export function VehiclesDirectory() {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Vehicles</h2>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Vehicles</h1>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Fleet vehicle directory</div>
       </div>
 
@@ -252,7 +252,7 @@ export function VehiclesDirectory() {
                         title={isDemo ? 'Not available in the demo' : undefined}
                         style={{
                           ...rowActionStyle,
-                          border: '1px solid var(--status-danger)', color: 'var(--status-danger)',
+                          border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))',
                           cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                         }}
                       >Delete</button>

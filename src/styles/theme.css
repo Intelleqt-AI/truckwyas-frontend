@@ -1119,17 +1119,24 @@ body {
   .os-app-shell .btn-action { min-height: 48px; }
 }
 
-/* Authenticated status text: keep chart/background status tokens unchanged. */
+/* Authenticated status text: keep chart/background status tokens unchanged.
+   --status-info-text / --avatar-on-dim come from tokens.json infoText: accent
+   blue reads at 4.1:1 on the dark accent-dim surface, so text on that surface
+   uses the info text role instead. */
 .os-app-shell {
   --status-success-text: #86EFAC;
   --status-warning-text: #FCD34D;
   --status-danger-text: #FCA5A5;
+  --status-info-text: #93C5FD;
+  --avatar-on-dim: #93C5FD;
 }
 [data-theme="light"] .os-app-shell,
 .os-app-shell[data-theme="light"] {
   --status-success-text: #166534;
   --status-warning-text: #92400E;
   --status-danger-text: #B91C1C;
+  --status-info-text: #1D4ED8;
+  --avatar-on-dim: #1D4ED8;
   --text-tertiary: #626975;
 }
 [data-theme="dark"] .os-app-shell,
@@ -1137,6 +1144,8 @@ body {
   --status-success-text: #86EFAC;
   --status-warning-text: #FCD34D;
   --status-danger-text: #FCA5A5;
+  --status-info-text: #93C5FD;
+  --avatar-on-dim: #93C5FD;
   --text-tertiary: #8A8F98;
 }
 
@@ -1165,7 +1174,10 @@ body {
   padding: 4px 8px;
   gap: 8px;
 }
-.os-app-shell .theme-toggle { width: 44px; height: 44px; flex-shrink: 0; border-radius: 6px; }
+.os-app-shell .theme-toggle { width: 44px; height: 44px; flex-shrink: 0; border-radius: 6px; font-size: 14px; }
+/* Icon-only header triggers: keep an on-scale font so any fallback text/count
+   renders at a sanctioned size rather than the 13.333px browser default. */
+.os-app-shell .dashboard-notification-trigger { font-size: 14px; }
 .os-app-shell .os-profile-trigger { padding: 0; flex-shrink: 0; font-family: var(--font-sans); }
 .os-app-shell .os-profile-action {
   display: block;

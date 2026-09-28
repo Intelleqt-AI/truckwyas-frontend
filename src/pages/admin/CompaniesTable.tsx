@@ -250,8 +250,8 @@ export function CompaniesTable() {
                       <td style={tdStyle}>
                         <div>
                           {c.company_name}
-                          {c.is_demo && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-warning)' }}>Demo</span>}
-                          {c.is_deleted && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-danger)' }}>Deleted</span>}
+                          {c.is_demo && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-warning-text, var(--status-warning))' }}>Demo</span>}
+                          {c.is_deleted && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-danger-text, var(--status-danger))' }}>Deleted</span>}
                         </div>
                         {/* company_name alone is rarely unique — self-service signup
                             defaults it to "<first name>'s Transport", so the owner's
@@ -306,7 +306,7 @@ export function CompaniesTable() {
                             <button
                               type="button"
                               className="admin-control"
-                              style={{ ...secondaryBtnStyle, color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
+                              style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }}
                               disabled={actionMutation.isPending}
                               onClick={() => setConfirmAction({ company: c, action: 'delete' })}
                             >
@@ -435,7 +435,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
               padding: 16, background: 'var(--status-warning-bg, rgba(245,158,11,0.1))',
               border: '1px solid var(--status-warning)', borderRadius: 8, fontSize: 14, lineHeight: '20px',
             }}>
-              <strong style={{ color: 'var(--status-warning)' }}>In grace period</strong>
+              <strong style={{ color: 'var(--status-warning-text, var(--status-warning))' }}>In grace period</strong>
               {company.grace_period_expires_at && <> — expires {fmtDate(company.grace_period_expires_at)}</>}.
               This is caused by a failed <em>subscription</em> charge, not a delivery-fee charge — use{' '}
               <strong>Record payment</strong> below to resolve it. Marking a delivery-fee row as paid in the
@@ -465,7 +465,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                 </button>
               </div>
               {company.grace_period_expires_at && (
-                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning)', marginTop: 6 }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning-text, var(--status-warning))', marginTop: 6 }}>
                   Grace period expires {fmtDate(company.grace_period_expires_at)}
                 </div>
               )}

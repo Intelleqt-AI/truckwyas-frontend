@@ -781,7 +781,7 @@ export default function Insights() {
                   <div className="card">
                     <div style={{
                       ...metricValueTypography,
-                      color: 'var(--status-danger)',
+                      color: 'var(--status-danger-text, var(--status-danger))',
                       marginBottom: 12,
                     }}>
                       {formatCurrency(financeData?.expenses_period || 0)}
@@ -925,14 +925,14 @@ export default function Insights() {
                                   flex: 1,
                                   height: 16,
                                   background: 'var(--bg-surface-hover)',
-                                  borderRadius: 2,
+                                  borderRadius: 4,
                                   overflow: 'hidden',
                                 }}>
                                   <div style={{
                                     width: `${r.margin_pct}%`,
                                     height: '100%',
                                     background: r.margin_pct > 50 ? 'var(--status-success)' : r.margin_pct > 30 ? 'var(--status-warning)' : 'var(--status-danger)',
-                                    borderRadius: 2,
+                                    borderRadius: 4,
                                   }} />
                                 </div>
                                 <div style={{
@@ -989,13 +989,13 @@ export default function Insights() {
                                     height: 16,
                                     background: 'var(--accent-primary)',
                                     width: `${revWidth}%`,
-                                    borderRadius: 2,
+                                    borderRadius: 4,
                                   }} />
                                   <div style={{
                                     height: 16,
                                     background: 'var(--status-danger)',
                                     width: `${expWidth}%`,
-                                    borderRadius: 2,
+                                    borderRadius: 4,
                                     opacity: 0.7,
                                   }} />
                                 </div>
@@ -1083,14 +1083,14 @@ export default function Insights() {
                                 flex: 1,
                                 height: 20,
                                 background: 'var(--bg-surface-hover)',
-                                borderRadius: 2,
+                                borderRadius: 4,
                                 overflow: 'hidden',
                               }}>
                                 <div style={{
                                   width: `${widthPct}%`,
                                   height: '100%',
                                   background: 'var(--accent-dim)',
-                                  borderRadius: 2,
+                                  borderRadius: 4,
                                 }} />
                               </div>
                               <div style={{
@@ -1414,7 +1414,7 @@ export default function Insights() {
                   <div className="card">
                     <div style={{
                       ...metricValueTypography,
-                      color: 'var(--status-danger)',
+                      color: 'var(--status-danger-text, var(--status-danger))',
                       marginBottom: 12,
                     }}>
                       {vehicles.filter(v => (v.ai_health_score || 100) < 60).length}

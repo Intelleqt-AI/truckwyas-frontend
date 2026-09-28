@@ -45,7 +45,7 @@ const fieldStyle: React.CSSProperties = {
   border: "1px solid var(--border-subtle)",
   color: "var(--text-primary)",
   padding: "10px 12px",
-  borderRadius: 2,
+  borderRadius: 6,
   fontSize: 14,
   lineHeight: "20px",
   fontFamily: "var(--font-sans)",
@@ -247,6 +247,7 @@ export default function Customers() {
             <tr>
               <th style={{
                 padding: "12px 0 12px 20px", width: 32,
+                fontSize: 13, lineHeight: "20px", fontWeight: 500,
                 borderBottom: "1px solid var(--border-subtle)",
               }}>
                 {filtered.length > 0 && (
@@ -347,7 +348,7 @@ export default function Customers() {
                         onClick={e => { e.stopPropagation(); openEdit(c); }}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", padding: "4px 10px", borderRadius: 2, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", fontWeight: 500, letterSpacing: "normal", opacity: isDemo ? 0.5 : 1 }}
+                        style={{ background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", padding: "4px 10px", minHeight: 40, borderRadius: 6, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", fontWeight: 500, letterSpacing: "normal", opacity: isDemo ? 0.5 : 1 }}
                       >Edit</button>
                       <button
                         onClick={e => {
@@ -370,7 +371,7 @@ export default function Customers() {
                         }}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: "none", border: "1px solid var(--status-danger)", color: "var(--status-danger)", padding: "4px 10px", borderRadius: 2, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", fontWeight: 500, letterSpacing: "normal", opacity: isDemo ? 0.5 : 1 }}
+                        style={{ background: "none", border: "1px solid var(--status-danger)", color: "var(--status-danger-text, var(--status-danger))", padding: "4px 10px", minHeight: 40, borderRadius: 6, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", fontWeight: 500, letterSpacing: "normal", opacity: isDemo ? 0.5 : 1 }}
                       >Delete</button>
                     </div>
                   </td>
@@ -410,7 +411,7 @@ export default function Customers() {
               { key: "billing_address", label: "Billing address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>}</label>
+                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text, var(--status-danger))", marginLeft: 2 }}>*</span>}</label>
                 <input
                   type={f.type || "text"}
                   placeholder={f.placeholder}
@@ -467,13 +468,13 @@ export default function Customers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: "10px 0", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", letterSpacing: "normal", background: "var(--accent-primary)", color: "var(--bg-deep)", border: "none", borderRadius: 2, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
+                style={{ flex: 1, padding: "10px 0", minHeight: 40, fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", letterSpacing: "normal", background: "var(--accent-primary)", color: "var(--btn-action-color, var(--bg-deep))", border: "none", borderRadius: 6, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
               >
                 {saving ? "Saving…" : "Create customer"}
               </button>
               <button
                 onClick={() => setShowAddForm(false)}
-                style={{ padding: "10px 20px", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 2, cursor: "pointer" }}
+                style={{ padding: "10px 20px", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 6, cursor: "pointer" }}
               >
                 Cancel
               </button>
@@ -504,7 +505,7 @@ export default function Customers() {
               { key: "billing_address", label: "Billing address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>}</label>
+                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text, var(--status-danger))", marginLeft: 2 }}>*</span>}</label>
                 <input
                   type={f.type || "text"}
                   placeholder={f.placeholder}
@@ -570,13 +571,13 @@ export default function Customers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: "10px 0", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", letterSpacing: "normal", background: "var(--accent-primary)", color: "var(--bg-deep)", border: "none", borderRadius: 2, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
+                style={{ flex: 1, padding: "10px 0", minHeight: 40, fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", letterSpacing: "normal", background: "var(--accent-primary)", color: "var(--btn-action-color, var(--bg-deep))", border: "none", borderRadius: 6, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
               >
                 {saving ? "Saving…" : "Update customer"}
               </button>
               <button
                 onClick={() => setEditCustomer(null)}
-                style={{ padding: "10px 20px", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 2, cursor: "pointer" }}
+                style={{ padding: "10px 20px", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 6, cursor: "pointer" }}
               >
                 Cancel
               </button>

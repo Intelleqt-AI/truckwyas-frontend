@@ -273,7 +273,7 @@ export function DeveloperApi() {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Risk-scoring API</h2>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Risk-scoring API</h1>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
           Score any invoice with the same 7-pillar underwriting engine your Capital product uses.
           Partners authenticate with an API key and are metered per call.
@@ -288,17 +288,17 @@ export function DeveloperApi() {
             <span style={{ ...mono, fontWeight: 700, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 4 }}>POST</span>
             <span style={{ ...mono, color: 'var(--text-primary)' }}>/api/v1/risk/underwrite/</span>
           </div>
-          <div style={{ ...mono, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-            Auth (key): <span style={{ color: 'var(--text-secondary)' }}>X-API-Key: &lt;your key&gt;</span>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 4 }}>
+            Auth (key): <span style={{ ...mono, color: 'var(--text-secondary)' }}>X-API-Key: &lt;your key&gt;</span>
           </div>
-          <div style={{ ...mono, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-            Auth (in-app): <span style={{ color: 'var(--text-secondary)' }}>Authorization: Token &lt;token&gt;</span>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 4 }}>
+            Auth (in-app): <span style={{ ...mono, color: 'var(--text-secondary)' }}>Authorization: Token &lt;token&gt;</span>
           </div>
-          <div style={{ ...mono, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-            Rate limit: <span style={{ color: 'var(--text-secondary)' }}>60 requests/minute per key</span>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 4 }}>
+            Rate limit: <span style={{ ...mono, color: 'var(--text-secondary)' }}>60 requests/minute per key</span>
           </div>
-          <div style={{ ...mono, color: 'var(--text-tertiary)' }}>
-            Returns: <span style={{ color: 'var(--text-secondary)' }}>eligible, risk_tier, score, fee_percent, max_advance_percent, net_advance, top_risk_drivers, top_strengths, pillars, _meta</span>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+            Returns: <span style={{ ...mono, color: 'var(--text-secondary)' }}>eligible, risk_tier, score, fee_percent, max_advance_percent, net_advance, top_risk_drivers, top_strengths, pillars, _meta</span>
           </div>
         </div>
       </div>
@@ -322,7 +322,7 @@ export function DeveloperApi() {
                   <td style={{ padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{f.field}</td>
                   <td style={{ padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)' }}>{f.type}</td>
                   <td style={{ padding: '7px 14px' }}>
-                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px', fontWeight: 500, padding: '2px 6px', borderRadius: 4, background: f.required ? 'rgba(239,68,68,0.12)' : 'var(--bg-deep)', color: f.required ? 'var(--status-danger)' : 'var(--text-tertiary)' }}>
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px', fontWeight: 500, padding: '2px 6px', borderRadius: 4, background: f.required ? 'rgba(239,68,68,0.12)' : 'var(--bg-deep)', color: f.required ? 'var(--status-danger-text, var(--status-danger))' : 'var(--text-tertiary)' }}>
                       {f.required ? 'Yes' : 'No'}
                     </span>
                   </td>
@@ -462,7 +462,7 @@ export function DeveloperApi() {
                       disabled={isDemo}
                       title={isDemo ? 'Fixed in demo mode' : undefined}
                       className="settings-control"
-                      style={{ ...rowActionStyle, border: '1px solid var(--status-danger)', color: 'var(--status-danger)', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+                      style={{ ...rowActionStyle, border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
                     >Revoke</button>
                   </div>
                 </div>
@@ -503,7 +503,7 @@ export function DeveloperApi() {
                               {log.eligible === null ? <span style={{ color: 'var(--text-tertiary)' }}>—</span>
                                 : log.eligible
                                   ? <span style={{ color: 'var(--status-success)', fontSize: 13, fontWeight: 500 }}>Yes</span>
-                                  : <span style={{ color: 'var(--status-danger)', fontSize: 13, fontWeight: 500 }}>No</span>}
+                                  : <span style={{ color: 'var(--status-danger-text, var(--status-danger))', fontSize: 13, fontWeight: 500 }}>No</span>}
                             </td>
                             <td style={{ padding: '5px 10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{log.caller_ip || '—'}</td>
                           </tr>
@@ -544,12 +544,12 @@ export function DeveloperApi() {
             <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>Request body</div>
             <textarea value={body} onChange={e => setBody(e.target.value)} spellCheck={false}
               className="settings-control"
-              style={{ ...inputStyle, ...mono, fontSize: 12, height: 300, resize: 'vertical', lineHeight: 1.5, whiteSpace: 'pre' }} />
+              style={{ ...inputStyle, ...mono, fontSize: 13, height: 300, resize: 'vertical', lineHeight: '20px', whiteSpace: 'pre' }} />
           </div>
           <div>
             <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>Response</div>
             {tryErr ? (
-              <div style={{ color: 'var(--status-danger)', fontSize: 13, lineHeight: '20px' }}>{tryErr}</div>
+              <div style={{ color: 'var(--status-danger-text, var(--status-danger))', fontSize: 13, lineHeight: '20px' }}>{tryErr}</div>
             ) : result ? (
               <div>
                 <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -610,7 +610,7 @@ export function DeveloperApi() {
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>TruckWys will POST the full scoring result here after every call.</div>
             </div>
 
-            {editErr && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger)', padding: '8px 12px', background: 'var(--status-danger-bg)', borderRadius: 6 }}>{editErr}</div>}
+            {editErr && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))', padding: '8px 12px', background: 'var(--status-danger-bg)', borderRadius: 6 }}>{editErr}</div>}
 
             <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 12 }}>
               <button

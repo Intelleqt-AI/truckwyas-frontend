@@ -53,7 +53,7 @@ const tdStyle: React.CSSProperties = {
   padding: '8px 10px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 const secondaryBtnStyle: React.CSSProperties = {
-  padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--status-danger)',
+  padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--status-danger-text, var(--status-danger))',
   borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer',
 };
 

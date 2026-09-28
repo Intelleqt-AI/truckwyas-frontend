@@ -300,7 +300,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
               {preview.needs_attention > 0 && (
                 <>
                   <span>·</span>
-                  <span style={{ color: 'var(--status-warning)' }}>
+                  <span style={{ color: 'var(--status-warning-text, var(--status-warning))' }}>
                     {preview.needs_attention} need attention
                   </span>
                 </>

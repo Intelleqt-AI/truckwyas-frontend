@@ -52,12 +52,14 @@ const roleBadgeStyle: React.CSSProperties = {
   padding: '3px 8px', borderRadius: 4, display: 'inline-block',
 };
 
+/* Badge text colours use the tested text roles — raw palette swatches
+   (#3B82F6, #9CA3AF) measure under 4.5:1 on the light surface. */
 const ROLE_COLORS: Record<string, string> = {
-  admin: 'var(--status-danger)',
-  manager: 'var(--status-warning)',
-  operator: '#3B82F6',
-  dispatcher: '#8B5CF6',
-  viewer: '#9CA3AF',
+  admin: 'var(--status-danger-text, var(--status-danger))',
+  manager: 'var(--status-warning-text, var(--status-warning))',
+  operator: 'var(--status-info-text, #3B82F6)',
+  dispatcher: 'var(--status-info-text, #8B5CF6)',
+  viewer: 'var(--text-tertiary)',
   driver: 'var(--status-success)',
   customer: 'var(--text-tertiary)',
 };
@@ -248,7 +250,7 @@ export function UsersPermissions() {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Users & permissions</h2>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Users & permissions</h1>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Manage team access and roles</div>
       </div>
 
@@ -370,8 +372,8 @@ export function UsersPermissions() {
                       <div style={{
                         width: 30, height: 30, borderRadius: '50%',
                         background: 'var(--accent-dim)', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 11,
-                        color: 'var(--accent-primary)', flexShrink: 0,
+                        justifyContent: 'center', fontFamily: 'var(--font-sans)', fontSize: 11,
+                        color: 'var(--avatar-on-dim, var(--accent-primary))', flexShrink: 0,
                       }}>
                         {u.name?.charAt(0).toUpperCase() || '?'}
                       </div>
@@ -425,7 +427,7 @@ export function UsersPermissions() {
                       disabled={isDemo}
                       title={isDemo ? 'Fixed in demo mode' : undefined}
                       style={{
-                        ...rowActionStyle, color: 'var(--status-danger)',
+                        ...rowActionStyle, color: 'var(--status-danger-text, var(--status-danger))',
                         cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                       }}
                     >Remove</button>
@@ -493,7 +495,7 @@ export function UsersPermissions() {
                           disabled={isDemo}
                           title={isDemo ? 'Fixed in demo mode' : undefined}
                           style={{
-                            ...rowActionStyle, color: 'var(--status-danger)',
+                            ...rowActionStyle, color: 'var(--status-danger-text, var(--status-danger))',
                             cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                           }}
                         >Revoke</button>

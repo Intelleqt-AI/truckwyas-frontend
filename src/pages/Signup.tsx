@@ -40,7 +40,7 @@ const rules = [
 
 function getStrength(password: string) {
   const passed = rules.filter(r => r.test(password)).length;
-  if (passed <= 2) return { level: 'Weak',   color: 'var(--status-danger)',  width: '20%' };
+  if (passed <= 2) return { level: 'Weak',   color: 'var(--status-danger-text, var(--status-danger))',  width: '20%' };
   if (passed === 3) return { level: 'Fair',   color: '#f59e0b',               width: '50%' };
   if (passed === 4) return { level: 'Good',   color: '#84cc16',               width: '75%' };
   return             { level: 'Strong', color: 'var(--status-success)',  width: '100%' };
@@ -159,7 +159,7 @@ const Signup = () => {
           <label htmlFor="name" style={labelStyle}>Full Name</label>
           <input id="name" name="name" type="text" placeholder="John Doe" required value={formData.name} onChange={handleChange}
             style={{ ...inputStyle, borderColor: validationErrors.name ? 'var(--status-danger)' : 'var(--border-subtle)' }} />
-          {validationErrors.name && <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>{validationErrors.name}</div>}
+          {validationErrors.name && <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger-text, var(--status-danger))' }}>{validationErrors.name}</div>}
         </div>
 
         {/* Email */}
@@ -167,7 +167,7 @@ const Signup = () => {
           <label htmlFor="email" style={labelStyle}>Email</label>
           <input id="email" name="email" type="email" placeholder="name@example.com" required value={formData.email} onChange={handleChange}
             style={{ ...inputStyle, borderColor: validationErrors.email ? 'var(--status-danger)' : 'var(--border-subtle)' }} />
-          {validationErrors.email && <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>{validationErrors.email}</div>}
+          {validationErrors.email && <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger-text, var(--status-danger))' }}>{validationErrors.email}</div>}
         </div>
 
         {/* Password */}
@@ -199,7 +199,7 @@ const Signup = () => {
               </div>
             </div>
           )}
-          {validationErrors.password && <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>{validationErrors.password}</div>}
+          {validationErrors.password && <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger-text, var(--status-danger))' }}>{validationErrors.password}</div>}
         </div>
 
         {/* Confirm Password */}
@@ -213,11 +213,11 @@ const Signup = () => {
               {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
-          {validationErrors.confirmPassword && <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>{validationErrors.confirmPassword}</div>}
+          {validationErrors.confirmPassword && <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger-text, var(--status-danger))' }}>{validationErrors.confirmPassword}</div>}
         </div>
 
         {error && (
-          <div style={{ padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 2, color: 'var(--status-danger)', fontSize: 12 }}>
+          <div style={{ padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 2, color: 'var(--status-danger-text, var(--status-danger))', fontSize: 12 }}>
             {error}
           </div>
         )}

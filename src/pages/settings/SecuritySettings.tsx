@@ -53,7 +53,7 @@ const inputStyle: React.CSSProperties = {
 
 const dangerBtnStyle: React.CSSProperties = {
   background: 'none', border: '1px solid var(--status-danger)',
-  color: 'var(--status-danger)', padding: '8px 12px',
+  color: 'var(--status-danger-text, var(--status-danger))', padding: '8px 12px',
   fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
   borderRadius: 6, minHeight: 40,
 };
@@ -62,9 +62,9 @@ const dangerBtnStyle: React.CSSProperties = {
 const ACTIVITY_META: Record<string, { label: string; color: string }> = {
   login: { label: 'Signed in', color: 'var(--status-success)' },
   logout: { label: 'Signed out', color: 'var(--text-tertiary)' },
-  revoked: { label: 'Session revoked', color: 'var(--status-danger)' },
-  revoked_others: { label: 'Other sessions revoked', color: 'var(--status-danger)' },
-  revoked_all: { label: 'All sessions revoked', color: 'var(--status-danger)' },
+  revoked: { label: 'Session revoked', color: 'var(--status-danger-text, var(--status-danger))' },
+  revoked_others: { label: 'Other sessions revoked', color: 'var(--status-danger-text, var(--status-danger))' },
+  revoked_all: { label: 'All sessions revoked', color: 'var(--status-danger-text, var(--status-danger))' },
 };
 
 interface ToggleRowProps {
@@ -306,9 +306,9 @@ export function SecuritySettings() {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>
           Security settings
-        </h2>
+        </h1>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
           Manage your account security and authentication methods
         </div>
@@ -463,7 +463,7 @@ export function SecuritySettings() {
       {/* Danger Zone */}
       <div style={{ ...sectionStyle, borderColor: 'var(--status-danger)' }}>
         <div style={sectionHeaderStyle}>
-          <h3 style={{ ...sectionTitleStyle, color: 'var(--status-danger)' }}>Danger zone</h3>
+          <h3 style={{ ...sectionTitleStyle, color: 'var(--status-danger-text, var(--status-danger))' }}>Danger zone</h3>
         </div>
         <div style={{
           padding: '16px 20px', display: 'flex', alignItems: 'center',
@@ -537,7 +537,7 @@ export function SecuritySettings() {
               placeholder="Your current password"
             />
             {deleteError && (
-              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger)', marginBottom: 12 }}>{deleteError}</div>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 12 }}>{deleteError}</div>
             )}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: deleteError ? 4 : 20 }}>
               <button

@@ -120,7 +120,9 @@ export default function Settings() {
                     lineHeight: '20px',
                     letterSpacing: 'normal',
                     textDecoration: 'none',
-                    color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                    /* accent-primary on the tinted active row measures 4.2:1
+                       in light — the info text role passes on that surface. */
+                    color: active ? 'var(--status-info-text, var(--accent-primary))' : 'var(--text-secondary)',
                     background: active ? 'rgba(var(--accent-primary-rgb, 37,99,235), 0.08)' : 'transparent',
                     borderLeft: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
                     transition: 'color 0.15s, background 0.15s',
@@ -158,7 +160,7 @@ export default function Settings() {
                 lineHeight: '20px',
                 letterSpacing: 'normal',
                 textDecoration: 'none',
-                color: 'var(--status-warning)',
+                color: 'var(--status-warning-text, var(--status-warning))',
               }}
             >
               Admin dashboard

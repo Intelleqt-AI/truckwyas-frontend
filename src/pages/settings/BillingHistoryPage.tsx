@@ -158,7 +158,7 @@ export default function BillingHistoryPage() {
       </button>
 
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Billing history</h2>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Billing history</h1>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
           Every charge to your card on file — the monthly plan and the per-delivery platform fee
         </div>

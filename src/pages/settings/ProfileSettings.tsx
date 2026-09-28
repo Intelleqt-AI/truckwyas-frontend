@@ -163,8 +163,8 @@ export function ProfileSettings() {
               width: 52, height: 52, borderRadius: '50%',
               background: 'var(--accent-dim)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 600,
-              color: 'var(--accent-primary)', flexShrink: 0,
+              fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 600,
+              color: 'var(--avatar-on-dim, var(--accent-primary))', flexShrink: 0,
             }}>
               {(form.first_name[0] || '') + (form.last_name[0] || '') || 'AU'}
             </div>

@@ -93,7 +93,7 @@ export function BulkDeleteBar({ entity, selected, onClear, onDeleted }: Props) {
             onClick={() => setConfirming(true)}
             style={{
               ...secondaryButtonStyle,
-              borderColor: 'var(--status-danger)', color: 'var(--status-danger)',
+              borderColor: 'var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))',
             }}
           >Delete</button>
           <button

@@ -7,8 +7,8 @@ import { Loader } from "@/components/Loader";
 const TIER_META: Record<string, { color: string; label: string; feeRange: string; desc: string }> = {
   PRIME:    { color: 'var(--accent-primary)',   label: 'Prime',    feeRange: '1.5%–2.0%', desc: 'Low-risk customer with strong payment history.' },
   STANDARD: { color: 'var(--status-success)',   label: 'Standard', feeRange: '2.0%–2.75%', desc: 'Normal risk — reliable customer, acceptable DSO.' },
-  ELEVATED: { color: 'var(--status-warning)',   label: 'Elevated', feeRange: '2.75%–3.5%', desc: 'Moderate risk — slower payer or older invoice.' },
-  HIGH:     { color: 'var(--status-danger)',    label: 'High',     feeRange: '3.5%–4.5%', desc: 'Higher risk — late payment history or high DSO.' },
+  ELEVATED: { color: 'var(--status-warning-text, var(--status-warning))',   label: 'Elevated', feeRange: '2.75%–3.5%', desc: 'Moderate risk — slower payer or older invoice.' },
+  HIGH:     { color: 'var(--status-danger-text, var(--status-danger))',    label: 'High',     feeRange: '3.5%–4.5%', desc: 'Higher risk — late payment history or high DSO.' },
 };
 
 // Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
@@ -64,7 +64,7 @@ export default function AdvanceDetail() {
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Advance Detail</div>
         </div>
         <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-          <div style={{ color: 'var(--status-danger)', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>{error || 'Advance not found'}</div>
+          <div style={{ color: 'var(--status-danger-text, var(--status-danger))', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>{error || 'Advance not found'}</div>
           <button
             className="btn-action"
             style={{ padding: '8px 16px', background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, marginTop: 12 }}
@@ -154,7 +154,7 @@ export default function AdvanceDetail() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Fee ({feePercent.toFixed(1)}%)</span>
-                <span style={{ fontSize: 16, fontFamily: 'var(--font-mono)', color: 'var(--status-danger)' }}>-{formatCurrency(feeAmount)}</span>
+                <span style={{ fontSize: 16, fontFamily: 'var(--font-mono)', color: 'var(--status-danger-text, var(--status-danger))' }}>-{formatCurrency(feeAmount)}</span>
               </div>
               <div style={{ height: 1, background: 'var(--border-subtle)' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -260,7 +260,7 @@ export default function AdvanceDetail() {
               <div style={{ height: 1, background: 'var(--border-subtle)' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Total Fee</span>
-                <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--status-danger)' }}>{formatCurrency(feeAmount)}</span>
+                <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--status-danger-text, var(--status-danger))' }}>{formatCurrency(feeAmount)}</span>
               </div>
             </div>
           </div>

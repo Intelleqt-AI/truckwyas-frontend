@@ -8,8 +8,8 @@ export function LiveBadge({ label = 'Live' }: { label?: string }) {
       title="This screen refreshes automatically"
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
-        fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em',
-        textTransform: 'uppercase', color: 'var(--status-success-text, var(--status-success))',
+        fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px', letterSpacing: 'normal',
+        fontWeight: 500, color: 'var(--status-success-text, var(--status-success))',
         padding: '3px 8px', borderRadius: 999,
         background: 'var(--status-success-bg, var(--bg-surface))',
         border: '1px solid var(--border-subtle)',

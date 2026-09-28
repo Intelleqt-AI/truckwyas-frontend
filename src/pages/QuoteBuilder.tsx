@@ -139,7 +139,7 @@ function SortableStopRow({ stop, index, inputStyle, onLocationChange, onRemove }
           width: 20, height: 20, marginTop: 6, borderRadius: "50%",
           display: "flex", alignItems: "center", justifyContent: "center", border: "none",
           background: hoverRemove ? "var(--status-danger-bg)" : "transparent",
-          color: "var(--status-danger)", cursor: "pointer", flexShrink: 0,
+          color: "var(--status-danger-text, var(--status-danger))", cursor: "pointer", flexShrink: 0,
           transition: "background 120ms ease",
         }}>
         <X size={14} />
@@ -1460,7 +1460,7 @@ export default function QuoteBuilder() {
                 padding: 14, marginBottom: ready ? 14 : 0, borderRadius: 6,
                 background: "var(--status-danger-bg)", border: "1px solid var(--status-danger)",
               }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--status-danger)", marginBottom: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--status-danger-text, var(--status-danger))", marginBottom: 4 }}>
                   Quoting is blocked
                 </div>
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", marginBottom: 10 }}>
@@ -1482,19 +1482,19 @@ export default function QuoteBuilder() {
             )}
             {!billingBlocked && ready && isDemoQuotaExceeded && (
               <div style={{ padding: "20px 4px" }}>
-                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Demo quota reached</div>
+                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-danger-text, var(--status-danger))", fontWeight: 600, marginBottom: 6 }}>Demo quota reached</div>
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)" }}>You've used this demo session's one free quote. Log out and log back in (or click &quot;View Demo&quot; again) to start a fresh session.</div>
               </div>
             )}
             {!billingBlocked && ready && !isDemoQuotaExceeded && routeBlockedMessage && (
               <div style={{ padding: "20px 4px" }}>
-                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Route not allowed</div>
+                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-danger-text, var(--status-danger))", fontWeight: 600, marginBottom: 6 }}>Route not allowed</div>
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)" }}>{routeBlockedMessage}</div>
               </div>
             )}
             {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && weightBlockedMessage && (
               <div style={{ padding: "20px 4px" }}>
-                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Overloaded for this vehicle</div>
+                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-danger-text, var(--status-danger))", fontWeight: 600, marginBottom: 6 }}>Overloaded for this vehicle</div>
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)" }}>{weightBlockedMessage}</div>
               </div>
             )}

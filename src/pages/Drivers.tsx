@@ -57,7 +57,7 @@ interface LeaderboardEntry {
 const STATUS_COLOR: Record<string, string> = {
   ACTIVE: 'var(--accent-primary)',
   INACTIVE: 'var(--text-tertiary)',
-  ON_LEAVE: 'var(--status-warning)',
+  ON_LEAVE: 'var(--status-warning-text, var(--status-warning))',
 };
 
 const formatZAR = (v: number) =>
@@ -201,7 +201,7 @@ export default function Drivers() {
 
   const rankColor = (rank: number) => {
     if (rank === 1) return 'var(--accent-primary)';
-    if (rank === 2) return 'var(--status-warning)';
+    if (rank === 2) return 'var(--status-warning-text, var(--status-warning))';
     return 'var(--text-secondary)';
   };
 
@@ -459,7 +459,7 @@ export default function Drivers() {
                         }}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
+                        style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
                       >Delete</button>
                     </div>
                   </td>
@@ -476,7 +476,7 @@ export default function Drivers() {
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setShowAddForm(false)} />
           <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Add Driver</div>
+              <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Add driver</h2>
               <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {/* Required fields first (Name through License Province), optional
@@ -490,7 +490,7 @@ export default function Drivers() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
                 </label>
                 {f.type === 'date' ? (
                   <DatePicker
@@ -503,7 +503,7 @@ export default function Drivers() {
                     placeholder={f.placeholder}
                     value={(addForm as any)[f.key]}
                     onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 6, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
                   />
                 )}
               </div>
@@ -513,7 +513,7 @@ export default function Drivers() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
                 </label>
                 <Select value={(addForm as any)[f.key]} onValueChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}>
                   <SelectTrigger>
@@ -538,7 +538,7 @@ export default function Drivers() {
                   placeholder={f.placeholder}
                   value={(addForm as any)[f.key]}
                   onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 6, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
                 />
               </div>
             ))}
@@ -597,13 +597,13 @@ export default function Drivers() {
                   } catch (e: any) { toast.error(e?.message || 'Failed to create driver'); }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : canCreate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canCreate ? 1 : 0.5 }}
+                style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6, cursor: saving ? 'wait' : canCreate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canCreate ? 1 : 0.5 }}
               >
                 {saving ? 'Saving…' : 'Create driver'}
               </button>
               <button
                 onClick={() => setShowAddForm(false)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+                style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer' }}
               >
                 Cancel
               </button>
@@ -620,11 +620,11 @@ export default function Drivers() {
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditDriver(null)} />
           <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Driver</div>
+              <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit driver</h2>
               <button onClick={() => setEditDriver(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {error && (
-              <div style={{ padding: 12, background: 'var(--status-danger)', color: 'var(--bg-deep)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
+              <div style={{ padding: 12, background: 'var(--status-danger-bg)', color: 'var(--status-danger-text, var(--status-danger))', border: '1px solid var(--status-danger)', borderRadius: 6, marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
                 {error}
               </div>
             )}
@@ -639,7 +639,7 @@ export default function Drivers() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
                 </label>
                 {f.type === 'date' ? (
                   <DatePicker
@@ -652,7 +652,7 @@ export default function Drivers() {
                     placeholder={f.placeholder}
                     value={(editForm as any)[f.key] ?? ''}
                     onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 6, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
                   />
                 )}
               </div>
@@ -662,7 +662,7 @@ export default function Drivers() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
                 </label>
                 <Select value={(editForm as any)[f.key]} onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}>
                   <SelectTrigger>
@@ -696,7 +696,7 @@ export default function Drivers() {
                     placeholder={f.placeholder}
                     value={(editForm as any)[f.key] ?? ''}
                     onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 6, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
                   />
                 )}
               </div>
@@ -775,13 +775,13 @@ export default function Drivers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : canUpdate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canUpdate ? 1 : 0.5 }}
+                style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6, cursor: saving ? 'wait' : canUpdate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canUpdate ? 1 : 0.5 }}
               >
                 {saving ? 'Saving…' : 'Update driver'}
               </button>
               <button
                 onClick={() => setEditDriver(null)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+                style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer' }}
               >
                 Cancel
               </button>

@@ -212,7 +212,7 @@ export default function VehicleTypesPanel() {
           display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12,
         }}>
           {formErr && (
-            <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', borderRadius: 2, fontSize: 12 }}>
+            <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 2, fontSize: 12 }}>
               {formErr}
             </div>
           )}
@@ -260,7 +260,7 @@ export default function VehicleTypesPanel() {
                         {t.active ? 'Deactivate' : 'Activate'}
                       </button>
                       <button
-                        style={{ ...secondaryBtnStyle, color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
+                        style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }}
                         disabled={pending === t.id}
                         onClick={() => setDeleteTarget(t)}
                       >
@@ -287,7 +287,7 @@ export default function VehicleTypesPanel() {
               <button onClick={() => setEditTarget(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {formErr && (
-              <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', borderRadius: 8, marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
+              <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 8, marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
                 {formErr}
               </div>
             )}

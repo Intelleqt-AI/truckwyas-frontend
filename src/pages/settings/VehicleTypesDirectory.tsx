@@ -70,7 +70,7 @@ const drawerSecondaryBtnStyle: React.CSSProperties = {
 
 const drawerErrorStyle: React.CSSProperties = {
   padding: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)',
-  color: 'var(--status-danger)', borderRadius: 8, marginBottom: 16, fontSize: 13, lineHeight: '20px',
+  color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 8, marginBottom: 16, fontSize: 13, lineHeight: '20px',
 };
 
 export function VehicleTypesDirectory() {
@@ -208,7 +208,7 @@ export function VehicleTypesDirectory() {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Vehicle types</h2>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Vehicle types</h1>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Configure vehicle categories and rate settings</div>
       </div>
 
@@ -354,7 +354,7 @@ export function VehicleTypesDirectory() {
                         title={isDemo ? 'Not available in the demo' : (isShared ? badgeTitle : undefined)}
                         style={{
                           ...rowActionStyle,
-                          border: '1px solid var(--status-danger)', color: 'var(--status-danger)',
+                          border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))',
                           cursor: deleteDisabled ? 'not-allowed' : 'pointer', opacity: deleteDisabled ? 0.5 : 1,
                         }}
                       >{isOverride ? 'Reset' : 'Delete'}</button>
@@ -426,7 +426,7 @@ export function VehicleTypesDirectory() {
             ] as const).map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
                 </label>
                 <input
                   className="settings-control"

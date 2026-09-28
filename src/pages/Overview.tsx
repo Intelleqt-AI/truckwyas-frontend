@@ -258,6 +258,26 @@ export default function Overview() {
         gap: 16,
         alignContent: "start",
       }}>
+      {/* One semantic H1 per screen. The dashboard deliberately leads with the
+          clock/command bar instead of a visible title, so the heading is
+          visually hidden but still announced to assistive technology. */}
+      <h1
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          margin: -1,
+          padding: 0,
+          overflow: "hidden",
+          clip: "rect(0 0 0 0)",
+          whiteSpace: "nowrap",
+          border: 0,
+          fontSize: 22,
+          lineHeight: "28px",
+          fontWeight: 600,
+        }}>
+        Dashboard
+      </h1>
       {/* Command bar — compact clock + actionable live pulse */}
       <div
           className="card"
@@ -354,7 +374,7 @@ export default function Overview() {
                       fontWeight: 700,
                       fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
                       color: s.warn
-                        ? "var(--status-warning)"
+                        ? "var(--status-warning-text, var(--status-warning))"
                         : "var(--text-primary)",
                     }}>
                     {s.value}
@@ -373,7 +393,7 @@ export default function Overview() {
           className="card"
           style={{
             gridColumn: "span 3",
-            padding: "14px 20px",
+            padding: "16px 20px",
           }}>
           <div
             style={{
@@ -577,7 +597,7 @@ export default function Overview() {
           </div>
           <div
             className="metric-value dashboard-kpi-value"
-            style={{ color: "var(--status-warning)" }}>
+            style={{ color: "var(--status-warning-text, var(--status-warning))" }}>
             {loading
               ? "..."
               : formatCurrency(financeData?.outstanding_invoices_total || 0)}
@@ -722,7 +742,7 @@ export default function Overview() {
             </span>
             <span>
               Fuel/Rev ratio{" "}
-              <span style={{ color: "var(--status-warning)" }}>
+              <span style={{ color: "var(--status-warning-text, var(--status-warning))" }}>
                 {financeData?.monthly_trend?.length > 0
                   ? `${Math.round(((financeData.monthly_trend.at(-1)?.expenses || 0) / Math.max(financeData.monthly_trend.at(-1)?.revenue || 1, 1)) * 100)}%`
                   : "—"}
@@ -817,9 +837,11 @@ export default function Overview() {
                 background: "transparent",
                 border: "1px solid var(--border-subtle)",
                 color: "var(--text-secondary)",
-                padding: "4px 8px",
-                fontSize: 13, lineHeight: "20px",
-                borderRadius: 2,
+                padding: "8px 16px",
+                minHeight: 40,
+                fontSize: 14, lineHeight: "20px",
+                fontFamily: "var(--font-sans)",
+                borderRadius: 6,
                 cursor: "pointer",
               }}>
               View all
@@ -873,7 +895,7 @@ export default function Overview() {
                             quote.status === "ACCEPTED"
                               ? "var(--status-success)"
                               : quote.status === "SENT"
-                                ? "var(--status-warning)"
+                                ? "var(--status-warning-text, var(--status-warning))"
                                 : "var(--text-tertiary)",
                           padding: "2px 6px",
                           background: "var(--bg-surface-hover)",
@@ -910,9 +932,11 @@ export default function Overview() {
                 background: "transparent",
                 border: "1px solid var(--border-subtle)",
                 color: "var(--text-secondary)",
-                padding: "4px 8px",
-                fontSize: 13, lineHeight: "20px",
-                borderRadius: 2,
+                padding: "8px 16px",
+                minHeight: 40,
+                fontSize: 14, lineHeight: "20px",
+                fontFamily: "var(--font-sans)",
+                borderRadius: 6,
                 cursor: "pointer",
               }}>
               View all

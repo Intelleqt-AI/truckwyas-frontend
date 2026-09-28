@@ -267,7 +267,7 @@ export default function AdvanceRequest() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Fee ({(feeRate * 100).toFixed(1)}%)</span>
-              <span style={{ fontSize: 16, lineHeight: '24px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', color: 'var(--status-danger)' }}>-{formatCurrency(feeAmount)}</span>
+              <span style={{ fontSize: 16, lineHeight: '24px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', color: 'var(--status-danger-text, var(--status-danger))' }}>-{formatCurrency(feeAmount)}</span>
             </div>
             <div style={{ height: 1, background: 'var(--border-subtle)' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

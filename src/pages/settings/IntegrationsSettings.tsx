@@ -433,9 +433,9 @@ export function IntegrationsSettings() {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>
           Integrations
-        </h2>
+        </h1>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
           Connect TruckWys to your existing tools
         </div>
@@ -926,7 +926,7 @@ export function IntegrationsSettings() {
                   title={isDemo ? 'Not available in the demo' : undefined}
                   className="settings-control"
                   style={{
-                    ...secondaryBtnStyle, border: '1px solid var(--status-danger)', color: 'var(--status-danger)',
+                    ...secondaryBtnStyle, border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))',
                     cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                   }}>
                   Revoke
@@ -1047,7 +1047,7 @@ export function IntegrationsSettings() {
                   title={isDemo ? 'Not available in the demo' : undefined}
                   className="settings-control"
                   style={{
-                    ...secondaryBtnStyle, border: '1px solid var(--status-danger)', color: 'var(--status-danger)',
+                    ...secondaryBtnStyle, border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))',
                     cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                   }}>
                   Delete

@@ -252,7 +252,7 @@ export default function CrossBorderRatesPanel() {
 
         {showAddFee && (
           <div style={{ padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))', border: '1px solid var(--border-subtle)', borderRadius: 2, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-            {feeErr && <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', borderRadius: 2, fontSize: 12 }}>{feeErr}</div>}
+            {feeErr && <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 2, fontSize: 12 }}>{feeErr}</div>}
             <div><label style={labelStyle}>From Country</label><input style={inputStyle} value={feeForm.from_country} onChange={e => setFeeForm(p => ({ ...p, from_country: e.target.value.toUpperCase() }))} placeholder="SA" /></div>
             <div><label style={labelStyle}>To Country</label><input style={inputStyle} value={feeForm.to_country} onChange={e => setFeeForm(p => ({ ...p, to_country: e.target.value.toUpperCase() }))} placeholder="ZW" /></div>
             <div><label style={labelStyle}>Fee (R)</label><input type="number" style={inputStyle} value={feeForm.fee_zar} onChange={e => setFeeForm(p => ({ ...p, fee_zar: e.target.value }))} /></div>
@@ -277,7 +277,7 @@ export default function CrossBorderRatesPanel() {
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <button style={secondaryBtnStyle} disabled={feePending === f.id} onClick={() => openEditFee(f)}>Edit</button>
                         <button style={secondaryBtnStyle} disabled={feePending === f.id} onClick={() => toggleFeeActive(f)}>{f.is_active ? 'Deactivate' : 'Activate'}</button>
-                        <button style={{ ...secondaryBtnStyle, color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }} disabled={feePending === f.id} onClick={() => setDeleteFee(f)}>Delete</button>
+                        <button style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }} disabled={feePending === f.id} onClick={() => setDeleteFee(f)}>Delete</button>
                       </div>
                     </td>
                   </tr>
@@ -302,7 +302,7 @@ export default function CrossBorderRatesPanel() {
 
         {showAddRate && (
           <div style={{ padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))', border: '1px solid var(--border-subtle)', borderRadius: 2, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-            {rateErr && <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', borderRadius: 2, fontSize: 12 }}>{rateErr}</div>}
+            {rateErr && <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 2, fontSize: 12 }}>{rateErr}</div>}
             <div><label style={labelStyle}>Country Code</label><input style={inputStyle} value={rateForm.country_code} onChange={e => setRateForm(p => ({ ...p, country_code: e.target.value.toUpperCase() }))} placeholder="ZW" /></div>
             <div><label style={labelStyle}>Country Name</label><input style={inputStyle} value={rateForm.country_name} onChange={e => setRateForm(p => ({ ...p, country_name: e.target.value }))} placeholder="Zimbabwe" /></div>
             <div><label style={labelStyle}>Weighbridge (R)</label><input type="number" style={inputStyle} value={rateForm.weighbridge_fee_zar} onChange={e => setRateForm(p => ({ ...p, weighbridge_fee_zar: e.target.value }))} /></div>
@@ -328,7 +328,7 @@ export default function CrossBorderRatesPanel() {
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <button style={secondaryBtnStyle} disabled={ratePending === r.id} onClick={() => openEditRate(r)}>Edit</button>
                         <button style={secondaryBtnStyle} disabled={ratePending === r.id} onClick={() => toggleRateActive(r)}>{r.is_active ? 'Deactivate' : 'Activate'}</button>
-                        <button style={{ ...secondaryBtnStyle, color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }} disabled={ratePending === r.id} onClick={() => setDeleteRate(r)}>Delete</button>
+                        <button style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }} disabled={ratePending === r.id} onClick={() => setDeleteRate(r)}>Delete</button>
                       </div>
                     </td>
                   </tr>
@@ -348,7 +348,7 @@ export default function CrossBorderRatesPanel() {
               <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit {editFee.from_country} → {editFee.to_country} Fee</div>
               <button onClick={() => setEditFee(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
-            {feeErr && <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>{feeErr}</div>}
+            {feeErr && <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>{feeErr}</div>}
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Fee (R)</label><input type="number" style={inputStyle} value={editFeeForm.fee_zar} onChange={e => setEditFeeForm(p => ({ ...p, fee_zar: e.target.value }))} /></div>
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Notes</label><input style={inputStyle} value={editFeeForm.notes} onChange={e => setEditFeeForm(p => ({ ...p, notes: e.target.value }))} /></div>
             <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
@@ -367,7 +367,7 @@ export default function CrossBorderRatesPanel() {
               <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit {editRate.country_name}</div>
               <button onClick={() => setEditRate(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
-            {rateErr && <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>{rateErr}</div>}
+            {rateErr && <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>{rateErr}</div>}
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Country Name</label><input style={inputStyle} value={editRateForm.country_name} onChange={e => setEditRateForm(p => ({ ...p, country_name: e.target.value }))} /></div>
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Weighbridge (R)</label><input type="number" style={inputStyle} value={editRateForm.weighbridge_fee_zar} onChange={e => setEditRateForm(p => ({ ...p, weighbridge_fee_zar: e.target.value }))} /></div>
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Toll Rate (R/km)</label><input type="number" style={inputStyle} value={editRateForm.toll_rate_per_km} onChange={e => setEditRateForm(p => ({ ...p, toll_rate_per_km: e.target.value }))} /></div>

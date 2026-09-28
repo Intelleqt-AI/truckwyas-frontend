@@ -106,6 +106,7 @@
   min-height: 44px;
   border: 0;
   border-radius: 6px;
+  font: 400 14px/20px var(--font-sans);
   background: transparent;
   padding: 8px;
   flex-shrink: 0;
@@ -135,6 +136,9 @@
 }
 .insights-lanes-table td {
   font: 400 14px/20px var(--font-sans);
+  /* The `font` shorthand resets font-variant-numeric — restore tabular
+     figures so money columns keep their digit alignment. */
+  font-variant-numeric: tabular-nums;
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-row);
 }

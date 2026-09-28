@@ -1993,7 +1993,7 @@ export default function NewQuote() {
                     background: "var(--bg-surface)",
                     border: "1px solid var(--status-danger)",
                     borderRadius: 2,
-                    color: "var(--status-danger)",
+                    color: "var(--status-danger-text, var(--status-danger))",
                     fontSize: 12,
                     marginBottom: 16,
                   }}>
@@ -2207,7 +2207,7 @@ export default function NewQuote() {
                               border: "1px solid var(--status-warning)",
                               borderRadius: 2,
                               fontSize: 9,
-                              color: "var(--status-warning)",
+                              color: "var(--status-warning-text, var(--status-warning))",
                               fontWeight: 600,
                               fontFamily: "var(--font-mono)",
                             }}>
@@ -2234,7 +2234,7 @@ export default function NewQuote() {
                               fontSize: 13,
                               fontWeight: 700,
                               fontFamily: "var(--font-mono)",
-                              color: "var(--status-warning)",
+                              color: "var(--status-warning-text, var(--status-warning))",
                             }}>
                             +R {Math.round(totalAdditional).toLocaleString()}
                           </span>
@@ -2249,7 +2249,7 @@ export default function NewQuote() {
                                 height: 18,
                                 borderRadius: "50%",
                                 border: "1.5px solid var(--status-warning)",
-                                color: "var(--status-warning)",
+                                color: "var(--status-warning-text, var(--status-warning))",
                                 fontSize: 10,
                                 fontWeight: 700,
                                 fontFamily: "var(--font-mono)",
@@ -2561,7 +2561,7 @@ export default function NewQuote() {
                                               gap: 6,
                                               fontSize: 11,
                                               fontFamily: "var(--font-sans)",
-                                              color: "var(--status-warning)",
+                                              color: "var(--status-warning-text, var(--status-warning))",
                                             }}>
                                             <span style={{ flexShrink: 0 }}>
                                               <AlertTriangle size={12} />
@@ -2616,7 +2616,7 @@ export default function NewQuote() {
                             <span
                               style={{
                                 fontFamily: "var(--font-mono)",
-                                color: "var(--status-warning)",
+                                color: "var(--status-warning-text, var(--status-warning))",
                                 fontWeight: 600,
                               }}>
                               R{" "}
@@ -2657,7 +2657,7 @@ export default function NewQuote() {
                             <span
                               style={{
                                 fontFamily: "var(--font-mono)",
-                                color: "var(--status-warning)",
+                                color: "var(--status-warning-text, var(--status-warning))",
                                 fontWeight: 600,
                               }}>
                               R{" "}
@@ -2698,7 +2698,7 @@ export default function NewQuote() {
                             <span
                               style={{
                                 fontFamily: "var(--font-mono)",
-                                color: "var(--status-warning)",
+                                color: "var(--status-warning-text, var(--status-warning))",
                                 fontWeight: 600,
                               }}>
                               R{" "}
@@ -3184,7 +3184,7 @@ export default function NewQuote() {
                                         <div
                                           style={{
                                             fontSize: 9,
-                                            color: "var(--status-warning)",
+                                            color: "var(--status-warning-text, var(--status-warning))",
                                             fontFamily: "var(--font-mono)",
                                           }}>
                                           +
@@ -3223,7 +3223,7 @@ export default function NewQuote() {
                                           style={{
                                             fontSize: 12,
                                             fontWeight: 700,
-                                            color: "var(--status-warning)",
+                                            color: "var(--status-warning-text, var(--status-warning))",
                                             fontFamily: "var(--font-mono)",
                                             marginBottom: 4,
                                           }}>
@@ -3536,12 +3536,12 @@ export default function NewQuote() {
                                     ? {
                                         label: `${weightTons}t load`,
                                         note: actualRate != null ? `${actualRate.toFixed(1)} L/100km` : "Heavy — ~38–45 L/100km",
-                                        color: "var(--status-warning)",
+                                        color: "var(--status-warning-text, var(--status-warning))",
                                       }
                                     : {
                                         label: `${weightTons}t load`,
                                         note: actualRate != null ? `${actualRate.toFixed(1)} L/100km` : "Very heavy — ~45–55 L/100km",
-                                        color: "var(--status-danger)",
+                                        color: "var(--status-danger-text, var(--status-danger))",
                                       };
 
                           // Terrain impact hints
@@ -4447,7 +4447,7 @@ export default function NewQuote() {
                         </div>
                       )}
                       {(analysis.fuel_analysis.stale_warning || analysis.fuel_analysis.price_note) && (
-                        <div style={{ fontSize: 11, color: "var(--status-warning)" }}>{analysis.fuel_analysis.stale_warning || analysis.fuel_analysis.price_note}</div>
+                        <div style={{ fontSize: 11, color: "var(--status-warning-text, var(--status-warning))" }}>{analysis.fuel_analysis.stale_warning || analysis.fuel_analysis.price_note}</div>
                       )}
                     </div>
                   )}
@@ -5032,7 +5032,7 @@ export default function NewQuote() {
                   <span
                     style={{
                       fontWeight: 600,
-                      color: "var(--status-warning)",
+                      color: "var(--status-warning-text, var(--status-warning))",
                     }}>
                     R {Math.round(_weightSurcharge).toLocaleString()}
                   </span>
@@ -5051,7 +5051,7 @@ export default function NewQuote() {
                   <span
                     style={{
                       fontWeight: 600,
-                      color: "var(--status-warning)",
+                      color: "var(--status-warning-text, var(--status-warning))",
                     }}>
                     R {Math.round(_additionalCosts).toLocaleString()}
                   </span>
@@ -5374,7 +5374,7 @@ export default function NewQuote() {
                 <div
                   style={{
                     fontSize: 10,
-                    color: "var(--status-warning)",
+                    color: "var(--status-warning-text, var(--status-warning))",
                     fontFamily: "var(--font-sans)",
                     marginBottom: 10,
                     padding: "8px",
@@ -5650,7 +5650,7 @@ export default function NewQuote() {
                 background: "var(--bg-surface)",
                 border: "1px solid var(--status-danger)",
                 borderRadius: 2,
-                color: "var(--status-danger)",
+                color: "var(--status-danger-text, var(--status-danger))",
                 fontSize: 12,
                 marginBottom: 16,
               }}>
@@ -5800,7 +5800,7 @@ export default function NewQuote() {
                   }}>
                   {f.label}
                   <span
-                    style={{ color: "var(--status-danger)", marginLeft: 2 }}>
+                    style={{ color: "var(--status-danger-text, var(--status-danger))", marginLeft: 2 }}>
                     *
                   </span>
                 </label>

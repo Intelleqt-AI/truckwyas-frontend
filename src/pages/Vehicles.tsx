@@ -101,7 +101,7 @@ const STATUS_COLOR: Record<string, string> = {
   ACTIVE: 'var(--status-success)',
   AVAILABLE: 'var(--status-success)',
   IN_USE: 'var(--status-success)',
-  MAINTENANCE: 'var(--status-warning)',
+  MAINTENANCE: 'var(--status-warning-text, var(--status-warning))',
   INACTIVE: 'var(--text-tertiary)',
   OUT_OF_SERVICE: 'var(--text-tertiary)',
 };
@@ -322,7 +322,7 @@ export default function Vehicles() {
         </div>
         <div className="card metric-card">
           <div className="card-header"><span className="card-title">In maintenance</span></div>
-          <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-warning)' }}>
+          <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-warning-text, var(--status-warning))' }}>
             {vehicles.filter(v => v.status === 'MAINTENANCE').length}
           </div>
         </div>
@@ -458,7 +458,7 @@ export default function Vehicles() {
                   )
                 ) : sorted.map((v, idx) => {
                   const utilizationPercent = ((v.total_trips || 0) / 20) * 100;
-                  const utilizationColor = utilizationPercent > 70 ? 'var(--status-success)' : utilizationPercent >= 40 ? 'var(--status-warning)' : 'var(--status-danger)';
+                  const utilizationColor = utilizationPercent > 70 ? 'var(--status-success)' : utilizationPercent >= 40 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))';
 
                   return (
                     <tr
@@ -545,7 +545,7 @@ export default function Vehicles() {
                             }}
                             disabled={isDemo}
                             title={isDemo ? 'Fixed in demo mode' : undefined}
-                            style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
+                            style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
                           >Delete</button>
                         </div>
                       </td>

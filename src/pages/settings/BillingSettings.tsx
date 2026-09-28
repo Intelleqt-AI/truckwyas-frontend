@@ -405,7 +405,7 @@ export function BillingSettings() {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Billing</h2>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Billing</h1>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Manage your subscription and payment history</div>
       </div>
 
@@ -444,13 +444,13 @@ export function BillingSettings() {
                   {isPaid && billingStatus?.cancel_at_period_end && (
                     <span style={{
                       ...planBadgeStyle,
-                      background: 'var(--status-warning-bg)', color: 'var(--status-warning)',
+                      background: 'var(--status-warning-bg)', color: 'var(--status-warning-text, var(--status-warning))',
                     }}>Cancelling</span>
                   )}
                   {subStatus === 'cancelled' && (
                     <span style={{
                       ...planBadgeStyle,
-                      background: 'var(--status-danger-bg)', color: 'var(--status-danger)',
+                      background: 'var(--status-danger-bg)', color: 'var(--status-danger-text, var(--status-danger))',
                     }}>Cancelled</span>
                   )}
                 </div>
@@ -532,7 +532,7 @@ export function BillingSettings() {
               <div style={{
                 marginBottom: 16, padding: 16,
                 background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)',
-                borderRadius: 8, fontSize: 14, lineHeight: '20px', color: 'var(--status-danger)',
+                borderRadius: 8, fontSize: 14, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))',
               }}>
                 <strong>Your account is suspended.</strong> You can still view existing data and manage
                 drivers/vehicles, but can't create quotes or invoices until you update your payment method.
@@ -548,7 +548,7 @@ export function BillingSettings() {
                 <div style={{ fontWeight: 600, marginBottom: 6 }}>
                   We couldn't charge your card
                 </div>
-                <div style={{ color: 'var(--status-warning)', fontWeight: 500 }}>
+                <div style={{ color: 'var(--status-warning-text, var(--status-warning))', fontWeight: 500 }}>
                   {grace.days_remaining > 0
                     ? `${grace.days_remaining} day${grace.days_remaining === 1 ? '' : 's'} left to resolve this before your account is suspended.`
                     : 'Grace period has ended — a successful charge is needed to avoid suspension.'}
@@ -579,7 +579,7 @@ export function BillingSettings() {
                         Failed {new Date(item.failed_at).toLocaleDateString('en-ZA')}
                       </div>
                     </div>
-                    <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--status-warning)' }}>{formatRand(item.amount)}</span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--status-warning-text, var(--status-warning))' }}>{formatRand(item.amount)}</span>
                   </div>
                 ))}
                 <div style={{
@@ -596,7 +596,7 @@ export function BillingSettings() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 {PLAN_FEATURES.map(f => (
                   <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                    <span style={{ color: 'var(--border-subtle)', fontSize: 14 }}>✓</span>
+                    <span style={{ color: 'var(--text-tertiary)', fontSize: 14 }} aria-hidden="true">✓</span>
                     {f}
                   </div>
                 ))}

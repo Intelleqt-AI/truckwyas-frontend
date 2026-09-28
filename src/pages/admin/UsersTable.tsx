@@ -278,7 +278,7 @@ export default function UsersTable() {
                   <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.55 }}>
                     <td style={tdStyle}>
                       {u.name || '—'}
-                      {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-warning)' }}>Superuser</span>}
+                      {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-warning-text, var(--status-warning))' }}>Superuser</span>}
                     </td>
                     <td style={tdStyle}>{u.email}</td>
                     <td style={tdStyle}>{u.company_name || '—'}</td>
@@ -313,7 +313,7 @@ export default function UsersTable() {
                         {u.is_active ? (
                           <button
                             className="admin-control"
-                            style={{ ...secondaryBtnStyle, color: 'var(--status-danger)' }}
+                            style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))' }}
                             disabled={!!rowPending}
                             onClick={() => setLockTarget(u)}
                           >
@@ -340,7 +340,7 @@ export default function UsersTable() {
                         {!u.is_superuser && (
                           <button
                             className="admin-control"
-                            style={{ ...secondaryBtnStyle, color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
+                            style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }}
                             disabled={!!rowPending}
                             onClick={() => setDeleteTarget(u)}
                           >

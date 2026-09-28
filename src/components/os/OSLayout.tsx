@@ -338,7 +338,9 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 14, lineHeight: '20px',
-                color: 'var(--accent-primary)',
+                /* accent-primary on accent-dim measures 4.1:1 in dark — the
+                   info text role passes on the same surface in both themes. */
+                color: 'var(--avatar-on-dim, var(--accent-primary))',
                 fontWeight: 500,
                 cursor: 'pointer',
               }}

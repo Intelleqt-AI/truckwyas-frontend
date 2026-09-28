@@ -26,14 +26,17 @@ interface Load {
   quote_number?: string;
 }
 
+/* Status text uses the tested -text roles: the raw amber swatch measures
+   2.2:1 on the light surface. (CANCELLED previously pointed at the
+   non-existent --status-error token and silently inherited.) */
 const STATUS_COLOR: Record<string, string> = {
   PENDING: 'var(--text-secondary)',
-  ASSIGNED: 'var(--status-warning)',
+  ASSIGNED: 'var(--status-warning-text, var(--status-warning))',
   IN_TRANSIT: 'var(--accent-primary)',
-  LOADING: 'var(--status-warning)',
+  LOADING: 'var(--status-warning-text, var(--status-warning))',
   DELIVERED: 'var(--status-success)',
   INVOICED: 'var(--accent-primary)',
-  CANCELLED: 'var(--status-error)',
+  CANCELLED: 'var(--status-danger-text, var(--status-danger))',
 };
 
 // Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
@@ -179,8 +182,8 @@ export default function LoadsList() {
                       background: 'transparent',
                       border: '1px solid var(--accent-primary)',
                       color: 'var(--accent-primary)',
-                      padding: '5px 12px', fontSize: 14, lineHeight: '20px', whiteSpace: 'nowrap',
-                      borderRadius: 4,
+                      padding: '5px 12px', minHeight: 40, fontSize: 14, lineHeight: '20px', whiteSpace: 'nowrap',
+                      borderRadius: 6,
                       cursor: convertingIds.has(load.id) ? 'not-allowed' : 'pointer',
                       opacity: convertingIds.has(load.id) ? 0.5 : 1,
                       transition: 'all 0.15s ease',
@@ -224,7 +227,7 @@ export default function LoadsList() {
   if (error) {
     return (
       <div style={{ padding: 40 }}>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger)', marginBottom: 4 }}>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 4 }}>
           Unable to reach the server.
         </div>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
@@ -249,7 +252,7 @@ export default function LoadsList() {
         <div>
           <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', marginBottom: 4 }}>Bookings</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)' }}>{TAB_SUBTITLES[activeTab]}</div>
+            <h1 style={{ margin: 0, fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)' }}>{TAB_SUBTITLES[activeTab]}</h1>
             <LiveBadge />
           </div>
         </div>
@@ -258,7 +261,7 @@ export default function LoadsList() {
             onClick={() => navigate('/bookings/quotes/new')}
             style={{
               background: 'var(--accent-primary)', border: 'none', color: 'var(--btn-action-color, #fff)',
-              padding: '8px 16px', fontSize: 14, lineHeight: '20px',
+              padding: '8px 16px', minHeight: 40, fontSize: 14, lineHeight: '20px',
               fontWeight: 500, borderRadius: 4, cursor: 'pointer',
             }}
           >+ New quote</button>
@@ -306,7 +309,7 @@ export default function LoadsList() {
               placeholder="Search loads, customers, routes..."
               value={quoteSearch}
               onChange={e => setQuoteSearch(e.target.value)}
-              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '6px 10px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 14, lineHeight: '20px', outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '6px 10px', minHeight: 40, color: 'var(--text-primary)', borderRadius: 6, fontSize: 14, lineHeight: '20px', outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
             />
             <div style={{ display: 'flex', gap: 4 }}>
               {(['board', 'list'] as const).map(v => (
@@ -315,7 +318,8 @@ export default function LoadsList() {
                   border: '1px solid var(--border-subtle)',
                   color: quoteView === v ? 'var(--bg-deep)' : 'var(--text-secondary)',
                   padding: '6px 12px',
-                  borderRadius: 2,
+                  minHeight: 40,
+                  borderRadius: 6,
                   fontSize: 14,
                   lineHeight: '20px',
                   fontFamily: 'var(--font-sans)',
@@ -344,7 +348,7 @@ export default function LoadsList() {
             {[
               { label: 'Active orders', value: activeLoads.length, color: 'var(--text-primary)' },
               { label: 'In transit', value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length, color: 'var(--accent-primary)' },
-              { label: 'Loading', value: activeLoads.filter(l => l.status === 'LOADING').length, color: 'var(--status-warning)' },
+              { label: 'Loading', value: activeLoads.filter(l => l.status === 'LOADING').length, color: 'var(--status-warning-text, var(--status-warning))' },
               { label: 'Revenue (active)', value: formatCurrency(activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--accent-primary)' },
             ].map(m => (
               <div key={m.label} className="card metric-card">
@@ -366,7 +370,7 @@ export default function LoadsList() {
                     background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
                     border: `1px solid ${isActive ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
                     color: isActive ? 'var(--btn-action-color, #fff)' : 'var(--text-secondary)',
-                    padding: '6px 12px', fontSize: 14, lineHeight: '20px', whiteSpace: 'nowrap',
+                    padding: '6px 12px', minHeight: 40, fontSize: 14, lineHeight: '20px', whiteSpace: 'nowrap',
                     borderRadius: 4, cursor: 'pointer',
                     fontWeight: isActive ? 500 : 400,
                     transition: 'all 0.2s ease'
@@ -407,7 +411,7 @@ export default function LoadsList() {
               value={historySearch} onChange={e => setHistorySearch(e.target.value)}
               style={{
                 background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                padding: '6px 10px', color: 'var(--text-primary)', borderRadius: 2,
+                padding: '6px 10px', minHeight: 40, color: 'var(--text-primary)', borderRadius: 6,
                 fontSize: 14, lineHeight: '20px', outline: 'none', width: 220, fontFamily: 'var(--font-sans)',
               }}
             />
@@ -422,8 +426,8 @@ export default function LoadsList() {
                       background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
                       border: '1px solid var(--border-subtle)',
                       color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                      padding: '6px 12px', fontFamily: 'var(--font-sans)', fontSize: 14,
-                      lineHeight: '20px', borderRadius: 2, cursor: 'pointer',
+                      padding: '6px 12px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14,
+                      lineHeight: '20px', borderRadius: 6, cursor: 'pointer',
                       fontWeight: isActive ? 600 : 400,
                       transition: 'all 0.2s ease'
                     }}

@@ -165,16 +165,16 @@ export function NotificationSettings() {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
-          Notification Settings
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+          Notifications
+        </h1>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
           Choose what you get notified about and how
         </div>
         {loadFailed && (
-          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--status-danger)' }}>
+          <div style={{ marginTop: 8, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
             Settings failed to load.{' '}
-            <button onClick={load} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: 0, fontSize: 12, textDecoration: 'underline' }}>
+            <button onClick={load} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: '20px', textDecoration: 'underline' }}>
               Retry
             </button>
           </div>

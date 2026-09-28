@@ -383,7 +383,7 @@ export default function InvoiceDetail() {
               {downloading ? 'Downloading...' : 'Download PDF'}
             </button>
             {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE') && (
-              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', fontWeight: 500, minHeight: 48, fontFamily: 'var(--font-sans)', letterSpacing: 0, background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={handleSendReminder} disabled={sendingReminder}>
+              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', fontWeight: 500, minHeight: 48, fontFamily: 'var(--font-sans)', letterSpacing: 0, background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning-text, var(--status-warning))' }} onClick={handleSendReminder} disabled={sendingReminder}>
                 {sendingReminder ? 'Sending...' : 'Send reminder'}
               </button>
             )}

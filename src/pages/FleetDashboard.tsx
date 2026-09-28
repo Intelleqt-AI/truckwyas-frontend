@@ -84,7 +84,7 @@ export default function FleetDashboard() {
         <div style={{ marginBottom: 24 }}>
           <h1 className="fleet-page-title">Fleet command</h1>
         </div>
-        <div className="card" style={{ padding: 20, color: 'var(--status-danger)', fontSize: 13, lineHeight: '20px' }}>
+        <div className="card" style={{ padding: 20, color: 'var(--status-danger-text, var(--status-danger))', fontSize: 13, lineHeight: '20px' }}>
           {error}
         </div>
       </div>
@@ -112,7 +112,7 @@ export default function FleetDashboard() {
           { label: 'Total vehicles', value: vehicles.length, color: 'var(--text-primary)' },
           { label: 'Active', value: activeVehicles, color: 'var(--accent-primary)' },
           { label: 'Idle', value: idleVehicles, color: 'var(--text-secondary)' },
-          { label: 'Maintenance', value: inMaintenance, color: 'var(--status-danger)' },
+          { label: 'Maintenance', value: inMaintenance, color: 'var(--status-danger-text, var(--status-danger))' },
           { label: 'Drivers on duty', value: activeDrivers, color: 'var(--status-success)' },
         ].map(m => (
           <div key={m.label} className="card metric-card">
@@ -150,7 +150,7 @@ export default function FleetDashboard() {
                   </td>
                   <td style={{ color: 'var(--text-secondary)' }}>{v.route || '—'}</td>
                   <td className="text-right">
-                    <span style={{ fontFamily: 'var(--font-mono)', color: v.fuel < 50 ? 'var(--status-danger)' : v.fuel < 70 ? 'var(--status-warning)' : 'var(--text-primary)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: v.fuel < 50 ? 'var(--status-danger-text, var(--status-danger))' : v.fuel < 70 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--text-primary)' }}>
                       {v.fuel !== undefined ? `${v.fuel}%` : '—'}
                     </span>
                   </td>
@@ -176,7 +176,7 @@ export default function FleetDashboard() {
                   <td>{(d.user_details ? `${d.user_details.first_name || ''} ${d.user_details.last_name || ''}`.trim() : '') || d.name || `Driver ${d.id}`}</td>
                   <td className="mono">{d.license_number || '—'}</td>
                   <td className="mono">{d.total_trips ?? '—'}</td>
-                  <td style={{ color: d.onTime >= 90 ? 'var(--accent-primary)' : d.onTime >= 80 ? 'var(--status-warning)' : 'var(--status-danger)', fontFamily: 'var(--font-mono)' }}>
+                  <td style={{ color: d.onTime >= 90 ? 'var(--accent-primary)' : d.onTime >= 80 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))', fontFamily: 'var(--font-mono)' }}>
                     {d.onTime !== undefined ? `${d.onTime}%` : '—'}
                   </td>
                   <td style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>

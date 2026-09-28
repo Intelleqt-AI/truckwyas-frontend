@@ -165,7 +165,7 @@ const Login = () => {
             }}
           />
           {validationErrors.username && (
-            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
+            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger-text, var(--status-danger))' }}>
               {validationErrors.username}
             </div>
           )}
@@ -209,7 +209,7 @@ const Login = () => {
             </button>
           </div>
           {validationErrors.password && (
-            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
+            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger-text, var(--status-danger))' }}>
               {validationErrors.password}
             </div>
           )}
@@ -221,7 +221,7 @@ const Login = () => {
             background: 'var(--status-danger-bg)',
             border: '1px solid var(--status-danger)',
             borderRadius: 2,
-            color: 'var(--status-danger)',
+            color: 'var(--status-danger-text, var(--status-danger))',
             fontSize: 12,
           }}>
             {error}

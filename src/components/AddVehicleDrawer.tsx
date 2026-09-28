@@ -26,28 +26,28 @@ const EMPTY_FORM = {
 // forms are deliberately kept in lockstep rather than each drifting on its
 // own idea of what's required.
 const TEXT_FIELDS = [
-  { key: 'vin', label: 'VIN Number', placeholder: 'e.g. WDB9634031L123456', required: true },
+  { key: 'vin', label: 'VIN number', placeholder: 'e.g. WDB9634031L123456', required: true },
   { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz', required: true },
   { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645', required: true },
   { key: 'year', label: 'Year', placeholder: '2024', type: 'number', required: true },
-  { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB', required: true },
+  { key: 'plate', label: 'Registration plate', placeholder: 'e.g. GP 567 ZAB', required: true },
   { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number', required: false },
-  { key: 'registration_expiry', label: 'Registration Expiry', type: 'date', required: false },
-  { key: 'last_maintenance_date', label: 'Last Maintenance Date', type: 'date', required: false },
-  { key: 'service_interval_km', label: 'Service Interval (km)', placeholder: 'e.g. 10000', type: 'number', required: false },
-  { key: 'last_service_mileage', label: 'Last Service Odometer (km)', placeholder: 'e.g. 145000', type: 'number', required: false },
+  { key: 'registration_expiry', label: 'Registration expiry', type: 'date', required: false },
+  { key: 'last_maintenance_date', label: 'Last maintenance date', type: 'date', required: false },
+  { key: 'service_interval_km', label: 'Service interval (km)', placeholder: 'e.g. 10000', type: 'number', required: false },
+  { key: 'last_service_mileage', label: 'Last service odometer (km)', placeholder: 'e.g. 145000', type: 'number', required: false },
 ];
 
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)',
-  color: 'var(--text-tertiary)', letterSpacing: '0.06em',
-  marginBottom: 6, textTransform: 'uppercase',
+  display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)',
+  letterSpacing: 'normal', marginBottom: 6,
 };
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2,
-  fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box',
+  color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 6,
+  fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box',
 };
 
 export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
@@ -142,8 +142,8 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
       <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={onClose} />
       <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Add Vehicle</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+          <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Add vehicle</h2>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, margin: '-13px -13px 0 0' }}>✕</button>
         </div>
 
         {submitError && (
@@ -189,7 +189,7 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
 
         <div style={{ marginBottom: 16 }}>
           <label style={labelStyle}>
-            Vehicle Type<span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>
+            Vehicle type<span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>
           </label>
           <Select value={form.type} onValueChange={handleTypeChange}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -247,7 +247,7 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
         ))}
 
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Assigned Driver</label>
+          <label style={labelStyle}>Assigned driver</label>
           <Select value={form.driver} onValueChange={val => set('driver', val)}>
             <SelectTrigger><SelectValue placeholder="— No driver assigned —" /></SelectTrigger>
             <SelectContent>
@@ -260,15 +260,15 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
           <button
             disabled={saving}
             onClick={handleCreate}
-            style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
+            style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6, cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
           >
-            {saving ? 'SAVING...' : 'CREATE VEHICLE'}
+            {saving ? 'Saving…' : 'Create vehicle'}
           </button>
           <button
             onClick={onClose}
-            style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+            style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer' }}
           >
-            CANCEL
+            Cancel
           </button>
         </div>
       </div>

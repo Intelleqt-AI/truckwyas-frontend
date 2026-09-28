@@ -61,7 +61,7 @@ export default function CustomerRisk() {
   if (error || !data) {
     return (
       <div style={{ padding: 40 }}>
-        <div style={{ fontSize: 13, color: "var(--status-danger)", marginBottom: 12 }}>
+        <div style={{ fontSize: 13, color: "var(--status-danger-text, var(--status-danger))", marginBottom: 12 }}>
           Customer risk profile not found
         </div>
         <button className="btn-action" onClick={() => navigate("/capital")}>Back to Capital</button>
@@ -97,7 +97,7 @@ export default function CustomerRisk() {
   const legend = [
     { label: "Early / on time", color: "var(--status-success)" },
     { label: "Late ≤30d (normal)", color: "var(--accent-primary)" },
-    { label: "Late >30d", color: "var(--status-danger)" },
+    { label: "Late >30d", color: "var(--status-danger-text, var(--status-danger))" },
   ];
 
   return (

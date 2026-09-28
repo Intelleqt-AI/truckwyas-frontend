@@ -313,7 +313,7 @@ export default function Bookings() {
             </SelectContent>
           </Select>
           {billingBlocked && (
-            <div style={{ fontSize: 11, color: 'var(--status-danger)', textAlign: 'right', maxWidth: 220 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
+            <div style={{ fontSize: 11, color: 'var(--status-danger-text, var(--status-danger))', textAlign: 'right', maxWidth: 220 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
               Status changes are blocked —{' '}
               <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/settings/billing')}>
                 go to billing
@@ -550,7 +550,7 @@ export default function Bookings() {
               )}
             </div>
             {billingBlocked && (
-              <div style={{ fontSize: 11, color: 'var(--status-danger)', marginBottom: 8 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
+              <div style={{ fontSize: 11, color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 8 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
                 Assignment is locked —{' '}
                 <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/settings/billing')}>
                   go to billing
@@ -597,7 +597,7 @@ export default function Bookings() {
                   </Select>
                 </div>
                 {(!!assignDriverId && !assignVehicleId) && (
-                  <div style={{ fontSize: 11, color: 'var(--status-warning)', marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: 'var(--status-warning-text, var(--status-warning))', marginBottom: 8 }}>
                     A driver needs a vehicle — select a vehicle too, or clear the driver.
                   </div>
                 )}
@@ -662,7 +662,7 @@ export default function Bookings() {
               </SelectContent>
             </Select>
             {assignableVehicles.length === 0 && (
-              <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 5 }}>No available vehicles — check the Fleet page.</div>
+              <div style={{ fontSize: 11, color: 'var(--status-warning-text, var(--status-warning))', marginTop: 5 }}>No available vehicles — check the Fleet page.</div>
             )}
           </div>
 
@@ -679,7 +679,7 @@ export default function Bookings() {
               </SelectContent>
             </Select>
             {assignableDrivers.length === 0 && (
-              <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 5 }}>No available drivers — check the Fleet page.</div>
+              <div style={{ fontSize: 11, color: 'var(--status-warning-text, var(--status-warning))', marginTop: 5 }}>No available drivers — check the Fleet page.</div>
             )}
           </div>
 

@@ -101,7 +101,7 @@ export const EmailVerification = () => {
       </div>
 
       {error && (
-        <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 4, fontSize: 12, color: 'var(--status-danger)' }}>
+        <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 4, fontSize: 12, color: 'var(--status-danger-text, var(--status-danger))' }}>
           {error}
         </div>
       )}

@@ -171,7 +171,7 @@ export default function FinanceReports() {
 
   const ErrorState = () => (
     <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-      <div style={{ color: 'var(--status-danger)', marginBottom: 16, fontSize: 14 }}>Failed to load data</div>
+      <div style={{ color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 16, fontSize: 14 }}>Failed to load data</div>
       <button className="btn-action" onClick={() => window.location.reload()}>Retry</button>
     </div>
   );
@@ -232,7 +232,7 @@ export default function FinanceReports() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
                 {[
                   { label: 'Total revenue', value: formatCurrency(financeData?.total_revenue || 0), color: 'var(--accent-primary)' },
-                  { label: 'Total expenses', value: formatCurrency(financeData?.total_expenses || 0), color: 'var(--status-danger)' },
+                  { label: 'Total expenses', value: formatCurrency(financeData?.total_expenses || 0), color: 'var(--status-danger-text, var(--status-danger))' },
                   { label: 'Net margin %', value: formatPercent(financeData?.net_margin_percent || 0), color: 'var(--status-success)' },
                   { label: 'Net profit', value: formatCurrency((financeData?.total_revenue || 0) - (financeData?.total_expenses || 0)), color: 'var(--text-primary)' },
                 ].map(m => (
@@ -363,8 +363,8 @@ export default function FinanceReports() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                       {[
                         { label: 'Expected in (30d)', value: formatCurrency(totalIn), color: 'var(--status-success)' },
-                        { label: 'Expected out (30d)', value: formatCurrency(totalOut), color: 'var(--status-danger)' },
-                        { label: 'Net cash position', value: formatCurrency(netPosition), color: netPosition >= 0 ? 'var(--accent-primary)' : 'var(--status-danger)' },
+                        { label: 'Expected out (30d)', value: formatCurrency(totalOut), color: 'var(--status-danger-text, var(--status-danger))' },
+                        { label: 'Net cash position', value: formatCurrency(netPosition), color: netPosition >= 0 ? 'var(--accent-primary)' : 'var(--status-danger-text, var(--status-danger))' },
                       ].map(m => (
                         <div key={m.label} className="card metric-card">
                           <div className="card-header"><span className="card-title" style={reportLabelText}>{m.label}</span></div>
@@ -402,13 +402,13 @@ export default function FinanceReports() {
                                   <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums', color: 'var(--status-success)' }}>
                                     {formatCurrency(f.expected_in || 0)}
                                   </td>
-                                  <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums', color: 'var(--status-danger)' }}>
+                                  <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums', color: 'var(--status-danger-text, var(--status-danger))' }}>
                                     {formatCurrency(f.expected_out || 0)}
                                   </td>
                                   <td className="mono text-right" style={{
                                     ...reportSupportText,
                                     fontVariantNumeric: 'tabular-nums',
-                                    color: net >= 0 ? 'var(--accent-primary)' : 'var(--status-danger)',
+                                    color: net >= 0 ? 'var(--accent-primary)' : 'var(--status-danger-text, var(--status-danger))',
                                     fontWeight: 600
                                   }}>
                                     {formatCurrency(net)}
@@ -416,7 +416,7 @@ export default function FinanceReports() {
                                   <td className="text-right">
                                     <span style={{
                                       ...reportSupportText,
-                                      color: net >= 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                                      color: net >= 0 ? 'var(--status-success)' : 'var(--status-danger-text, var(--status-danger))',
                                       padding: '2px 6px',
                                       background: 'var(--bg-surface-hover)',
                                       borderRadius: 4,
@@ -559,14 +559,14 @@ export default function FinanceReports() {
                                   <td className="mono text-right" style={{
                                     ...reportSupportText,
                                     fontVariantNumeric: 'tabular-nums',
-                                    color: dso > 60 ? 'var(--status-danger)' : dso > 30 ? 'var(--status-warning)' : 'var(--status-success)'
+                                    color: dso > 60 ? 'var(--status-danger-text, var(--status-danger))' : dso > 30 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-success)'
                                   }}>
                                     {dso}d
                                   </td>
                                   <td className="text-right">
                                     <span style={{
                                       ...reportSupportText,
-                                      color: dso <= 30 ? 'var(--status-success)' : dso <= 60 ? 'var(--status-warning)' : 'var(--status-danger)',
+                                      color: dso <= 30 ? 'var(--status-success)' : dso <= 60 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))',
                                       padding: '2px 6px',
                                       background: 'var(--bg-surface-hover)',
                                       borderRadius: 4,
@@ -598,7 +598,7 @@ export default function FinanceReports() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                 {[
                   { label: 'Total outstanding', value: formatCurrency(agingData?.summary?.total_outstanding || 0), color: 'var(--accent-primary)' },
-                  { label: 'Overdue amount', value: formatCurrency(agingData?.summary?.total_overdue || 0), color: 'var(--status-danger)' },
+                  { label: 'Overdue amount', value: formatCurrency(agingData?.summary?.total_overdue || 0), color: 'var(--status-danger-text, var(--status-danger))' },
                   { label: 'DSO (days)', value: Math.round(agingData?.summary?.dso || 0), color: 'var(--text-primary)' },
                 ].map(m => (
                   <div key={m.label} className="card metric-card">
@@ -612,10 +612,10 @@ export default function FinanceReports() {
               {(() => {
                 const buckets = agingData?.buckets || [
                   { label: 'Current', amount: 0, count: 0, color: 'var(--status-success)' },
-                  { label: '1-30 Days', amount: 0, count: 0, color: 'var(--status-warning)' },
-                  { label: '31-60 Days', amount: 0, count: 0, color: 'var(--status-warning)' },
-                  { label: '61-90 Days', amount: 0, count: 0, color: 'var(--status-danger)' },
-                  { label: '90+ Days', amount: 0, count: 0, color: 'var(--status-danger)' },
+                  { label: '1-30 Days', amount: 0, count: 0, color: 'var(--status-warning-text, var(--status-warning))' },
+                  { label: '31-60 Days', amount: 0, count: 0, color: 'var(--status-warning-text, var(--status-warning))' },
+                  { label: '61-90 Days', amount: 0, count: 0, color: 'var(--status-danger-text, var(--status-danger))' },
+                  { label: '90+ Days', amount: 0, count: 0, color: 'var(--status-danger-text, var(--status-danger))' },
                 ];
                 const totalAmount = buckets.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
                 const colorMap: Record<string, string> = {
@@ -729,7 +729,7 @@ export default function FinanceReports() {
                           <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={inv.customer_name}>{inv.customer_name}</td>
                           <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{formatCurrency(inv.total_amount || 0)}</td>
                           <td className="mono text-right" style={{ ...reportSupportText, whiteSpace: 'nowrap' }}>{inv.due_date}</td>
-                          <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums', color: 'var(--status-danger)' }}>
+                          <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums', color: 'var(--status-danger-text, var(--status-danger))' }}>
                             {inv.days_overdue || 0}
                           </td>
                         </tr>
@@ -750,7 +750,7 @@ export default function FinanceReports() {
                 {[
                   { label: 'Facility limit', value: formatCurrency(facilities?.facility_limit || 0), color: 'var(--accent-primary)' },
                   { label: 'Available', value: formatCurrency((facilities?.facility_limit || 0) - (facilities?.outstanding_advances || 0)), color: 'var(--status-success)' },
-                  { label: 'In use', value: formatCurrency(facilities?.outstanding_advances || 0), color: 'var(--status-warning)' },
+                  { label: 'In use', value: formatCurrency(facilities?.outstanding_advances || 0), color: 'var(--status-warning-text, var(--status-warning))' },
                   { label: 'Advances this month', value: advances.filter((a: any) => {
                     const date = new Date(a.created_at || a.advanced_date);
                     const now = new Date();
@@ -882,7 +882,7 @@ export default function FinanceReports() {
                           <td className="text-right">
                             <span style={{
                               ...reportSupportText,
-                              color: adv.status === 'FUNDED' || adv.status === 'ACTIVE' ? 'var(--status-warning)' : 'var(--status-success)',
+                              color: adv.status === 'FUNDED' || adv.status === 'ACTIVE' ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-success)',
                               padding: '2px 6px',
                               background: 'var(--bg-surface-hover)',
                               borderRadius: 4,
@@ -910,7 +910,7 @@ export default function FinanceReports() {
                   { label: 'Lanes', value: laneData?.summary?.lane_count || 0, color: 'var(--accent-primary)' },
                   { label: 'Lane revenue', value: formatCurrency(laneData?.summary?.total_revenue || 0), color: 'var(--text-primary)' },
                   { label: 'Best margin', value: laneData?.summary?.best_lane ? formatPercent(laneData.summary.best_lane.margin_pct) : '—', color: 'var(--status-success)' },
-                  { label: 'Worst margin', value: laneData?.summary?.worst_lane ? formatPercent(laneData.summary.worst_lane.margin_pct) : '—', color: 'var(--status-danger)' },
+                  { label: 'Worst margin', value: laneData?.summary?.worst_lane ? formatPercent(laneData.summary.worst_lane.margin_pct) : '—', color: 'var(--status-danger-text, var(--status-danger))' },
                 ].map(m => (
                   <div key={m.label} className="card metric-card">
                     <div className="card-header"><span className="card-title" style={reportLabelText}>{m.label}</span></div>
@@ -971,7 +971,7 @@ export default function FinanceReports() {
                 {[
                   { label: 'Cash accelerated', value: formatCurrency(fastpayData?.cash_accelerated || 0), color: 'var(--accent-primary)' },
                   { label: 'Avg days early', value: `${fastpayData?.avg_days_early || 0}`, color: 'var(--status-success)' },
-                  { label: 'Total fees', value: formatCurrency(fastpayData?.total_fees || 0), color: 'var(--status-warning)' },
+                  { label: 'Total fees', value: formatCurrency(fastpayData?.total_fees || 0), color: 'var(--status-warning-text, var(--status-warning))' },
                   { label: 'Effective APR', value: fastpayData?.effective_apr == null ? '—' : formatPercent(fastpayData.effective_apr), color: 'var(--text-primary)' },
                 ].map(m => (
                   <div key={m.label} className="card metric-card">

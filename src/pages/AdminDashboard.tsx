@@ -32,21 +32,21 @@ const SECTIONS: Section[] = [
     group: 'Support',
     items: [
       { id: 'search', label: 'Search', component: SearchPanel },
-      { id: 'demo', label: 'Demo Account', component: DemoAccountPanel },
+      { id: 'demo', label: 'Demo account', component: DemoAccountPanel },
     ],
   },
   {
     group: 'Catalog',
     items: [
-      { id: 'vehicle-types', label: 'Truck Types', component: VehicleTypesPanel },
-      { id: 'cross-border-rates', label: 'Cross-Border Rates', component: CrossBorderRatesPanel },
+      { id: 'vehicle-types', label: 'Truck types', component: VehicleTypesPanel },
+      { id: 'cross-border-rates', label: 'Cross-border rates', component: CrossBorderRatesPanel },
     ],
   },
   {
     group: 'Platform',
     items: [
-      { id: 'health', label: 'Platform Health', component: PlatformHealth },
-      { id: 'audit-log', label: 'Audit Log', component: AuditLogPanel },
+      { id: 'health', label: 'Platform health', component: PlatformHealth },
+      { id: 'audit-log', label: 'Audit log', component: AuditLogPanel },
     ],
   },
 ];
@@ -86,19 +86,20 @@ export default function AdminDashboard() {
           paddingBottom: 24,
         }}>
           <div style={{ padding: '4px 20px 16px' }}>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal' }}>
               Platform
             </div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>Admin Dashboard</div>
+            <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>Admin dashboard</div>
           </div>
           {SECTIONS.map((s, idx) => (
             <div key={s.group} style={{ marginBottom: idx < SECTIONS.length - 1 ? 20 : 0 }}>
               <div style={{
-                fontSize: 10,
-                fontFamily: 'var(--font-mono)',
+                fontSize: 13,
+                lineHeight: '20px',
+                fontWeight: 500,
+                fontFamily: 'var(--font-sans)',
                 color: 'var(--text-tertiary)',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
+                letterSpacing: 'normal',
                 padding: '12px 20px 6px',
               }}>
                 {s.group}
@@ -112,10 +113,12 @@ export default function AdminDashboard() {
                     style={{
                       display: 'block',
                       padding: '8px 20px',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 12,
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: 14,
+                      lineHeight: '20px',
+                      letterSpacing: 'normal',
                       textDecoration: 'none',
-                      color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      color: active ? 'var(--status-info-text, var(--accent-primary))' : 'var(--text-secondary)',
                       background: active ? 'rgba(var(--accent-primary-rgb, 37,99,235), 0.08)' : 'transparent',
                       borderLeft: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
                       transition: 'color 0.15s, background 0.15s',
@@ -133,8 +136,8 @@ export default function AdminDashboard() {
       {/* Content */}
       <div style={{ flex: 1, padding: '0 0 60px 32px', minWidth: 0 }}>
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>{current.label}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+          <h1 style={{ margin: 0, fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)' }}>{current.label}</h1>
+          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 2 }}>
             Cross-tenant visibility and controls, superuser only. Every write action is recorded in the audit log.
           </div>
         </div>

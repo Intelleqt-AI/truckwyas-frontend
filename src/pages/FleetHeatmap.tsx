@@ -121,7 +121,7 @@ export default function FleetHeatmap() {
           { label: 'FLEET SIZE', value: vehicles.length, sub: 'Total vehicles', color: 'var(--text-primary)' },
           { label: 'IN USE NOW', value: statusMap['IN_USE'] || 0, sub: `${utilRate}% utilisation`, color: 'var(--accent-primary)' },
           { label: 'AVAILABLE', value: statusMap['AVAILABLE'] || 0, sub: 'Ready to deploy', color: 'var(--status-success)' },
-          { label: 'MAINTENANCE', value: statusMap['MAINTENANCE'] || 0, sub: 'Off the road', color: 'var(--status-warning)' },
+          { label: 'MAINTENANCE', value: statusMap['MAINTENANCE'] || 0, sub: 'Off the road', color: 'var(--status-warning-text, var(--status-warning))' },
         ].map(k => (
           <div key={k.label} className="card metric-card" style={{ padding: 20 }}>
             <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 8 }}>{k.label}</div>

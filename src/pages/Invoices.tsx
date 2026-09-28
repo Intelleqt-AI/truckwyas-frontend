@@ -46,21 +46,21 @@ const invoiceMetricText = { fontFamily: "var(--font-sans)", fontSize: 28, lineHe
 const TIER_COLOR: Record<string, string> = {
   prime: "var(--status-success)",
   standard: "var(--accent-primary)",
-  elevated: "var(--status-warning)",
-  high: "var(--status-danger)",
+  elevated: "var(--status-warning-text, var(--status-warning))",
+  high: "var(--status-danger-text, var(--status-danger))",
 };
 
 const STATUS_COLOR: Record<string, string> = {
   PAID: "var(--status-success)",
-  SENT: "var(--status-warning)",
-  OVERDUE: "var(--status-danger)",
+  SENT: "var(--status-warning-text, var(--status-warning))",
+  OVERDUE: "var(--status-danger-text, var(--status-danger))",
   DRAFT: "var(--text-tertiary)",
 };
 
 const EXPENSE_STATUS_COLOR: Record<string, string> = {
-  PENDING: "var(--status-warning)",
+  PENDING: "var(--status-warning-text, var(--status-warning))",
   APPROVED: "var(--status-success)",
-  REJECTED: "var(--status-danger)",
+  REJECTED: "var(--status-danger-text, var(--status-danger))",
 };
 
 // Sentence-case a status/token for display: "PARTIALLY_PAID" → "Partially paid".
@@ -462,7 +462,7 @@ export default function Invoices() {
             background: "var(--accent-primary)",
             color: "black",
             padding: "12px 20px",
-            borderRadius: 2,
+            borderRadius: 6,
             fontWeight: 500,
           }}>
           {toast}
@@ -705,7 +705,7 @@ export default function Invoices() {
                         border: "1px solid var(--border-subtle)",
                         padding: "10px 12px",
                         color: "var(--text-primary)",
-                        borderRadius: 2,
+                        borderRadius: 6,
                       }}
                     />
                   </div>
@@ -743,7 +743,7 @@ export default function Invoices() {
                               border: "1px solid var(--border-subtle)",
                               padding: "10px 12px",
                               color: "var(--text-primary)",
-                              borderRadius: 2,
+                              borderRadius: 6,
                             }}
                           />
                         </div>
@@ -775,7 +775,7 @@ export default function Invoices() {
                               border: "1px solid var(--border-subtle)",
                               padding: "10px 12px",
                               color: "var(--text-primary)",
-                              borderRadius: 2,
+                              borderRadius: 6,
                             }}
                           />
                         </div>
@@ -813,7 +813,7 @@ export default function Invoices() {
                         border: "1px solid var(--border-subtle)",
                         padding: "10px 12px",
                         color: "var(--text-primary)",
-                        borderRadius: 2,
+                        borderRadius: 6,
                       }}
                     />
                   </div>
@@ -900,7 +900,7 @@ export default function Invoices() {
                           border: "1px solid var(--border-subtle)",
                           padding: "10px 12px",
                           color: "var(--text-primary)",
-                          borderRadius: 2,
+                          borderRadius: 6,
                         }}
                       />
                     </div>
@@ -931,7 +931,7 @@ export default function Invoices() {
                           border: "1px solid var(--border-subtle)",
                           padding: "10px 12px",
                           color: "var(--text-primary)",
-                          borderRadius: 2,
+                          borderRadius: 6,
                         }}
                       />
                     </div>
@@ -961,7 +961,7 @@ export default function Invoices() {
                         border: "1px solid var(--border-subtle)",
                         padding: "10px 12px",
                         color: "var(--text-primary)",
-                        borderRadius: 2,
+                        borderRadius: 6,
                         resize: "vertical",
                       }}
                     />
@@ -995,7 +995,7 @@ export default function Invoices() {
                         border: "1px solid var(--border-subtle)",
                         color: "var(--text-secondary)",
                         padding: "10px 16px",
-                        borderRadius: 2,
+                        borderRadius: 6,
                         cursor: "pointer",
                         fontWeight: 500,
                       }}>
@@ -1077,7 +1077,7 @@ export default function Invoices() {
                       {
                         label: "Pending approval",
                         value: `${pendingExpenses.length} / ${formatCurrency(pendingAmount)}`,
-                        color: "var(--status-warning)",
+                        color: "var(--status-warning-text, var(--status-warning))",
                       },
                       {
                         label: "Fuel costs MTD",
@@ -1135,7 +1135,7 @@ export default function Invoices() {
                 border: "1px solid var(--border-subtle)",
                 padding: "6px 10px",
                 color: "var(--text-primary)",
-                borderRadius: 2,
+                borderRadius: 6,
                 outline: "none",
                 width: 220,
               }}
@@ -1152,7 +1152,7 @@ export default function Invoices() {
                 border: "1px solid var(--border-subtle)",
                 padding: "6px 10px",
                 color: "var(--text-primary)",
-                borderRadius: 2,
+                borderRadius: 6,
                 width: 160,
                 cursor: "pointer",
               }}>
@@ -1181,7 +1181,8 @@ export default function Invoices() {
                       ? "var(--bg-deep)"
                       : "var(--text-secondary)",
                   padding: "6px 12px",
-                  borderRadius: 2,
+                  minHeight: 40,
+                  borderRadius: 6,
                   cursor: "pointer",
                   fontWeight: expenseStatusFilter === s ? 500 : 400,
                   whiteSpace: "nowrap",
@@ -1380,7 +1381,7 @@ export default function Invoices() {
                                               type="button"
                                               role="menuitem"
                                               className="expense-menu-item"
-                                              style={{ color: "var(--status-danger)" }}
+                                              style={{ color: "var(--status-danger-text, var(--status-danger))" }}
                                               onClick={() => {
                                                 setOpenExpenseMenuId(null);
                                                 handleRejectExpense(exp.id);
@@ -1403,7 +1404,7 @@ export default function Invoices() {
                                           type="button"
                                           role="menuitem"
                                           className="expense-menu-item"
-                                          style={{ color: "var(--status-danger)" }}
+                                          style={{ color: "var(--status-danger-text, var(--status-danger))" }}
                                           onClick={() => {
                                             setOpenExpenseMenuId(null);
                                             handleDeleteExpense(exp.id);
@@ -1498,7 +1499,7 @@ export default function Invoices() {
                 {
                   label: "Overdue",
                   value: `${stats?.overdue_count ?? 0} / ${formatCurrency(stats?.overdue_amount ?? overdue)}`,
-                  color: "var(--status-danger)",
+                  color: "var(--status-danger-text, var(--status-danger))",
                 },
                 {
                   label: "Collection rate",
@@ -1543,7 +1544,7 @@ export default function Invoices() {
                 border: "1px solid var(--border-subtle)",
                 padding: "6px 10px",
                 color: "var(--text-primary)",
-                borderRadius: 2,
+                borderRadius: 6,
                 outline: "none",
                 width: 220,
               }}
@@ -1568,7 +1569,7 @@ export default function Invoices() {
                         ? "var(--bg-deep)"
                         : "var(--text-secondary)",
                     padding: "6px 12px",
-                    borderRadius: 2,
+                    borderRadius: 6,
                     cursor: "pointer",
                     fontWeight: statusFilter === s ? 500 : 400,
                     transition: "all 0.2s ease",
@@ -1680,10 +1681,10 @@ export default function Invoices() {
                       ageDays <= 0
                         ? "var(--status-success)"
                         : ageDays <= 30
-                          ? "var(--status-warning)"
+                          ? "var(--status-warning-text, var(--status-warning))"
                           : ageDays <= 60
                             ? "var(--accent-primary)"
-                            : "var(--status-danger)";
+                            : "var(--status-danger-text, var(--status-danger))";
                     const agingLabel =
                       ageDays <= 0
                         ? `Due in ${Math.abs(ageDays)}d`
@@ -1769,7 +1770,7 @@ export default function Invoices() {
                                   color: agingColor,
                                   padding: "1px 5px",
                                   border: `1px solid ${agingColor}`,
-                                  borderRadius: 2,
+                                  borderRadius: 4, /* badge radius */
                                   whiteSpace: "nowrap",
                                 }}>
                                 {agingLabel}
@@ -1797,7 +1798,7 @@ export default function Invoices() {
                               background: "transparent",
                               border: "1px solid var(--border-subtle)",
                               color: "var(--text-secondary)",
-                              borderRadius: 2,
+                              borderRadius: 6,
                               cursor: "pointer",
                               padding: "3px 8px",
                               display: "inline-flex",
@@ -1876,7 +1877,7 @@ export default function Invoices() {
                                       border: "none",
                                       borderBottom:
                                         "1px solid var(--border-subtle)",
-                                      color: "var(--status-warning)",
+                                      color: "var(--status-warning-text, var(--status-warning))",
                                       fontFamily: "var(--font-sans)",
                                       fontSize: 14,
                                       lineHeight: "20px",
@@ -1968,7 +1969,7 @@ export default function Invoices() {
                                     <div
                                       style={{
                                         ...invoiceSupportText,
-                                        color: "var(--status-danger)",
+                                        color: "var(--status-danger-text, var(--status-danger))",
                                         fontWeight: 500,
                                         marginBottom: 2,
                                       }}>

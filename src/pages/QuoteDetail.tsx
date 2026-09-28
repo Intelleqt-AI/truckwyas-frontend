@@ -226,7 +226,7 @@ export default function QuoteDetail() {
   if (error || !quote) {
     return (
       <div style={{ padding: 40 }}>
-        <div style={{ fontSize: 13, color: 'var(--status-danger)', marginBottom: 12 }}>Quote not found</div>
+        <div style={{ fontSize: 13, color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 12 }}>Quote not found</div>
         <button className="btn-action" onClick={() => navigate('/bookings/quotes')}>Back to quotes</button>
       </div>
     );
@@ -337,7 +337,7 @@ export default function QuoteDetail() {
           <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
             <AlertTriangle size={18} color="var(--status-warning)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--status-warning)', marginBottom: 4 }}>
+              <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--status-warning-text, var(--status-warning))', marginBottom: 4 }}>
                 Fuel price alert
               </div>
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 8 }}>
@@ -641,7 +641,7 @@ export default function QuoteDetail() {
                   <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {new Date(quote.valid_until).toLocaleDateString('en-ZA')}
                     {new Date(quote.valid_until).getTime() - Date.now() < 48 * 60 * 60 * 1000 && (
-                      <span style={{ color: 'var(--status-danger)', marginLeft: 8 }}>
+                      <span style={{ color: 'var(--status-danger-text, var(--status-danger))', marginLeft: 8 }}>
                         ({Math.ceil((new Date(quote.valid_until).getTime() - Date.now()) / (1000 * 60 * 60))}h left)
                       </span>
                     )}

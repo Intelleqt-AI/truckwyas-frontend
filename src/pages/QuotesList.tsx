@@ -38,18 +38,19 @@ import { CSS } from "@dnd-kit/utilities";
 // quote still carrying one of those statuses renders sensibly in the list view.
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',   // neutral grey
-  SENT: '#F59E0B',                 // amber — awaiting reply
-  ACCEPTED: '#22C55E',             // green — won
-  DECLINED: 'var(--status-danger)',
+  SENT: 'var(--status-warning-text, #F59E0B)', // amber — awaiting reply
+  ACCEPTED: 'var(--status-success-text, #22C55E)', // green — won
+  DECLINED: 'var(--status-danger-text, var(--status-danger))',
   IT: 'var(--accent-primary)',     // blue — in motion (legacy)
   COMPLETED: '#14B8A6',            // teal — done (legacy)
 };
 
-const WON_GREEN = '#22C55E';
+// Green stays distinct from the blue success token; the -text role keeps AA in both themes.
+const WON_GREEN = 'var(--status-success-text, #22C55E)';
 const WON_GREEN_BG = 'rgba(34,197,94,0.12)';
 
 const confidenceColor = (c?: string) =>
-  c === 'HIGH' ? WON_GREEN : c === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)';
+  c === 'HIGH' ? WON_GREEN : c === 'LOW' ? 'var(--status-danger-text, var(--status-danger))' : 'var(--status-warning-text, var(--status-warning))';
 
 // Full route chain, stops included — same data the quote and its map show
 // elsewhere, not just the pickup/delivery pair. Shared by every place this
@@ -102,7 +103,7 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
     cursor: dragDisabled ? 'pointer' : (isDragging ? 'grabbing' : 'grab'),
     background: 'var(--bg-surface)',
     border: '1px solid var(--border-subtle)',
-    borderRadius: 2,
+    borderRadius: 8,
     boxShadow: isDragging ? '0 8px 16px rgba(0,0,0,0.25)' : 'none',
   };
 
@@ -130,7 +131,7 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
               <span style={{ fontSize: 13, lineHeight: '20px', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, fontFamily: 'var(--font-sans)', fontWeight: 500 }}>✓ Won</span>
             )}
             {quote.outcome === 'rejected' && (
-              <span style={{ fontSize: 13, lineHeight: '20px', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', fontFamily: 'var(--font-sans)', fontWeight: 500 }}>✗ Lost</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', background: 'var(--status-danger-bg)', color: 'var(--status-danger-text, var(--status-danger))', border: '1px solid var(--status-danger)', fontFamily: 'var(--font-sans)', fontWeight: 500 }}>✗ Lost</span>
             )}
           </div>
         </div>
@@ -150,7 +151,7 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
         {quote.status === 'ACCEPTED' && convertedLoad && (
           <button
             onClick={(e) => onViewBooking?.(e, convertedLoad)}
-            style={{ width: '100%', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, padding: '7px 8px', background: WON_GREEN_BG, border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
+            style={{ width: '100%', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, padding: '7px 8px', minHeight: 40, background: WON_GREEN_BG, border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 6, cursor: 'pointer', pointerEvents: 'auto' }}
           >
             ✓ Converted — View booking →
           </button>
@@ -158,7 +159,7 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
         {quote.status === 'ACCEPTED' && !convertedLoad && onConvertToLoad && (
           <button
             onClick={(e) => onConvertToLoad(e, quote)}
-            style={{ width: '100%', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, padding: '7px 8px', background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
+            style={{ width: '100%', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, padding: '7px 8px', minHeight: 40, background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 6, cursor: 'pointer', pointerEvents: 'auto' }}
           >
             → Convert to booking
           </button>
@@ -472,7 +473,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
             placeholder="Search loads, customers, routes..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '6px 10px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 14, lineHeight: '20px', outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '6px 10px', minHeight: 40, color: 'var(--text-primary)', borderRadius: 6, fontSize: 14, lineHeight: '20px', outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
           />
           <div style={{ display: 'flex', gap: 4 }}>
             {(['board', 'list'] as const).map(v => (
@@ -481,7 +482,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                 border: '1px solid var(--border-subtle)',
                 color: view === v ? 'var(--bg-deep)' : 'var(--text-secondary)',
                 padding: '6px 12px',
-                borderRadius: 2,
+                minHeight: 40,
+                borderRadius: 6,
                 fontSize: 14,
                 lineHeight: '20px',
                 fontFamily: 'var(--font-sans)',
@@ -504,7 +506,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           flexShrink: 0,
         }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--status-danger)', marginBottom: 2 }}>Quoting is blocked</div>
+            <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 2 }}>Quoting is blocked</div>
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{subscriptionStatusDetail(authUser?.subscription_status)} Drag-and-drop status changes are disabled until then.</div>
           </div>
           <button onClick={() => navigate('/settings/billing')} className="btn-action" style={{ flexShrink: 0 }}>
@@ -559,16 +561,16 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                           />
                         ))}
                         {colItems.length === 0 && (
-                          <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px', border: '1px dashed var(--border-subtle)', borderRadius: 2 }}>Drop here</div>
+                          <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px', border: '1px dashed var(--border-subtle)', borderRadius: 6 }}>Drop here</div>
                         )}
                         {hasNextPage && (
                           <button
                             onClick={() => fetchNextPage()}
                             disabled={isFetchingNextPage}
                             style={{
-                              width: '100%', padding: '8px', marginTop: 2, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
+                              width: '100%', padding: '8px', marginTop: 2, minHeight: 40, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
                               background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                              color: 'var(--text-secondary)', borderRadius: 2, cursor: isFetchingNextPage ? 'default' : 'pointer',
+                              color: 'var(--text-secondary)', borderRadius: 6, cursor: isFetchingNextPage ? 'default' : 'pointer',
                               opacity: isFetchingNextPage ? 0.6 : 1,
                             }}
                           >
@@ -587,7 +589,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           {/* Drag Overlay */}
           <DragOverlay>
             {activeQuote ? (
-              <div style={{ padding: 12, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, boxShadow: '0 8px 16px rgba(0,0,0,0.25)' }}>
+              <div style={{ padding: 12, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 6, boxShadow: '0 8px 16px rgba(0,0,0,0.25)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <span style={{ width: 6, height: 6, borderRadius: 6, background: STATUS_COLOR[activeQuote.status] || 'var(--border-subtle)', flexShrink: 0 }} />
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{activeQuote.quote_number}</span>
@@ -622,7 +624,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                   border: '1px solid var(--border-subtle)',
                   color: statusFilter === status ? 'var(--bg-deep)' : 'var(--text-secondary)',
                   padding: '6px 12px',
-                  borderRadius: 2,
+                  minHeight: 40,
+                  borderRadius: 6,
                   fontSize: 14,
                   lineHeight: '20px',
                   fontFamily: 'var(--font-sans)',
@@ -686,7 +689,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                         <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', padding: '2px 6px', background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', fontWeight: 500 }}>✓ Won</span>
                       )}
                       {quote.outcome === 'rejected' && (
-                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', padding: '2px 6px', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', fontWeight: 500 }}>✗ Lost</span>
+                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', padding: '2px 6px', background: 'var(--status-danger-bg)', color: 'var(--status-danger-text, var(--status-danger))', border: '1px solid var(--status-danger)', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', fontWeight: 500 }}>✗ Lost</span>
                       )}
                       {(!quote.outcome || quote.outcome === 'pending') && (
                         <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>—</span>
@@ -702,7 +705,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       {quote.status === 'ACCEPTED' && loadByQuoteId.has(String(quote.id)) && (
                         <button
                           onClick={(e) => { e.stopPropagation(); navigate(`/bookings/${loadByQuoteId.get(String(quote.id)).id}`); }}
-                          style={{ background: WON_GREEN_BG, border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          style={{ background: WON_GREEN_BG, border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', minHeight: 40, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
                           ✓ View booking
                         </button>
@@ -710,7 +713,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       {quote.status === 'ACCEPTED' && !loadByQuoteId.has(String(quote.id)) && (
                         <button
                           onClick={(e) => handleConvertToLoad(e, quote)}
-                          style={{ background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          style={{ background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', minHeight: 40, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
                           → Booking
                         </button>
@@ -732,9 +735,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                   onClick={() => listFetchNextPage()}
                   disabled={listIsFetchingNextPage}
                   style={{
-                    padding: '8px 20px', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
+                    padding: '8px 20px', minHeight: 40, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
                     background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-                    borderRadius: 2, cursor: listIsFetchingNextPage ? 'default' : 'pointer', opacity: listIsFetchingNextPage ? 0.6 : 1,
+                    borderRadius: 6, cursor: listIsFetchingNextPage ? 'default' : 'pointer', opacity: listIsFetchingNextPage ? 0.6 : 1,
                   }}
                 >
                   {listIsFetchingNextPage ? 'Loading…' : 'Load 10 more'}

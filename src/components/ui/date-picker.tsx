@@ -113,7 +113,7 @@ export function DatePicker({ dashboard = false, value, onChange, placeholder = "
           width: '100%',
           background: 'var(--bg-surface)',
           border: dashboard ? '1px solid var(--date-picker-control-border)' : '1px solid var(--border-subtle)',
-          borderRadius: dashboard ? 6 : 2,
+          borderRadius: 6,
           ...style,
         }}
       >
@@ -130,8 +130,9 @@ export function DatePicker({ dashboard = false, value, onChange, placeholder = "
             border: 'none',
             color: inputVal ? 'var(--text-primary)' : 'var(--text-tertiary)',
             padding: dashboard ? '8px 12px' : '10px 12px',
-            fontSize: dashboard ? 'var(--date-picker-input-font)' : 12,
-            fontFamily: dashboard ? 'var(--font-sans)' : 'var(--font-mono)',
+            /* Dates are body content, not identifiers: sans 14, both variants. */
+            fontSize: dashboard ? 'var(--date-picker-input-font)' : 14,
+            fontFamily: 'var(--font-sans)',
             outline: 'none',
             minWidth: 0,
             width: '100%',
@@ -165,7 +166,7 @@ export function DatePicker({ dashboard = false, value, onChange, placeholder = "
         style={{
           background: 'var(--bg-surface)',
           border: dashboard ? '1px solid var(--border-active)' : '1px solid var(--border-subtle)',
-          borderRadius: dashboard ? 8 : 4,
+          borderRadius: 8,
           boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
           color: 'var(--text-primary)',
         }}

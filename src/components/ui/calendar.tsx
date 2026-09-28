@@ -19,7 +19,7 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-7 w-7 p-0 opacity-50 hover:opacity-100"
+          "h-10 w-10 p-0 opacity-50 hover:opacity-100"
         ),
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
@@ -27,8 +27,8 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         head_row: "flex",
         head_cell: "rounded-md w-9 font-normal text-[0.75rem] opacity-50",
         row: "flex w-full mt-1",
-        cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
-        day: "rdp-day-btn h-9 w-9 p-0 font-normal rounded-md",
+        cell: "h-10 w-10 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+        day: "rdp-day-btn h-10 w-10 p-0 text-sm font-normal rounded-md",
         day_selected: "rdp-day-selected",
         day_today: "rdp-day-today",
         day_outside: "opacity-30",

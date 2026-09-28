@@ -11,9 +11,9 @@ import { Loader } from "@/components/Loader";
 
 const RISK_BAND_COLOR: Record<string, string> = {
   LOW: "var(--status-success)",
-  MEDIUM: "var(--status-warning)",
-  HIGH: "var(--status-danger)",
-  CRITICAL: "var(--status-danger)",
+  MEDIUM: "var(--status-warning-text, var(--status-warning))",
+  HIGH: "var(--status-danger-text, var(--status-danger))",
+  CRITICAL: "var(--status-danger-text, var(--status-danger))",
   NEW: "var(--text-tertiary)",
 };
 
@@ -170,7 +170,7 @@ export default function Capital() {
             label: "In use",
             value: formatCurrency(outstanding),
             sub: `${utilization}% utilization`,
-            color: "var(--status-warning)",
+            color: "var(--status-warning-text, var(--status-warning))",
           },
           {
             label: "Eligible invoices",
@@ -208,7 +208,7 @@ export default function Capital() {
       </div>
 
       {/* Facility utilization bar */}
-      <div className="card" style={{ padding: "14px 20px", marginBottom: 24 }}>
+      <div className="card" style={{ padding: "16px 20px", marginBottom: 24 }}>
         <div
           style={{
             display: "flex",
@@ -223,7 +223,7 @@ export default function Capital() {
             style={{
               color:
                 utilization > 75
-                  ? "var(--status-warning)"
+                  ? "var(--status-warning-text, var(--status-warning))"
                   : "var(--status-success)",
             }}>
             {utilization}% used
@@ -232,7 +232,7 @@ export default function Capital() {
         <div
           style={{
             background: "var(--bg-surface)",
-            borderRadius: 2,
+            borderRadius: 4,
             height: 12,
             width: "100%",
             overflow: "hidden",
@@ -248,7 +248,7 @@ export default function Capital() {
                   : utilization > 75
                     ? "var(--status-warning)"
                     : "var(--accent-primary)",
-              borderRadius: 2,
+              borderRadius: 4,
               transition: "width 0.3s",
             }}
           />
@@ -265,7 +265,7 @@ export default function Capital() {
             color: "var(--text-tertiary)",
           }}>
           <div>
-            <div style={{ color: "var(--status-danger)", fontWeight: 500 }}>
+            <div style={{ color: "var(--status-danger-text, var(--status-danger))", fontWeight: 500 }}>
               Outstanding
             </div>
             <div>{formatCurrency(outstanding)}</div>
@@ -367,7 +367,7 @@ export default function Capital() {
                       )}
                     </td>
                     <td className="mono capital-amount">{formatCurrency(amount)}</td>
-                    <td className="mono capital-amount" style={{ color: fundable < amount ? "var(--status-warning)" : undefined }}>
+                    <td className="mono capital-amount" style={{ color: fundable < amount ? "var(--status-warning-text, var(--status-warning))" : undefined }}>
                       {formatCurrency(fundable)}
                     </td>
                     <td className="text-left">
@@ -379,7 +379,7 @@ export default function Capital() {
                             lineHeight: "20px",
                             padding: "4px 12px",
                             background: "none",
-                            color: "var(--status-danger)",
+                            color: "var(--status-danger-text, var(--status-danger))",
                             border: "1px solid var(--status-danger)",
                             borderRadius: 4,
                             fontFamily: "var(--font-sans)",
@@ -410,7 +410,7 @@ export default function Capital() {
                               : "var(--accent-primary)",
                             color: "var(--btn-action-color)",
                             border: "none",
-                            borderRadius: 2,
+                            borderRadius: 4,
                             fontFamily: "var(--font-sans)",
                             fontWeight: 600,
                             textDecoration: "none",
@@ -470,7 +470,7 @@ export default function Capital() {
                     <td className="mono capital-amount">{formatCurrency(inv.amount)}</td>
                     <td
                       style={{
-                        color: "var(--status-danger)",
+                        color: "var(--status-danger-text, var(--status-danger))",
                         fontFamily: "var(--font-sans)",
                         fontSize: 13,
                         lineHeight: "20px",

@@ -153,8 +153,8 @@ export function CustomersDirectory() {
   return (
     <div className="customer-directory-controls" style={{ maxWidth: 960, minWidth: 0, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Customers</div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Your customer directory</div>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>Customers</h1>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Your customer directory</div>
       </div>
 
       <div style={sectionStyle}>
@@ -217,7 +217,7 @@ export function CustomersDirectory() {
                 />
               ))}
             </div>
-            {addErr && <div style={{ color: 'var(--status-danger)', fontSize: 12, marginBottom: 10 }}>{addErr}</div>}
+            {addErr && <div style={{ color: 'var(--status-danger-text, var(--status-danger))', fontSize: 12, marginBottom: 10 }}>{addErr}</div>}
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 className="btn-action"
@@ -247,7 +247,7 @@ export function CustomersDirectory() {
           <table style={{ width: '100%', minWidth: 830, borderCollapse: 'collapse' as const, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
             <thead>
               <tr>
-                <th style={{ padding: '10px 0 10px 16px', width: 32, borderBottom: '1px solid var(--border-subtle)' }}>
+                <th style={{ padding: '10px 0 10px 16px', width: 32, fontSize: 13, lineHeight: '20px', fontWeight: 500, borderBottom: '1px solid var(--border-subtle)' }}>
                   {filtered.length > 0 && (
                     <RowCheckbox
                       title="Select everything shown"
@@ -312,7 +312,7 @@ export function CustomersDirectory() {
                         title={isDemo ? 'Not available in the demo' : undefined}
                         style={{
                           background: 'none', border: '1px solid var(--status-danger)',
-                          color: 'var(--status-danger)', padding: '4px 10px',
+                          color: 'var(--status-danger-text, var(--status-danger))', padding: '4px 10px',
                           fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer',
                           letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1,
                         }}
@@ -348,7 +348,7 @@ export function CustomersDirectory() {
               <button onClick={() => setEditCustomer(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {editErr && (
-              <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
+              <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
                 {editErr}
               </div>
             )}

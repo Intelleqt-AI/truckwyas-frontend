@@ -415,7 +415,7 @@ export default function Expenses() {
                   <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>Actual</div>
-                      <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', color: isOverBudget ? 'var(--status-danger)' : 'var(--text-primary)', fontWeight: 600 }}>
+                      <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', color: isOverBudget ? 'var(--status-danger-text, var(--status-danger))' : 'var(--text-primary)', fontWeight: 600 }}>
                         {formatCurrency(item.actual)}
                       </div>
                     </div>
@@ -429,7 +429,7 @@ export default function Expenses() {
                       fontSize: 13, lineHeight: '20px',
                       fontFamily: 'var(--font-sans)',
                       fontVariantNumeric: 'tabular-nums',
-                      color: isOverBudget ? 'var(--status-danger)' : percentUsed > 80 ? 'var(--status-warning)' : 'var(--status-success)',
+                      color: isOverBudget ? 'var(--status-danger-text, var(--status-danger))' : percentUsed > 80 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-success)',
                       fontWeight: 600,
                       minWidth: 50,
                       textAlign: 'right'
@@ -438,12 +438,12 @@ export default function Expenses() {
                     </div>
                   </div>
                 </div>
-                <div style={{ height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ height: 8, background: 'var(--bg-surface-hover)', borderRadius: 4, overflow: 'hidden' }}>
                   <div style={{
                     height: '100%',
                     width: `${Math.min(percentUsed, 100)}%`,
                     background: isOverBudget ? 'var(--status-danger)' : percentUsed > 80 ? 'var(--status-warning)' : 'var(--accent-primary)',
-                    borderRadius: 2,
+                    borderRadius: 4,
                   }} />
                 </div>
               </div>
@@ -509,11 +509,12 @@ export default function Expenses() {
             aria-pressed={statusFilter === s}
             onClick={() => { setStatusFilter(s); setPage(1); }}
             style={{
-              padding: '7px 12px', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
-              fontWeight: 500, borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap',
+              padding: '7px 12px', minHeight: 40, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
+              fontWeight: 500, borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap',
               border: statusFilter === s ? 'none' : '1px solid var(--border-subtle)',
               background: statusFilter === s ? 'var(--accent-primary)' : 'var(--bg-surface)',
-              color: statusFilter === s ? 'black' : 'var(--text-secondary)',
+              /* On-accent text follows the theme: near-black on dark's bright blue, white on light's blue. */
+              color: statusFilter === s ? 'var(--btn-action-color, black)' : 'var(--text-secondary)',
             }}
           >
             {s === 'ALL' ? 'All' : formatStatus(s)}
@@ -548,7 +549,7 @@ export default function Expenses() {
                 <td>
                   <span style={{
                     fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px',
-                    color: exp.status === 'APPROVED' ? 'var(--status-success)' : exp.status === 'REJECTED' ? 'var(--status-danger)' : 'var(--status-warning)',
+                    color: exp.status === 'APPROVED' ? 'var(--status-success)' : exp.status === 'REJECTED' ? 'var(--status-danger-text, var(--status-danger))' : 'var(--status-warning-text, var(--status-warning))',
                     padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 4,
                     display: 'inline-block', whiteSpace: 'nowrap',
                   }}>
@@ -587,7 +588,7 @@ export default function Expenses() {
                             type="button"
                             role="menuitem"
                             className="expense-menu-item"
-                            style={{ color: 'var(--status-danger)' }}
+                            style={{ color: 'var(--status-danger-text, var(--status-danger))' }}
                             disabled={deletingId === exp.id}
                             onClick={() => { setOpenMenuId(null); handleDelete(exp.id); }}
                           >

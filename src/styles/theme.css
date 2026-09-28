@@ -76,7 +76,7 @@
   --input-bg-focus: var(--bg-surface);
 
   /* Card */
-  --card-radius: 8px;
+  --card-radius: 12px;
 
   /* ===========================
      TYPE SCALE / WEIGHT / SPACING (theme-agnostic — same in light + dark)
@@ -204,7 +204,7 @@
   --input-bg-focus: #FFFFFF;
 
   /* Card */
-  --card-radius: 8px;
+  --card-radius: 12px;
 
   /* Nav item hover */
   --nav-hover-bg: var(--bg-deep);
@@ -246,8 +246,14 @@
   /* Tailwind radius scale (tailwind.config.ts) resolves from these: lg/xl = card 8,
      md = control 6, sm = badge 4, 2xl/sheet = dialog 12. Previously undefined,
      so every rounded-* utility collapsed to square corners. */
-  --radius: 8px;
-  --radius-sheet: 12px;
+  --radius: 12px;
+  --radius-sheet: 16px;
+  /* Design principles v2 shape scale (docs/brand/DESIGN-PRINCIPLES.md). */
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-chip: 6px;
+  --radius-dialog: 16px;
+  --radius-nested: 8px;
 }
 
 /* ===========================
@@ -523,7 +529,7 @@ button, input, select, textarea, optgroup {
   position: relative;
   overflow: visible;
   transition: border-color 0.2s, box-shadow 0.2s;
-  box-shadow: var(--shadow-card);
+  box-shadow: none;
 }
 
 .card:hover {

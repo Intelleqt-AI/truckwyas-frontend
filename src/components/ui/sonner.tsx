@@ -20,8 +20,9 @@ export function Toaster() {
   return (
     <ToastContainer
       position="bottom-right"
-      autoClose={3500}
-      hideProgressBar={false}
+      autoClose={4000}
+      hideProgressBar
+      limit={3}
       newestOnTop
       closeOnClick
       pauseOnFocusLoss={false}

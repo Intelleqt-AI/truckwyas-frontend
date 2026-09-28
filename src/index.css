@@ -9,8 +9,8 @@
   background: var(--bg-surface) !important;
   color: var(--text-primary) !important;
   border: 1px solid var(--border-subtle) !important;
-  border-radius: 8px !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
   font-family: var(--font-sans) !important;
   font-size: 14px !important;
   letter-spacing: normal !important;
@@ -25,10 +25,6 @@
   line-height: 20px !important;
 }
 
-.Toastify__toast--success { border-left: 3px solid #22c55e !important; }
-.Toastify__toast--error   { border-left: 3px solid #ef4444 !important; }
-.Toastify__toast--warning { border-left: 3px solid #f59e0b !important; }
-.Toastify__toast--info    { border-left: 3px solid #4d9eff !important; }
 
 .Toastify__progress-bar--success { background: #22c55e !important; }
 .Toastify__progress-bar--error   { background: #ef4444 !important; }

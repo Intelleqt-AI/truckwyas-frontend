@@ -146,8 +146,8 @@ export default {
 			/* Border Radius - Professional logistics design */
 			borderRadius: {
 				lg: 'var(--radius)',           // Standard cards
-				md: 'calc(var(--radius) - 2px)',
-				sm: 'calc(var(--radius) - 4px)',
+				md: 'var(--radius-control)',
+				sm: 'var(--radius-chip)',
 				xl: 'var(--radius)',           // Cards (same as lg for consistency)
 				'2xl': 'var(--radius-sheet)',  // Sheets and drawers
 				'sheet': 'var(--radius-sheet)'

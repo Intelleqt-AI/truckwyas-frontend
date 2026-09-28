@@ -1,4 +1,5 @@
 import './fleet-vehicles-brand.css';
+import { localDateISO } from '@/lib/dates';
 import StaleDataNotice from '@/components/data/StaleDataNotice';
 import './table-heading-roles.css';
 import { UserRound as EmptyDriversIcon } from 'lucide-react';
@@ -55,14 +56,20 @@ interface LeaderboardEntry {
   rank: number;
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  ACTIVE: 'var(--accent-primary)',
-  INACTIVE: 'var(--text-tertiary)',
-  ON_LEAVE: 'var(--status-warning-text, var(--status-warning))',
+// Status chip tone. Colour always sits next to the status word.
+const STATUS_TONE: Record<string, 'success' | 'warning' | 'neutral'> = {
+  ACTIVE: 'success',
+  INACTIVE: 'neutral',
+  ON_LEAVE: 'warning',
 };
 
-// Numeric columns are right aligned (header and cells) per the table standard.
-const NUMERIC_COLUMNS = new Set(['Trips MTD', 'Revenue generated']);
+// total_trips is the all-time count of delivered or invoiced loads
+// (DriverSerializer.get_total_trips), so it is not labelled "MTD".
+const NUMERIC_COLUMNS = new Set(['Completed loads', 'Revenue']);
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const formatDay = (iso?: string) =>
+  iso ? new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
 // The API sends amounts as decimal strings; coerce before formatting.
 const formatZAR = (v: number | string | null | undefined) => {
@@ -99,7 +106,7 @@ export default function Drivers() {
   const [addForm, setAddForm] = useState({
     first_name: '', last_name: '', email: '', phone: '',
     license_number: '', license_expiry: '', license_state: 'GP',
-    hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE',
+    hire_date: localDateISO(), status: 'ACTIVE',
   });
   const [editDriver, setEditDriver] = useState<Driver | null>(null);
   const [editForm, setEditForm] = useState<any>({});
@@ -205,11 +212,24 @@ export default function Drivers() {
 
   const filtered = drivers.filter(d => statusFilter === 'All' || d.status === statusFilter);
 
-  const rankColor = (rank: number) => {
-    if (rank === 1) return 'var(--accent-primary)';
-    if (rank === 2) return 'var(--status-warning-text, var(--status-warning))';
-    return 'var(--text-secondary)';
-  };
+  // Summary figures: availability, work done, and the next compliance date.
+  const activeCount = overview?.active_drivers ?? drivers.filter(d => d.status === 'ACTIVE').length;
+  const inactiveCount = drivers.filter(d => d.status === 'INACTIVE').length;
+  const onLeaveCount = drivers.filter(d => d.status === 'ON_LEAVE').length;
+  const completedLoads = drivers.reduce((sum, d) => sum + (Number(d.total_trips) || 0), 0);
+  const now = Date.now();
+  const withExpiry = drivers.filter(d => d.license_expiry).map(d => ({ d, t: new Date(d.license_expiry as string).getTime() }));
+  const expired = withExpiry.filter(x => x.t < now);
+  const nextRenewal = withExpiry.filter(x => x.t >= now).sort((a, b) => a.t - b.t)[0];
+  // Score and revenue columns only appear once the driver stats job has
+  // produced them; a column of dashes answers nothing.
+  const hasEfficiency = drivers.some(d => (d.efficiency_score || 0) > 0);
+  const hasRevenue = drivers.some(d => Number(d.revenue_generated) > 0);
+  const colCount = 6 + (hasEfficiency ? 1 : 0) + (hasRevenue ? 1 : 0);
+  const availabilityNote = [
+    inactiveCount ? `${inactiveCount} inactive` : '',
+    onLeaveCount ? `${onLeaveCount} on leave` : '',
+  ].filter(Boolean).join(', ');
 
   return (
     <div className="fleet-page">
@@ -229,28 +249,41 @@ export default function Drivers() {
       />
       <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
 
-      {/* KPI strip — same 4-card grid, toolbar and table card as Vehicles so
-          switching tabs never moves the page. */}
-      <div className="fleet-summary fleet-summary--4">
-        {[
-          { label: 'Total drivers', value: overview?.total_drivers ?? drivers.length, color: 'var(--text-primary)' },
-          { label: 'Active', value: overview?.active_drivers ?? drivers.filter(d => d.status === 'ACTIVE').length, color: 'var(--accent-primary)' },
-          { label: 'On leave', value: drivers.filter(d => d.status === 'ON_LEAVE').length, color: 'var(--status-warning-text, var(--status-warning))' },
-          { label: 'Avg revenue per driver', value: formatZAR(overview?.avg_revenue_per_driver ?? 0), color: 'var(--text-primary)' },
-        ].map(k => (
-          <div key={k.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{k.label}</span></div>
-            <div className="metric-value" style={{ color: loading ? 'var(--text-tertiary)' : k.color }}>{loading ? '—' : k.value}</div>
+      {/* Driver summary: same strip geometry as Vehicles so switching tabs
+          never moves the page. Hidden when there are no drivers yet. */}
+      {(loading || drivers.length > 0) && (
+        <section className="card fleet-kpis" aria-label="Driver summary" aria-busy={loading}>
+          <div className="fleet-kpi">
+            <div className="fleet-kpi__label">Active drivers</div>
+            <div className="fleet-kpi__value">{loading ? '—' : activeCount}{!loading && <span className="fleet-kpi__of">of {overview?.total_drivers ?? drivers.length}</span>}</div>
+            <div className="fleet-kpi__note">{loading ? 'Loading' : availabilityNote ? `${availabilityNote}.` : 'Everyone is active.'}</div>
           </div>
-        ))}
-      </div>
+          <div className="fleet-kpi">
+            <div className="fleet-kpi__label">Completed loads</div>
+            <div className="fleet-kpi__value">{loading ? '—' : completedLoads}</div>
+            <div className="fleet-kpi__note">{loading ? 'Loading' : 'Delivered or invoiced, all time.'}</div>
+          </div>
+          <div className="fleet-kpi">
+            <div className="fleet-kpi__label">{expired.length > 0 ? 'Expired licences' : 'Next licence renewal'}</div>
+            <div className={`fleet-kpi__value${expired.length > 0 ? ' is-attention' : ''}`}>
+              {loading ? '—' : expired.length > 0 ? expired.length : nextRenewal ? formatDay(nextRenewal.d.license_expiry) : '—'}
+            </div>
+            <div className="fleet-kpi__note">
+              {loading ? 'Loading'
+                : expired.length > 0 ? `${expired.slice(0, 2).map(x => getDriverName(x.d)).join(', ')}${expired.length > 2 ? ` and ${expired.length - 2} more` : ''}. Renew before their next load.`
+                : nextRenewal ? `${getDriverName(nextRenewal.d)}, in ${Math.ceil((nextRenewal.t - now) / DAY_MS)} days.`
+                : 'No licence expiry dates recorded.'}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Search + status filter toolbar */}
       <div className="fleet-toolbar">
         <input data-fleet-control
           type="text"
           aria-label="Search drivers"
-          placeholder="Search name, license, username..."
+          placeholder="Search name, licence or username"
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="fleet-search"
@@ -277,26 +310,28 @@ export default function Drivers() {
         <table className="table-heading-roles fleet-table">
           <thead>
             <tr>
-              {['Name', 'License', 'Status', 'Trips MTD', 'Revenue generated', 'Performance', ''].map(h => (
-                <th key={h} className={NUMERIC_COLUMNS.has(h) ? 'is-numeric' : undefined}>{h}</th>
+              {['Name', 'Licence', 'Licence expires', 'Status', 'Completed loads', ...(hasRevenue ? ['Revenue'] : []), ...(hasEfficiency ? ['Efficiency'] : []), ''].map(h => (
+                <th key={h || 'actions'} className={NUMERIC_COLUMNS.has(h) || h === 'Efficiency' ? 'is-numeric' : undefined}>
+                  {h || <span className="sr-only">Actions</span>}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="fleet-table__state-cell">
+                <td colSpan={colCount} className="fleet-table__state-cell">
                   <div className="fleet-table-state"><Loader size={32} label="Loading drivers" /></div>
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               drivers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="fleet-table__state-cell">
+                  <td colSpan={colCount} className="fleet-table__state-cell">
                     <div className="fleet-empty">
                       <div className="fleet-empty__icon"><EmptyDriversIcon size={40} aria-hidden="true" /></div>
                       <h2 className="fleet-empty__title">No drivers yet</h2>
-                      <p className="fleet-empty__text">Get started by adding your first driver to your team.</p>
+                      <p className="fleet-empty__text">Add a driver so you can assign them to loads.</p>
                       <div className="fleet-empty__actions">
                       <button data-fleet-control
                         onClick={() => setShowAddForm(true)}
@@ -312,72 +347,51 @@ export default function Drivers() {
                   </td>
                 </tr>
               ) : (
-                <tr><td colSpan={7} className="fleet-table__no-match">No drivers match your filters</td></tr>
+                <tr><td colSpan={colCount} className="fleet-table__no-match">No drivers match your filters</td></tr>
               )
-            ) : filtered.map((d, idx) => {
-              const statusDotColor = d.status === 'ACTIVE' ? 'var(--status-success)' : d.status === 'ON_LEAVE' ? 'var(--status-warning)' : 'var(--text-tertiary)';
+            ) : filtered.map((d) => {
               const efficiencyScore = d.efficiency_score || 0;
+              const expiryT = d.license_expiry ? new Date(d.license_expiry).getTime() : null;
+              const isExpired = expiryT != null && expiryT < now;
+              // The driver stats job fills revenue_generated; until it runs the API
+              // sends 0.00 even for drivers with completed loads, so a zero is
+              // shown as missing rather than as a real R 0.
+              const revenue = Number(d.revenue_generated) || 0;
 
               return (
                 <tr
                   key={d.id}
-                  style={{ cursor: 'pointer', borderBottom: idx < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}
+                  className="is-clickable"
                   onClick={() => navigate(`/fleet/drivers/${d.id}`)}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        background: statusDotColor,
-                        flexShrink: 0
-                      }} />
-                      {getDriverName(d)}
-                    </div>
+                  <td className="is-primary" style={{ fontWeight: 500 }}>
+                    {getDriverName(d)}
                   </td>
                   <td>
                     <span className="fleet-table__id">{d.license_number || '—'}</span>
                   </td>
+                  <td style={{ color: isExpired ? 'var(--status-danger-text, var(--status-danger))' : undefined }}>
+                    {formatDay(d.license_expiry)}{isExpired ? ', expired' : ''}
+                  </td>
                   <td>
-                    <span style={{
-                      display: 'inline-block', whiteSpace: 'nowrap',
-                      color: STATUS_COLOR[d.status] || 'var(--text-secondary)',
-                    }}>
-                      {formatStatus(d.status)}
-                    </span>
+                    <span className={`fleet-chip fleet-chip--${STATUS_TONE[d.status] || 'neutral'}`}>{formatStatus(d.status)}</span>
                   </td>
                   <td className="is-numeric">
                     {d.total_trips ?? 0}
                   </td>
-                  <td className="is-numeric">
-                    {d.revenue_generated != null && d.revenue_generated !== '' ? formatZAR(d.revenue_generated) : '—'}
-                  </td>
-                  <td>
-                    {efficiencyScore > 0 ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ flex: 1, maxWidth: 120, height: 6, background: 'var(--bg-surface-hover)', borderRadius: 3, overflow: 'hidden' }}>
-                          <div style={{
-                            width: `${Math.min(efficiencyScore, 100)}%`,
-                            height: '100%',
-                            background: 'var(--accent-primary)',
-                            borderRadius: 3,
-                            transition: 'width 0.3s ease'
-                          }} />
-                        </div>
-                        <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)', fontWeight: 600, minWidth: 32, textAlign: 'right' }}>
-                          {efficiencyScore}
-                        </span>
-                      </div>
-                    ) : (
-                      <span style={{ color: 'var(--text-tertiary)' }}>—</span>
-                    )}
-                  </td>
+                  {hasRevenue && (
+                    <td className="is-numeric" style={{ color: revenue ? 'var(--text-primary)' : undefined }}>
+                      {revenue ? formatZAR(revenue) : '—'}
+                    </td>
+                  )}
+                  {hasEfficiency && (
+                    <td className="is-numeric">{efficiencyScore > 0 ? efficiencyScore : '—'}</td>
+                  )}
                   <td className="fleet-table__actions">
                     <div>
-                      <button data-fleet-control
+                      <button
+                        className="fleet-row-action"
+                        aria-label={`Edit ${getDriverName(d)}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditDriver(d);
@@ -400,9 +414,10 @@ export default function Drivers() {
                         }}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
                       >Edit</button>
-                      <button data-fleet-control
+                      <button
+                        className="fleet-row-action fleet-row-action--danger"
+                        aria-label={`Delete ${getDriverName(d)}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           setConfirmOpts({
@@ -423,7 +438,6 @@ export default function Drivers() {
                         }}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
                       >Delete</button>
                     </div>
                   </td>
@@ -446,14 +460,14 @@ export default function Drivers() {
             {/* Required fields first (Name through License Province), optional
                 fields (Phone, Email, Status) after. */}
             {[
-              { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan', required: true },
-              { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter', required: true },
-              { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001', required: true },
-              { key: 'license_expiry', label: 'License Expiry', type: 'date', required: true },
-              { key: 'hire_date', label: 'Hire Date', type: 'date', required: true },
+              { key: 'first_name', label: 'First name', placeholder: 'e.g. Riaan', required: true },
+              { key: 'last_name', label: 'Last name', placeholder: 'e.g. Venter', required: true },
+              { key: 'license_number', label: 'Licence number', placeholder: 'e.g. DRV-2024-001', required: true },
+              { key: 'license_expiry', label: 'Licence expiry', type: 'date', required: true },
+              { key: 'hire_date', label: 'Hire date', type: 'date', required: true },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
                   {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
                 </label>
                 {f.type === 'date' ? (
@@ -473,10 +487,10 @@ export default function Drivers() {
               </div>
             ))}
             {[
-              { key: 'license_state', label: 'License Province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'], required: true },
+              { key: 'license_state', label: 'Licence province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'], required: true },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
                   {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
                 </label>
                 <Select value={(addForm as any)[f.key]} onValueChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}>
@@ -494,7 +508,7 @@ export default function Drivers() {
               { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
                   {f.label}
                 </label>
                 <input
@@ -510,7 +524,7 @@ export default function Drivers() {
               { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
                   {f.label}
                 </label>
                 <Select value={(addForm as any)[f.key]} onValueChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}>
@@ -555,7 +569,7 @@ export default function Drivers() {
                       status: addForm.status,
                     }});
                     setShowAddForm(false);
-                    setAddForm({ first_name: '', last_name: '', email: '', phone: '', license_number: '', license_expiry: '', license_state: 'GP', hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE' });
+                    setAddForm({ first_name: '', last_name: '', email: '', phone: '', license_number: '', license_expiry: '', license_state: 'GP', hire_date: localDateISO(), status: 'ACTIVE' });
                     // Refresh
                     refetch();
                   } catch (e: any) { toast.error(e?.message || 'Failed to create driver'); }
@@ -595,14 +609,14 @@ export default function Drivers() {
             {/* Required fields first (Name through Hire Date, then License
                 Province), optional fields after. */}
             {[
-              { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan', required: true },
-              { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter', required: true },
-              { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001', required: true },
-              { key: 'license_expiry', label: 'License Expiry', type: 'date', required: true },
-              { key: 'hire_date', label: 'Hire Date', type: 'date', required: true },
+              { key: 'first_name', label: 'First name', placeholder: 'e.g. Riaan', required: true },
+              { key: 'last_name', label: 'Last name', placeholder: 'e.g. Venter', required: true },
+              { key: 'license_number', label: 'Licence number', placeholder: 'e.g. DRV-2024-001', required: true },
+              { key: 'license_expiry', label: 'Licence expiry', type: 'date', required: true },
+              { key: 'hire_date', label: 'Hire date', type: 'date', required: true },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
                   {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
                 </label>
                 {f.type === 'date' ? (
@@ -622,10 +636,10 @@ export default function Drivers() {
               </div>
             ))}
             {[
-              { key: 'license_state', label: 'License Province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'], required: true },
+              { key: 'license_state', label: 'Licence province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'], required: true },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
                   {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
                 </label>
                 <Select value={(editForm as any)[f.key]} onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}>
@@ -642,11 +656,11 @@ export default function Drivers() {
               { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
               { key: 'phone', label: 'Phone', placeholder: 'e.g. 082 123 4567' },
               { key: 'address', label: 'Address', placeholder: 'e.g. 12 Main Street, Cape Town' },
-              { key: 'medical_card_expiry', label: 'Medical Card Expiry', type: 'date' },
-              { key: 'emergency_contact', label: 'Emergency Contact', placeholder: 'e.g. Jane Doe or 082 123 4567' },
+              { key: 'medical_card_expiry', label: 'Medical card expiry', type: 'date' },
+              { key: 'emergency_contact', label: 'Emergency contact', placeholder: 'e.g. Jane Doe or 082 123 4567' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
                   {f.label}
                 </label>
                 {f.type === 'date' ? (
@@ -669,7 +683,7 @@ export default function Drivers() {
               { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
                   {f.label}
                 </label>
                 <Select value={(editForm as any)[f.key]} onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}>
@@ -683,15 +697,15 @@ export default function Drivers() {
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Vehicle</label>
+              <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>Assigned vehicle</label>
               <Select value={editForm.vehicle ?? ''} onValueChange={val => setEditForm((prev: any) => ({ ...prev, vehicle: val }))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="— No vehicle assigned —" />
+                  <SelectValue placeholder="No vehicle assigned" />
                 </SelectTrigger>
                 <SelectContent>
                   {vehicles.map(v => (
                     <SelectItem key={v.id} value={String(v.id)}>
-                      {v.plate}{v.make || v.model ? ` — ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
+                      {v.plate}{v.make || v.model ? ` · ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>

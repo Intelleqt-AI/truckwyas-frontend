@@ -1,4 +1,5 @@
 import "./quote-invoice-roles.css";
+import { localDateISO } from '@/lib/dates';
 import "./quote-builder-controls.css";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -269,7 +270,7 @@ export default function QuoteBuilder() {
   const [tripType, setTripType] = useState<"ONE_WAY" | "ROUND_TRIP">("ONE_WAY");
   const [notes, setNotes] = useState("");
   const [validUntil, setValidUntil] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10);
+    const d = new Date(); d.setDate(d.getDate() + 7); return localDateISO(d);
   });
   // Which field the next map click fills. Auto-advances to the empty one so a
   // "click collection, click delivery" flow needs no manual toggling — but stays
@@ -941,7 +942,7 @@ export default function QuoteBuilder() {
     setRouteData(null); setSelectedRouteIndex(0); setRouteBlockedMessage(null);
     setAnalysis(null); setGuard(null); setBenchmark(null);
     setChatMessages([]); setChatOpen(false); setPendingEntity(null); setDeclinedEntities([]);
-    { const d = new Date(); d.setDate(d.getDate() + 7); setValidUntil(d.toISOString().slice(0, 10)); }
+    { const d = new Date(); d.setDate(d.getDate() + 7); setValidUntil(localDateISO(d)); }
     if (isEditing) navigate("/bookings/quotes/new", { replace: true });
     toast.success("Started a new quote");
   };

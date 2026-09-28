@@ -69,10 +69,13 @@ export const formatDay = (iso?: string, withYear = true) => {
 export const formatPeriod = (from?: string, to?: string) => {
   const a = parseIso(from);
   const b = parseIso(to);
-  if (!a || !b) return [from, to].filter(Boolean).join(' – ');
+  if (!a || !b) return [from, to].filter(Boolean).join(' to ');
   if (a.y === b.y && a.m === b.m && a.d === b.d) return formatDay(to);
-  return `${formatDay(from, a.y !== b.y)} – ${formatDay(to)}`;
+  return `${formatDay(from, a.y !== b.y)} to ${formatDay(to)}`;
 };
+
+/** Display only: the narrative text may contain em dashes; show a colon instead. */
+const plainNarrative = (s?: string) => (s || '').replace(/\s*\u2014\s*/g, ': ');
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const money = (v: unknown) => (isNum(v) ? formatCurrency(v) : '—');
@@ -248,7 +251,7 @@ export default function ExecutiveBriefing({
   const header = (periodLabel?: string, company?: string, ai?: boolean) => (
     <header className="eb-header">
       <div className="eb-header__text">
-        <h2 id="eb-title" className="eb-title">Executive briefing</h2>
+        <h2 id="eb-title" className="eb-title">What happened this period, and what needs you</h2>
         {(periodLabel || company) && (
           <p className="eb-period">{[periodLabel, company].filter(Boolean).join(' · ')}</p>
         )}
@@ -305,7 +308,7 @@ export default function ExecutiveBriefing({
     return (
       <section className="card eb-card" aria-labelledby="eb-title">
         {header(undefined, undefined, ai)}
-        <p className="eb-narrative">{data.narrative}</p>
+        <p className="eb-narrative">{plainNarrative(data.narrative)}</p>
       </section>
     );
   }
@@ -387,7 +390,7 @@ export default function ExecutiveBriefing({
       {data.narrative && (
         <details className="eb-details">
           <summary>Full summary</summary>
-          <p className="eb-narrative">{data.narrative}</p>
+          <p className="eb-narrative">{plainNarrative(data.narrative)}</p>
           {!ai && <p className="eb-footnote">Written from your records by fixed rules, not by AI.</p>}
         </details>
       )}

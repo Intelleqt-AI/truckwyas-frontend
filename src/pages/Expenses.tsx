@@ -1,4 +1,5 @@
 import './expenses-type-roles.css';
+import { localDateISO } from '@/lib/dates';
 import './table-heading-roles.css';
 import './expense-row-actions.css';
 import './finance-brand.css';
@@ -75,7 +76,6 @@ const DATE_FILTERS = [
 
 const STATUS_FILTERS = ['ALL', 'PENDING', 'APPROVED', 'REJECTED'];
 const STATUS_TONE: Record<string, string> = { APPROVED: 'success', PENDING: 'warning', REJECTED: 'danger' };
-const CHART_COLORS = ['var(--accent-primary)', 'var(--status-warning)', 'var(--status-danger)', '#22C55E', 'var(--text-tertiary)', '#A78BFA', '#14B8A6', '#F472B6'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const expenseDate = (e: Expense) => new Date(e.expense_date || e.date);
@@ -89,14 +89,19 @@ export default function Expenses() {
         // A vehicles failure must not hide the expenses list.
         fetchData('api/v1/vehicles/').catch(() => []),
       ]);
+      const list = (Array.isArray(expData) ? expData : (expData?.results || [])) as Expense[];
       return {
-        expenses: (Array.isArray(expData) ? expData : (expData?.results || [])) as Expense[],
+        expenses: list,
+        // Paginated endpoint: `count` is the full total, used to say how much
+        // of it this page is based on.
+        total: typeof expData?.count === 'number' ? expData.count : list.length,
         vehicles: (Array.isArray(vehData) ? vehData : (vehData?.results || [])) as Vehicle[],
       };
     },
   });
 
   const expenses = data?.expenses ?? [];
+  const totalExpenseCount: number = data?.total ?? expenses.length;
   const vehicles = data?.vehicles ?? [];
 
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -237,7 +242,7 @@ export default function Expenses() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `expenses-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `expenses-${localDateISO()}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -268,61 +273,58 @@ export default function Expenses() {
   }
 
   const totalExpenses = expenses.reduce((sum, e) => sum + amountOf(e), 0);
+  const truncated = totalExpenseCount > expenses.length;
+  const validDates = expenses.map(expenseDate).filter(d => !isNaN(d.getTime()));
+  const oldestLoaded = validDates.length ? new Date(Math.min(...validDates.map(d => d.getTime()))) : null;
+  const newestLoaded = validDates.length ? new Date(Math.max(...validDates.map(d => d.getTime()))) : null;
 
-  // KPIs for the current calendar month
-  const thisMonthExpenses = expenses.filter(e => {
-    const d = expenseDate(e);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  });
-  const approvedMtd = thisMonthExpenses.filter(e => e.status === 'APPROVED').reduce((s, e) => s + amountOf(e), 0);
+  // Calendar months by expense date.
+  const monthKey = (d: Date) => d.getFullYear() * 12 + d.getMonth();
+  const nowKey = monthKey(now);
+  const monthLong = (key: number) => new Date(Math.floor(key / 12), key % 12, 1).toLocaleString('en-GB', { month: 'long' });
+  const inMonth = (e: Expense, key: number) => monthKey(expenseDate(e)) === key;
+  const thisMonthExpenses = expenses.filter(e => inMonth(e, nowKey));
+  const lastMonthExpenses = expenses.filter(e => inMonth(e, nowKey - 1));
+  const sumApproved = (list: Expense[]) => list.filter(e => e.status === 'APPROVED').reduce((s, e) => s + amountOf(e), 0);
+  const sumFuel = (list: Expense[]) => list.filter(e => e.category === 'FUEL').reduce((s, e) => s + amountOf(e), 0);
+  const approvedMtd = sumApproved(thisMonthExpenses);
+  const fuelMtd = sumFuel(thisMonthExpenses);
   const pendingExpenses = expenses.filter(e => e.status === 'PENDING');
   const pendingAmount = pendingExpenses.reduce((s, e) => s + amountOf(e), 0);
-  const fuelMtd = thisMonthExpenses.filter(e => e.category === 'FUEL').reduce((s, e) => s + amountOf(e), 0);
   const mtdCategoryTotals: Record<string, number> = {};
   thisMonthExpenses.forEach(e => { mtdCategoryTotals[e.category] = (mtdCategoryTotals[e.category] || 0) + amountOf(e); });
   const topMtd = Object.entries(mtdCategoryTotals).sort((a, b) => b[1] - a[1])[0];
+  const mtdTotal = thisMonthExpenses.reduce((s, e) => s + amountOf(e), 0);
 
-  const kpis = [
-    { label: 'Approved this month', value: formatCurrency(approvedMtd), sub: 'Month to date' },
-    {
-      label: 'Pending approval',
-      value: formatCurrency(pendingAmount),
-      sub: `${pendingExpenses.length} ${pendingExpenses.length === 1 ? 'expense' : 'expenses'}`,
-      tone: pendingExpenses.length > 0 ? 'fin-text-warning' : '',
-    },
-    { label: 'Fuel this month', value: formatCurrency(fuelMtd), sub: 'Month to date' },
-    {
-      label: 'Top category this month',
-      value: topMtd ? catLabel(topMtd[0]) : '—',
-      sub: topMtd ? formatCurrency(topMtd[1]) : 'No expenses this month',
-    },
-  ];
+  // A previous-month comparison is only honest when last month is fully loaded.
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthCovered = !truncated || (!!oldestLoaded && oldestLoaded < lastMonthStart);
+  const vsLastMonth = (current: number, previous: number) => {
+    if (!lastMonthCovered) return null;
+    const name = monthLong(nowKey - 1);
+    if (previous === 0) return current === 0 ? `Same as ${name} (none)` : `None in ${name}`;
+    const pct = ((current - previous) / previous) * 100;
+    return `${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(1)}% vs ${name} (${formatCurrency(previous)})`;
+  };
 
-  // Monthly trend: the six most recent months that have expenses, oldest first.
-  const monthlyTrend = (() => {
-    const months = new Map<number, number>();
-    expenses.forEach(e => {
-      const d = expenseDate(e);
-      if (isNaN(d.getTime())) return;
-      const key = d.getFullYear() * 12 + d.getMonth();
-      months.set(key, (months.get(key) || 0) + amountOf(e));
-    });
-    return [...months.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .slice(-6)
-      .map(([key, amt]) => ({ label: `${MONTHS[key % 12]} ${Math.floor(key / 12)}`, amount: amt }));
-  })();
-  const maxMonthlyAmount = monthlyTrend.length > 0 ? Math.max(...monthlyTrend.map(m => m.amount), 1) : 1;
+  // Last six calendar months, current month last. Months older than the
+  // loaded page are marked, not shown as zero.
+  const oldestKey = oldestLoaded ? monthKey(oldestLoaded) : nowKey;
+  const monthlyTrend = Array.from({ length: 6 }, (_, i) => nowKey - 5 + i).map(key => {
+    const amount = expenses.filter(e => inMonth(e, key)).reduce((s, e) => s + amountOf(e), 0);
+    const count = expenses.filter(e => inMonth(e, key)).length;
+    const state: 'complete' | 'partial' | 'unloaded' =
+      !truncated || key > oldestKey ? 'complete' : key === oldestKey ? 'partial' : 'unloaded';
+    return { key, label: `${MONTHS[key % 12]} ${String(Math.floor(key / 12)).slice(2)}`, amount, count, state };
+  });
+  const maxMonthlyAmount = Math.max(1, ...monthlyTrend.map(m => m.amount));
   const compactRand = (n: number) => n >= 1000 ? `R${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : formatCurrency(n);
 
-  // Budget vs actual — fixed placeholder targets (no budget API exists yet).
-  const budgetData = [
-    { category: 'FUEL', budget: 150000, actual: allCategoryTotals['FUEL'] || 0 },
-    { category: 'MAINTENANCE', budget: 80000, actual: allCategoryTotals['MAINTENANCE'] || 0 },
-    { category: 'TOLLS', budget: 40000, actual: allCategoryTotals['TOLLS'] || 0 },
-    { category: 'DRIVER', budget: 60000, actual: allCategoryTotals['DRIVER'] || 0 },
-    { category: 'INSURANCE', budget: 50000, actual: allCategoryTotals['INSURANCE'] || 0 },
-  ];
+  const categoryCounts = expenses.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + 1; return acc; }, {} as Record<string, number>);
+  const maxCategory = categoryBreakdown[0]?.total || 1;
+  const basisLabel = truncated
+    ? `the ${expenses.length} most recent of ${totalExpenseCount} expenses`
+    : `all ${expenses.length} recorded ${expenses.length === 1 ? 'expense' : 'expenses'}`;
 
   const resetPage = () => setPage(1);
 
@@ -330,16 +332,70 @@ export default function Expenses() {
     <div className="fin-page expenses-type-roles">
       {header}
 
-      {/* KPIs */}
-      <div className="fin-kpis">
-        {kpis.map(m => (
-          <div key={m.label} className="card fin-kpi">
-            <span className="fin-kpi__label">{m.label}</span>
-            <span className={`fin-kpi__value ${m.tone ?? ''}`}>{m.value}</span>
-            <span className="fin-kpi__sub">{m.sub}</span>
+      {/* Headline: this month's spend, or one sentence when there is none */}
+      {thisMonthExpenses.length === 0 ? (
+        <div className="fin-kpis fin-kpis--3">
+          <div className="card fin-kpi fin-kpi--wide">
+            <p className="fin-summary__title">No expenses recorded in {monthLong(nowKey)} yet</p>
+            <p className="fin-summary__body">
+              {newestLoaded
+                ? `The most recent expense is dated ${formatDate(newestLoaded)}. Add fuel, tolls and other costs as they happen so margins stay current.`
+                : 'Add fuel, tolls and other costs as they happen so margins stay current.'}
+            </p>
+            <div className="fin-kpi__action">
+              <button type="button" className="fin-link" onClick={() => setShowAdd(true)}>Add expense</button>
+            </div>
           </div>
-        ))}
-      </div>
+          <div className="card fin-kpi">
+            <span className="fin-kpi__label">Waiting for approval</span>
+            <span className="fin-kpi__value">{pendingExpenses.length > 0 ? formatCurrency(pendingAmount) : 'None'}</span>
+            <span className="fin-kpi__sub">
+              {pendingExpenses.length > 0
+                ? `${pendingExpenses.length} ${pendingExpenses.length === 1 ? 'expense' : 'expenses'}${truncated ? ' in the loaded list' : ''}`
+                : 'Every loaded expense has been reviewed'}
+            </span>
+            {pendingExpenses.length > 0 && (
+              <div className="fin-kpi__action">
+                <button type="button" className="fin-link" onClick={() => { setStatusFilter('PENDING'); resetPage(); }}>Review pending</button>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="fin-kpis">
+          <div className="card fin-kpi">
+            <span className="fin-kpi__label">Approved in {monthLong(nowKey)}</span>
+            <span className="fin-kpi__value">{formatCurrency(approvedMtd)}</span>
+            <span className="fin-kpi__delta">{vsLastMonth(approvedMtd, sumApproved(lastMonthExpenses)) ?? 'By expense date'}</span>
+          </div>
+          <div className="card fin-kpi">
+            <span className="fin-kpi__label">Waiting for approval</span>
+            <span className="fin-kpi__value">{pendingExpenses.length > 0 ? formatCurrency(pendingAmount) : 'None'}</span>
+            <span className="fin-kpi__sub">
+              {pendingExpenses.length > 0
+                ? `${pendingExpenses.length} ${pendingExpenses.length === 1 ? 'expense' : 'expenses'}`
+                : 'Every loaded expense has been reviewed'}
+            </span>
+            {pendingExpenses.length > 0 && (
+              <div className="fin-kpi__action">
+                <button type="button" className="fin-link" onClick={() => { setStatusFilter('PENDING'); resetPage(); }}>Review pending</button>
+              </div>
+            )}
+          </div>
+          <div className="card fin-kpi">
+            <span className="fin-kpi__label">Fuel in {monthLong(nowKey)}</span>
+            <span className="fin-kpi__value">{formatCurrency(fuelMtd)}</span>
+            <span className="fin-kpi__delta">{vsLastMonth(fuelMtd, sumFuel(lastMonthExpenses)) ?? 'All statuses, by expense date'}</span>
+          </div>
+          <div className="card fin-kpi">
+            <span className="fin-kpi__label">Largest cost in {monthLong(nowKey)}</span>
+            <span className="fin-kpi__value">{topMtd ? catLabel(topMtd[0]) : '—'}</span>
+            <span className="fin-kpi__sub">
+              {topMtd ? `${formatCurrency(topMtd[1])}, ${mtdTotal > 0 ? Math.round((topMtd[1] / mtdTotal) * 100) : 0}% of this month` : ''}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Filters — same toolbar layout as Invoices */}
       <div className="fin-toolbar expenses-filter-bar">
@@ -382,6 +438,12 @@ export default function Expenses() {
         </div>
         <span className="fin-toolbar__count">{sorted.length} {sorted.length === 1 ? 'expense' : 'expenses'}</span>
       </div>
+      {truncated && (
+        <p className="fin-coverage">
+          This page holds the {expenses.length} most recent of {totalExpenseCount} expenses. Search, filters, totals and charts
+          on this page use these {expenses.length}; Export CSV exports the filtered list.
+        </p>
+      )}
 
       {/* Table */}
       <div className="card fin-table-card fin-section">
@@ -391,11 +453,11 @@ export default function Expenses() {
               <tr>
                 <th>Date</th>
                 <th>Reference</th>
-                <th>Category</th>
                 <th>Description</th>
+                <th>Category</th>
                 <th>Vehicle</th>
-                <th className="num">Amount</th>
                 <th>Status</th>
+                <th className="num">Amount</th>
                 <th className="actions"><span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Actions</span></th>
               </tr>
             </thead>
@@ -428,11 +490,11 @@ export default function Expenses() {
                   <tr key={exp.id}>
                     <td className="fin-date">{formatDate(exp.expense_date || exp.date)}</td>
                     <td>{exp.expense_number ? <span className="fin-id">{exp.expense_number}</span> : '—'}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{catLabel(exp.category)}</td>
                     <td className="fin-strong"><div className="fin-truncate" title={exp.description}>{exp.description}</div></td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{vehicleLabel(exp)}</td>
-                    <td className="num">{formatCurrency(amountOf(exp))}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{catLabel(exp.category)}</td>
+                    <td><div className="fin-truncate" style={{ maxWidth: 220 }} title={vehicleLabel(exp)}>{vehicleLabel(exp)}</div></td>
                     <td><span className={`fin-chip${tone ? ` fin-chip--${tone}` : ''}`}>{formatStatus(status)}</span></td>
+                    <td className="num">{formatCurrency(amountOf(exp))}</td>
                     <td className="actions" onKeyDown={e => { if (e.key === 'Escape') setOpenMenuId(null); }}>
                       <div className="expense-row-actions">
                         <button
@@ -485,7 +547,7 @@ export default function Expenses() {
 
         {totalPages > 1 && (
           <div className="fin-table-foot">
-            <span>{(page - 1) * perPage + 1}–{Math.min(page * perPage, sorted.length)} of {sorted.length}</span>
+            <span>{(page - 1) * perPage + 1} to {Math.min(page * perPage, sorted.length)} of {sorted.length}</span>
             <div className="fin-table-foot__nav">
               <button className="btn-action fin-btn-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</button>
               <button className="btn-action fin-btn-secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</button>
@@ -494,114 +556,72 @@ export default function Expenses() {
         )}
       </div>
 
-      {/* Analytics: monthly trend + category breakdown (all recorded expenses) */}
+      {/* Analytics: monthly trend + category ranking */}
       <div className="fin-grid-2">
-        <div className="card">
-          <div className="fin-card-head">
-            <h2 className="fin-h2">Monthly expenses</h2>
-            <p className="fin-support">Last 6 months with expenses</p>
+        <section className="card" aria-labelledby="exp-month-title">
+          <div className="fin-panel-head">
+            <div className="fin-panel-head__text">
+              <h2 id="exp-month-title" className="fin-panel-title">How has spending moved over six months?</h2>
+              <p className="fin-panel-desc">
+                Total recorded per calendar month by expense date, all statuses, amounts as entered.
+                {monthlyTrend.some(m => m.state !== 'complete') && ' Faded months are only partly loaded on this page.'}
+              </p>
+            </div>
           </div>
-          {monthlyTrend.length === 0 ? (
-            <div className="fin-empty fin-empty--compact">No monthly data yet</div>
+          {expenses.length === 0 ? (
+            <div className="fin-empty fin-empty--compact">No expenses recorded yet</div>
           ) : (
-            <div className="fin-bars" role="list" aria-label="Monthly expense totals">
+            <div className="fin-months" role="list" aria-label="Expenses per month">
               {monthlyTrend.map(m => (
-                <div key={m.label} className="fin-bars__col" role="listitem" aria-label={`${m.label}: ${formatCurrency(m.amount)}`} title={formatCurrency(m.amount)}>
-                  <span className="fin-bars__val" aria-hidden="true">{compactRand(m.amount)}</span>
-                  <div className="fin-bars__bar" style={{ height: `${Math.max(2, (m.amount / maxMonthlyAmount) * 140)}px` }} />
-                  <span className="fin-bars__lab" aria-hidden="true">{m.label}</span>
+                <div
+                  key={m.key}
+                  className={`fin-months__col${m.key === nowKey ? ' is-current' : ''}${m.state !== 'complete' ? ' is-partial' : ''}`}
+                  role="listitem"
+                  aria-label={`${m.label}: ${m.state === 'unloaded' ? 'not loaded' : `${formatCurrency(m.amount)} across ${m.count} ${m.count === 1 ? 'expense' : 'expenses'}${m.state === 'partial' ? ', partly loaded' : ''}`}`}
+                  title={m.state === 'unloaded' ? 'Not loaded on this page' : `${formatCurrency(m.amount)} · ${m.count} ${m.count === 1 ? 'expense' : 'expenses'}`}
+                >
+                  <span className="fin-months__val" aria-hidden="true">
+                    {m.state === 'unloaded' ? '—' : m.amount > 0 ? compactRand(m.amount) : 'R0'}
+                  </span>
+                  {m.state !== 'unloaded' && (
+                    <div className="fin-months__bar" style={{ height: `${Math.max(2, (m.amount / maxMonthlyAmount) * 120)}px` }} />
+                  )}
+                  <span className="fin-months__lab" aria-hidden="true">{m.label}</span>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </section>
 
-        <div className="card">
-          <div className="fin-card-head">
-            <h2 className="fin-h2">By category</h2>
-            <p className="fin-support">All recorded expenses</p>
+        <section className="card" aria-labelledby="exp-cat-title">
+          <div className="fin-panel-head">
+            <div className="fin-panel-head__text">
+              <h2 id="exp-cat-title" className="fin-panel-title">Where does the money go?</h2>
+              <p className="fin-panel-desc">
+                {formatCurrency(totalExpenses)} across {basisLabel}, all statuses, by category.
+              </p>
+            </div>
           </div>
           {categoryBreakdown.length === 0 ? (
-            <div className="fin-empty fin-empty--compact">No category data yet</div>
+            <div className="fin-empty fin-empty--compact">No expenses recorded yet</div>
           ) : (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <svg width="96" height="96" viewBox="0 0 200 200" aria-hidden="true" style={{ flex: 'none' }}>
-                  {(() => {
-                    let cumulative = 0;
-                    return categoryBreakdown.map((cat, i) => {
-                      const percent = totalExpenses > 0 ? (cat.total / totalExpenses) * 100 : 0;
-                      if (percent >= 99.999) {
-                        return <circle key={i} cx="100" cy="100" r="90" fill={CHART_COLORS[i % CHART_COLORS.length]} />;
-                      }
-                      const angle = (percent / 100) * 360;
-                      const startAngle = (cumulative / 100) * 360;
-                      cumulative += percent;
-                      const startRad = (startAngle - 90) * (Math.PI / 180);
-                      const endRad = (startAngle + angle - 90) * (Math.PI / 180);
-                      const x1 = 100 + 90 * Math.cos(startRad);
-                      const y1 = 100 + 90 * Math.sin(startRad);
-                      const x2 = 100 + 90 * Math.cos(endRad);
-                      const y2 = 100 + 90 * Math.sin(endRad);
-                      const largeArc = angle > 180 ? 1 : 0;
-                      return (
-                        <path key={i} d={`M 100 100 L ${x1} ${y1} A 90 90 0 ${largeArc} 1 ${x2} ${y2} Z`} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                      );
-                    });
-                  })()}
-                  <circle cx="100" cy="100" r="54" fill="var(--bg-surface)" />
-                </svg>
-                <div style={{ minWidth: 0 }}>
-                  <div className="fin-kpi__label">Total expenses</div>
-                  <div className="fin-kpi__value">{formatCurrency(totalExpenses)}</div>
+            <div className="fin-rank" role="list">
+              {categoryBreakdown.map((cat, i) => (
+                <div key={cat.category} className="fin-rank__row fin-rank__row--compact" role="listitem">
+                  <span className="fin-rank__label">
+                    {cat.label}
+                    <small>{categoryCounts[cat.category] || 0} {(categoryCounts[cat.category] || 0) === 1 ? 'expense' : 'expenses'}</small>
+                  </span>
+                  <span className="fin-rank__track" aria-hidden="true">
+                    <span className={`fin-rank__bar${i === 0 ? ' fin-rank__bar--accent' : ''}`} style={{ display: 'block', width: `${(cat.total / maxCategory) * 100}%` }} />
+                  </span>
+                  <span className="fin-rank__value">{formatCurrency(cat.total)}</span>
+                  <span className="fin-rank__share">{totalExpenses > 0 ? Math.round((cat.total / totalExpenses) * 100) : 0}%</span>
                 </div>
-              </div>
-              <div className="fin-legend">
-                {categoryBreakdown.map((cat, i) => (
-                  <div key={cat.category} className="fin-legend__row">
-                    <span className="fin-legend__dot" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
-                    <span className="fin-legend__name">{cat.label}</span>
-                    <span className="fin-legend__amt">{formatCurrency(cat.total)}</span>
-                    <span className="fin-legend__pct">{totalExpenses > 0 ? ((cat.total / totalExpenses) * 100).toFixed(1) : '0.0'}%</span>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Budget vs actual */}
-      <div className="card fin-section">
-        <div className="fin-card-head">
-          <h2 className="fin-h2">Budget vs actual</h2>
-          <p className="fin-support">Targets are fixed placeholders, not budgets you have set.</p>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {budgetData.map(item => {
-            const percentUsed = item.budget > 0 ? (item.actual / item.budget) * 100 : 0;
-            const isOverBudget = percentUsed > 100;
-            const toneClass = isOverBudget ? 'fin-text-danger' : percentUsed > 80 ? 'fin-text-warning' : '';
-            return (
-              <div key={item.category}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16, marginBottom: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>{catLabel(item.category)}</span>
-                  <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
-                    <span className={toneClass} style={{ color: toneClass ? undefined : 'var(--text-primary)', fontWeight: 500 }}>{formatCurrency(item.actual)}</span>
-                    {' '}of {formatCurrency(item.budget)} ·{' '}
-                    <span className={toneClass}>{percentUsed.toFixed(0)}%</span>
-                  </span>
-                </div>
-                <div className="fin-meter" role="presentation">
-                  <div className="fin-meter__fill" style={{
-                    width: `${Math.min(percentUsed, 100)}%`,
-                    background: isOverBudget ? 'var(--status-danger)' : percentUsed > 80 ? 'var(--status-warning)' : 'var(--accent-primary)',
-                  }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        </section>
       </div>
 
       {/* Add/Edit Expense Modal */}
@@ -630,7 +650,7 @@ function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expen
   const fuelMatch = expense?.category === 'FUEL' && expense.notes ? expense.notes.match(FUEL_NOTE) : null;
   const [category, setCategory] = useState(expense?.category || 'FUEL');
   const [amount, setAmount] = useState(expense ? String(amountOf(expense)) : '');
-  const [date, setDate] = useState(expense?.expense_date || expense?.date || new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(expense?.expense_date || expense?.date || localDateISO());
   const [description, setDescription] = useState(expense?.description || '');
   const [vehicleId, setVehicleId] = useState(expense?.vehicle ? String(expense.vehicle) : '');
   const [vendor, setVendor] = useState(expense?.vendor || '');

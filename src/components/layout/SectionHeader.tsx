@@ -33,7 +33,8 @@ export default function SectionHeader({ eyebrow, title, description, actions, ta
     <header className="section-header">
       <div className="section-header__top">
         <div className="section-header__titles">
-          {eyebrow && <div className="section-header__eyebrow">{eyebrow}</div>}
+          {/* A label that only repeats the title adds noise. Siblings share both, so alignment holds. */}
+          {eyebrow && eyebrow !== title && <div className="section-header__eyebrow">{eyebrow}</div>}
           <div className="section-header__title-row">
             <h1 className="section-header__title">{title}</h1>
             {titleAdornment}

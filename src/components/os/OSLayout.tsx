@@ -475,7 +475,6 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
       <main
         className="os-app-main"
         style={{
-          gridColumn: '2 / -1',
           overflowY: 'auto',
           background: 'var(--bg-deep)',
           color: 'var(--text-primary)',

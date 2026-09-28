@@ -1369,3 +1369,25 @@ button, input, select, textarea, optgroup {
   .os-app-shell .os-subscription-trigger { display: none; }
   .os-app-shell .os-header-actions { margin-left: auto; gap: 8px; }
 }
+
+/* Compact row actions and inline link buttons are 24-32px with a mouse, where
+   they sit inside 48px rows. On touch screens every one gets a 44px target. */
+@media (pointer: coarse) {
+  .fleet-row-action,
+  .bk-btn--sm,
+  .fin-link,
+  .viz-table-toggle,
+  .settings-control {
+    /* Accessibility floor: must beat page-scoped compact sizing. */
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+  .settings-switch {
+    position: relative;
+  }
+  .settings-switch::after {
+    content: '';
+    position: absolute;
+    inset: -10px -6px;
+  }
+}

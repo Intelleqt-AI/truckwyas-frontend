@@ -162,7 +162,7 @@
 .fp-steps__num {
   flex: none;
   font: 500 14px/20px var(--font-sans);
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
   min-width: 12px;
 }

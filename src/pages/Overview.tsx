@@ -360,7 +360,7 @@ export default function Overview() {
       <div className="ov-kpis">
         <section className="ov-card ov-kpi" aria-label="Revenue received to date">
           <div className="ov-kpi__head">
-            <h2 className="ov-kpi__label">Revenue received to date</h2>
+            <h3 className="ov-kpi__label">Revenue received to date</h3>
             <KpiMenu id="revenue" label="Revenue" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={200} onGo={navigate} />
           </div>
           <div className="ov-kpi__value">
@@ -383,7 +383,7 @@ export default function Overview() {
 
         <section className="ov-card ov-kpi" aria-label="Net margin">
           <div className="ov-kpi__head">
-            <h2 className="ov-kpi__label">Net margin{marginBasis ? `, ${marginBasis}` : ""}</h2>
+            <h3 className="ov-kpi__label">Net margin{marginBasis ? `, ${marginBasis}` : ""}</h3>
             <KpiMenu id="margin" label="Net margin" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={200} onGo={navigate} />
           </div>
           <div className="ov-kpi__value">
@@ -406,7 +406,7 @@ export default function Overview() {
 
         <section className="ov-card ov-kpi" aria-label="Owed to you">
           <div className="ov-kpi__head">
-            <h2 className="ov-kpi__label">Owed to you</h2>
+            <h3 className="ov-kpi__label">Owed to you</h3>
             <KpiMenu id="outstanding" label="Owed to you" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={220} onGo={navigate} />
           </div>
           <div className="ov-kpi__value">
@@ -433,7 +433,7 @@ export default function Overview() {
 
         <section className="ov-card ov-kpi" aria-label="Active loads">
           <div className="ov-kpi__head">
-            <h2 className="ov-kpi__label">Active loads</h2>
+            <h3 className="ov-kpi__label">Active loads</h3>
             <Link to="/bookings" className="ov-link">Bookings</Link>
           </div>
           <div className="ov-kpi__value">{loading ? skeleton : failed.includes("loads") ? "—" : activeLoadsCount}</div>

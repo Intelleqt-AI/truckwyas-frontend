@@ -63,3 +63,9 @@ These read as generated UI. Never use them.
 5. Is every number real, labelled with its basis, and neutral unless it needs attention?
 6. Card padding 24, rows 44 to 48, gaps 16/24, radius 12/8/6?
 7. Correct in light and dark, and at phone width?
+
+## 8. Control sizes
+
+- Standalone buttons and inputs: 40px tall on desktop, 48px on phones.
+- Row actions inside tables and inline link-style buttons may be 24 to 32px with a mouse so they sit inside 44 to 48px rows, but every one of them must reach a 44px target on touch screens (`@media (pointer: coarse)`, see `theme.css`).
+- Icon-only buttons: 44px target at every size.

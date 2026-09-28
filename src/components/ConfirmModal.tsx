@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import './confirm-dialog-brand.css';
 
 interface Props {
@@ -20,6 +21,8 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, true);
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
@@ -38,6 +41,7 @@ export function ConfirmModal({
       onClick={onCancel}
     >
       <div
+        ref={dialogRef}
         className="dashboard-confirm-dialog"
         role="alertdialog"
         aria-modal="true"

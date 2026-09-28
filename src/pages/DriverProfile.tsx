@@ -10,6 +10,7 @@ import {
 } from '@/components/fleet-detail/parts';
 import { MonthlyBars } from '@/components/fleet-detail/MonthlyBars';
 import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
 
 const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] as const;
 
@@ -32,13 +33,17 @@ export default function DriverProfile() {
   const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(false);
 
-  const { data: driver, isLoading, isError, error: loadError, refetch } = useQuery({
+  const driverQuery = useQuery({
     queryKey: ['driver', driverId],
     queryFn: () => fetchData(`api/v1/drivers/${driverId}/`),
     enabled: !!driverId,
     // A missing record is final; only retry transient failures.
     retry: (count: number, err: unknown) => !isNotFound(err) && count < 2,
   });
+  const { data: driver, isLoading, error: queryError, refetch } = driverQuery;
+  const loadError = queryError ?? driverQuery.failureReason;
+  // Failing (even while retrying) with nothing to show: say so straight away.
+  const isError = loadFailed(driverQuery);
 
   const { data: loadsData } = useQuery({
     queryKey: ['driver-loads', driverId],
@@ -46,15 +51,15 @@ export default function DriverProfile() {
     enabled: !!driverId,
   });
 
-  if (isLoading) return <DetailSkeleton />;
   if (isError && !isNotFound(loadError)) return (
-    <DetailMessage
-      title="Driver did not load"
-      body="Check your connection and try again."
-      primary={{ label: 'Try again', onClick: () => refetch() }}
-      secondary={{ label: 'Back to drivers', onClick: () => navigate('/fleet/drivers') }}
-    />
+    <div style={{ display: 'grid', gap: 16 }}>
+      <div>
+        <button type="button" className="tw-btn tw-btn--ghost" onClick={() => navigate('/fleet/drivers')}>Back to drivers</button>
+      </div>
+      <LoadError what="this driver" error={loadError} busy={driverQuery.isFetching} onRetry={() => refetch()} />
+    </div>
   );
+  if (isLoading && !isError) return <DetailSkeleton />;
   if (!driver) return (
     <DetailMessage
       title="Driver not found"

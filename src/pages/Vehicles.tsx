@@ -21,6 +21,8 @@ import { useAuth } from '@/lib/AuthContext';
 import RowActions from '@/components/ui/RowActions';
 import { InfoTip } from '@/components/ui/InfoTip';
 import './ops-tiles.css';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { rowLink } from '@/lib/rowLink';
 
 interface Vehicle {
   id: number;
@@ -193,12 +195,16 @@ export default function Vehicles() {
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
 
-  const { data, isLoading: loading, refetch, dataUpdatedAt, isRefetchError } = useQuery({
+  const fleetQuery = useQuery({
     // search drives the vehicles fetch URL (server-side search), so it must be
     // part of the key — statusFilter / sortBy are applied client-side in render.
     queryKey: ['vehicles-page', debouncedSearch],
     queryFn: () => loadFleet(debouncedSearch),
   });
+  const { data, refetch, dataUpdatedAt, isRefetchError } = fleetQuery;
+  // Failed (or failing and retrying) with nothing to show: say so, never "No vehicles yet".
+  const failed = loadFailed(fleetQuery);
+  const loading = fleetQuery.isLoading && !failed;
 
   // Cached data drives the view; defaults keep the first render safe.
   // vehicleTypes/drivers are fetched here too, but only AddVehicleDrawer /
@@ -287,7 +293,7 @@ export default function Vehicles() {
       {/* Fleet summary: separate tiles, same geometry as Drivers so switching
           tabs never moves the page. Hidden when there is no fleet yet; the
           table's empty state carries the next action instead of zeros. */}
-      {(loading || vehicles.length > 0) && (
+      {!failed && (loading || vehicles.length > 0) && (
         <section className="ops-tiles" aria-label="Fleet summary" aria-busy={loading}>
           <div className="ops-tile">
             <h2 className="ops-tile__label">Available now</h2>
@@ -346,6 +352,14 @@ export default function Vehicles() {
       />
 
       {/* Table */}
+      {failed ? (
+        <LoadError
+          what="vehicles"
+          error={fleetQuery.error ?? fleetQuery.failureReason}
+          busy={fleetQuery.isFetching}
+          onRetry={() => refetch()}
+        />
+      ) : (
       <div className="card fleet-table-region" role="region" aria-label="Vehicles table" tabIndex={0}>
         <table className="table-heading-roles fleet-table">
           <thead>
@@ -413,6 +427,7 @@ export default function Vehicles() {
                 <tr
                   key={v.id}
                   className="is-clickable"
+                  {...rowLink(() => navigate(`/fleet/vehicles/${v.id}`))}
                   onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
                 >
                   <td className="fleet-table__select">
@@ -451,11 +466,11 @@ export default function Vehicles() {
                     <RowActions
                       label={v.plate || v.registration || 'vehicle'}
                       items={[
-                        { label: 'Edit', onSelect: () => setEditVehicle(v), disabled: isDemo },
+                        { label: 'Edit', onSelect: () => setEditVehicle(v), disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined },
                         {
                           label: 'Delete',
                           danger: true,
-                          disabled: isDemo,
+                          disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined,
                           onSelect: () => setConfirmOpts({
                             title: 'Delete vehicle',
                             message: `Remove ${v.plate || v.registration} from your fleet? This cannot be undone.`,
@@ -481,6 +496,7 @@ export default function Vehicles() {
           </tbody>
         </table>
       </div>
+      )}
 
       <PasteImportDrawer
         entity="vehicles"

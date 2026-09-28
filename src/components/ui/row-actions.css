@@ -54,11 +54,14 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.tw-rowact-menu__item:hover:not(:disabled),
+.tw-rowact-menu__item:hover:not(.is-disabled),
 .tw-rowact-menu__item:focus-visible { background: var(--bg-surface-hover); outline: none; }
 .tw-rowact-menu__item:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-primary); }
 .tw-rowact-menu__item.is-danger { color: var(--status-danger-text, var(--status-danger)); }
-.tw-rowact-menu__item:disabled { color: var(--text-tertiary); cursor: not-allowed; }
+.tw-rowact-menu__item.is-disabled { color: var(--text-tertiary); cursor: not-allowed; }
+.tw-rowact[aria-disabled="true"] { color: var(--text-tertiary); cursor: not-allowed; }
+.tw-rowact[aria-disabled="true"]:hover { background: transparent; color: var(--text-tertiary); }
+.tw-rowact-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .tw-rowact-menu__hint { display: block; padding: 0 0 8px; margin-top: -2px; font-size: 12px; line-height: 16px; color: var(--text-tertiary); white-space: normal; }
 .tw-rowact-menu__label { display: block; }
 .tw-rowact-menu__item:has(.tw-rowact-menu__hint) { padding-top: 8px; }

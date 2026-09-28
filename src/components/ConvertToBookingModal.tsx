@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
 interface Props {
   quoteNumber?: string;
@@ -78,6 +79,7 @@ const fieldLabelStyle: React.CSSProperties = {
 // and leaves the booking unassigned (pick it up later from Bookings); a
 // vehicle picked (driver optional) converts pre-assigned.
 export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfirm, onCancel }: Props) {
+  useFocusTrap(latestModal, true);
   const [showAssign, setShowAssign] = useState(false);
   const [driverId, setDriverId] = useState('');
   const [vehicleId, setVehicleId] = useState('');

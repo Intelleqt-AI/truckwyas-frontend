@@ -21,6 +21,7 @@ import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } f
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Loader } from "@/components/Loader";
+import QuoteSendPreview from "@/components/QuoteSendPreview";
 
 /**
  * QuoteBuilder — the redesigned single-page quote flow.
@@ -809,6 +810,21 @@ export default function QuoteBuilder() {
   // Zeroing it drops the total back to directCost, the real cost-based price.
   const cancelAiPrice = () => { setServiceCharge(0); toast.success("Reverted to actual price"); };
 
+  // ---- one price (display only: no pricing maths changes here) ----
+  // `total` is the one price that is saved and sent (buildPayload's
+  // total_amount); the price bar next to Send always shows it as "Quote price".
+  // The suggestion is an option: "Use" runs applyOptimal, which moves `total`
+  // onto it. applyOptimal never takes the price below costs (the markup floors
+  // at 0), so a suggestion under the cost floor is explained, never offered.
+  const suggestionBelowCost = suggestedPrice != null && suggestedPrice > 0 && suggestedPrice < directCost - 0.5;
+  const suggestionState: "loading" | "unavailable" | "below-cost" | "applied" | "offer" =
+    optimizing ? "loading"
+      : !analysis || !suggestedPrice || suggestedPrice <= 0 ? "unavailable"
+      : suggestionBelowCost ? "below-cost"
+      : alreadyApplied ? "applied"
+      : "offer";
+  const suggestionBasis = aiAwaitingData ? "cost + 25%" : aiAvailable ? (aiPrediction?.model_scope === "user" ? "from your quotes" : "from platform quotes") : "for this lane";
+
   // ---- natural-language input (typed or transcribed from voice) ----
   // Shared by the top quick-fill bar and the AI chat panel — both are just
   // different entry points into the same conversation, so every message
@@ -1020,12 +1036,27 @@ export default function QuoteBuilder() {
   });
 
   // ---- explicit save / send ----
+  // Why the quote can't be saved or sent yet (null when it can). Shared by
+  // save() and the Send button, which checks before opening the preview.
+  const saveBlocker = (): string | null => {
+    if (!customerId) return "Pick a client first";
+    if (!ready) return "Add collection, delivery and weight";
+    if (routeBlockedMessage) return routeBlockedMessage;
+    if (weightBlockedMessage) return weightBlockedMessage;
+    if (isDemoQuotaExceeded) return "You've used this demo session's one free quote. Log out and log back in (or click \"View Demo\" again) to start a fresh session.";
+    return null;
+  };
+  // Send emails the client: it opens a preview first and sends only on confirm.
+  const [sendPreviewOpen, setSendPreviewOpen] = useState(false);
+  const openSendPreview = () => {
+    const blocker = saveBlocker();
+    if (blocker) { toast.error(blocker); return; }
+    setSendPreviewOpen(true);
+  };
+
   const save = async (send: boolean) => {
-    if (!customerId) { toast.error("Pick a client first"); return; }
-    if (!ready) { toast.error("Add collection, delivery and weight"); return; }
-    if (routeBlockedMessage) { toast.error(routeBlockedMessage); return; }
-    if (weightBlockedMessage) { toast.error(weightBlockedMessage); return; }
-    if (isDemoQuotaExceeded) { toast.error("You've used this demo session's one free quote. Log out and log back in (or click \"View Demo\" again) to start a fresh session."); return; }
+    const blocker = saveBlocker();
+    if (blocker) { toast.error(blocker); return; }
     setSaving(true);
     try {
       let quoteId = savedQuoteId || (isEditing ? Number(editId) : null);
@@ -1240,7 +1271,10 @@ export default function QuoteBuilder() {
   // All four AI fields (recommended price, margin, win probability, sweet-spot)
   // come from the same analyze response — show them together only once it has
   // landed; until then every field renders the same spinner.
-  const aiLoading = optimizing || !analysis;
+  const aiLoading = optimizing;
+  const aiUnavailable = (
+    <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 10 }}>Not available right now</div>
+  );
   const aiSpinner = (
     <div style={{ marginTop: 10 }}>
       <Loader size={18} />
@@ -1248,9 +1282,9 @@ export default function QuoteBuilder() {
   );
 
   return (
-    <div className="qi-form qb-controls" style={{ maxWidth: 1080, margin: "0 auto" }}>
+    <div className={`qi-form qb-controls${!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 ? " qb-has-pricebar" : ""}`} style={{ maxWidth: 1080, margin: "0 auto" }}>
       {/* header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
+      <div className="qb-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
         <div>
           <div style={labelS}>Bookings</div>
           <h1 style={{ fontSize: 22, lineHeight: "28px", fontWeight: 600, color: "var(--text-primary)", margin: "4px 0 0" }}>{isEditing ? "Edit quote" : "New quote"}</h1>
@@ -1316,7 +1350,7 @@ export default function QuoteBuilder() {
       </div>
 
       {/* 1 — inputs */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+      <div className="qb-grid qb-grid--inputs" style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
         <div>
           <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Client<Req /></span>{!authUser?.is_demo && <span onClick={() => navigate("/customers")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span>}</div>
           <select value={customerId} onChange={e => setCustomerId(e.target.value)} style={inputS}>
@@ -1354,7 +1388,7 @@ export default function QuoteBuilder() {
 
       {/* details */}
       <div style={{ marginBottom: 18 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+        <div className="qb-grid qb-grid--details" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
           <div>
             <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Vehicle type</span>{!authUser?.is_demo && <span onClick={() => navigate("/fleet/vehicles")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span>}</div>
             <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS}>
@@ -1431,7 +1465,7 @@ export default function QuoteBuilder() {
       </div>
 
       {/* 2 — map + cost */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 14, marginBottom: 14 }}>
+      <div className="qb-grid qb-grid--mapcost" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 14, marginBottom: 14 }}>
           <div style={{ ...cardS, overflow: "hidden" }}>
             {renderMapPanel(300, (
               <Dialog>
@@ -1660,8 +1694,16 @@ export default function QuoteBuilder() {
                   <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatCurrency(r.v)}</span>
                 </div>
               ))}
+              {serviceCharge > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border-row)", fontSize: 13 }}>
+                  <span style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={dot("var(--text-tertiary)")} />Markup (suggested price in use)
+                  </span>
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatCurrency(serviceCharge)}</span>
+                </div>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 10, paddingTop: 12, borderTop: "1px solid var(--border-subtle)" }}>
-                <span style={labelS}>Quote total</span>
+                <span style={labelS}>Quote price</span>
                 <span style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, color: "var(--text-primary)" }}>{formatCurrency(total)}</span>
               </div>
               <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 8 }}>{Math.round(distance)} km {legs === 2 ? `one way · ${Math.round(chargeDistance)} km round trip` : "one way"} · live diesel · {hasVehicleType ? `your ${vehicleType} settings` : "your company defaults"}{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
@@ -1771,10 +1813,10 @@ export default function QuoteBuilder() {
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
+          <div className="qb-grid qb-grid--ai" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
               <div style={{ ...labelS, display: "flex", alignItems: "center", gap: 6 }}>
-                {aiAwaitingData ? "Suggested price" : "Recommended price"}
+                Suggested price
                 {aiAvailable && (
                   <span
                     title={`Trained on ${aiPrediction.training_samples?.toLocaleString?.() ?? aiPrediction.training_samples} ${aiPrediction.model_scope === "user" ? "of your own" : "platform-wide"} closed quotes`}
@@ -1788,14 +1830,17 @@ export default function QuoteBuilder() {
                   </span>
                 )}
               </div>
-              {aiLoading ? aiSpinner : (<>
-                <div style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, color: aiAwaitingData ? undefined : "var(--accent-primary)", marginTop: 4 }}>{suggestedPrice ? formatCurrency(suggestedPrice) : formatCurrency(total)}</div>
-                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 2 }}>{aiAwaitingData ? "true cost + 25%" : "to this client"}</div>
+              {aiLoading ? aiSpinner : !analysis || !suggestedPrice ? aiUnavailable : (<>
+                {/* An option, not the price: the price that is sent is the Quote price next to Send. */}
+                <div style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 22, lineHeight: "30px", fontWeight: 600, color: "var(--text-primary)", marginTop: 4 }}>{formatCurrency(suggestedPrice)}</div>
+                <div style={{ fontSize: 13, lineHeight: "20px", color: suggestionBelowCost ? "var(--status-warning-text, var(--status-warning))" : "var(--text-tertiary)", marginTop: 2 }}>
+                  {suggestionBelowCost ? `Below your costs of ${formatCurrency(directCost)}` : alreadyApplied ? "In use as your quote price" : aiAwaitingData ? "true cost + 25%" : "to this client"}
+                </div>
               </>)}
             </div>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
-              <div style={labelS}>Margin</div>
-              {aiLoading ? aiSpinner : aiAwaitingData ? (
+              <div style={labelS}>Margin at suggested price</div>
+              {aiLoading ? aiSpinner : !analysis ? aiUnavailable : aiAwaitingData ? (
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
               ) : (<>
                 <div style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, marginTop: 4 }}>{opt?.optimal_margin_pct ? `${Math.round(opt.optimal_margin_pct)}%` : `${marginPct}%`}</div>
@@ -1803,8 +1848,8 @@ export default function QuoteBuilder() {
               </>)}
             </div>
             <div style={{ padding: "16px 18px" }}>
-              <div style={labelS}>Win probability</div>
-              {aiLoading ? aiSpinner : aiAwaitingData ? (
+              <div style={labelS}>Win chance at suggested price</div>
+              {aiLoading ? aiSpinner : !analysis ? aiUnavailable : aiAwaitingData ? (
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
               ) : (<>
                 <div style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, marginTop: 4 }}>{opt?.win_probability_at_optimal != null ? `${Math.round(opt.win_probability_at_optimal * 100)}%` : "—"}</div>
@@ -1821,24 +1866,73 @@ export default function QuoteBuilder() {
             </div>
           )}
 
-          {/* actions */}
-          <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "14px 18px", borderTop: "1px solid var(--border-row)" }}>
-            {!aiLoading && suggestedPrice != null && suggestedPrice > 0 && !alreadyApplied && <button onClick={applyOptimal} style={{ fontSize: 14, fontWeight: 500, background: "transparent", border: "1px solid var(--accent-primary)", color: "var(--accent-primary)", borderRadius: "var(--radius-control, 8px)", padding: "9px 14px", cursor: "pointer" }}>Apply recommended</button>}
-            {!aiLoading && alreadyApplied && (
-              <>
-                <span style={{ fontSize: 13, color: "var(--status-success)" }}>✓ AI price applied</span>
-                <button onClick={cancelAiPrice} style={{ fontSize: 14, background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: "var(--radius-control, 8px)", padding: "10px 16px", cursor: "pointer" }}>Use actual price</button>
-              </>
-            )}
-            <button onClick={() => save(true)} disabled={saving} style={{ fontSize: 14, fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: "var(--radius-control, 8px)", padding: "10px 16px", cursor: "pointer" }}>Send quote to client</button>
-            <button onClick={() => save(false)} disabled={saving} style={{ fontSize: 14, background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: "var(--radius-control, 8px)", padding: "10px 16px", cursor: "pointer" }}>Save as draft</button>
-            {benchmark?.market_avg_rate ? <span style={{ marginLeft: "auto", fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)" }}>Benchmark: {formatCurrency(benchmark.market_avg_rate)} avg · {benchmark.recommendation || ""}</span> : null}
-          </div>
+          {/* Send, Save and Use-suggested live in the price bar below, next to the one price. */}
+          {benchmark?.market_avg_rate ? (
+            <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border-row)", fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)" }}>
+              Benchmark: {formatCurrency(benchmark.market_avg_rate)} avg · {benchmark.recommendation || ""}
+            </div>
+          ) : null}
         </div>
       )}
 
-      {/* notes */}
-      {ready && <div style={{ marginBottom: 40 }}><div style={{ ...labelS, marginBottom: 5 }}>Notes (optional)</div><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Anything for the client or your team…" style={{ ...inputS, resize: "vertical" }} /></div>}
+      {/* notes: above the price bar so they are filled in before sending */}
+      {ready && <div style={{ marginBottom: 16 }}><div style={{ ...labelS, marginBottom: 5 }}>Notes (optional)</div><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Anything for the client or your team…" style={{ ...inputS, resize: "vertical" }} /></div>}
+
+      {/* One price, next to Send. Sticky so Send stays in reach while scrolling. */}
+      {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 && (
+        <section className="qb-pricebar" aria-label="Quote price and send">
+          <div className="qb-pricebar__price">
+            <span className="qb-pricebar__label">Quote price</span>
+            <span className="qb-pricebar__figure" aria-live="polite">{formatCurrency(total)}</span>
+            <span className="qb-pricebar__sub">Excl. VAT · what the client is sent{serviceCharge > 0 ? " · includes markup" : ""}</span>
+          </div>
+          <div className="qb-pricebar__suggest" aria-live="polite">
+            {suggestionState === "loading" && <span className="qb-pricebar__muted">Working out a suggested price…</span>}
+            {suggestionState === "unavailable" && <span className="qb-pricebar__muted">No suggested price for this quote</span>}
+            {suggestionState === "below-cost" && suggestedPrice != null && (
+              <span className="qb-pricebar__warn">Suggested {formatCurrency(suggestedPrice)} is below your costs ({formatCurrency(directCost)}), so it isn't offered</span>
+            )}
+            {suggestionState === "offer" && suggestedPrice != null && (
+              <>
+                <span>Suggested: <b className="qb-pricebar__num">{formatCurrency(suggestedPrice)}</b> <span className="qb-pricebar__muted">({suggestionBasis})</span></span>
+                <button type="button" className="tw-btn qb-pricebar__use" onClick={applyOptimal}>Use</button>
+              </>
+            )}
+            {suggestionState === "applied" && (
+              <>
+                <span>Using the suggested price</span>
+                {serviceCharge > 0 && (
+                  <button type="button" className="tw-btn tw-btn--ghost qb-pricebar__use" onClick={cancelAiPrice}>Use cost price ({formatCurrency(directCost)})</button>
+                )}
+              </>
+            )}
+          </div>
+          <div className="qb-pricebar__actions">
+            <button type="button" className="tw-btn" onClick={() => save(false)} disabled={saving}>Save as draft</button>
+            <button type="button" className="tw-btn tw-btn--primary" onClick={openSendPreview} disabled={saving}>Send quote</button>
+          </div>
+        </section>
+      )}
+
+      {sendPreviewOpen && (() => {
+        const client = customers.find((c: any) => String(c.id) === String(customerId));
+        return (
+          <QuoteSendPreview
+            quote={{
+              customer_name: client?.name,
+              customer_email: client ? (client.email || null) : null,
+              pickup_location: pickup,
+              delivery_location: delivery,
+              pickup_date: pickupDate || null,
+              total_amount: round2(total),
+              valid_until: validUntil,
+            }}
+            sending={saving}
+            onCancel={() => setSendPreviewOpen(false)}
+            onConfirm={async () => { await save(true); setSendPreviewOpen(false); }}
+          />
+        );
+      })()}
 
       <AIChatPanel messages={chatMessages} busy={nlBusy} open={chatOpen} onOpenChange={setChatOpen} onSend={(t, lang) => submitNL(t, lang)} />
     </div>

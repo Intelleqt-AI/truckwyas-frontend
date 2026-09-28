@@ -10,6 +10,7 @@ import {
 import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { Loader } from "@/components/Loader";
+import LoadError, { loadFailed } from "@/components/data/LoadError";
 
 const BAND_TONE: Record<string, string> = {
   LOW: "success",
@@ -55,17 +56,29 @@ export default function CustomerRisk() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const { data, isLoading, error } = useQuery({
+  const riskQuery = useQuery({
     queryKey: ["customer-risk", id],
     queryFn: () => fetchData(`api/v1/customers/${id}/risk-profile/`),
     retry: 1,
   });
+  const { data, isLoading, error } = riskQuery;
+  const riskFailed = loadFailed(riskQuery);
+  const riskError = (riskQuery.error ?? riskQuery.failureReason) as { status?: number } | null;
 
   useEffect(() => {
     document.title = "Payment risk profile - TruckWys";
   }, []);
 
-  if (isLoading) {
+  // A failed request is not a missing profile: only a 404 says "not found".
+  if (riskFailed && riskError?.status !== 404) {
+    return (
+      <div className="fin-page">
+        <LoadError what="this risk profile" error={riskError} busy={riskQuery.isFetching} onRetry={() => riskQuery.refetch()} />
+      </div>
+    );
+  }
+
+  if (isLoading && !riskFailed) {
     return <Loader fullScreen />;
   }
 

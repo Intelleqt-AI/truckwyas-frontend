@@ -11,6 +11,9 @@ import { Loader } from "@/components/Loader";
 import RowActions from "@/components/ui/RowActions";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { FinTile, FinTiles, wholeRand } from "@/components/finance/FinTile";
+import LoadError, { loadFailed } from "@/components/data/LoadError";
+import InvoiceSendPreview, { type InvoiceMessageKind } from "@/components/finance/InvoiceSendPreview";
+import { canSendReminder, invoiceBalance, REMINDER_STATUSES } from "@/lib/invoiceStatus";
 
 // External Fast Pay application link. The applied-state key is unchanged so
 // invoices already marked "Applied" stay marked.
@@ -75,13 +78,18 @@ export default function InvoiceDetail() {
   const [paymentMethod, setPaymentMethod] = useState('EFT');
   const [paymentReference, setPaymentReference] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
+  // Outgoing messages are previewed and confirmed before they are sent.
+  const [preview, setPreview] = useState<InvoiceMessageKind | null>(null);
 
-  const { data: invoice, isLoading, isError, refetch } = useQuery({
+  const invoiceQuery = useQuery({
     queryKey: ['invoice', id],
     queryFn: () => fetchData(`api/v1/invoices/${id}/`),
     enabled: !!id,
     retry: 2,
   });
+  const { data: invoice, isLoading, isError, refetch } = invoiceQuery;
+  const invoiceFailed = loadFailed(invoiceQuery);
+  const invoiceError = (invoiceQuery.error ?? invoiceQuery.failureReason) as { status?: number } | null;
 
   // Capital eligibility — shared cache with invoices list
   const { data: capitalData } = useQuery({
@@ -229,7 +237,18 @@ export default function InvoiceDetail() {
     }
   };
 
-  if (isLoading) return <Loader fullScreen />;
+  // A failed request is not a missing invoice: only a 404 says "not found".
+  if (invoiceFailed && invoiceError?.status !== 404) {
+    return (
+      <div className="fin-page">
+        <button type="button" onClick={() => navigate('/finance/invoices')} className="fin-back">
+          <span aria-hidden="true">←</span> Back to invoices
+        </button>
+        <LoadError what="this invoice" error={invoiceError} busy={invoiceQuery.isFetching} onRetry={() => refetch()} />
+      </div>
+    );
+  }
+  if (isLoading && !invoiceFailed) return <Loader fullScreen />;
   if (isError || !invoice) {
     return (
       <div className="fin-page">
@@ -250,7 +269,9 @@ export default function InvoiceDetail() {
   const showBalance = hasBalance && status !== 'PAID' && status !== 'DRAFT';
   const applied = appliedIds.has(String(id));
   const canSend = status === 'DRAFT' || status === 'SENT' || status === 'VIEWED';
-  const canRemind = status === 'SENT' || status === 'VIEWED' || status === 'OVERDUE';
+  // Any sent invoice with an unpaid balance past its due date, including
+  // part-paid ones (shared definition in lib/invoiceStatus).
+  const canRemind = canSendReminder(invoice);
   const canRecordPayment = status === 'SENT' || status === 'VIEWED' || status === 'OVERDUE' || status === 'PARTIALLY_PAID';
   const totalPaid = (payments || []).reduce((sum: number, p: any) => sum + num(p.amount), 0);
   const paidToDate = invoice.paid_amount != null ? num(invoice.paid_amount) : null;
@@ -277,13 +298,18 @@ export default function InvoiceDetail() {
     ...(invoice.paid_at ? [{ label: 'Paid', value: safeDate(invoice.paid_at) }] : []),
   ];
 
-  const primary = canSend ? 'send' : canRecordPayment ? 'pay' : null;
+  // Past due: chasing is the job, so the reminder is the primary action.
+  const primary = canRemind ? 'remind' : canSend ? 'send' : canRecordPayment ? 'pay' : null;
   const moreActions = [
+    ...(primary === 'remind' && canSend
+      ? [{ label: sending ? 'Sending…' : 'Resend invoice', onSelect: () => setPreview('invoice'), disabled: sending }]
+      : []),
+    // Not yet late: a (friendly) reminder stays available from the menu, as before.
+    ...(primary !== 'remind' && REMINDER_STATUSES.has(status) && invoiceBalance(invoice) > 0
+      ? [{ label: sendingReminder ? 'Sending…' : 'Send reminder', onSelect: () => setPreview('reminder'), disabled: sendingReminder }]
+      : []),
     ...(primary !== 'pay' && canRecordPayment
       ? [{ label: 'Record payment', onSelect: () => setShowPaymentForm(true), disabled: showPaymentForm }]
-      : []),
-    ...(canRemind
-      ? [{ label: sendingReminder ? 'Sending…' : 'Send reminder', onSelect: handleSendReminder, disabled: sendingReminder }]
       : []),
     ...(primary !== null
       ? [{ label: downloading ? 'Downloading…' : 'Download PDF', onSelect: handleDownloadPDF, disabled: downloading }]
@@ -296,6 +322,20 @@ export default function InvoiceDetail() {
         <div className={`fin-toast${toast.isError ? ' fin-toast--error' : ''}`} role={toast.isError ? 'alert' : 'status'}>
           {toast.msg}
         </div>
+      )}
+
+      {preview && (
+        <InvoiceSendPreview
+          kind={preview}
+          invoice={invoice}
+          sending={preview === 'reminder' ? sendingReminder : sending}
+          onCancel={() => setPreview(null)}
+          onConfirm={async () => {
+            if (preview === 'reminder') await handleSendReminder();
+            else await handleSendInvoice();
+            setPreview(null);
+          }}
+        />
       )}
 
       <button type="button" onClick={() => navigate('/finance/invoices')} className="fin-back">
@@ -321,8 +361,12 @@ export default function InvoiceDetail() {
         </div>
         <div className="fin-detail-head__actions">
           {/* One primary action; everything else sits behind one menu. */}
-          {primary === 'send' ? (
-            <button className="btn-action" onClick={handleSendInvoice} disabled={sending}>
+          {primary === 'remind' ? (
+            <button className="btn-action" onClick={() => setPreview('reminder')} disabled={sendingReminder}>
+              {sendingReminder ? 'Sending…' : 'Send reminder'}
+            </button>
+          ) : primary === 'send' ? (
+            <button className="btn-action" onClick={() => setPreview('invoice')} disabled={sending}>
               {sending ? 'Sending…' : status === 'VIEWED' ? 'Resend to customer' : 'Send to customer'}
             </button>
           ) : primary === 'pay' ? (

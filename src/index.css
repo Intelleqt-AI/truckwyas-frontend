@@ -1,5 +1,6 @@
 /* OS Theme first — defines all CSS variables and layout classes */
 @import './styles/theme.css';
+@import './styles/a11y.css';
 
 /* ── React-Toastify overrides ─────────────────────────────────────────────── */
 /* Theme tokens resolve fine across the portal (they live on <html>), and the

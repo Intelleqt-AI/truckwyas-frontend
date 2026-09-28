@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, MessageSquareText, Sun, Moon, ChevronDown } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { LiveEvents } from '@/components/LiveEvents';
@@ -12,6 +12,7 @@ import { isSubscriptionBlocked, subscriptionStatusDetail, subscriptionStatusLabe
 import { Sidebar } from '@/components/shell/Sidebar';
 import { PhoneBar } from '@/components/shell/PhoneBar';
 import '@/components/shell/shell.css';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // "Auto sign out after 30 minutes of inactivity"
 
@@ -161,12 +162,22 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   }, []);
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
   const closeMore = useCallback((v: boolean) => setMoreOpen(v), []);
+  const { pathname } = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
 
   return (
     <div
       className={`os-app-shell tw-shell${railed ? ' is-railed' : ''}`}
       data-rail={railed ? 'true' : 'false'}
     >
+      {/* First focusable element: jumps past the sidebar and top bar. */}
+      <a
+        href="#main-content"
+        className="tw-skip-link"
+        onClick={(e) => { e.preventDefault(); mainRef.current?.focus(); mainRef.current?.scrollIntoView({ block: 'start' }); }}
+      >
+        Skip to content
+      </a>
       <LiveEvents />
 
       <Sidebar
@@ -270,8 +281,10 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* CONTENT */}
-      <main className="os-app-main tw-main">
-        {children}
+      <main id="main-content" ref={mainRef} tabIndex={-1} className="os-app-main tw-main">
+        <ErrorBoundary variant="page" resetKey={pathname}>
+          {children}
+        </ErrorBoundary>
       </main>
 
       <PhoneBar

@@ -106,7 +106,7 @@ export function DatePicker({ dashboard = false, value, onChange, placeholder = "
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <div
-        className={dashboard ? "dashboard-date-picker" : undefined}
+        className={dashboard ? "dashboard-date-picker" : "tw-date-field"}
         style={{
           display: 'flex',
           alignItems: 'center',

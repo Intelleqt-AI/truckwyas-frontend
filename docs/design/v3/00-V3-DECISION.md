@@ -40,7 +40,7 @@ Roughly 40% of non-data text can go. Titles become 2 to 6 word labels (not quest
 
 ## Numbers that disagree (needs backend Wave 0)
 
-Owed to you, cash received, margin, active loads and fleet size show different values on different pages. True values from reading every record: owed R 542 140, received R 205 053, margin 23.7%, active loads 11, vehicles 23. Fix: one server-side definition per metric and list endpoints that return complete results.
+Owed to you, cash received, margin, active loads and fleet size show different values on different pages. Correction (29 Sep): the "true" figures first reported here (owed R 542 140, received R 205 053, margin 23.7%, active loads 11, vehicles 23) were calculated with a superuser login, which on normal pages also returned other companies' records. For the company itself, owed is R 499 530 (the aging endpoint was correct). Backend PR #110 scopes superusers to their own company; the remaining figures will be re-verified after it merges. Fix: one server-side definition per metric and list endpoints that return complete results (page size, in #110).
 
 ## Rollout plan once the spec is approved
 

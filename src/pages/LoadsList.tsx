@@ -12,6 +12,8 @@ import { fetchData, postData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { QuotesList } from './QuotesList';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { rowLink } from '@/lib/rowLink';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { Loader } from '@/components/Loader';
 
@@ -69,7 +71,7 @@ const TAB_DESCRIPTIONS: Record<BookingTab, string> = {
 };
 
 export default function LoadsList() {
-  const { data, isLoading: loading, isError, isFetching, refetch } = useQuery({
+  const loadsQuery = useQuery({
     queryKey: ["loads-list"],
     queryFn: () => fetchData('/api/v1/loads/'),
     // Give the backend enough time to wake from a cold start (Render free tier ~20-30s).
@@ -80,8 +82,12 @@ export default function LoadsList() {
     },
     retryDelay: (attempt) => Math.min(3000 * (attempt + 1), 12000),
   });
+  const { data, isFetching, refetch } = loadsQuery;
+  // Failed (or failing and retrying) with nothing to show: say so straight away.
+  const failed = loadFailed(loadsQuery);
+  const loading = loadsQuery.isLoading && !failed;
   const loads = (data?.results || data || []) as Load[];
-  const error = isError ? 'Failed to load bookings' : null;
+  const error = failed ? 'Failed to load bookings' : null;
   const [convertingIds, setConvertingIds] = useState<Set<number>>(new Set());
   const [orderFilter, setOrderFilter] = useState('All');
   const [historyFilter, setHistoryFilter] = useState('All');
@@ -158,6 +164,7 @@ export default function LoadsList() {
             <tr
               key={load.id}
               className="is-clickable"
+              {...rowLink(() => navigate(`/bookings/${load.id}`))}
               onClick={() => navigate(`/bookings/${load.id}`)}
             >
               <td className="is-id">{load.load_number}</td>
@@ -241,22 +248,12 @@ export default function LoadsList() {
     body = <Loader fullScreen />;
   } else if (error) {
     body = (
-      <div className="card" role="alert" style={{ padding: 24 }}>
-        <h2 className="bk-empty__title" style={{ textAlign: 'left' }}>Unable to load bookings</h2>
-        <p className="bk-empty__text" style={{ marginBottom: 16 }}>
-          The server may be starting up. This usually resolves in 20 to 30 seconds.
-        </p>
-        <div>
-          <button
-            type="button"
-            className="bk-btn bk-btn--primary"
-            disabled={isFetching}
-            onClick={() => refetch()}
-          >
-            {isFetching ? 'Retrying…' : 'Retry loading'}
-          </button>
-        </div>
-      </div>
+      <LoadError
+        what={activeTab === 'history' ? 'past loads' : 'orders'}
+        error={loadsQuery.error ?? loadsQuery.failureReason}
+        busy={isFetching}
+        onRetry={() => refetch()}
+      />
     );
   }
 

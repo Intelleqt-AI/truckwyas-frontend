@@ -15,6 +15,9 @@ import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscript
 import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
 import { Loader } from '@/components/Loader';
 import { AlertTriangle, ArrowLeft, Download } from 'lucide-react';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import QuoteSendPreview from '@/components/QuoteSendPreview';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   DRAFT: 'neutral',
@@ -81,12 +84,18 @@ export default function QuoteDetail() {
   const [fuelAlert, setFuelAlert] = useState<any>(null);
   const [confirmOpts, setConfirmOpts] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void; danger?: boolean } | null>(null);
   const [showConvertModal, setShowConvertModal] = useState(false);
+  useFocusTrap(latestModal, showOutcomeModal && !!outcomeType);
+  // Sending (button or status change to Sent) emails the customer: preview first.
+  const [sendPreview, setSendPreview] = useState<'button' | 'status' | null>(null);
 
-  const { data: quote, isLoading, error } = useQuery({
+  const quoteQuery = useQuery({
     queryKey: ['quote', id],
     queryFn: () => fetchData(`api/v1/quotes/${id}/`),
     retry: 1,
   });
+  const { data: quote, isLoading, error } = quoteQuery;
+  const quoteFailed = loadFailed(quoteQuery);
+  const quoteError = (quoteQuery.error ?? quoteQuery.failureReason) as { status?: number } | null;
 
   // Live update: refetch when backend pushes a quote status event over WebSocket
   useEffect(() => {
@@ -219,6 +228,18 @@ export default function QuoteDetail() {
   const handleConvertToLoad = () => {
     setShowConvertModal(true);
   };
+
+  // A failed request is not a missing quote: only a 404 says "not found".
+  if (quoteFailed && quoteError?.status !== 404) {
+    return (
+      <div className="bk-detail">
+        <button type="button" className="bk-back" onClick={() => navigate('/bookings/quotes')}>
+          <ArrowLeft size={16} aria-hidden="true" /> Back to quotes
+        </button>
+        <LoadError what="this quote" error={quoteError} busy={quoteQuery.isFetching} onRetry={() => quoteQuery.refetch()} />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return <Loader fullScreen />;
@@ -587,7 +608,11 @@ export default function QuoteDetail() {
               </div>
               <div>
                 {label('Status')}
-                <Select value={quote.status} onValueChange={(val) => statusMutation.mutate(val)} disabled={statusMutation.isPending || billingBlocked}>
+                <Select value={quote.status} onValueChange={(val) => {
+                  // Moving to Sent emails the customer: preview and confirm first.
+                  if (val === 'SENT' && quote.status !== 'SENT') { setSendPreview('status'); return; }
+                  statusMutation.mutate(val);
+                }} disabled={statusMutation.isPending || billingBlocked}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -729,7 +754,7 @@ export default function QuoteDetail() {
               <button
                 type="button"
                 className={`bk-btn bk-btn--block ${quote.status === 'ACCEPTED' ? 'bk-btn--secondary' : 'bk-btn--primary'}`}
-                onClick={() => sendToCustomerMutation.mutate()}
+                onClick={() => setSendPreview('button')}
                 disabled={sendToCustomerMutation.isPending}
               >
                 {sendToCustomerMutation.isPending
@@ -954,6 +979,19 @@ export default function QuoteDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {sendPreview && (
+        <QuoteSendPreview
+          quote={quote}
+          confirmLabel={quote.status === 'SENT' ? 'Resend quote' : 'Send quote'}
+          sending={sendPreview === 'status' ? statusMutation.isPending : sendToCustomerMutation.isPending}
+          onCancel={() => setSendPreview(null)}
+          onConfirm={() => {
+            if (sendPreview === 'status') statusMutation.mutate('SENT', { onSettled: () => setSendPreview(null) });
+            else sendToCustomerMutation.mutate(undefined, { onSettled: () => setSendPreview(null) });
+          }}
+        />
       )}
 
       {confirmOpts && (

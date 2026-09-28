@@ -29,7 +29,6 @@ const SelectTrigger = React.forwardRef<
       lineHeight: "20px",
       fontFamily: "var(--font-sans)",
       cursor: "pointer",
-      outline: "none",
       boxSizing: "border-box" as const,
       gap: 8,
       ...style,

@@ -104,7 +104,7 @@
 .fr-table .is-indent { padding-left: 32px; }
 .fr-table tr > :first-child { padding-left: 20px; }
 .fr-table tr > .is-indent:first-child { padding-left: 32px; }
-.fr-table tr > :last-child { padding-right: 20px; }
+.fr-table tr > :last-child { padding-right: calc(20px + var(--fr-tail, 0px)); }
 .fr-table--sticky tr > :first-child { position: sticky; left: 0; z-index: 1; min-width: 180px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
 .fr-table--sticky tr > :first-child { box-shadow: inset -1px 0 0 var(--border-row); }
 .fr-table tbody tr:not(.fr-row--section):hover > * { background: var(--bg-surface-hover); }

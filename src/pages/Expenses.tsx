@@ -17,6 +17,8 @@ import SectionHeader, { FINANCE_TABS } from '@/components/layout/SectionHeader';
 import RowActions from '@/components/ui/RowActions';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { FinTile, FinTiles, wholeRand } from '@/components/finance/FinTile';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
 interface Expense {
   id: number;
@@ -83,7 +85,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const expenseDate = (e: Expense) => new Date(e.expense_date || e.date);
 
 export default function Expenses() {
-  const { data, isLoading: loading, isError, refetch } = useQuery({
+  const expensesQuery = useQuery({
     queryKey: ["expenses-page"],
     queryFn: async () => {
       const [expData, vehData] = await Promise.all([
@@ -101,6 +103,10 @@ export default function Expenses() {
       };
     },
   });
+  const { data, isError, refetch } = expensesQuery;
+  // Failed (or failing and retrying) with nothing to show: say so, never R 0 figures.
+  const failed = loadFailed(expensesQuery);
+  const loading = expensesQuery.isLoading && !failed;
 
   const expenses = data?.expenses ?? [];
   const totalExpenseCount: number = data?.total ?? expenses.length;
@@ -263,6 +269,20 @@ export default function Expenses() {
       }
     />
   );
+
+  if (failed) {
+    return (
+      <div className="fin-page expenses-type-roles">
+        {header}
+        <LoadError
+          what="expenses"
+          error={expensesQuery.error ?? expensesQuery.failureReason}
+          busy={expensesQuery.isFetching}
+          onRetry={() => refetch()}
+        />
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -631,6 +651,7 @@ const FUEL_NOTE = /^Fuel: ([\d.,]+)L @ R\s?([\d\s., ]+)\/L\n?/;
 const parseLocaleNumber = (s: string) => s.replace(/[\s ]/g, '').replace(',', '.');
 
 function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expense; vehicles: Vehicle[]; onClose: () => void; onSaved: () => void }) {
+  useFocusTrap(latestModal, true);
   const fuelMatch = expense?.category === 'FUEL' && expense.notes ? expense.notes.match(FUEL_NOTE) : null;
   const [category, setCategory] = useState(expense?.category || 'FUEL');
   const [amount, setAmount] = useState(expense ? String(amountOf(expense)) : '');

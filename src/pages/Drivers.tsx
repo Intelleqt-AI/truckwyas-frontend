@@ -18,6 +18,9 @@ import { useAuth } from '@/lib/AuthContext';
 import RowActions from '@/components/ui/RowActions';
 import { InfoTip } from '@/components/ui/InfoTip';
 import './ops-tiles.css';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { rowLink } from '@/lib/rowLink';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
 interface Driver {
   id: number;
@@ -112,6 +115,9 @@ export default function Drivers() {
     hire_date: localDateISO(), status: 'ACTIVE',
   });
   const [editDriver, setEditDriver] = useState<Driver | null>(null);
+  // Slide-outs: focus moves in, Tab stays inside, focus returns on close.
+  useFocusTrap(latestModal, showAddForm);
+  useFocusTrap(latestModal, !!editDriver);
   const [editForm, setEditForm] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
   const [confirmOpts, setConfirmOpts] = useState<{
@@ -129,7 +135,7 @@ export default function Drivers() {
     return () => clearTimeout(searchTimer.current);
   }, [search]);
 
-  const { data, isLoading: loading, refetch, dataUpdatedAt, isRefetchError } = useQuery({
+  const driversQuery = useQuery({
     queryKey: ['drivers-page', debouncedSearch],
     queryFn: async () => {
       const q = debouncedSearch;
@@ -206,6 +212,10 @@ export default function Drivers() {
       return { drivers, vehicles, overview, leaderboard: leaderboardEntries };
     },
   });
+  const { data, refetch, dataUpdatedAt, isRefetchError } = driversQuery;
+  // Failed (or failing and retrying) with nothing to show: say so, never "No drivers yet".
+  const failed = loadFailed(driversQuery);
+  const loading = driversQuery.isLoading && !failed;
 
   const drivers: Driver[] = data?.drivers ?? [];
   const vehicles: { id: number; plate: string; make?: string; model?: string; driver_id?: number | null }[] = data?.vehicles ?? [];
@@ -254,7 +264,7 @@ export default function Drivers() {
 
       {/* Driver summary: separate tiles, same geometry as Vehicles so
           switching tabs never moves the page. Hidden when there are no drivers. */}
-      {(loading || drivers.length > 0) && (
+      {!failed && (loading || drivers.length > 0) && (
         <section className="ops-tiles" aria-label="Driver summary" aria-busy={loading}>
           <div className="ops-tile">
             <h2 className="ops-tile__label">Active drivers</h2>
@@ -313,6 +323,14 @@ export default function Drivers() {
       </div>
 
       {/* Table */}
+      {failed ? (
+        <LoadError
+          what="drivers"
+          error={driversQuery.error ?? driversQuery.failureReason}
+          busy={driversQuery.isFetching}
+          onRetry={() => refetch()}
+        />
+      ) : (
       <div className="card fleet-table-region" role="region" aria-label="Drivers table" tabIndex={0}>
         <table className="table-heading-roles fleet-table">
           <thead>
@@ -369,6 +387,7 @@ export default function Drivers() {
                 <tr
                   key={d.id}
                   className="is-clickable"
+                  {...rowLink(() => navigate(`/fleet/drivers/${d.id}`))}
                   onClick={() => navigate(`/fleet/drivers/${d.id}`)}
                 >
                   <td className="is-primary" style={{ fontWeight: 500 }}>
@@ -400,7 +419,7 @@ export default function Drivers() {
                       items={[
                         {
                           label: 'Edit',
-                          disabled: isDemo,
+                          disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined,
                           onSelect: () => {
                             setEditDriver(d);
                             const dUd: any = d.user_details || {};
@@ -424,7 +443,7 @@ export default function Drivers() {
                         {
                           label: 'Delete',
                           danger: true,
-                          disabled: isDemo,
+                          disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined,
                           onSelect: () => {
                             setConfirmOpts({
                               title: 'Delete driver',
@@ -452,12 +471,13 @@ export default function Drivers() {
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Add Driver Slide-out */}
       {showAddForm && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setShowAddForm(false)} />
-          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+          <div role="dialog" aria-modal="true" aria-label="Add driver" style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Add driver</h2>
               <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
@@ -601,7 +621,7 @@ export default function Drivers() {
       {editDriver && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditDriver(null)} />
-          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+          <div role="dialog" aria-modal="true" aria-label="Edit driver" style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit driver</h2>
               <button onClick={() => setEditDriver(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>

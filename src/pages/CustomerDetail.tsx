@@ -13,6 +13,9 @@ import { formatCurrency, formatDate } from "@/lib/formatters";
 import { ArrowLeft, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { rowLink } from '@/lib/rowLink';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
 // Exact rand amounts, two decimals, shared formatter.
 const formatZAR = (v: number) => formatCurrency(v || 0);
@@ -77,15 +80,19 @@ export default function CustomerDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showEdit, setShowEdit] = useState(false);
+  useFocusTrap(latestModal, showEdit);
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [updating, setUpdating] = useState(false);
 
-  const { data: customer, isLoading } = useQuery({
+  const customerQuery = useQuery({
     queryKey: ["customer", id],
     queryFn: () => fetchData(`api/v1/customers/${id}/`),
     enabled: !!id,
   });
+  const { data: customer, isLoading } = customerQuery;
+  const customerFailed = loadFailed(customerQuery);
+  const customerError = (customerQuery.error ?? customerQuery.failureReason) as { status?: number } | null;
 
   const { data: quotesData } = useQuery({
     queryKey: ["customer-quotes", id],
@@ -93,7 +100,17 @@ export default function CustomerDetail() {
     enabled: !!id,
   });
 
-  if (isLoading) return <Loader fullScreen />;
+  // A failed request is not a missing record: only a 404 says "not found".
+  if (customerFailed && customerError?.status !== 404) return (
+    <div className="bk-detail">
+      <button type="button" className="bk-back" onClick={() => navigate("/customers")}>
+        <ArrowLeft size={16} aria-hidden="true" /> Back to customers
+      </button>
+      <LoadError what="this customer" error={customerError} busy={customerQuery.isFetching} onRetry={() => customerQuery.refetch()} />
+    </div>
+  );
+
+  if (isLoading && !customerFailed) return <Loader fullScreen />;
 
   if (!customer) return (
     <div className="bk-detail">
@@ -306,6 +323,7 @@ export default function CustomerDetail() {
                   <tr
                     key={q.id}
                     className="is-clickable"
+                    {...rowLink(() => navigate(`/bookings/quotes/${q.id}`))}
                     onClick={() => navigate(`/bookings/quotes/${q.id}`)}
                   >
                     <td className="is-id">

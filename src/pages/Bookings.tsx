@@ -15,6 +15,8 @@ import { useAuth } from '@/lib/AuthContext';
 import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
 import { ExpandableRouteMap } from "@/components/ExpandableRouteMap";
 import { Loader } from '@/components/Loader';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   PENDING: 'neutral',
@@ -65,12 +67,19 @@ export default function Bookings() {
   const [podSkipping, setPodSkipping] = useState(false);
   const [podButtonUploading, setPodButtonUploading] = useState(false);
   const [podPreviewOpen, setPodPreviewOpen] = useState(false);
+  // Dialogs: focus moves in, Tab stays inside, focus returns on close.
+  useFocusTrap(latestModal, assignModalOpen);
+  useFocusTrap(latestModal, podModalOpen);
+  useFocusTrap(latestModal, podPreviewOpen);
 
-  const { data: load, isLoading } = useQuery({
+  const loadQuery = useQuery({
     queryKey: ['load', id],
     queryFn: () => fetchData(`api/v1/loads/${id}/`),
     enabled: !!id,
   });
+  const { data: load, isLoading } = loadQuery;
+  const loadFailedNow = loadFailed(loadQuery);
+  const loadError = (loadQuery.error ?? loadQuery.failureReason) as { status?: number } | null;
 
   const { data: driversData } = useQuery({
     queryKey: ['drivers-active'],
@@ -278,7 +287,17 @@ export default function Bookings() {
     }
   };
 
-  if (isLoading) return <Loader fullScreen />;
+  // A failed request is not a missing record: only a 404 says "not found".
+  if (loadFailedNow && loadError?.status !== 404) return (
+    <div className="bk-detail">
+      <button type="button" className="bk-back" onClick={() => navigate('/bookings/orders')}>
+        <ArrowLeft size={16} aria-hidden="true" /> Back to orders
+      </button>
+      <LoadError what="this load" error={loadError} busy={loadQuery.isFetching} onRetry={() => loadQuery.refetch()} />
+    </div>
+  );
+
+  if (isLoading && !loadFailedNow) return <Loader fullScreen />;
 
   if (!load) return (
     <div className="bk-detail">

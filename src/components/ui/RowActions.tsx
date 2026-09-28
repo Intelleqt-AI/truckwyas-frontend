@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MoreHorizontal } from 'lucide-react';
 import './row-actions.css';
@@ -10,6 +10,11 @@ export interface RowActionItem {
   disabled?: boolean;
   /** Optional second line, e.g. why an item is unavailable. */
   hint?: string;
+  /**
+   * Tooltip for the item. On a disabled item this is the reason it is
+   * unavailable; it is also announced to screen readers. Falls back to `hint`.
+   */
+  title?: string;
 }
 
 /**
@@ -24,10 +29,16 @@ export interface RowActionItem {
  * clipped by a table's own scroll region. Keyboard: Enter/Space/ArrowDown
  * opens, arrows and Home/End move, Escape or Tab closes, focus returns to the
  * trigger. 32px with a mouse, 44px on touch (pointer: coarse).
+ *
+ * Disabled items (and a disabled Edit, via `editDisabledReason`) stay
+ * focusable so keyboard and screen-reader users can find out why they are
+ * unavailable; the reason shows as a tooltip and is announced.
  */
-export default function RowActions({ label, onEdit, items }: {
+export default function RowActions({ label, onEdit, editDisabledReason, items }: {
   label: string;
   onEdit?: () => void;
+  /** Show Edit but make it unavailable, with this reason as its tooltip. */
+  editDisabledReason?: string;
   items?: RowActionItem[];
 }) {
   const [open, setOpen] = useState(false);
@@ -36,6 +47,8 @@ export default function RowActions({ label, onEdit, items }: {
   const menuRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const focusFirstOnOpen = useRef<'first' | 'last' | null>(null);
+  const uid = useId();
+  const menuId = `rowact-${uid.replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
   const list = items ?? [];
   const safe = list.filter((i) => !i.danger);
@@ -98,31 +111,45 @@ export default function RowActions({ label, onEdit, items }: {
     if (!open || !pos) return;
     const want = focusFirstOnOpen.current;
     focusFirstOnOpen.current = null;
-    const enabled = itemRefs.current.filter((b): b is HTMLButtonElement => !!b && !b.disabled);
-    if (!enabled.length) { menuRef.current?.focus(); return; }
-    (want === 'last' ? enabled[enabled.length - 1] : enabled[0]).focus();
+    const all = itemRefs.current.filter((b): b is HTMLButtonElement => !!b);
+    const enabled = all.filter((b) => b.getAttribute('aria-disabled') !== 'true');
+    const pool = enabled.length ? enabled : all;
+    if (!pool.length) { menuRef.current?.focus(); return; }
+    (want === 'last' ? pool[pool.length - 1] : pool[0]).focus();
   }, [open, pos]);
+
+  const editDisabled = !!editDisabledReason;
 
   if (!list.length) {
     if (!onEdit) return null;
+    const reasonId = `${menuId}-edit-reason`;
     return (
-      <button
-        type="button"
-        className="tw-rowact tw-rowact--text"
-        aria-label={`Edit ${label}`}
-        onClick={(e) => { e.stopPropagation(); onEdit(); }}
-      >
-        Edit
-      </button>
+      <>
+        <button
+          type="button"
+          className="tw-rowact tw-rowact--text"
+          aria-label={`Edit ${label}`}
+          aria-disabled={editDisabled || undefined}
+          aria-describedby={editDisabled ? reasonId : undefined}
+          title={editDisabledReason}
+          onClick={(e) => { e.stopPropagation(); if (!editDisabled) onEdit(); }}
+        >
+          Edit
+        </button>
+        {editDisabled && <span id={reasonId} className="tw-rowact-sr">{editDisabledReason}</span>}
+      </>
     );
   }
 
   // With a menu, Edit becomes its first item so the row keeps one control.
-  const menuItems: RowActionItem[] = onEdit ? [{ label: 'Edit', onSelect: onEdit }, ...ordered] : ordered;
+  const menuItems: RowActionItem[] = onEdit
+    ? [{ label: 'Edit', onSelect: onEdit, disabled: editDisabled, title: editDisabledReason }, ...ordered]
+    : ordered;
   const firstDanger = menuItems.findIndex((i) => i.danger);
 
   const moveFocus = (dir: 1 | -1 | 'first' | 'last') => {
-    const enabled = itemRefs.current.filter((b): b is HTMLButtonElement => !!b && !b.disabled);
+    // Disabled items stay in the focus order so their reason can be read.
+    const enabled = itemRefs.current.filter((b): b is HTMLButtonElement => !!b);
     if (!enabled.length) return;
     const cur = enabled.indexOf(document.activeElement as HTMLButtonElement);
     let next = 0;
@@ -154,8 +181,6 @@ export default function RowActions({ label, onEdit, items }: {
     }
   };
 
-  const menuId = `rowact-${label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
-
   return (
     <>
       <button
@@ -183,27 +208,34 @@ export default function RowActions({ label, onEdit, items }: {
           onKeyDown={onMenuKey}
           onClick={(e) => e.stopPropagation()}
         >
-          {menuItems.map((item, i) => (
-            <div key={`${item.label}-${i}`} role="none">
-              {i === firstDanger && firstDanger > 0 && <div className="tw-rowact-menu__sep" role="separator" />}
-              <button
-                ref={(el) => { itemRefs.current[i] = el; }}
-                type="button"
-                role="menuitem"
-                disabled={item.disabled}
-                aria-disabled={item.disabled || undefined}
-                className={`tw-rowact-menu__item${item.danger ? ' is-danger' : ''}`}
-                onClick={() => {
-                  if (item.disabled) return;
-                  close(true);
-                  item.onSelect();
-                }}
-              >
-                <span className="tw-rowact-menu__label">{item.label}</span>
-                {item.hint && <span className="tw-rowact-menu__hint">{item.hint}</span>}
-              </button>
-            </div>
-          ))}
+          {menuItems.map((item, i) => {
+            const tip = item.title ?? (item.disabled ? item.hint : undefined);
+            // The hint is already visible text inside the item; only a tooltip-only reason needs describing.
+            const reasonId = item.disabled && item.title && item.title !== item.hint ? `${menuId}-reason-${i}` : undefined;
+            return (
+              <div key={`${item.label}-${i}`} role="none">
+                {i === firstDanger && firstDanger > 0 && <div className="tw-rowact-menu__sep" role="separator" />}
+                <button
+                  ref={(el) => { itemRefs.current[i] = el; }}
+                  type="button"
+                  role="menuitem"
+                  aria-disabled={item.disabled || undefined}
+                  aria-describedby={reasonId}
+                  title={tip}
+                  className={`tw-rowact-menu__item${item.danger ? ' is-danger' : ''}${item.disabled ? ' is-disabled' : ''}`}
+                  onClick={() => {
+                    if (item.disabled) return;
+                    close(true);
+                    item.onSelect();
+                  }}
+                >
+                  <span className="tw-rowact-menu__label">{item.label}</span>
+                  {item.hint && <span className="tw-rowact-menu__hint">{item.hint}</span>}
+                  {reasonId && <span id={reasonId} className="tw-rowact-sr">{item.title}</span>}
+                </button>
+              </div>
+            );
+          })}
         </div>,
         document.body,
       )}

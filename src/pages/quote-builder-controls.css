@@ -10,3 +10,69 @@
   color-scheme: light;
 }
 .qb-controls input[type="date"] { height: 40px; }
+
+/* ---- One price, next to Send (behaviour fix 2) ------------------------- */
+.qb-pricebar {
+  position: sticky;
+  /* Sits 12px above the window edge (main has 48px bottom padding). */
+  bottom: -36px;
+  /* Above the map's panes and controls (Leaflet uses 400 to 1000). */
+  z-index: 1100;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px 24px;
+  margin: 0 0 8px;
+  padding: 14px 18px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card, 12px);
+  font-family: var(--font-sans);
+}
+.qb-pricebar__price { display: flex; flex-direction: column; min-width: 0; }
+.qb-pricebar__label { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.qb-pricebar__figure { font: 600 28px/36px var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--text-primary); white-space: nowrap; }
+.qb-pricebar__sub { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.qb-pricebar__suggest {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; min-width: 0;
+  font: 400 13px/20px var(--font-sans); color: var(--text-secondary);
+}
+.qb-pricebar__num { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.qb-pricebar__muted { color: var(--text-tertiary); }
+.qb-pricebar__warn { color: var(--status-warning-text, var(--status-warning)); }
+.qb-pricebar__use { height: 32px; }
+.qb-pricebar__actions { display: flex; gap: 10px; justify-content: flex-end; }
+.qb-pricebar__actions .tw-btn { height: 40px; padding: 0 16px; font-size: 14px; }
+.qb-pricebar__actions .tw-btn:disabled { opacity: 0.6; cursor: progress; }
+
+/* The assistant bubble floats bottom-right; lift it clear of the price bar. */
+.qb-has-pricebar button[aria-label="AI assistant"] { bottom: 112px !important; }
+
+/* ---- Phones and narrow tablets: one column, price bar stays in reach ---- */
+@media (max-width: 1024px) {
+  .qb-grid--inputs, .qb-grid--details { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .qb-grid--mapcost { grid-template-columns: minmax(0, 1fr) !important; }
+  .qb-pricebar { grid-template-columns: auto minmax(0, 1fr); }
+  .qb-pricebar__actions { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .qb-head { flex-wrap: wrap; gap: 12px; }
+  .qb-grid--inputs, .qb-grid--details, .qb-grid--ai { grid-template-columns: minmax(0, 1fr) !important; }
+  .qb-grid--details > *, .qb-grid--inputs > * { grid-column: auto !important; min-width: 0; }
+  .qb-grid--ai > * { border-right: 0 !important; border-bottom: 1px solid var(--border-row); }
+  .qb-grid--ai > *:last-child { border-bottom: 0; }
+  .qb-pricebar {
+    bottom: -32px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin: 0 -16px -32px;
+    padding: 12px 16px;
+    border-radius: 0;
+    border-width: 1px 0 0;
+  }
+  .qb-pricebar__price { flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 0 8px; }
+  .qb-pricebar__figure { font-size: 22px; line-height: 28px; }
+  .qb-pricebar__sub { flex-basis: 100%; }
+  .qb-pricebar__actions .tw-btn { flex: 1 1 0; height: 48px; }
+  .qb-has-pricebar button[aria-label="AI assistant"] { bottom: 236px !important; }
+}

@@ -2,6 +2,7 @@ import { Fragment, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Check as CheckIcon, Download, Printer } from 'lucide-react';
 import { InfoTip } from '@/components/ui/InfoTip';
+import LoadError from '@/components/data/LoadError';
 import {
   PERIODS, day, downloadCsv, int, money, pct, resolvePeriod, slug,
   type CsvCell, type Period, type PeriodId,
@@ -182,8 +183,23 @@ export function StatementTable({ table, caption, stickyFirst = true, footer, scr
   const scroller = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = scroller.current;
-    if (scrollEnd && el) el.scrollLeft = el.scrollWidth;
-  }, [scrollEnd, columns.length]);
+    if (!scrollEnd || !el) return;
+    const table = el.querySelector('table');
+    table?.style.removeProperty('--fr-tail');
+    el.scrollLeft = el.scrollWidth;
+    // Opening at the right edge can leave the first visible month cut in half
+    // behind the sticky label column ("…45,60"). Add just enough trailing space
+    // after the last column that the cut column scrolls fully out of view, so
+    // every figure on screen is whole. Display only: no values change.
+    const heads = Array.from(el.querySelectorAll<HTMLTableCellElement>('thead th'));
+    if (!table || heads.length < 2 || el.scrollWidth <= el.clientWidth) return;
+    const left = el.scrollLeft + (stickyFirst ? heads[0].offsetWidth : 0);
+    const cut = heads.slice(1).find(th => th.offsetLeft < left - 1 && th.offsetLeft + th.offsetWidth > left + 1);
+    if (!cut) return;
+    const tail = Math.ceil(cut.offsetLeft + cut.offsetWidth - left);
+    table.style.setProperty('--fr-tail', `${tail}px`);
+    el.scrollLeft = el.scrollWidth;
+  }, [scrollEnd, stickyFirst, columns.length, rows.length]);
   return (
     <section className="tw-card tw-card--flush fr-statement" aria-label={caption}>
       <div ref={scroller} className="fr-scroll" tabIndex={0} role="region" aria-label={`${caption}, scrolls sideways`}>
@@ -266,12 +282,7 @@ export function ReportState({ loading, error, onRetry }: { loading: boolean; err
     );
   }
   if (error) {
-    return (
-      <div className="fr-state" role="alert">
-        <p>Figures could not load.</p>
-        <button type="button" className="tw-btn" onClick={onRetry}>Retry</button>
-      </div>
-    );
+    return <LoadError what="this report" onRetry={onRetry} />;
   }
   return null;
 }

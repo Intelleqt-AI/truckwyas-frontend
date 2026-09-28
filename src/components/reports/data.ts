@@ -5,6 +5,7 @@
    Query keys match the Insights sources so the two share one cache. */
 
 import { useQuery } from '@tanstack/react-query';
+import { loadFailed } from '@/components/data/LoadError';
 import { fetchData } from '@/lib/Api';
 import { fetchAllPages, type Source } from '@/components/insights/findings';
 
@@ -72,9 +73,11 @@ export function useLedger(need: SourceName[]) {
     vehicles: useList<Vehicle>('vehicles', PATHS.vehicles, need.includes('vehicles')),
   };
   const used = need.map(n => q[n]);
-  const loading = used.some(x => x.isLoading);
-  const error = used.some(x => x.isError);
-  const retry = () => used.forEach(x => x.isError && x.refetch());
+  // Failing (even while still retrying) with nothing to show counts as an error,
+  // so the report says so straight away instead of holding a skeleton.
+  const error = used.some(x => loadFailed(x));
+  const loading = !error && used.some(x => x.isLoading);
+  const retry = () => used.forEach(x => loadFailed(x) && x.refetch());
   if (loading || error || used.some(x => !x.data)) return { loading, error, retry, data: null as Ledger | null };
   const partial = need
     .filter(n => q[n].data && !q[n].data!.complete)

@@ -12,6 +12,10 @@ import SectionHeader, { FINANCE_TABS } from "@/components/layout/SectionHeader";
 import RowActions from "@/components/ui/RowActions";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { FinTile, FinTiles, wholeRand } from "@/components/finance/FinTile";
+import LoadError, { loadFailed } from "@/components/data/LoadError";
+import InvoiceSendPreview, { type InvoiceMessageKind } from "@/components/finance/InvoiceSendPreview";
+import { canSendReminder, invoiceBalance, isInvoiceOverdue } from "@/lib/invoiceStatus";
+import { rowLink } from "@/lib/rowLink";
 
 // External Fast Pay application link. The applied-state key is unchanged so
 // invoices already marked "Applied" stay marked.
@@ -74,13 +78,33 @@ function financeTabsFor(pathname: string) {
 // Fetches invoices + stats. Lives in the queryFn so the result is cached by
 // TanStack Query (keyed below) and survives navigation — revisiting the page
 // no longer refires these requests until the cache goes stale.
+// The list endpoint pages at 20. Filters and the Overdue tile must agree, so the
+// remaining pages are fetched too (same endpoint, `?page=n`, in parallel), up to
+// a bound that keeps request volume modest under the API's per-user rate limit.
+// A later page that fails leaves the list partial (and labelled so), never
+// failing the whole page.
+const MAX_INVOICE_PAGES = 10;
+
 async function loadInvoicesPage() {
   const [data, statsData] = await Promise.all([
     fetchData("/api/v1/invoices/"),
     fetchData("/api/v1/invoices/stats/").catch(() => null),
   ]);
   // API returns paginated {count, results} — extract results
-  const invoices = Array.isArray(data) ? data : data?.results || [];
+  const invoices = Array.isArray(data) ? [...data] : [...(data?.results || [])];
+  const pageSize = invoices.length;
+  if (!Array.isArray(data) && data?.next && typeof data?.count === "number" && pageSize > 0) {
+    const pages = Math.min(Math.ceil(data.count / pageSize), MAX_INVOICE_PAGES);
+    const rest = await Promise.all(
+      Array.from({ length: Math.max(0, pages - 1) }, (_, i) =>
+        fetchData(`/api/v1/invoices/?page=${i + 2}`).catch(() => null),
+      ),
+    );
+    for (const pageData of rest) {
+      if (!pageData) break; // keep pages in order; stop at the first gap
+      invoices.push(...(Array.isArray(pageData) ? pageData : pageData?.results || []));
+    }
+  }
   return {
     invoices,
     // The list endpoint is paginated; `count` is the tenant's full total, so
@@ -104,18 +128,21 @@ export default function Invoices() {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Outgoing messages are previewed and confirmed before they are sent.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [preview, setPreview] = useState<{ kind: InvoiceMessageKind; invoice: any } | null>(null);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
 
   // Invoices + stats, cached across navigations.
-  const {
-    data: invoicesData,
-    isLoading: loading,
-    isError,
-    refetch: refetchInvoices,
-  } = useQuery({
+  const invoicesQuery = useQuery({
     queryKey: ["invoices-page"],
     queryFn: loadInvoicesPage,
   });
+  const { data: invoicesData, refetch: refetchInvoices } = invoicesQuery;
+  // Nothing to show because the request failed (or is failing and retrying):
+  // the page says so instead of spinning or showing an empty list.
+  const failed = loadFailed(invoicesQuery);
+  const loading = invoicesQuery.isLoading && !failed;
   const invoices: any[] = invoicesData?.invoices ?? [];
   const stats: any = invoicesData?.stats ?? null;
   const totalInvoices: number = invoicesData?.total ?? invoices.length;
@@ -186,6 +213,7 @@ export default function Invoices() {
         data: {},
       });
       flash("Reminder sent");
+      refetchInvoices();
     } catch (error: any) {
       if (error?.response?.status === 404) {
         flash("Reminder recorded. The customer will be contacted.");
@@ -202,7 +230,11 @@ export default function Invoices() {
 
   const filtered = allInvoices.filter((inv) => {
     const invStatus = inv.status?.toUpperCase();
-    const matchStatus = statusFilter === "All" || invStatus === statusFilter;
+    // "Overdue" uses the one shared definition (unpaid, sent, past due),
+    // whatever the status string says, so it matches the Overdue tile.
+    const matchStatus =
+      statusFilter === "All" ||
+      (statusFilter === "OVERDUE" ? isInvoiceOverdue(inv) : invStatus === statusFilter);
     const invNumber = inv.invoice_number || inv.invoiceNumber || "";
     const custName = inv.customer_name || inv.customerName || "";
     const matchSearch =
@@ -228,10 +260,19 @@ export default function Invoices() {
   const invoicedMtd: number = stats?.total_invoiced_mtd ?? 0;
   const collectedMtd: number = stats?.total_collected_mtd ?? 0;
   const monthActive = invoicedMtd > 0 || collectedMtd > 0;
-  const overdueCount: number = stats?.overdue_count ?? 0;
+  const truncatedList = totalInvoices > invoices.length;
+  // Overdue tile: when every invoice is loaded, count them with the same
+  // definition the filter uses so the two always agree. Only when the list is
+  // partial (the API pages at 20) does it fall back to the server's figure.
+  const overdueList = invoices.filter((i) => isInvoiceOverdue(i));
+  const overdueFromList = !truncatedList;
+  const overdueCount: number = overdueFromList ? overdueList.length : (stats?.overdue_count ?? 0);
+  const overdueAmount: number = overdueFromList
+    ? overdueList.reduce((sum, i) => sum + invoiceBalance(i), 0)
+    : (stats?.overdue_amount ?? 0);
   const paidCount: number = byStatus.PAID ?? 0;
   const avgDays: number | null = paidCount > 0 && stats?.avg_days_to_pay ? stats.avg_days_to_pay : null;
-  const truncated = totalInvoices > allInvoices.length;
+  const truncated = truncatedList;
 
   // Previous-month comparison only when every invoice is loaded; a partial
   // page would understate last month.
@@ -277,6 +318,30 @@ export default function Invoices() {
         }
       />
 
+      {preview && (
+        <InvoiceSendPreview
+          kind={preview.kind}
+          invoice={preview.invoice}
+          sending={preview.kind === "reminder" ? sendingReminderId === preview.invoice.id : sendingId === preview.invoice.id}
+          onCancel={() => setPreview(null)}
+          onConfirm={async () => {
+            const { kind, invoice } = preview;
+            if (kind === "reminder") await handleSendReminder(null, invoice.id);
+            else await handleSendInvoice(null, invoice.id);
+            setPreview(null);
+          }}
+        />
+      )}
+
+      {failed ? (
+        <LoadError
+          what="invoices"
+          error={invoicesQuery.error ?? invoicesQuery.failureReason}
+          busy={invoicesQuery.isFetching}
+          onRetry={() => refetchInvoices()}
+        />
+      ) : (
+      <>
       {/* Headline: tiles only where the number drives a decision */}
       {loading ? (
         <div style={{ display: "flex", justifyContent: "center", padding: "20px 0", marginBottom: 24 }}>
@@ -325,9 +390,13 @@ export default function Invoices() {
           )}
           <FinTile
             label="Overdue"
-            info="Unpaid balance incl. VAT on invoices past their due date. Covers all invoices."
-            value={wholeRand(stats.overdue_amount ?? 0)}
-            valueTitle={formatCurrency(stats.overdue_amount ?? 0)}
+            info={
+              overdueFromList
+                ? "Unpaid balance incl. VAT on sent invoices past their due date, including part-paid ones. Covers all invoices."
+                : "Unpaid balance incl. VAT on invoices past their due date, from the server's count of all invoices."
+            }
+            value={wholeRand(overdueAmount)}
+            valueTitle={formatCurrency(overdueAmount)}
             sub={overdueCount > 0 ? `${overdueCount} ${overdueCount === 1 ? "invoice" : "invoices"} late` : "None late"}
             subTone={overdueCount > 0 ? "danger" : undefined}
             action={overdueCount > 0 && statusFilter !== "OVERDUE" ? { label: "Show", onClick: () => showStatus("OVERDUE") } : undefined}
@@ -407,14 +476,6 @@ export default function Invoices() {
                   <td colSpan={6} style={{ padding: 0 }}>
                     {loading ? (
                       <div className="fin-empty fin-empty--compact">Loading invoices…</div>
-                    ) : isError ? (
-                      <div className="fin-empty">
-                        <p className="fin-empty__title">Couldn’t load invoices</p>
-                        <p className="fin-empty__body">Check your connection and try again.</p>
-                        <button className="btn-action" onClick={() => refetchInvoices()}>
-                          Retry loading
-                        </button>
-                      </div>
                     ) : allInvoices.length === 0 ? (
                       <div className="fin-empty">
                         <p className="fin-empty__title">No invoices yet</p>
@@ -459,6 +520,7 @@ export default function Invoices() {
                     <tr
                       key={inv.id}
                       className="is-clickable"
+                      {...rowLink(() => navigate(`/finance/invoices/${inv.id}`))}
                       onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
                       <td className="fin-strong m-party m-span2 fin-cell-2">
                         <div className="fin-truncate" title={custName}>
@@ -499,14 +561,14 @@ export default function Invoices() {
                             ...(invStatus === "DRAFT"
                               ? [{
                                   label: sendingId === inv.id ? "Sending…" : "Send to customer",
-                                  onSelect: () => handleSendInvoice(null, inv.id),
+                                  onSelect: () => setPreview({ kind: "invoice", invoice: inv }),
                                   disabled: sendingId === inv.id,
                                 }]
                               : []),
-                            ...(invStatus === "OVERDUE"
+                            ...(canSendReminder(inv)
                               ? [{
                                   label: sendingReminderId === inv.id ? "Sending…" : "Send reminder",
-                                  onSelect: () => handleSendReminder(null, inv.id),
+                                  onSelect: () => setPreview({ kind: "reminder", invoice: inv }),
                                   disabled: sendingReminderId === inv.id,
                                 }]
                               : []),
@@ -561,6 +623,8 @@ export default function Invoices() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

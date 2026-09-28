@@ -7,6 +7,7 @@ import SectionHeader from '@/components/layout/SectionHeader';
 import './fleet-vehicles-brand.css';
 import './ops-tiles.css';
 import { InfoTip } from '@/components/ui/InfoTip';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
 
 // 7-day heatmap — Mon → Sun
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -76,10 +77,14 @@ const RouteBar = ({ route, count, revenue, maxCount, total }: any) => (
 export default function FleetHeatmap() {
   const navigate = useNavigate();
 
-  const { data: loadsData, isLoading } = useQuery({
+  const loadsQuery = useQuery({
     queryKey: ['loads-heatmap'],
     queryFn: () => fetchData('api/v1/loads/?page_size=200'),
   });
+  const { data: loadsData } = loadsQuery;
+  // A failed load list must not draw as an empty (all quiet) heatmap.
+  const loadsFailed = loadFailed(loadsQuery);
+  const isLoading = loadsQuery.isLoading && !loadsFailed;
 
   const { data: vehiclesData } = useQuery({
     queryKey: ['vehicles-heatmap'],
@@ -169,7 +174,14 @@ export default function FleetHeatmap() {
             </div>
           </div>
 
-          {isLoading ? (
+          {loadsFailed ? (
+            <LoadError
+              what="fleet activity"
+              error={loadsQuery.error ?? loadsQuery.failureReason}
+              busy={loadsQuery.isFetching}
+              onRetry={() => loadsQuery.refetch()}
+            />
+          ) : isLoading ? (
             <div style={{ padding: '40px 0', display: 'flex', justifyContent: 'center' }}><Loader size={28} label="Loading activity" /></div>
           ) : (
             <div className="fleet-heatmap">

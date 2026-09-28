@@ -11,6 +11,8 @@ import {
 } from '@/components/fleet-detail/parts';
 import { MonthlyBars } from '@/components/fleet-detail/MonthlyBars';
 import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
 const VEHICLE_STATUSES = ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'OUT_OF_SERVICE'] as const;
 
@@ -40,17 +42,22 @@ export default function VehicleFinancialProfile() {
   const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  useFocusTrap(latestModal, showEditForm);
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: vehicle, isLoading, isError, error: loadError, refetch } = useQuery({
+  const vehicleQuery = useQuery({
     queryKey: ['vehicle', id],
     queryFn: () => fetchData(`api/v1/vehicles/${id}/`),
     enabled: !!id,
     // A missing record is final; only retry transient failures.
     retry: (count: number, err: unknown) => !isNotFound(err) && count < 2,
   });
+  const { data: vehicle, isLoading, error: queryError, refetch } = vehicleQuery;
+  const loadError = queryError ?? vehicleQuery.failureReason;
+  // Failing (even while retrying) with nothing to show: say so straight away.
+  const isError = loadFailed(vehicleQuery);
 
   const { data: loadsData } = useQuery({
     queryKey: ['vehicle-loads', id],
@@ -76,15 +83,15 @@ export default function VehicleFinancialProfile() {
     return { id: d.id, name: fn && ln ? `${fn} ${ln}` : fn || ln || `Driver ${d.id}` };
   });
 
-  if (isLoading) return <DetailSkeleton />;
   if (isError && !isNotFound(loadError)) return (
-    <DetailMessage
-      title="Vehicle did not load"
-      body="Check your connection and try again."
-      primary={{ label: 'Try again', onClick: () => refetch() }}
-      secondary={{ label: 'Back to vehicles', onClick: () => navigate('/fleet/vehicles') }}
-    />
+    <div style={{ display: 'grid', gap: 16 }}>
+      <div>
+        <button type="button" className="tw-btn tw-btn--ghost" onClick={() => navigate('/fleet/vehicles')}>Back to vehicles</button>
+      </div>
+      <LoadError what="this vehicle" error={loadError} busy={vehicleQuery.isFetching} onRetry={() => refetch()} />
+    </div>
   );
+  if (isLoading && !isError) return <DetailSkeleton />;
   if (!vehicle) return (
     <DetailMessage
       title="Vehicle not found"

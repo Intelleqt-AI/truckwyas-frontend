@@ -7,6 +7,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Building2, Plus, X } from "lucide-react";
 import SectionHeader from "@/components/layout/SectionHeader";
 import { useQuery } from "@tanstack/react-query";
+import LoadError, { loadFailed } from "@/components/data/LoadError";
+import { rowLink } from "@/lib/rowLink";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
 import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
 import { fetchData, postData, patchData, deleteData } from "../lib/Api";
@@ -17,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader } from '@/components/Loader';
 import { useAuth } from '@/lib/AuthContext';
 import RowActions from '@/components/ui/RowActions';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
 interface Customer {
   id: number;
@@ -103,6 +106,9 @@ export default function Customers() {
   const [saving, setSaving] = useState(false);
 
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
+  // Slide-outs: focus moves in, Tab stays inside, focus returns on close.
+  useFocusTrap(latestModal, showAddForm);
+  useFocusTrap(latestModal, !!editCustomer);
   const [editForm, setEditForm] = useState<any>({});
 
   const [confirmOpts, setConfirmOpts] = useState<{
@@ -119,7 +125,7 @@ export default function Customers() {
     }
   }, [location.pathname]);
 
-  const { data, isLoading: loading, refetch } = useQuery({
+  const customersQuery = useQuery({
     queryKey: ["customers-page", debouncedSearch],
     queryFn: () => {
       const url = debouncedSearch
@@ -128,6 +134,10 @@ export default function Customers() {
       return fetchData(url);
     },
   });
+  const { data, refetch } = customersQuery;
+  // Failed (or failing and retrying) with nothing to show: say so, never "No customers yet".
+  const failed = loadFailed(customersQuery);
+  const loading = customersQuery.isLoading && !failed;
   const customers: Customer[] = Array.isArray(data) ? data : data?.results || [];
   // The endpoint is paginated; count is the true total, results only the first page.
   const totalCustomers: number = Array.isArray(data) ? customers.length : (data?.count ?? customers.length);
@@ -198,6 +208,19 @@ export default function Customers() {
     />
   );
 
+  if (failed) {
+    return (
+      <div className="customers-typography">
+        {header}
+        <LoadError
+          what="customers"
+          error={customersQuery.error ?? customersQuery.failureReason}
+          busy={customersQuery.isFetching}
+          onRetry={() => refetch()}
+        />
+      </div>
+    );
+  }
   if (loading) return <div className="customers-typography">{header}<Loader fullScreen /></div>;
 
   return (
@@ -310,6 +333,7 @@ export default function Customers() {
                 <tr
                   key={c.id}
                   className="is-clickable"
+                  {...rowLink(() => navigate(`/customers/${c.id}`))}
                   onClick={() => navigate(`/customers/${c.id}`)}
                 >
                   <td style={{ paddingRight: 0, width: 32 }}>
@@ -343,11 +367,11 @@ export default function Customers() {
                     <RowActions
                       label={c.name}
                       items={[
-                        { label: "Edit", onSelect: () => openEdit(c), disabled: isDemo },
+                        { label: "Edit", onSelect: () => openEdit(c), disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined },
                         {
                           label: "Delete",
                           danger: true,
-                          disabled: isDemo,
+                          disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined,
                           onSelect: () => setConfirmOpts({
                             title: "Delete customer",
                             message: `Remove "${c.name}"? This cannot be undone.`,

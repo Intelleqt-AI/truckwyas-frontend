@@ -30,6 +30,9 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import QuoteSendPreview from '@/components/QuoteSendPreview';
+import { rowLink } from '@/lib/rowLink';
 
 
 // Pipeline stage -> dot/chip tone. Colour only ever sits next to its text label.
@@ -263,6 +266,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [confirmOpts, setConfirmOpts] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void } | null>(null);
   const [pendingConvertQuote, setPendingConvertQuote] = useState<any>(null);
+  // Dragging a card into Sent emails the customer (the server sends on the
+  // status change), so it is previewed and confirmed first.
+  const [pendingSend, setPendingSend] = useState<{ quote: any; oldColumn: string } | null>(null);
 
   // Search is sent to the backend (it searches across every quote, not just
   // whatever's already loaded on screen) — debounced so typing doesn't fire
@@ -313,6 +319,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     [draftQ, sentQ, acceptedQ, declinedQ]
   );
   const totalQuotesCount = COLUMNS.reduce((sum, col) => sum + flattenColumn(columnQueries[col]).count, 0);
+  // A failed column must never read as "No quotes" (and its 0 must not be counted).
+  const failedColumns = COLUMNS.filter(col => loadFailed(columnQueries[col]));
+  const retryFailedColumns = () => failedColumns.forEach(col => columnQueries[col].refetch());
 
   // Live update: refetch every column when the backend pushes any quote
   // event over WebSocket — prefix match invalidates all of them (and the
@@ -411,12 +420,21 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     // new column (and disappears from the old) once these refetch, which
     // the live WebSocket event above also triggers the moment the backend
     // confirms the change.
+    if (newStatus === 'SENT') {
+      const quote = allLoadedBoardItems.find((q: any) => String(q.id) === quoteId);
+      if (quote) { setPendingSend({ quote, oldColumn }); return; }
+    }
+    moveQuote(quoteId, oldColumn, newStatus);
+  };
+
+  const moveQuote = (quoteId: string, oldColumn: string, newStatus: string, onDone?: () => void) => {
     statusMutation.mutate({ id: quoteId, status: newStatus }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['quotes-column', oldColumn] });
         queryClient.invalidateQueries({ queryKey: ['quotes-column', newStatus] });
         queryClient.invalidateQueries({ queryKey: ['quotes-column', null] });
       },
+      onSettled: () => onDone?.(),
     });
   };
 
@@ -474,7 +492,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           ))}
         </div>
         <span className="bk-toolbar__end">
-          {view === 'board' && !billingBlocked ? 'Drag a card to change its status · ' : ''}{totalQuotesCount} {totalQuotesCount === 1 ? 'quote' : 'quotes'}
+          {view === 'board' && !billingBlocked ? 'Drag a card to change its status' : ''}
+          {failedColumns.length === 0 && <>{view === 'board' && !billingBlocked ? ' · ' : ''}{totalQuotesCount} {totalQuotesCount === 1 ? 'quote' : 'quotes'}</>}
         </span>
       </div>
 
@@ -491,7 +510,14 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       )}
 
       {/* Tabs */}
-      {view === 'board' ? (
+      {view === 'board' && failedColumns.length === COLUMNS.length ? (
+        <LoadError
+          what="quotes"
+          error={columnQueries.DRAFT.error ?? columnQueries.DRAFT.failureReason}
+          busy={COLUMNS.some(col => columnQueries[col].isFetching)}
+          onRetry={retryFailedColumns}
+        />
+      ) : view === 'board' ? (
         <DndContext
           sensors={sensors}
           onDragStart={handleDragStart}
@@ -503,19 +529,29 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
             <div className="bk-kanban">
               {COLUMNS.map(col => {
-                const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading, isFetchingNextPage, fetchNextPage } = flattenColumn(columnQueries[col]);
+                const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading: colLoading, isFetchingNextPage, fetchNextPage } = flattenColumn(columnQueries[col]);
+                const colFailed = failedColumns.includes(col);
+                const isLoading = colLoading && !colFailed;
                 return (
                 <section key={col} className="bk-col" aria-label={`${COLUMN_LABELS[col]} quotes`}>
                   <div className="bk-col__head">
                     <span className="bk-col__title">
                       <span className={`bk-dot bk-dot--${COLUMN_TONE[col]}`} aria-hidden="true" />
                       {COLUMN_LABELS[col]}
-                      <span className="bk-col__count">{colCount}</span>
+                      {!colFailed && <span className="bk-col__count">{colCount}</span>}
                     </span>
                     {colTotal > 0 && <span className="bk-col__total">{formatCurrency(colTotal)}</span>}
                   </div>
                   <div className="kanban-col-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
-                    {isLoading ? (
+                    {colFailed ? (
+                      <LoadError
+                        compact
+                        what={`${COLUMN_LABELS[col].toLowerCase()} quotes`}
+                        error={columnQueries[col].error ?? columnQueries[col].failureReason}
+                        busy={columnQueries[col].isFetching}
+                        onRetry={() => columnQueries[col].refetch()}
+                      />
+                    ) : isLoading ? (
                       <div style={{ padding: '28px 0', display: 'flex', justifyContent: 'center' }}><Loader size={22} /></div>
                     ) : (
                       <DroppableColumn columnId={col} items={colItems} isOver={overColumnId === col}>
@@ -577,11 +613,21 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                 onClick={() => setStatusFilter(status)}
               >
                 {status === 'ALL' ? 'All' : COLUMN_LABELS[status]}
-                <span className="bk-chip__count">{status === 'ALL' ? totalQuotesCount : flattenColumn(columnQueries[status]).count}</span>
+                {(status === 'ALL' ? failedColumns.length === 0 : !failedColumns.includes(status)) && (
+                  <span className="bk-chip__count">{status === 'ALL' ? totalQuotesCount : flattenColumn(columnQueries[status]).count}</span>
+                )}
               </button>
             ))}
           </div>
 
+          {loadFailed(activeListQuery) ? (
+            <LoadError
+              what="quotes"
+              error={activeListQuery.error ?? activeListQuery.failureReason}
+              busy={activeListQuery.isFetching}
+              onRetry={() => activeListQuery.refetch()}
+            />
+          ) : (
           <div className="bk-table-wrap" style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
             <table className="table-heading-roles bk-table">
               <thead>
@@ -601,6 +647,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                   <tr
                     key={quote.id}
                     className="is-clickable"
+                    {...rowLink(() => navigate(`/bookings/quotes/${quote.id}`))}
                     onClick={() => navigate(`/bookings/quotes/${quote.id}`)}
                   >
                     <td className="is-id">
@@ -651,7 +698,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                 ))}
               </tbody>
             </table>
-            {listIsLoading && (
+            {listIsLoading && !loadFailed(activeListQuery) && (
               <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={24} /></div>
             )}
             {!listIsLoading && listItems.length === 0 && (
@@ -670,7 +717,20 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
               </div>
             )}
           </div>
+          )}
         </div>
+      )}
+
+      {pendingSend && (
+        <QuoteSendPreview
+          quote={pendingSend.quote}
+          sending={statusMutation.isPending}
+          onCancel={() => setPendingSend(null)}
+          onConfirm={() => {
+            const { quote, oldColumn } = pendingSend;
+            moveQuote(String(quote.id), oldColumn, 'SENT', () => setPendingSend(null));
+          }}
+        />
       )}
 
       {confirmOpts && (

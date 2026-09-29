@@ -114,3 +114,14 @@
 @media (max-width: 1000px) { .bk-card.qd-map--empty { height: auto !important; } }
 /* The empty map slot reads as a map area (tinted), not a blank white card. */
 .bk-card.qd-map--empty { background: var(--bg-deep, var(--bg-surface-hover)); border-style: dashed; }
+
+/* ---- Round 11 ---- */
+/* Converted quote: one line under the total names its booking. */
+.qd-booked {
+  margin: 12px 0 0; padding: 8px 0 0;
+  border-top: 1px solid var(--border-row);
+  font: 400 13px/20px var(--font-sans); color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+/* Touch floor: the booking link's box grows to 44px without moving the line. */
+.qd-booked .bk-link { display: inline-block; padding: 12px 0; margin: -12px 0; }

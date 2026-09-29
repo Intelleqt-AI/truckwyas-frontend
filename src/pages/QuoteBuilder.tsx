@@ -589,6 +589,10 @@ export default function QuoteBuilder() {
   // True only when a specific type was chosen, so the UI can say what a number
   // was actually based on rather than implying a truck that isn't picked.
   const hasVehicleType = !!vehicleType;
+  // Display only (R11): one spelling of a truck name across the form, the
+  // same sentence case as the suggestions and the quote detail. The stored
+  // value (vehicleType, option values) is unchanged.
+  const vtLabel = sentenceCaseLabel(vehicleType);
 
   // ---- derived costs ----
   const route = routeData?.routes?.[selectedRouteIndex] || null;
@@ -622,14 +626,14 @@ export default function QuoteBuilder() {
   const weightBlockedMessage = (() => {
     if (!vehicleCapacityTons || Number(weight) <= vehicleCapacityTons) return null;
     if (Number(weight) <= vehicleCapacityTons * OVERLOAD_TOLERANCE) {
-      return `${weight}t exceeds the ${vehicleType}'s rated capacity of ${vehicleCapacityTons}t. Even within the legal 5% tolerance this is an overload. Pick a larger vehicle or reduce the weight.`;
+      return `${weight}t exceeds the ${vtLabel}'s rated capacity of ${vehicleCapacityTons}t. Even within the legal 5% tolerance this is an overload. Pick a larger vehicle or reduce the weight.`;
     }
-    return `${weight}t is well beyond the ${vehicleType}'s ${vehicleCapacityTons}t capacity. This needs an abnormal-load permit (route approval, possibly escorts) and can't be priced through a standard quote.`;
+    return `${weight}t is well beyond the ${vtLabel}'s ${vehicleCapacityTons}t capacity. This needs an abnormal-load permit (route approval, possibly escorts) and can't be priced through a standard quote.`;
   })();
   const baseRateSource = (() => {
     const v = Number(baseRatePerKm);
     if (!(v > 0)) return null;
-    if (hasVehicleType && Number(selectedVT?.base_rate) === v) return `From ${vehicleType}`;
+    if (hasVehicleType && Number(selectedVT?.base_rate) === v) return `From ${vtLabel}`;
     if (Number(companyProfile?.default_base_rate_per_km) === v) return "From company settings";
     return "Custom rate";
   })();
@@ -1445,14 +1449,26 @@ export default function QuoteBuilder() {
 
       {/* details */}
       <div style={{ marginBottom: 24 }}>
-        <div className="qb-grid qb-grid--details" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gridAutoFlow: "row dense", gap: 16 }}>
-          <div>
+        <div className="qb-grid qb-grid--details" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16 }}>
+          {/* The app's shared DatePicker: it hands back the same "yyyy-MM-dd"
+              string the native date input did, straight to the same setter. */}
+          {([
+            ["qb-date-pickup", "Pickup date", pickupDate, setPickupDate],
+            ["qb-date-delivery", "Delivery date", deliveryDate, setDeliveryDate],
+            ["qb-date-valid", "Valid until", validUntil, setValidUntil],
+          ] as const).map(([id, label, value, set]) => (
+            <div key={id} role="group" aria-labelledby={id} className="qb-date">
+              <div style={fieldLabelS}><span id={id}>{label}</span></div>
+              <DatePicker value={value} onChange={set} style={{ minHeight: "var(--field-h, 40px)", boxSizing: "border-box" }} />
+            </div>
+          ))}
+          <div className="qb-vehicle">
             <div style={fieldLabelS}><span>Vehicle type</span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New vehicle type" onClick={() => navigate("/fleet/vehicles")}><Plus size={12} aria-hidden="true" />New</button>}</div>
             <div className="qb-select">
             <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS} aria-label="Vehicle type">
               <option value="">Not decided yet</option>
               {vehicleTypes.map((v: any) => (
-                <option key={v.id || v.name} value={v.name}>{v.name}{Number(v.capacity) > 0 ? ` (${capLabel(v.capacity)})` : ""}</option>
+                <option key={v.id || v.name} value={v.name}>{sentenceCaseLabel(v.name)}{Number(v.capacity) > 0 ? ` (${capLabel(v.capacity)})` : ""}</option>
               ))}
               {/* The options above only cover types with a vehicle free today.
                   A suggested or already-saved type outside that set still has to
@@ -1462,25 +1478,24 @@ export default function QuoteBuilder() {
                 .filter((n, i, a) => a.indexOf(n) === i)
                 .map((n) => {
                   const v = allVehicleTypes.find((x: any) => x.name === n);
-                  return <option key={n} value={n}>{n}{Number(v?.capacity) > 0 ? ` (${capLabel(v.capacity)})` : ""}</option>;
+                  return <option key={n} value={n}>{sentenceCaseLabel(n)}{Number(v?.capacity) > 0 ? ` (${capLabel(v.capacity)})` : ""}</option>;
                 })}
             </select>
             <ChevronDown size={14} className="qb-select__chev" aria-hidden="true" />
             </div>
           </div>
-          {/* Spans the grid: sits directly under the Vehicle type field but
-              gets the full form width, so the options stay on one line.
-              It follows Vehicle type in the markup, so on phones (one
-              column) it reads right after it; the grid packs densely, so on
-              wider screens the dates still fill the rest of the first row.
-              Rendered only when there is something to show, so an empty row
-              doesn't add a second grid gap. */}
-          {suggestions.length > 0 && <div style={{ gridColumn: "1 / -1", marginTop: -8 }}>
+          {/* Spans the grid on the row right under Vehicle type (the last
+              field of the row above), aligned to its end, so the options stay
+              on one line. Markup order = visual order at every width (R11):
+              dates, Vehicle type, these suggestions, then Cargo and Trip, so
+              Tab never jumps back up a row. Rendered only when there is
+              something to show, so an empty row adds no second grid gap. */}
+          {suggestions.length > 0 && <div className="qb-suggest-row" style={{ gridColumn: "1 / -1", marginTop: -8 }}>
           {/* Offered, not applied. Accepting one is a real selection, so the
               rate, the capacity check and the lane benchmark all switch on
               together — the same as picking it from the list by hand. */}
           {suggestions.length > 0 && (
-            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px 16px", fontSize: 13, lineHeight: "20px" }}>
+            <div className="qb-suggest" style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px 16px", fontSize: 13, lineHeight: "20px" }}>
               {/* Label sits on the same line as the options: it's a lead-in, not
                   a field heading, so it keeps the form's spacing tight. */}
               <span style={{ ...labelS, textTransform: "none", letterSpacing: "normal" }}>
@@ -1517,18 +1532,6 @@ export default function QuoteBuilder() {
             </div>
           )}
           </div>}
-          {/* The app's shared DatePicker: it hands back the same "yyyy-MM-dd"
-              string the native date input did, straight to the same setter. */}
-          {([
-            ["qb-date-pickup", "Pickup date", pickupDate, setPickupDate],
-            ["qb-date-delivery", "Delivery date", deliveryDate, setDeliveryDate],
-            ["qb-date-valid", "Valid until", validUntil, setValidUntil],
-          ] as const).map(([id, label, value, set]) => (
-            <div key={id} role="group" aria-labelledby={id} className="qb-date">
-              <div style={fieldLabelS}><span id={id}>{label}</span></div>
-              <DatePicker value={value} onChange={set} style={{ minHeight: "var(--field-h, 40px)", boxSizing: "border-box" }} />
-            </div>
-          ))}
           <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span>Cargo</span></div><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} aria-label="Cargo" /></div>
           <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span id="qb-trip-label">Trip</span></div>
             {/* The shared segmented control: neutral track, raised active option. */}
@@ -1569,7 +1572,7 @@ export default function QuoteBuilder() {
           <section className="qb-cost" aria-labelledby="qb-cost-title" style={{ ...cardS, padding: "var(--card-pad, 20px)" }}>
             <div className="qb-cost__head">
               <h2 id="qb-cost-title" className="qb-cost__title">Cost breakdown</h2>
-              <p className="qb-cost__sub">{vehicleType ? `On your ${vehicleType} rates` : "No truck picked, so company defaults"}</p>
+              <p className="qb-cost__sub">{vehicleType ? `On your ${vtLabel} rates` : "No truck picked, so company defaults"}</p>
             </div>
             {billingBlocked && (
               <div style={{
@@ -1646,7 +1649,7 @@ export default function QuoteBuilder() {
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
                 ...(crossBorderCost > 0 ? [{ key: "cb", l: "Cross-border / weighbridge", v: crossBorderCost, c: "#2BB6A6" }] : []),
                 { key: "driver", l: "Driver allowance", v: driverAllowance, c: "var(--text-tertiary)" },
-                { key: "base", l: `Base rate (${hasVehicleType ? vehicleType : "company default"} · ${formatCurrency(baseRatePerKm)}/km)`, v: baseCost, c: "var(--accent-primary)" },
+                { key: "base", l: `Base rate (${hasVehicleType ? vtLabel : "company default"} · ${formatCurrency(baseRatePerKm)}/km)`, v: baseCost, c: "var(--accent-primary)" },
               ].map((r, i) => (
                 <div key={i} className="qb-cost__row">
                   <span className="qb-cost__label">
@@ -1669,11 +1672,11 @@ export default function QuoteBuilder() {
                           {fuelRefCapacityTons > 0 ? (<>
                             <div style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 10 }}>
                               {hasVehicleType
-                                ? `Your ${vehicleType}'s own consumption, adjusted for this load.`
-                                : `No truck is picked, so this uses ${fuelBasisVT?.name}, the most economical type in your fleet that can carry ${weight}t.`}
+                                ? `Your ${vtLabel}'s own consumption, adjusted for this load.`
+                                : `No truck is picked, so this uses ${sentenceCaseLabel(fuelBasisVT?.name)}, the most economical type in your fleet that can carry ${weight}t.`}
                             </div>
                             {[
-                              ["Truck used", `${fuelBasisVT?.name ?? "—"} (${capLabel(fuelRefCapacityTons)})`],
+                              ["Truck used", `${fuelBasisVT?.name ? sentenceCaseLabel(fuelBasisVT.name) : "—"} (${capLabel(fuelRefCapacityTons)})`],
                               ["Its rated burn", `${oneDp(fuelConsumptionRef)} L/100 km at ${capLabel(fuelRefCapacityTons)}`],
                               ["This load", capLabel(weight || 0)],
                               ["Weight effect", `${oneDp(fuelSensitivity * 100)}% per tonne`],
@@ -1714,7 +1717,7 @@ export default function QuoteBuilder() {
                           {!hasVehicleType && fuelRefCapacityTons > 0 && (
                             <div style={{ color: "var(--text-tertiary)", marginTop: 10, lineHeight: 1.5 }}>
                               This is a fleet-wide estimate, picked so the figure doesn't jump
-                              around as you change the weight.{suggestions.length ? ` Choose ${suggestions[0].vt.name} above to price on the truck you'd actually send.` : " Pick a vehicle type to price on that truck exactly."}
+                              around as you change the weight.{suggestions.length ? ` Choose ${sentenceCaseLabel(suggestions[0].vt.name)} above to price on the truck you'd actually send.` : " Pick a vehicle type to price on that truck exactly."}
                             </div>
                           )}
                         </PopoverContent>
@@ -1810,7 +1813,7 @@ export default function QuoteBuilder() {
                 <span style={labelS}>Quote price</span>
                 <span style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, color: "var(--text-primary)" }}>{formatCurrency(total)}</span>
               </div>
-              <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 8 }}>{formatNumber(Math.round(distance))} km {legs === 2 ? `one way · ${formatNumber(Math.round(chargeDistance))} km round trip` : "one way"} · live diesel · {hasVehicleType ? `your ${vehicleType} settings` : "your company defaults"}{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
+              <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 8 }}>{formatNumber(Math.round(distance))} km {legs === 2 ? `one way · ${formatNumber(Math.round(chargeDistance))} km round trip` : "one way"} · live diesel · {hasVehicleType ? `your ${vtLabel} settings` : "your company defaults"}{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
               <div className="qb-cost__adjust">
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ ...fieldLabelS, marginBottom: 4 }}><span>Tolls</span></div><input type="number" value={tollManuallyEdited ? editableTollCost : String(tollCost)} onChange={e => { setEditableTollCost(e.target.value); setTollManuallyEdited(true); }} aria-label="Tolls" className="qb-mini" style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ ...fieldLabelS, marginBottom: 4 }}><span>Driver</span></div><input type="number" value={driverAllowanceInput} onChange={e => setDriverAllowanceInput(e.target.value)} aria-label="Driver allowance" className="qb-mini" style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
@@ -1844,7 +1847,7 @@ export default function QuoteBuilder() {
                         </div>
                         {hasVehicleType && (
                           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, paddingTop: 5 }}>
-                            <span style={{ color: "var(--text-tertiary)" }}>{vehicleType}</span>
+                            <span style={{ color: "var(--text-tertiary)" }}>{vtLabel}</span>
                             <span style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
                               {Number(selectedVT?.base_rate) > 0
                                 ? formatCurrency(selectedVT.base_rate)
@@ -1890,7 +1893,7 @@ export default function QuoteBuilder() {
                 <Sparkles size={16} color="var(--status-warning)" style={{ flexShrink: 0 }} />
                 <div>
                   <b>{awaitingCopy.title}</b>
-                  <span style={{ color: "var(--text-secondary)" }}> Priced on true cost + {hasVehicleType ? `your ${vehicleType} base rate` : "your company default base rate"} for now.{awaitingCopy.detail && ` ${awaitingCopy.detail}`}</span>
+                  <span style={{ color: "var(--text-secondary)" }}> Priced on true cost + {hasVehicleType ? `your ${vtLabel} base rate` : "your company default base rate"} for now.{awaitingCopy.detail && ` ${awaitingCopy.detail}`}</span>
                 </div>
               </div>
               {winModel && (

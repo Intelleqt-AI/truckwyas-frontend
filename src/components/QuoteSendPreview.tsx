@@ -1,6 +1,7 @@
 import { useAuth } from '@/lib/AuthContext';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import SendPreviewDialog, { type SendPreviewRow } from '@/components/SendPreviewDialog';
+import { quoteLapsed } from '@/components/overview/today';
 
 export interface QuotePreviewData {
   quote_number?: string | null;
@@ -43,12 +44,19 @@ export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send 
   const from = quote.pickup_location || quote.origin;
   const to = quote.delivery_location || quote.destination;
 
+  // Past its valid-until date (the board's one expiry rule): sending is still
+  // allowed, but the customer's link would open on an expired offer, so the
+  // preview says so right above the Send button (R11).
+  const expired = quoteLapsed(quote);
+
   const rows: SendPreviewRow[] = [
     ...(quote.quote_number ? [{ label: 'Quote', value: quote.quote_number }] : []),
     ...(from || to ? [{ label: 'Route', value: `${from || '—'} to ${to || '—'}` }] : []),
     ...(quote.pickup_date ? [{ label: 'Collection', value: safeDate(quote.pickup_date) }] : []),
     { label: 'Price', value: amount == null || Number.isNaN(amount) ? '—' : `${formatCurrency(amount)} excl. VAT` },
-    ...(quote.valid_until ? [{ label: 'Valid until', value: safeDate(quote.valid_until) }] : []),
+    ...(quote.valid_until ? [{ label: 'Valid until', value: expired
+      ? <>{safeDate(quote.valid_until)} <span className="send-preview__warn">· expired</span></>
+      : safeDate(quote.valid_until) }] : []),
   ];
 
   return (
@@ -58,7 +66,12 @@ export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send 
       toName={quote.customer_name || undefined}
       subject={quote.quote_number ? `Your freight quote ${quote.quote_number} from ${company}` : undefined}
       rows={rows}
-      note="The email links to the quote so they can accept or decline it online."
+      note={expired ? <>
+        <span className="send-preview__warn" role="alert" style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
+          This quote expired on {safeDate(quote.valid_until)}. Edit it to set a new valid-until date before sending.
+        </span>
+        The email links to the quote so they can accept or decline it online.
+      </> : 'The email links to the quote so they can accept or decline it online.'}
       noEmailHint="No email will go out. The quote is marked as sent and you can share its link yourself."
       noEmailConfirmLabel="Mark as sent"
       confirmLabel={confirmLabel}

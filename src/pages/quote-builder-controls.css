@@ -289,3 +289,16 @@
 @media (min-width: 1700px) {
   .qb-need__row { min-height: 44px; }
 }
+
+/* ---- Round 11 ---- */
+/* The suggested-truck row sits under Vehicle type, the last field of the
+   row above it (markup order = visual order), so it lines up with that
+   field's end; on phones it starts at the left like every other row. */
+.qb-controls .qb-suggest { justify-content: flex-end; }
+@media (max-width: 640px) {
+  .qb-controls .qb-suggest { justify-content: flex-start; }
+  /* Vehicle type now follows Valid until (one column): 8px more room so the
+     label-row "New" target (grows 20px upward) clears the calendar button
+     with room to spare. */
+  .qb-controls .qb-vehicle { margin-top: 8px; }
+}

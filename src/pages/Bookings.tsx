@@ -600,8 +600,8 @@ export default function Bookings() {
               // note under Base rate rather than among the lines (R10).
               const dist = parseFloat(load.distance || '0') || 0;
               const perKm = dist > 0 ? `${formatMoney(rate / Math.max(dist, 1))}/km` : null;
-              const rows: { label: React.ReactNode; key?: string; value: string; note?: string | null; muted?: boolean }[] = [
-              { label: 'Base rate', value: formatCurrency(rate), note: perKm },
+              const rows: { label: React.ReactNode; key?: string; value: string; note?: React.ReactNode; noteTitle?: string; muted?: boolean }[] = [
+              { label: 'Base rate', value: formatCurrency(rate), note: perKm, noteTitle: 'Base rate divided by distance, before surcharges' },
               { label: 'Fuel surcharge', value: formatCurrency(fuel) },
               { label: 'Additional charges', value: formatCurrency(extra) },
               ];
@@ -613,13 +613,19 @@ export default function Bookings() {
                   ? `The order total includes charges not broken down here. Quote ${load.quote_number} has the full breakdown.`
                   : 'Set on the order when it was created: its total includes charges that were not entered as separate lines.'}</InfoTip></>,
                 value: formatCurrency(gap),
+                // The tip names the quote; this line takes you there (R11).
+                note: load.quote != null && load.quote_number ? (
+                  <a className="bk-link bk-link--sm" style={{ display: 'inline-block', padding: '12px 0', margin: '-12px 0', whiteSpace: 'nowrap' }} title="Open the quote with the full breakdown" href={`/bookings/quotes/${load.quote}`} onClick={(e) => { e.preventDefault(); navigate(`/bookings/quotes/${load.quote}`); }}>
+                    Quote {load.quote_number}
+                  </a>
+                ) : null,
               });
               return rows.map(r => (
                 <div key={r.key ?? String(r.label)} className={`bk-kv${r.muted ? ' bk-muted' : ''}`}>
                   <span className="bk-kv__label">{r.label}</span>
                   <span className={`bk-kv__value${r.muted || r.value === 'Not recorded' ? ' bk-muted' : ''}`}>
                     {r.value}
-                    {r.note && <span className="bk-kv__note" title="Base rate divided by distance, before surcharges">{r.note}</span>}
+                    {r.note && <span className="bk-kv__note" title={r.noteTitle}>{r.note}</span>}
                   </span>
                 </div>
               ));

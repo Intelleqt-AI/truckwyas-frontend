@@ -19,11 +19,12 @@ import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import SectionHeader from '@/components/layout/SectionHeader';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { StatusChip, statusMeta } from '@/components/ui/StatusChip';
 import { boardStage } from '@/components/overview/today';
 import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
 import { StatusMenu, type StatusOption } from '@/components/fleet-detail/StatusMenu';
 import { BlockSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import { loadsQuery, mapLoadsByQuoteId } from './QuotesList';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   DRAFT: 'neutral',
@@ -86,6 +87,9 @@ export default function QuoteDetail() {
     retry: (count, err) => (err as { status?: number } | null)?.status !== 404 && count < 1,
   });
   const { data: quote, isLoading, error } = quoteQuery;
+  // The board's quote -> load lookup (same cached GET), so a converted quote
+  // offers "View booking" here exactly as its board card does (R11).
+  const loadsQ = useQuery(loadsQuery);
   // The route map grows to end level with the rail when the rail is the
   // longer column, but never drops below a readable floor (R10): 320px on
   // desktop, 240px on phones. When the Job card is long, the main column
@@ -258,8 +262,12 @@ export default function QuoteDetail() {
     );
   }
 
+  // A won quote waits for the loads lookup too, so its actions don't flip
+  // from "Convert to booking" to "View booking" after the first paint.
+  const awaitingBooking = !!quote && ['ACCEPTED', 'IT', 'COMPLETED'].includes(quote.status) && loadsQ.isPending;
+
   // Loading: the back link and page frame stay; only the content waits.
-  if (isLoading) {
+  if (isLoading || awaitingBooking) {
     return (
       <div className="bk-detail">
         <SectionHeader
@@ -376,7 +384,15 @@ export default function QuoteDetail() {
   // An expired quote, or a draft priced before the diesel rise, is edited
   // before it goes out (R8): Edit quote is the primary, Send the secondary.
   const openStatus = quote.status === 'DRAFT' || quote.status === 'SENT';
-  const needsEdit = openStatus && (lapsed || (quote.status === 'DRAFT' && !!fuelAlert?.has_alert));
+  // Already booked (R11): the backend leaves a converted quote at Accepted and
+  // refuses a second conversion, so a quote with a load offers "View booking"
+  // and nothing that sends or converts it again. Legacy quotes carrying a
+  // load status (In transit, Completed) with no load found offer no Send
+  // either: the chip says where the job stands.
+  const booking = mapLoadsByQuoteId(loadsQ.data).get(String(quote.id)) as { id: number | string; load_number?: string; status?: string } | undefined;
+  const booked = !!booking;
+  const loadStateOnly = !booked && (quote.status === 'IT' || quote.status === 'COMPLETED');
+  const needsEdit = !booked && openStatus && (lapsed || (quote.status === 'DRAFT' && !!fuelAlert?.has_alert));
   const sendLabel = quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer';
   const headChip = (size?: 'sm') => lapsed
     ? <span title={`${STATUS_LABEL[quote.status]}, past its valid-until date`}><StatusChip status="EXPIRED" label="Expired" size={size} /></span>
@@ -413,8 +429,12 @@ export default function QuoteDetail() {
   ];
   const statusOptions: StatusOption[] = [
     { value: 'DRAFT', label: 'Draft', hint: 'Not offered to the customer yet' },
-    { value: 'SENT', label: 'Sent', hint: 'Emails the quote to the customer' },
-    { value: 'ACCEPTED', label: 'Accepted', hint: 'Ready to convert to a booking' },
+    // An expired quote can still be marked Sent (the preview warns), but the
+    // menu says to edit it first (R11).
+    ...(booked
+      ? [{ value: 'SENT', label: 'Sent', hint: `Already booked as ${booking?.load_number || 'a load'}`, disabledReason: `Already booked as ${booking?.load_number || 'a load'}` }]
+      : [{ value: 'SENT', label: 'Sent', hint: lapsed ? 'Quote has expired, edit first' : 'Emails the quote to the customer' }]),
+    { value: 'ACCEPTED', label: 'Accepted', hint: booked ? 'Won and booked' : 'Ready to convert to a booking' },
     { value: 'DECLINED', label: 'Declined' },
     // In transit and Completed live on the order created by "Convert to
     // booking"; the backend rejects a direct write. Listed only so a legacy
@@ -463,7 +483,11 @@ export default function QuoteDetail() {
             Edit quote
           </button>
           )}
-          {needsEdit ? null : quote.status === 'ACCEPTED' ? (
+          {needsEdit || loadStateOnly ? null : booked ? (
+            <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate(`/bookings/${booking!.id}`)} aria-label="View booking">
+              <span className="qd-label-long" data-short="Booking">View booking</span>
+            </button>
+          ) : quote.status === 'ACCEPTED' ? (
             <button type="button" className="bk-btn bk-btn--primary" onClick={handleConvertToLoad} disabled={convertToLoadMutation.isPending} aria-label={convertToLoadMutation.isPending ? undefined : 'Convert to booking'}>
               {convertToLoadMutation.isPending ? 'Converting…' : <span className="qd-label-long" data-short="Convert">Convert to booking</span>}
             </button>
@@ -580,6 +604,18 @@ export default function QuoteDetail() {
                 <span title="Estimated chance of winning at this price">{Math.round(Number(quote.win_probability))}% chance to win</span>
               )}
             </div>
+            {booked && (
+              <p className="qd-booked">
+                Booked as{' '}
+                <a className="bk-link" href={`/bookings/${booking!.id}`} onClick={(e) => { e.preventDefault(); navigate(`/bookings/${booking!.id}`); }}>{booking!.load_number || 'a booking'}</a>
+                {booking!.status && <> · {statusMeta(booking!.status).label}</>}
+              </p>
+            )}
+            {loadStateOnly && (
+              <p className="qd-booked">
+                Marked {STATUS_LABEL[quote.status].toLowerCase()} on an older record. No booking is linked to this quote.
+              </p>
+            )}
             {fuelNote && (
               <p className="qd-fuel" role="status">
                 <span className="bk-dot bk-dot--warning" aria-hidden="true" />
@@ -612,7 +648,7 @@ export default function QuoteDetail() {
             </div>
           </section>
 
-          {(effectiveShareUrl || ((quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome)) && (
+          {!booked && (effectiveShareUrl || ((quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome)) && (
             <section className="bk-card" aria-labelledby="qd-customer-title">
               <h2 className="bk-card__title" id="qd-customer-title" style={{ marginBottom: 12 }}>With the customer</h2>
               {effectiveShareUrl && lapsed && (
@@ -710,7 +746,7 @@ export default function QuoteDetail() {
             >
               <Download size={16} aria-hidden="true" /> Download PDF
             </button>
-            {quote.status === 'ACCEPTED' && (
+            {quote.status === 'ACCEPTED' && !booked && (
               <button type="button" className="bk-btn bk-btn--quiet" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending}>
                 Send to customer
               </button>

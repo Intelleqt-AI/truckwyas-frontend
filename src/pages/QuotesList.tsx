@@ -223,6 +223,26 @@ function DroppableColumn({ columnId, items, children, isOver }: { columnId: stri
   );
 }
 
+// The loads list behind "View booking". Quote detail reads the same cached
+// query, so the board card and the detail page always agree.
+export const loadsQuery = {
+  queryKey: ['loads'],
+  queryFn: () => fetchData('api/v1/loads/'),
+  retry: 1,
+};
+
+// A quote converts to at most one load (convert_to_load blocks a second
+// conversion) — map quote id -> its load so the "Convert to booking"
+// button can be swapped for a "View booking" link once that's happened.
+export function mapLoadsByQuoteId(loadsData: any): Map<string, any> {
+  const loads: any[] = loadsData?.results || loadsData || [];
+  const byQuote = new Map<string, any>();
+  loads.forEach(l => {
+    if (l.quote != null) byQuote.set(String(l.quote), l);
+  });
+  return byQuote;
+}
+
 const QUOTE_PAGE_SIZE = 10;
 
 interface QuotePage {
@@ -359,20 +379,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     })
   );
 
-  const { data: loadsData } = useQuery({
-    queryKey: ['loads'],
-    queryFn: () => fetchData('api/v1/loads/'),
-    retry: 1,
-  });
-  const loads: any[] = loadsData?.results || loadsData || [];
-
-  // A quote converts to at most one load (convert_to_load blocks a second
-  // conversion) — map quote id -> its load so the "Convert to booking"
-  // button can be swapped for a "View booking" link once that's happened.
-  const loadByQuoteId = new Map<string, any>();
-  loads.forEach(l => {
-    if (l.quote != null) loadByQuoteId.set(String(l.quote), l);
-  });
+  const { data: loadsData } = useQuery(loadsQuery);
+  const loadByQuoteId = mapLoadsByQuoteId(loadsData);
 
   // Each pipeline column is its own backend-paginated query (10 at a time,
   // "load more" — see useQuoteColumn) rather than one big "fetch every

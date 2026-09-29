@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { fetchData, postData } from '@/lib/Api';
 import { History } from 'lucide-react';
 
@@ -51,6 +51,33 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
   const [lng, setLng] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Presentation only (R11): the list may be wider than a narrow field so a
+  // place's suburb isn't cut off (at least 320px on phones, 400px on wider
+  // screens), kept inside the viewport with a 16px gutter by shifting it
+  // left when the field sits near the right edge.
+  const [listBox, setListBox] = useState<{ left: number; width: number } | null>(null);
+  const listOpen = open && suggestions.length > 0;
+  useLayoutEffect(() => {
+    if (!listOpen || !inputRef.current) return;
+    const place = () => {
+      const r = inputRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const vw = document.documentElement.clientWidth;
+      const gutter = 16;
+      const floor = vw <= 640 ? 320 : 400;
+      const width = Math.round(Math.max(r.width, Math.min(floor, vw - 2 * gutter)));
+      let left = 0;
+      if (r.left + width > vw - gutter) left = vw - gutter - width - r.left;
+      if (r.left + left < gutter) left = gutter - r.left;
+      setListBox({ left: Math.round(left), width });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [listOpen]);
+  // Rows are 44px on phones and touch screens (the touch floor).
+  const coarse = typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 768px), (pointer: coarse)').matches;
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -205,6 +232,7 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
           also holds the GPS link, so it opens directly under the field. */}
       <div style={{ position: 'relative' }}>
       <input
+        ref={inputRef}
         type="text"
         placeholder={placeholder}
         value={value}
@@ -233,7 +261,8 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
       )}
       {open && suggestions.length > 0 && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+          position: 'absolute', top: 'calc(100% + 4px)',
+          ...(listBox ? { left: listBox.left, width: listBox.width } : { left: 0, right: 0 }),
           background: 'var(--bg-surface)',
           border: '1px solid var(--border-subtle)',
           borderRadius: 'var(--radius-control)',
@@ -246,7 +275,7 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
               onMouseDown={() => handleSelect(s)}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                padding: '10px 12px', minHeight: 40, boxSizing: 'border-box', fontSize: 14, cursor: 'pointer',
+                padding: coarse ? '12px 12px' : '10px 12px', minHeight: coarse ? 44 : 40, boxSizing: 'border-box', fontSize: 14, cursor: 'pointer',
                 color: 'var(--text-primary)', fontFamily: 'var(--font-sans)',
                 borderBottom: i < suggestions.length - 1 ? '1px solid var(--border-row)' : 'none',
                 lineHeight: '20px',
@@ -255,10 +284,11 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               {/* The row is a flex box, which never ellipsises its own text:
-                  the label gets an inner span that does, full text in title. */}
+                  the label gets an inner span that wraps to at most two lines
+                  (R11: the suburb is what tells rows apart), full text in title. */}
               <span title={s.label} style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
                 {s.is_recent && <span title="Used before" aria-label="Used before" style={{ flexShrink: 0, display: 'inline-flex', color: 'var(--text-secondary)' }}><History size={14} aria-hidden="true" /></span>}
-                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
+                <span style={{ minWidth: 0, overflow: 'hidden', display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflowWrap: 'anywhere' }}>{s.label}</span>
               </span>
               {s.cross_border && (
                 <span

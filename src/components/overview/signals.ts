@@ -1,4 +1,6 @@
 import { formatDate, formatDays, formatMoneyWhole, normaliseFigures, sentenceCaseLabel, toDate } from '@/lib/formatters';
+import { staleLabel, staleLoads, staleWork } from '@/lib/staleWork';
+import { localDateISO, saDaysBetween } from '@/lib/dates';
 
 /**
  * Home "Needs you": turn a backend signal into a clean row.
@@ -28,7 +30,8 @@ const ACTION_LABELS: Record<string, string> = {
 
 const IMPERATIVE_TAIL = /\s*(Chase now|Assign now|Review now|Act now)\.?\s*$/i;
 
-const daysSince = (d: Date) => Math.floor((Date.now() - d.getTime()) / 86_400_000);
+// South African calendar days, the Debtors report's count (src/lib/dates.ts).
+const daysSince = (d: Date) => saDaysBetween(localDateISO(d)) ?? 0;
 
 export function presentSignal(s: { title?: string; body?: string; action?: string; category?: string }, loads: any[] = []): SignalRow {
   const rawTitle = String(s.title || '').replace(/\s+—\s+/g, ': ');
@@ -79,5 +82,34 @@ export function presentSignal(s: { title?: string; body?: string; action?: strin
     title: sentenceCaseLabel(normaliseFigures(rawTitle)),
     detail: rawBody && rawBody !== rawTitle ? normaliseFigures(rawBody) : '',
     actionLabel,
+  };
+}
+
+/** True for the backend's "N loads in transit" signal, which Home replaces with the stale-work row. */
+export const isInTransitSignal = (s: { title?: string }) => /loads?\s+in\s+transit/i.test(String(s?.title || ''));
+
+const STATUS_WORDS: Record<string, string> = { IN_TRANSIT: 'in transit', LOADING: 'loading', ASSIGNED: 'assigned', PENDING: 'pending' };
+
+/**
+ * Home's stale-work row (R6): the same loads Orders, Findings and the fleet
+ * pages flag (src/lib/staleWork.ts), so the counts agree everywhere.
+ * "11 loads not closed" · "Oldest since 2 Jan 2026 (270 days)" (status mix in the tooltip).
+ */
+export function staleSignal(loads: any[], today: Date = new Date()): (SignalRow & { actionUrl: string }) | null {
+  const stale = staleLoads(loads, today);
+  if (stale.length === 0) return null;
+  const n = stale.length;
+  const by = new Map<string, number>();
+  stale.forEach((l) => { const k = String(l?.status || '').toUpperCase(); by.set(k, (by.get(k) || 0) + 1); });
+  const mix = ['IN_TRANSIT', 'LOADING', 'ASSIGNED', 'PENDING'].filter((k) => by.get(k)).map((k) => `${by.get(k)} ${STATUS_WORDS[k]}`).join(', ');
+  const oldest = staleLabel(staleWork(stale[0], today)!);
+  return {
+    kind: 'fleet',
+    title: `${n} ${n === 1 ? 'load' : 'loads'} not closed`,
+    // One line in the side column; the mix of statuses is in the tooltip.
+    detail: n === 1 ? `Open ${oldest.text}` : `Oldest ${oldest.text}`,
+    detailTitle: `Open loads past their delivery date or open more than 30 days: ${mix}. The oldest has been open ${oldest.text}.`,
+    actionLabel: 'Review',
+    actionUrl: '/bookings/orders',
   };
 }

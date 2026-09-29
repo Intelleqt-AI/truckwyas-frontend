@@ -555,3 +555,27 @@
 @container (max-width: 560px) {
   .fleet-detail .fd-perf__fig.is-lead + .fd-perf__fig:last-child { grid-column: 1 / -1; padding-left: 0; border-left: 0; }
 }
+
+/* ======================================================= Round 6 */
+/* Condition in the wide main column: the scores sit side by side like the
+   Performance figures (label, score and band, then the meter), so no row
+   runs a long empty track from a short label (R6 UX: close the gap). The
+   rail keeps the compact one-row-per-score list. */
+@container (min-width: 560px) {
+  .fleet-detail .fd-condition__parts {
+    grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+    column-gap: 0; margin-top: 4px;
+  }
+  .fleet-detail .fd-condition__part {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "label label" "n band" "meter meter";
+    column-gap: 8px; row-gap: 0; align-content: start; align-items: end; padding: 4px 16px; border-left: 1px solid var(--fd-row-line);
+  }
+  .fleet-detail .fd-condition__part:first-child { padding-left: 0; border-left: 0; }
+  .fleet-detail .fd-condition__part > * { min-height: 0; }
+  .fleet-detail .fd-condition__label { grid-area: label; padding: 0; display: block; font: 400 13px/20px var(--font-sans); }
+  .fleet-detail .fd-condition__label .fd-condition__note { display: inline; }
+  .fleet-detail .fd-condition__label .fd-condition__note::before { content: ' · '; }
+  .fleet-detail .fd-condition__n { grid-area: n; justify-content: flex-start; align-self: end; margin-top: 2px; font: 600 20px/28px var(--font-sans); letter-spacing: -0.01em; }
+  .fleet-detail .fd-condition__band { grid-area: band; align-self: end; padding-bottom: 5px; }
+  .fleet-detail .fd-condition__part > .fd-meter { grid-area: meter; margin-top: 8px; }
+}

@@ -450,3 +450,8 @@
   position: absolute; left: 0; right: 0; text-align: center;
   bottom: calc((100% - 20px) * var(--v, 0) + 3px); line-height: 16px;
 }
+
+/* ---- Round 6: stale work in "Doing now" (shared rule, src/lib/staleWork.ts) ----
+   An order left open is not current work: neutral words, one amber dot. */
+.fleet-page .fleet-doing--stale { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fleet-page .fleet-doing__dot { display: inline-block; width: 8px; height: 8px; margin: 0 8px 1px 0; border-radius: 50%; vertical-align: middle; background: var(--status-warning-dot); }

@@ -56,6 +56,11 @@
 .td-kpi__body .td-micro { margin-bottom: 4px; }
 .td-kpi__meta { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .td-kpi__meta .tw-delta { max-width: 100%; }
+/* R6: pending costs on the margin tile. The figure it becomes sits where the
+   other tiles carry a micro chart; the note under it names the pending amount.
+   One line each at desktop, so the row keeps --kpi-height (no shift on load). */
+.td-kpi__alt { margin-bottom: 4px; font: 600 13px/16px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-secondary); white-space: nowrap; }
+.td-kpi__alt.is-loss, .td-kpi__if .is-loss { color: var(--status-danger-text); }
 .td-kpi__go {
   display: inline-grid; place-items: center;
   width: 28px; height: 28px; margin: -6px -8px -6px 0;

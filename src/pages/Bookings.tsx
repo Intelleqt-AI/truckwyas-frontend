@@ -4,8 +4,8 @@ import SectionHeader from '@/components/layout/SectionHeader';
 import { StatusChip } from "@/components/ui/StatusChip";
 import { useStickyRail } from "@/components/fleet-detail/useStickyRail";
 import { InfoTip } from "@/components/ui/InfoTip";
-import { useState, useRef } from "react";
-import { ArrowLeft, Upload, X } from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { Upload, X } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, postData, patchData } from "@/lib/Api";
@@ -20,7 +20,8 @@ import { StatusMenu } from '@/components/fleet-detail/StatusMenu';
 import { BlockSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
-import { staleSince } from './bookings-stale';
+import { staleWork, staleLabel, staleAction } from './bookings-stale';
+import { useMapFill } from './useMapFill';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   PENDING: 'neutral',
@@ -49,20 +50,35 @@ const fmt = (dateStr?: string) =>
 const titleCase = (s?: string) =>
   s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
 
+// "UD Trucks Quon GW26.450 - MP 567 MNO": the plate first and never broken
+// across lines, then the make and model (R6).
+const vehicleValue = (info?: string | null): React.ReactNode => {
+  if (!info) return null;
+  const parts = info.split(' - ');
+  if (parts.length < 2) return <span className="bk-plate">{info}</span>;
+  const plate = parts.pop()!.trim();
+  return <><span className="bk-plate">{plate}</span> <span className="bk-vehicle-model">· {parts.join(' - ')}</span></>;
+};
+
 export default function Bookings() {
   const { id } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const podModalFileRef = useRef<HTMLInputElement>(null);
-  const railRef = useStickyRail<HTMLDivElement>();
+  const stickyRail = useStickyRail<HTMLDivElement>();
+  // Columns end together (R6, within 48px): the route map takes up the
+  // difference between the Route card and the rail, before paint.
+  const [factsInRail, setFactsInRail] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState(false);
+  const fill = useMapFill({ base: 220, min: 180, max: 380, paused: editingAssignment, onStuck: () => setFactsInRail(true) });
+  const railRef = useCallback((node: HTMLDivElement | null) => { fill.sideRef.current = node; stickyRail(node); }, [stickyRail, fill.sideRef]);
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
 
   const [confirmOpts, setConfirmOpts] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
-  const [editingAssignment, setEditingAssignment] = useState(false);
   const [assignDriverId, setAssignDriverId] = useState('');
   const [assignVehicleId, setAssignVehicleId] = useState('');
   const [assignSaving, setAssignSaving] = useState(false);
@@ -294,10 +310,8 @@ export default function Bookings() {
 
   // A failed request is not a missing record: only a 404 says "not found".
   if (loadFailedNow && loadError?.status !== 404) return (
-    <div className="bk-detail">
-      <button type="button" className="bk-back" onClick={() => navigate('/bookings/orders')}>
-        <ArrowLeft size={16} aria-hidden="true" /> Back to orders
-      </button>
+    <div className="bk-detail bookings-typography">
+      <SectionHeader title="Order" back={{ to: '/bookings/orders', label: 'Orders' }} />
       <LoadError what="this load" error={loadError} busy={loadQuery.isFetching} onRetry={() => loadQuery.refetch()} />
     </div>
   );
@@ -316,19 +330,41 @@ export default function Bookings() {
   );
 
   if (!load) return (
-    <div className="bk-detail">
-      <button type="button" className="bk-back" onClick={() => navigate('/bookings/orders')}>
-        <ArrowLeft size={16} aria-hidden="true" /> Back to orders
-      </button>
+    <div className="bk-detail bookings-typography">
+      <SectionHeader title="Order not found" back={{ to: '/bookings/orders', label: 'Orders' }} />
       <div className="bk-card">
         <div className="bk-empty" style={{ padding: 16 }}>
-          <h1 className="bk-empty__title">Load not found</h1>
-          <p className="bk-empty__text">It may have been removed, or the link is out of date.</p>
+          <p className="bk-empty__text">This order may have been removed, or the link is out of date.</p>
           <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate('/bookings/orders')}>View orders</button>
         </div>
       </div>
     </div>
   );
+
+  const jobFacts = (cls: string) => {
+    const distance = parseFloat(load.distance || '0');
+    const weight = parseFloat(load.weight || '0');
+    const distanceText = distance > 0 ? formatDistance(distance) : 'Not recorded';
+    const cargoText = [weight > 0 ? `${formatNumber(weight)} kg` : '', load.cargo_description || ''].filter(Boolean).join(', ') || 'Not recorded';
+    if (cls === 'rail') return [{ label: 'Distance', value: distanceText }, { label: 'Cargo', value: cargoText }].map(r => (
+      <div key={r.label} className="bk-kv">
+        <span className="bk-kv__label">{r.label}</span>
+        <span className={`bk-kv__value${r.value === 'Not recorded' ? ' bk-muted' : ''}`}>{r.value}</span>
+      </div>
+    ));
+    return (
+      <dl className={cls} aria-label="Job figures">
+        <div>
+          <dt className="bk-fact__label">Distance</dt>
+          <dd className="bk-fact__value">{distance > 0 ? formatDistance(distance) : 'Not recorded'}</dd>
+        </div>
+        <div>
+          <dt className="bk-fact__label">Cargo</dt>
+          <dd className="bk-fact__value">{[weight > 0 ? `${formatNumber(weight)} kg` : '', load.cargo_description || ''].filter(Boolean).join(', ') || 'Not recorded'}</dd>
+        </div>
+      </dl>
+    );
+  };
 
   const hasPOD = !!(load.pod_signature || load.pod_received_by);
   const invoiceId = load.invoice_id;
@@ -387,7 +423,18 @@ export default function Bookings() {
         // Stale work (R5): still Assigned, Loading or In transit past the
         // delivery date, or older than 30 days. Same loads Home and Findings
         // call out; one neutral line with one amber dot.
-        const stale = staleSince(load);
+        const stale = staleWork(load);
+        // The one step this page can actually take (R6). Assignment is
+        // locked once a load is Loading or In transit, so those are closed
+        // through Change status, never "reassigned".
+        // The shared action words (staleAction), plus where on this page to
+        // do it. Loading cannot go straight to Delivered here, so it says
+        // "in transit" instead.
+        const staleAct = load.status === 'LOADING'
+          ? 'Mark it in transit or cancel it via Change status'
+          : ['PENDING', 'ASSIGNED'].includes(load.status) && !billingBlocked
+            ? `${staleAction(load)} with Edit or Change status`
+            : `${staleAction(load)} via Change status`;
         return (
           <section className="bk-card bk-progress" aria-label="Order progress">
           {/* One grid column per step: the dot sits at the column centre and
@@ -411,9 +458,8 @@ export default function Bookings() {
             <p className="bk-stale" role="status">
               <span className="bk-dot bk-dot--warning" aria-hidden="true" />
               <span>
-                {stale.pastDue
-                  ? <>Still {titleCase(load.status).toLowerCase()} since delivery was due on <b>{formatDate(stale.iso)} ({stale.days} days)</b> — close or reassign.</>
-                  : <>{titleCase(load.status)} since <b>{formatDate(stale.iso)} ({stale.days} days)</b> — close or reassign.</>}
+                Still {titleCase(load.status).toLowerCase()}{stale.overdue ? ', past its delivery date' : ''}{' '}
+                <b>{staleLabel(stale).text}</b>. {staleAct}.
               </span>
             </p>
           )}
@@ -431,7 +477,7 @@ export default function Bookings() {
       {/* Main column plus a sticky rail, so unequal heights read as a rail. */}
       <div className="bk-detail-grid bk-detail-grid--rail">
         {/* Route */}
-        <section className="bk-card" aria-labelledby="bk-route-title">
+        <section ref={fill.mainRef} className="bk-card" aria-labelledby="bk-route-title">
           <div className="bk-card__head"><h2 className="bk-card__title" id="bk-route-title">Route</h2></div>
           <ol className="bk-route">
             <li className="bk-route__stop">
@@ -461,31 +507,7 @@ export default function Bookings() {
             </li>
           </ol>
 
-          {/* The job's attributes: facts, not KPIs. A zero means the value was
-              never captured, so it shows as missing rather than 0 km or 0 kg. */}
-          {(() => {
-            const distance = parseFloat(load.distance || '0');
-            const weight = parseFloat(load.weight || '0');
-            return (
-              <dl className="bk-facts bk-facts--3" aria-label="Job figures">
-                <div>
-                  <dt className="bk-fact__label">Distance</dt>
-                  <dd className="bk-fact__value">{distance > 0 ? formatDistance(distance) : 'Not recorded'}</dd>
-                </div>
-                <div>
-                  <dt className="bk-fact__label" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    Base rate per km
-                    <InfoTip>Base rate divided by distance, before surcharges.</InfoTip>
-                  </dt>
-                  <dd className="bk-fact__value">{distance > 0 ? formatMoney(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)) : 'Not recorded'}</dd>
-                </div>
-                <div>
-                  <dt className="bk-fact__label">Cargo</dt>
-                  <dd className="bk-fact__value">{[weight > 0 ? `${formatNumber(weight)} kg` : '', load.cargo_description || ''].filter(Boolean).join(', ') || 'Not recorded'}</dd>
-                </div>
-              </dl>
-            );
-          })()}
+          {!factsInRail && jobFacts('bk-facts bk-facts--job')}
 
           {/* Live map — pickup, delivery, and (if the assigned vehicle is CtrlFleet-linked) its last known position */}
           <div style={{ marginTop: 16 }}>
@@ -507,7 +529,7 @@ export default function Bookings() {
                   ? `${vehicleDetail.plate}, last seen ${formatDateTime(vehicleDetail.last_location_at)}`
                   : undefined
               }
-              height={220}
+              height={fill.height}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
               <p className="bk-help">
@@ -540,12 +562,17 @@ export default function Bookings() {
             <div className="bk-card__head"><h2 className="bk-card__title" id="bk-fin-title">Financials</h2></div>
             {[
               { label: 'Base rate', value: formatCurrency(parseFloat(load.rate || '0')) },
+              {
+                label: <>Base rate per km <InfoTip>Base rate divided by distance, before surcharges.</InfoTip></>,
+                key: 'per-km',
+                value: parseFloat(load.distance || '0') > 0 ? formatMoney(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)) : 'Not recorded',
+              },
               { label: 'Fuel surcharge', value: formatCurrency(parseFloat(load.fuel_surcharge || '0')) },
               { label: 'Additional charges', value: formatCurrency(parseFloat(load.additional_charges || '0')) },
-            ].map(r => (
-              <div key={r.label} className="bk-kv">
+            ].map((r: { label: React.ReactNode; key?: string; value: string }) => (
+              <div key={r.key ?? String(r.label)} className="bk-kv">
                 <span className="bk-kv__label">{r.label}</span>
-                <span className="bk-kv__value">{r.value}</span>
+                <span className={`bk-kv__value${r.value === 'Not recorded' ? ' bk-muted' : ''}`}>{r.value}</span>
               </div>
             ))}
             <div className="bk-kv bk-kv--total">
@@ -553,6 +580,16 @@ export default function Bookings() {
               <span className="bk-kv__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</span>
             </div>
           </section>
+
+          {/* Job figures join the rail when the main column would otherwise
+              run long even with the smallest map (Pending loads have no
+              document buttons, so their rail is short). */}
+          {factsInRail && (
+            <section className="bk-card" aria-labelledby="bk-job-title">
+              <div className="bk-card__head"><h2 className="bk-card__title" id="bk-job-title">Job</h2></div>
+              {jobFacts('rail')}
+            </section>
+          )}
 
           {/* Assignment and the order's documents */}
           <section className="bk-card" aria-labelledby="bk-assign-title">
@@ -575,17 +612,21 @@ export default function Bookings() {
             {!load.vehicle && ['LOADING', 'IN_TRANSIT'].includes(load.status) && !editingAssignment && (
               <div className="bk-assign__flag">
                 <StatusChip tone="warning" size="sm" label={`${load.status === 'IN_TRANSIT' ? 'In transit' : 'Loading'} · no vehicle assigned`} />
-                <p className="bk-help">Add the vehicle that is carrying it, so tracking and fleet status stay right.</p>
+                <p className="bk-help">
+                  {load.status === 'LOADING'
+                    ? 'To add the vehicle, move it back to Assigned via Change status; that asks for one.'
+                    : "The vehicle can't be changed once a load is in transit. Mark it delivered or cancel it via Change status."}
+                </p>
               </div>
             )}
             {!editingAssignment || assignmentLocked ? (
               [
-                { label: 'Vehicle', value: load.vehicle_info || 'Not assigned' },
+                { label: 'Vehicle', value: load.vehicle_info || 'Not assigned', node: vehicleValue(load.vehicle_info) },
                 { label: 'Driver', value: load.driver_name || 'Not assigned' },
-              ].map(r => (
+              ].map((r: { label: string; value: string; node?: React.ReactNode }) => (
                 <div key={r.label} className="bk-kv">
                   <span className="bk-kv__label">{r.label}</span>
-                  <span className={`bk-kv__value${r.value === 'Not assigned' ? ' bk-muted' : ''}`}>{r.value}</span>
+                  <span className={`bk-kv__value${r.value === 'Not assigned' ? ' bk-muted' : ''}`}>{r.node ?? r.value}</span>
                 </div>
               ))
             ) : (

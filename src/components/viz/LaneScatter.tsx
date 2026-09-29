@@ -18,8 +18,10 @@ import { Legend, TableTwin, Tip, TipRow, VIZ, num0, overlaps, textBox, type Box,
  */
 export interface LanePoint { id: string; label: string; kmPerTrip: number; perKm: number; revenue: number; trips: number; thin: boolean }
 
-export function LaneScatter({ points, overallPerKm, minTrips, height: heightProp = 320 }: {
+export function LaneScatter({ points, overallPerKm, minTrips, height: heightProp = 320, period }: {
   points: LanePoint[];
+  /** The window the average covers, e.g. "12 months"; named in the legend. */
+  period?: string;
   /** Total revenue / total km over every plotted lane. */
   overallPerKm: number | null;
   minTrips: number;
@@ -42,10 +44,21 @@ export function LaneScatter({ points, overallPerKm, minTrips, height: heightProp
   // R5: the top is the highest evidenced lane (or the average) plus 10% headroom,
   // rounded up to half a tick step; it is not pushed up to the next whole tick,
   // which left the top of the plot empty. Thin lanes above it are counted under the plot.
-  const want0 = Math.max(evMax * 1.1, 1);
+  // R6: use the height. The top takes every lane when the thin ones are not
+  // far above the evidence (at most 1.6x), else the evidence alone; the
+  // floor starts just under the lowest lane (-10%) instead of at R 0, so the
+  // band nobody earns in is not drawn. A scatter has no bars, so a non-zero
+  // floor misreads nothing; the axis says where it starts.
+  const allMax = Math.max(...ys, overallPerKm ?? 0);
+  const topBasis = allMax <= evMax * 1.6 ? allMax : evMax;
+  const want0 = Math.max(topBasis * 1.08, 1);
+  const lowBasis = Math.min(...ys.filter((v) => v <= want0), overallPerKm ?? Infinity);
   const step0 = (() => { const t = niceTicks(0, want0, 5); return t.length > 1 ? t[1] - t[0] : want0; })();
-  const yTop = Math.ceil(want0 / (step0 / 2) - 1e-9) * (step0 / 2);
-  const yt = niceTicks(0, yTop, 5).filter((t) => t <= yTop + 1e-9);
+  const half = step0 / 2;
+  const yTop = Math.ceil(want0 / half - 1e-9) * half;
+  const yMin = Number.isFinite(lowBasis) ? Math.max(0, Math.floor((lowBasis * 0.9) / half + 1e-9) * half) : 0;
+  const yt = niceTicks(yMin, yTop, 5).filter((t) => t >= yMin - 1e-9 && t <= yTop + 1e-9);
+  // The floor is drawn as the baseline; it is labelled only when it is a tick.
   const offScale = points.filter((p) => p.perKm > yTop);
   const yLabel = (v: number) => rand(v, v % 1 === 0 ? 0 : 1);
   const axisW = Math.max(...yt.map((t) => yLabel(t).length)) * 7 + 10;
@@ -53,7 +66,7 @@ export function LaneScatter({ points, overallPerKm, minTrips, height: heightProp
   const padR = 16;
   const padB = 44;
   const x = linear(0, xt[xt.length - 1], axisW, W - padR);
-  const y = linear(0, yTop, height - padB, padT);
+  const y = linear(yMin, yTop, height - padB, padT);
   // Lanes above the scale (thin data only) are not drawn: a line under the plot counts them and opens the table.
   const plotted = points.filter((p) => p.perKm <= yTop);
   const py = (p: LanePoint) => y(p.perKm);
@@ -71,7 +84,7 @@ export function LaneScatter({ points, overallPerKm, minTrips, height: heightProp
   const want = evidenced.length > 0 ? byRev.filter((p) => !p.thin) : byRev.slice(0, 3);
   // The fleet-average rule and its own label are obstacles: lane labels keep 4px clear of both.
   const avgY = overallPerKm != null && overallPerKm > 0 ? y(overallPerKm) : null;
-  const avgText = overallPerKm != null ? `Average ${rand(overallPerKm)}/km` : '';
+  const avgText = overallPerKm != null ? `Fleet ${rand(overallPerKm)}/km` : '';
   const avgBox = avgY != null && W >= 520 ? textBox(avgText, W - padR, avgY - 6, 'end') : null;
   // Lane labels may cross the average hairline (they carry a surface halo) but never its text.
   const placed: Box[] = [
@@ -133,9 +146,9 @@ export function LaneScatter({ points, overallPerKm, minTrips, height: heightProp
   return (
     <div className="viz" ref={figRef}>
       <Legend items={[
-        { label: `${minTrips}+ trips`, color: VIZ.accent, shape: 'dot' },
+        ...(evidenced.length > 0 ? [{ label: `${minTrips}+ trips`, color: VIZ.accent, shape: 'dot' as const }] : []),
         { label: `Fewer than ${minTrips} trips`, color: VIZ.neutralStrong, shape: 'ring' },
-        ...(overallPerKm ? [{ label: `Your average, ${rand(overallPerKm)}/km`, color: 'var(--text-secondary)', shape: 'line' as const }] : []),
+        ...(overallPerKm ? [{ label: `Fleet average${period ? ` (${period})` : ''}, ${rand(overallPerKm)}/km`, color: 'var(--text-secondary)', shape: 'line' as const }] : []),
       ]} />
       <div ref={ref} onPointerLeave={close}>
         <svg ref={svgRef} width={W} height={height} role="img" tabIndex={0} className="viz-focusable"
@@ -148,9 +161,10 @@ export function LaneScatter({ points, overallPerKm, minTrips, height: heightProp
             if (e.key === 'ArrowLeft') { e.preventDefault(); openP(kbOrder[Math.max(0, i - 1)]); }
             if (e.key === 'Escape') close();
           }}>
+          <line x1={axisW} x2={W - padR} y1={y(yMin)} y2={y(yMin)} className="viz-baseline" />
           {yt.map((t) => (
             <g key={`y${t}`}>
-              <line x1={axisW} x2={W - padR} y1={y(t)} y2={y(t)} className={t === 0 ? 'viz-baseline' : 'viz-gridline'} />
+              {Math.abs(t - yMin) > 1e-9 && <line x1={axisW} x2={W - padR} y1={y(t)} y2={y(t)} className="viz-gridline" />}
               <text x={axisW - 8} y={y(t)} dy="0.32em" textAnchor="end">{yLabel(t)}</text>
             </g>
           ))}

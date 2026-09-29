@@ -124,6 +124,10 @@ export default function UsersTable() {
   });
 
   const users: AdminUserRow[] = data?.results || [];
+  // Company earns a column only when at least 20% of the rows have one (R6:
+  // hidden when more than 80% would read "—"); the name's title still
+  // carries it, and Email gets the width.
+  const showCompanyCol = users.length > 0 && users.filter(u => (u.company_name || "").trim()).length >= users.length * 0.2;
   const refresh = () => qc.invalidateQueries({ queryKey: ['admin-users-table'] });
 
   const resetCreateForm = () => {
@@ -272,7 +276,7 @@ export default function UsersTable() {
               <tr>
                 <th style={thStyle}>Name</th>
                 <th className="adm-col-phone" style={thStyle}>Email</th>
-                <th className="adm-col-phone" style={thStyle}>Company</th>
+                {showCompanyCol && <th className="adm-col-phone" style={thStyle}>Company</th>}
                 <th className="adm-col-phone" style={thStyle}>Role</th>
                 <th style={thStyle}>Status</th>
                 <th className="adm-col-low" style={thStyle}>Last login</th>
@@ -284,14 +288,15 @@ export default function UsersTable() {
                 const rowPending = pending?.id === u.id ? pending.kind : null;
                 return (
                   <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.55 }}>
-                    <td className="adm-user-name" style={tdStyle}>
+                    <td className="adm-user-name" style={tdStyle} title={[u.name, !showCompanyCol ? u.company_name : ''].filter(Boolean).join(' · ') || undefined}>
                       {u.name || '—'}
                       {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)' }}>Superuser</span>}
+
                       {/* Phones: email and role ride under the name (their columns fold away). */}
                       <div className="adm-status-sub adm-owner">{String(u.email || '').split('@')[0]}{String(u.email || '').includes('@') && <><wbr />@{String(u.email).split('@').slice(1).join('@')}</>}{u.role ? ` · ${roleLabel(u.role)}` : ''}</div>
                     </td>
-                    <td className="adm-col-phone" style={{ ...tdStyle, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.email}>{u.email}</td>
-                    <td className="adm-col-phone" style={{ ...tdStyle, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.company_name || undefined}>{u.company_name || '—'}</td>
+                    <td className="adm-col-phone" style={{ ...tdStyle, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.email}>{u.email}</td>
+                    {showCompanyCol && <td className="adm-col-phone" style={{ ...tdStyle, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.company_name || undefined}>{u.company_name || '—'}</td>}
                     <td className="adm-col-phone" style={tdStyle}>{roleLabel(u.role)}</td>
                     <td style={tdStyle}>
                       <StatusChip status={u.is_active ? 'ACTIVE' : 'INACTIVE'} size="sm" />
@@ -315,7 +320,7 @@ export default function UsersTable() {
                 );
               })}
               {users.length === 0 && (
-                <tr><td style={tdStyle} colSpan={7}>No users match.</td></tr>
+                <tr><td style={tdStyle} colSpan={showCompanyCol ? 7 : 6}>No users match.</td></tr>
               )}
             </tbody>
           </table>

@@ -10,6 +10,8 @@
    a finding fires only on a clear trigger and above a R 1 000 threshold. */
 
 import { formatMoney, formatMoneyWhole, formatPercent } from '@/lib/formatters';
+import { saDateISO, saDaysBetween } from '@/lib/dates';
+import { STALE_AFTER_DAYS, staleLabel, staleLoads, staleWork } from '@/lib/staleWork';
 import { fetchData } from '@/lib/Api';
 import { resolvePeriod, periodText, type Ledger } from '@/components/reports/data';
 import { marginFromLedger } from './margin-ledger';
@@ -59,7 +61,7 @@ export interface PaymentRec { id: number; invoice: number | null; amount: string
 export interface ExpenseRec { id: number; expense_number?: string; category: string; description?: string; amount: string | number; expense_date: string; status: string; created_at: string }
 export interface LoadRec {
   id: number; load_number: string; customer: number | null; customer_name: string; status: string; total_amount: string | number;
-  delivery_date: string | null; pickup_city?: string; delivery_city?: string; pickup_location?: string; delivery_location?: string;
+  delivery_date: string | null; pickup_date?: string | null; created_at?: string | null; pickup_city?: string; delivery_city?: string; pickup_location?: string; delivery_location?: string;
   pod_document: string | null; pod_signature: string | null; pod_received_by: string | null; quote: number | null;
 }
 export interface QuoteRec {
@@ -131,13 +133,12 @@ export interface Finding {
 // ----------------------------------------------------------------- helpers
 
 export const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
-const DAY = 86_400_000;
-const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-/** Whole days from a to b (b later is positive). Date-only strings are read as local dates. */
-export const daysBetween = (a: string | Date, b: string | Date) => {
-  const p = (x: string | Date) => (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) ? new Date(`${x}T00:00:00`) : new Date(x));
-  return Math.round((dayStart(p(b)) - dayStart(p(a))) / DAY);
-};
+/**
+ * Whole days from a to b (b later is positive), as South African calendar
+ * days: the Debtors report's count (todayISO in Africa/Johannesburg), so
+ * "N days late" here is the same number as on Debtors in any time zone.
+ */
+export const daysBetween = (a: string | Date, b: string | Date) => saDaysBetween(a, b) ?? 0;
 const dateOnly = (s: string | null | undefined) => (s ? s.slice(0, 10) : '');
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 /** Whole rand, e.g. "R 127 621". Used in headlines and lines, where cents are noise. */
@@ -286,15 +287,19 @@ export function computeFindings(input: FindingInputs, now = new Date()): Finding
   const unchasedTotal = unchased.reduce((s, i) => s + num(i.balance), 0);
   if (unchased.length && unchasedTotal >= THRESHOLD) {
     const customers = new Set(unchased.map(i => i.customer ?? i.customer_name)).size;
-    const avgLate = Math.round(unchased.reduce((s, i) => s + lateDays(i), 0) / unchased.length);
+    // Days past the due date, weighted by balance: the Debtors report's "Average days late" basis.
+    const avgLate = Math.round(unchased.reduce((s, i) => s + lateDays(i) * num(i.balance), 0) / unchasedTotal);
+    // The line quotes the oldest invoice: the same day count as its row on Debtors "By invoice"
+    // (an average over this subset would sit next to Debtors' whole-book average and disagree).
+    const maxLate = Math.max(...unchased.map(lateDays));
     out.push({
       id: 'never_chased', kind: 'never_chased', category: 'Get paid', basis: 'Measured', confidence: 'high',
       severity: avgLate > 60 ? 'high' : 'medium',
       amount: unchasedTotal,
       headline: 'Overdue, never chased',
-      line: `${plural(customers, 'customer')}, on average ${avgLate} days late. No reminder sent on any.`,
+      line: `${plural(customers, 'customer')}, up to ${maxLate} days past the due date. No reminder sent on any.`,
       action: { label: 'Send reminders', href: '/finance/invoices' },
-      method: `Sent invoices more than 7 days past their due date with no reminder ever recorded. Customers and invoices already in a card above are left out. Value is the unpaid balance.${invCompleteNote}`,
+      method: `Sent invoices more than 7 days past their due date with no reminder ever recorded. Customers and invoices already in a card above are left out. Value is the unpaid balance. Days late are whole days since each invoice's due date, counted as on the Debtors report.${invCompleteNote}`,
       evidence: unchased.map(i => invoiceRow(i, `${lateDays(i)} days late`)),
       evidenceNoun: ['invoice', 'invoices'],
       invoiceIds: unchased.map(i => i.id), loadIds: [], cash: true,
@@ -372,7 +377,7 @@ export function computeFindings(input: FindingInputs, now = new Date()): Finding
     const zone = (input.company?.fuel_zone || 'INLAND').toUpperCase();
     const official = num(zone === 'COASTAL' ? input.fuel.coastal_price : input.fuel.inland_price);
     const loadByQuote = new Map((input.loads?.rows ?? []).filter(l => l.quote != null).map(l => [l.quote!, l]));
-    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const todayIso = saDateISO(today)!;
     const rows = official > 0 ? input.quotes.rows.map(q => {
       const st = (q.status || '').toUpperCase();
       const price = num(q.fuel_price_at_creation); const fuel = num(q.fuel_surcharge);
@@ -411,27 +416,34 @@ export function computeFindings(input: FindingInputs, now = new Date()): Finding
     }
   }
 
-  // 8. Loads still in transit long after their delivery date --------------
+  // 8. Loads never closed (R6: the one stale-work rule, src/lib/staleWork.ts) --
+  // The same loads Orders, Home and the fleet pages flag: open (Pending,
+  // Assigned, Loading, In transit) and past the delivery date or open more
+  // than 30 days. The count is every such load, so it matches Home.
   if (input.loads) {
-    const invoicedLoads = new Set(invoices.map(i => i.load).filter((x): x is number => x != null));
-    const stale = input.loads.rows.filter(l =>
-      (l.status || '').toUpperCase() === 'IN_TRANSIT' && l.delivery_date && daysBetween(l.delivery_date, today) > 7 && !invoicedLoads.has(l.id) && num(l.total_amount) > 0,
-    ).sort((a, b) => num(b.total_amount) - num(a.total_amount));
+    const stale = staleLoads(input.loads.rows, today);
     const total = stale.reduce((s, l) => s + num(l.total_amount), 0);
     if (stale.length && total >= THRESHOLD) {
-      const minLate = Math.min(...stale.map(l => daysBetween(l.delivery_date!, today)));
+      const by = new Map<string, number>();
+      stale.forEach(l => { const k = (l.status || '').toUpperCase(); by.set(k, (by.get(k) || 0) + 1); });
+      const words: Record<string, string> = { IN_TRANSIT: 'in transit', LOADING: 'loading', ASSIGNED: 'assigned', PENDING: 'pending' };
+      const mix = ['IN_TRANSIT', 'LOADING', 'ASSIGNED', 'PENDING'].filter(k => by.get(k)).map(k => `${by.get(k)} ${words[k]}`).join(', ');
+      const oldest = staleLabel(staleWork(stale[0], today)!);
       out.push({
         id: 'open_loads', kind: 'open_loads', category: 'Bill your work', basis: 'Measured', confidence: 'medium',
         severity: 'medium',
         amount: total,
         headline: 'Loads never closed',
-        line: `${plural(stale.length, 'load')} still in transit, at least ${minLate} days after delivery was due.`,
+        line: `${plural(stale.length, 'load')} still open (${mix}); the oldest ${oldest.text}.`,
         action: { label: 'Close and invoice loads', href: '/bookings/orders' },
-        method: 'Loads still In transit more than 7 days after their delivery date, with no invoice. If they were delivered, they can be invoiced once marked delivered. Value is the load total, excluding VAT.' + (input.loads.complete ? '' : ' Not every load could be loaded.'),
-        evidence: stale.map(l => ({
-          id: `load-${l.id}`, ref: l.load_number, label: l.customer_name,
-          note: `due ${daysBetween(l.delivery_date!, today)} days ago`, amount: num(l.total_amount), href: `/bookings/${l.id}`,
-        })),
+        method: `Open loads (Pending, Assigned, Loading or In transit) past their delivery date, or open more than ${STALE_AFTER_DAYS} days: the same rule as Orders, Home and the fleet pages. If they were delivered, mark them delivered and invoice them; if not, cancel them. Value is the load total, excluding VAT.` + (input.loads.complete ? '' : ' Not every load could be loaded.'),
+        evidence: stale.map(l => {
+          const st = staleWork(l, today)!;
+          return {
+            id: `load-${l.id}`, ref: l.load_number, label: l.customer_name,
+            note: st.overdue ? `due ${st.since}, ${st.days} days ago` : `open since ${st.since} (${st.days} days)`, amount: num(l.total_amount), href: `/bookings/${l.id}`,
+          };
+        }),
         evidenceNoun: ['load', 'loads'],
         invoiceIds: [], loadIds: stale.map(l => l.id), cash: true,
       });
@@ -440,7 +452,7 @@ export function computeFindings(input: FindingInputs, now = new Date()): Finding
 
   // 9. Sent quotes that lapsed without a reply (worth checking) -----------
   if (input.quotes) {
-    const todayIso = dateOnly(new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString());
+    const todayIso = saDateISO(today)!;
     const lapsed = input.quotes.rows
       .filter(q => (q.status || '').toUpperCase() === 'SENT' && q.valid_until && q.valid_until < todayIso && num(q.total_amount) > 0)
       .sort((a, b) => num(b.total_amount) - num(a.total_amount));

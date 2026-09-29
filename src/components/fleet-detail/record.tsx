@@ -4,6 +4,7 @@ import { DELIVERED } from '@/components/reports/data';
 import { formatNumber } from '@/lib/formatters';
 import { StatusChip as UiStatusChip } from '@/components/ui/StatusChip';
 import { MonthlyBars } from './MonthlyBars';
+import { fleetRevenuePerKm, lastTwelveMonths, perKmLoads } from '@/lib/revenuePerKm';
 import {
   DAY_MS, InfoTip, dateText, daysUntil, kmText, loadDate, monthlySeries, monthsWithRevenue, num, plural, randCents, randWhole,
   type MonthPoint,
@@ -77,7 +78,8 @@ export function performance(loads: any[], expenses: any[] | null, now = new Date
   const deliveredAll = loads.filter(isDelivered);
   const delivered = deliveredAll.filter((l) => inWin(loadDate(l)));
   const revenue = delivered.reduce((s, l) => s + num(l.total_amount), 0);
-  const withKm = delivered.filter((l) => num(l.distance) > 0);
+  // Per km on the shared basis (delivered, with a distance, last 12 months).
+  const withKm = perKmLoads(loads, lastTwelveMonths(now));
   const km = withKm.reduce((s, l) => s + num(l.distance), 0);
   const kmRevenue = withKm.reduce((s, l) => s + num(l.total_amount), 0);
   let costs = 0; let pending = 0; let pendingCount = 0; let costCount = 0;
@@ -105,42 +107,18 @@ export const latest = (loads: any[]) => [...loads].sort((a, b) => String(loadDat
 /** Whole days since a date (0 today). */
 export const daysSince = (iso?: string | null) => { const d = daysUntil(iso); return d === null ? null : -d; };
 
-/** An open order older than this (from its pickup, else its creation) is stale work. */
-export const STALE_AFTER_DAYS = 30;
+/* Stale work and revenue per km follow the app-wide rules (R6): one stale
+   rule (src/lib/staleWork.ts) and one per-km basis (src/lib/revenuePerKm.ts),
+   so the Vehicles list, these pages, Orders, Home and Findings agree. */
+export { STALE_AFTER_DAYS, staleWork, staleLabel, staleAction } from '@/lib/staleWork';
 
-/**
- * Stale work (R5): an order still Assigned, Loading or In transit past its
- * delivery date, or older than 30 days. It is labelled "since <date> (N days)
- * — close or reassign", never presented as current work. Null when current.
- */
-export function staleWork(load: any): { since: string; days: number } | null {
-  if (!load || !isOpenLoad(load)) return null;
-  const startIso = load.pickup_date || load.created_at || null;
-  const age = daysSince(startIso);
-  const late = daysSince(load.delivery_date);
-  // Past its delivery date: it has been overdue since then. Else open too long: since it started.
-  if (late !== null && late > 0) return { since: dateText(load.delivery_date) || '', days: late };
-  if (age !== null && age > STALE_AFTER_DAYS) return { since: dateText(startIso) || '', days: age };
-  return null;
-}
-
-/**
- * Fleet revenue per km over the same 12 months, from every delivered load
- * with a distance (the loaded Reports ledger). Null without enough data.
- */
-export function fleetPerKm(allLoads: any[] | null | undefined, now = new Date()): number | null {
+/** The fleet's revenue per km over the last 12 months (the shared basis), with its window. */
+export function fleetPerKm(allLoads: any[] | null | undefined, now = new Date()): FleetKm | null {
   if (!allLoads) return null;
-  const from = windowStart(now);
-  let km = 0; let rev = 0;
-  for (const l of allLoads) {
-    if (!isDelivered(l)) continue;
-    const iso = loadDate(l); if (!iso) continue;
-    const d = new Date(iso); if (Number.isNaN(d.getTime()) || d < from || d > now) continue;
-    const dist = num(l.distance); if (dist <= 0) continue;
-    km += dist; rev += num(l.total_amount);
-  }
-  return km > 0 ? rev / km : null;
+  const f = fleetRevenuePerKm(allLoads, lastTwelveMonths(now));
+  return f.perKm === null ? null : { perKm: f.perKm, window: '12 months' };
 }
+export interface FleetKm { perKm: number; /** The named window, e.g. "12 months". */ window: string }
 
 // ------------------------------------------------------------------ head
 
@@ -236,7 +214,7 @@ export function perfLine(perf: Perf): string {
 }
 
 /** Figures shared by the vehicle and driver cards. `fleetKm` is the fleet's revenue per km for comparison. */
-export function perfFigures(perf: Perf, opts: { revenueLabel: string; thin: boolean; costs?: boolean; costsKnown?: boolean; fleetKm?: number | null }): PerfFigure[] {
+export function perfFigures(perf: Perf, opts: { revenueLabel: string; thin: boolean; costs?: boolean; costsKnown?: boolean; fleetKm?: FleetKm | null }): PerfFigure[] {
   const n = perf.delivered.length;
   const figs: PerfFigure[] = [
     { label: opts.revenueLabel, value: randWhole(perf.revenue), note: opts.thin ? undefined : plural(n, 'load'), lead: true },
@@ -256,27 +234,27 @@ export function perfFigures(perf: Perf, opts: { revenueLabel: string; thin: bool
     } else {
       const margin = perf.revenue - perf.costs;
       const after = margin - perf.pending;
+      // One consequence line (R6: the note stays within two lines). With
+      // pending costs it names what approval would leave; the approved total
+      // is in the Performance tip. Without, it names the approved total.
       figs.push({
         label: 'Margin after truck costs',
         value: randWhole(margin),
-        note: <>
-          {perf.pending > 0 && (
-            <span className={`fd-perf__if${after < 0 ? ' is-loss' : ''}`}>
-              {randWhole(after)} if the {randWhole(perf.pending)} pending is approved
-            </span>
-          )}
-          <span>After {randWhole(perf.costs)} approved costs</span>
-        </>,
+        note: perf.pending > 0
+          ? <span className={`fd-perf__if${after < 0 ? ' is-loss' : ''}`}>{randWhole(after)} if the {randWhole(perf.pending)} pending is approved</span>
+          : `After ${randWhole(perf.costs)} approved costs`,
       });
     }
   }
+  // Compared with the fleet on the same basis and a named window (R6); the
+  // km behind the figure are in the Performance tip.
   let kmNote: ReactNode = perf.km > 0 ? `Over ${kmText(perf.km)}` : undefined;
   if (perf.perKm !== null && opts.fleetKm) {
-    const diff = perf.perKm - opts.fleetKm;
-    const cmp = Math.abs(diff) / opts.fleetKm < 0.03
-      ? `In line with the fleet's ${randCents(opts.fleetKm)}`
-      : `${randCents(Math.abs(diff))} ${diff < 0 ? 'below' : 'above'} the fleet's ${randCents(opts.fleetKm)}`;
-    kmNote = <><span>{kmNote}</span><span>{cmp}</span></>;
+    const f = opts.fleetKm.perKm;
+    const diff = perf.perKm - f;
+    kmNote = Math.abs(diff) / f < 0.03
+      ? `In line with the fleet's ${randCents(f)} over ${opts.fleetKm.window}`
+      : `${randCents(Math.abs(diff))} ${diff < 0 ? 'below' : 'above'} the fleet's ${randCents(f)} over ${opts.fleetKm.window}`;
   }
   figs.push({ label: 'Revenue per km', value: perf.perKm !== null ? randCents(perf.perKm) : null, note: kmNote });
   if (!opts.thin) figs.push({ label: 'Days on a job', value: formatNumber(perf.days), note: 'Pickup to delivery' });

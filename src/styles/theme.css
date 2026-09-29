@@ -1336,7 +1336,24 @@ code, pre, kbd, samp, .tw-code {
 .tw-seg--sm .tw-seg__opt { height: 24px; padding: 0 8px; }
 .tw-seg--block { display: flex; width: 100%; }
 .tw-seg--block .tw-seg__opt { flex: 1 1 0; }
-@media (pointer: coarse) { .tw-seg__opt, .tw-seg--sm .tw-seg__opt { height: 40px; padding: 0 12px; } }
+/* Touch (R6): every option is a 44px target. The track loses its vertical
+   padding so it stays 44 tall beside 44px fields, and the active chip keeps its
+   inset look through an inset ring in the track colour. !important because
+   page toolbars size options from --control-h (36 - 6); this is the floor. */
+@media (pointer: coarse) {
+  .tw-seg { padding-block: 0 !important; }
+  .tw-seg__opt, .tw-seg--sm .tw-seg__opt { height: 44px !important; min-height: 44px !important; padding: 0 12px; }
+  .tw-seg__opt.is-active,
+  .tw-seg__opt[aria-pressed="true"],
+  .tw-seg__opt[aria-checked="true"],
+  .tw-seg__opt[aria-selected="true"] {
+    box-shadow: inset 0 0 0 3px var(--bg-raised), inset 0 0 0 4px var(--border-default);
+  }
+  [data-theme="dark"] .tw-seg__opt.is-active,
+  [data-theme="dark"] .tw-seg__opt[aria-pressed="true"],
+  [data-theme="dark"] .tw-seg__opt[aria-checked="true"],
+  [data-theme="dark"] .tw-seg__opt[aria-selected="true"] { box-shadow: inset 0 0 0 3px var(--bg-raised); }
+}
 
 /* Small status pill (e.g. "Live", "Last 20 quotes"). */
 .tw-chip {
@@ -1472,7 +1489,8 @@ textarea.tw-input { height: auto; padding: 8px 12px; }
   pointer-events: none;
 }
 .tw-info__pop--end { left: auto; right: -8px; }
-@media (pointer: coarse) { .tw-info::after { content: ''; position: absolute; inset: -12px; } }
+/* 44px hit area on touch for the 16px (KPI) and 20px tips. */
+@media (pointer: coarse) { .tw-info::after { content: ''; position: absolute; inset: -14px; } }
 
 /* ===========================================================================
    FORM-CONTROL BOUNDARY, TOKEN-LEVEL (DESIGN-PRINCIPLES §3, WCAG 1.4.11)

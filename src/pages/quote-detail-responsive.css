@@ -85,3 +85,13 @@
 @media (max-width: 480px) {
   .qd .section-header .section-header__title { font-size: 24px; letter-spacing: -0.02em; }
 }
+
+/* ---- Round 6 ---- */
+/* Phones: the subtitle keeps to one line (chip and customer); the route is
+   the Job card's first fact below. */
+@media (max-width: 768px) { .qd-desc-route { display: none; } }
+.bk-card.qd-map--empty { display: flex; align-items: center; justify-content: center; padding: var(--card-pad, 20px); text-align: center; box-sizing: border-box; }
+.bk-card.qd-map--empty .bk-help { max-width: 40ch; margin: 0; }
+@media (max-width: 1000px) { .bk-card.qd-map--empty { height: auto !important; } }
+/* The empty map slot reads as a map area (tinted), not a blank white card. */
+.bk-card.qd-map--empty { background: var(--bg-deep, var(--bg-surface-hover)); border-style: dashed; }

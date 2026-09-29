@@ -1,7 +1,8 @@
 import './quote-detail-responsive.css';
 import './quote-invoice-roles.css';
 import './bookings-section.css';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useMapFill } from './useMapFill';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchData, patchData, deleteData, postData, downloadBlob } from '@/lib/Api';
@@ -76,7 +77,12 @@ export default function QuoteDetail() {
   const queryClient = useQueryClient();
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
-  const railRef = useStickyRail<HTMLDivElement>();
+  const stickyRail = useStickyRail<HTMLDivElement>();
+  // Columns end within 48px (R6): the route map takes up the difference.
+  // Still long at the smallest map: the customer's contact facts move to the rail.
+  const [contactInRail, setContactInRail] = useState(false);
+  const fill = useMapFill({ base: 200, min: 160, max: 440, onStuck: () => setContactInRail(true) });
+  const railRef = useCallback((node: HTMLDivElement | null) => { fill.sideRef.current = node; stickyRail(node); }, [stickyRail, fill.sideRef]);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [emailStatus, setEmailStatus] = useState<{ sent: boolean; address: string | null; reason?: string | null } | null>(null);
 
@@ -397,7 +403,7 @@ export default function QuoteDetail() {
         // customer's own city, which read as a destination).
         description={<><span className="qd-desc-chips"><StatusChip status={quote.status} label={STATUS_LABEL[quote.status]} size="sm" />
             {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && <StatusChip status="WON" size="sm" />}
-            {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <StatusChip status="LOST" size="sm" />}</span>{[company, routeSummary, isRound ? 'Round trip' : ''].filter(Boolean).join(' · ')}</>}
+            {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <StatusChip status="LOST" size="sm" />}</span>{company}{routeSummary && <span className="qd-desc-route">{company ? ' · ' : ''}{routeSummary}</span>}</>}
         actions={<>
           <StatusMenu
             subject={quote.quote_number}
@@ -436,16 +442,18 @@ export default function QuoteDetail() {
 
       <div className="quote-detail-grid">
         {/* LEFT: the job in one card (customer, route, cargo), then the map. */}
-        <div className="qd-main">
+        <div ref={fill.mainRef as React.RefObject<HTMLDivElement>} className="qd-main">
           <section className="bk-card" aria-labelledby="qd-job-title">
             <div className="bk-card__head"><h2 className="bk-card__title" id="qd-job-title">Job</h2></div>
-            <dl className="qd-facts">
-              {fact('Customer', company || 'Not recorded')}
-              {showContact && fact('Contact', contact)}
-              {quote.customer_email && <div className="qd-fact qd-fact--email"><dt className="bk-fact__label">Email</dt><dd className="bk-fact__value"><span className="qd-email">{breakableEmail(quote.customer_email)}</span></dd></div>}
-              {quote.customer_phone && fact('Phone', quote.customer_phone)}
-            </dl>
-            <hr className="qd-rule" />
+            {!contactInRail && <>
+              <dl className="qd-facts">
+                {fact('Customer', company || 'Not recorded')}
+                {showContact && fact('Contact', contact)}
+                {quote.customer_email && <div className="qd-fact qd-fact--email"><dt className="bk-fact__label">Email</dt><dd className="bk-fact__value"><span className="qd-email">{breakableEmail(quote.customer_email)}</span></dd></div>}
+                {quote.customer_phone && fact('Phone', quote.customer_phone)}
+              </dl>
+              <hr className="qd-rule" />
+            </>}
             <div className="qd-route-row">
               <div>
                 <div className="bk-fact__label" style={{ marginBottom: 8 }}>{isRound ? 'Leg 1, outbound' : 'Route'}</div>
@@ -502,7 +510,7 @@ export default function QuoteDetail() {
             </dl>
           </section>
 
-          {(quote.pickup_lat || quote.delivery_lat) && (
+          {(quote.pickup_lat || quote.delivery_lat) ? (
             <section className="bk-card qd-map" aria-label="Route map">
               <ExpandableRouteMap
                 pickup={quote.pickup_location}
@@ -511,9 +519,15 @@ export default function QuoteDetail() {
                 deliveryCoords={quote.delivery_lat ? { lat: Number(quote.delivery_lat), lon: Number(quote.delivery_lng) } : undefined}
                 stops={Array.isArray(quote.stops) ? quote.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
                 geometry={Array.isArray(quote.route_geometry) && quote.route_geometry.length > 1 ? quote.route_geometry.map((p: { lat: number; lon: number }) => [Number(p.lat), Number(p.lon)] as [number, number]) : undefined}
-                height={200}
+                height={fill.height}
                 dialogStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-dialog, 16px)', boxShadow: 'none' }}
               />
+            </section>
+          ) : (
+            // No coordinates (older quotes): say so in the map's place, at the
+            // height that keeps the two columns ending together (R6).
+            <section className="bk-card qd-map qd-map--empty" aria-label="Route map" style={{ height: fill.height }}>
+              <p className="bk-help">No map for this quote: its addresses have no map position. Edit the quote and pick them on the map to add one.</p>
             </section>
           )}
         </div>
@@ -559,6 +573,23 @@ export default function QuoteDetail() {
               {quote.confidence && !showWinChance && <div className="bk-kv"><span className="bk-kv__label">Price confidence</span><span className="bk-kv__value">{sentenceCase(quote.confidence)}</span></div>}
             </div>
           </section>
+
+          {contactInRail && (
+            <section className="bk-card" aria-labelledby="qd-contact-title">
+              <div className="bk-card__head"><h2 className="bk-card__title" id="qd-contact-title">Customer</h2></div>
+              {[
+                { label: 'Customer', value: company || 'Not recorded' },
+                ...(showContact ? [{ label: 'Contact', value: contact }] : []),
+                ...(quote.customer_email ? [{ label: 'Email', value: <span className="qd-email">{breakableEmail(quote.customer_email)}</span> }] : []),
+                ...(quote.customer_phone ? [{ label: 'Phone', value: quote.customer_phone }] : []),
+              ].map((r: { label: string; value: React.ReactNode }) => (
+                <div key={r.label} className="bk-kv">
+                  <span className="bk-kv__label">{r.label}</span>
+                  <span className="bk-kv__value">{r.value}</span>
+                </div>
+              ))}
+            </section>
+          )}
 
           {(effectiveShareUrl || ((quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome)) && (
             <section className="bk-card" aria-labelledby="qd-customer-title">

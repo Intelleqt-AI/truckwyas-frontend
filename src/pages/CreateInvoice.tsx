@@ -119,7 +119,11 @@ export default function CreateInvoice() {
                   <input id="create-invoice-invoice_number" className="fin-control qi-input" type="text" value={form.invoice_number} onChange={set('invoice_number')} />
                 </div>
               </div>
-              <div className="fin-form__row">
+              {/* Amount, due date, "Save as" and the description: three across
+                  with the description below when the card is wide, else two
+                  across ("Save as" beside the description), so the form ends
+                  level with the summary rail at every two-column width. */}
+              <div className="fin-form__row fin-form__row--3">
                 <div>
                   <label htmlFor="create-invoice-amount" className="fin-label">Amount excl. VAT (ZAR)</label>
                   <input id="create-invoice-amount" className="fin-control qi-input" type="number" inputMode="decimal" step="0.01" placeholder="0,00" value={form.amount} onChange={set('amount')} style={{ fontVariantNumeric: 'tabular-nums' }} />
@@ -128,12 +132,6 @@ export default function CreateInvoice() {
                   <div className="fin-label">Due date</div>
                   <DatePicker value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} />
                 </div>
-              </div>
-              <div>
-                <label htmlFor="create-invoice-description" className="fin-label">Description</label>
-                <textarea id="create-invoice-description" className="fin-control qi-input" value={form.description} onChange={set('description')} rows={2} placeholder="e.g. Standby charge, 2 days at Durban port" />
-              </div>
-              <div className="fin-form__row">
                 <div>
                   <label id="create-invoice-status-label" htmlFor="create-invoice-status" className="fin-label">Save as</label>
                   <Select value={form.status} onValueChange={val => setForm(f => ({ ...f, status: val }))}>
@@ -145,6 +143,10 @@ export default function CreateInvoice() {
                       <SelectItem value="SENT">Sent, already with the customer</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="fin-form__wide">
+                  <label htmlFor="create-invoice-description" className="fin-label">Description</label>
+                  <textarea id="create-invoice-description" className="fin-control qi-input" value={form.description} onChange={set('description')} rows={2} placeholder="e.g. Standby charge, 2 days at Durban port" />
                 </div>
               </div>
             </div>
@@ -167,7 +169,8 @@ export default function CreateInvoice() {
               {error && <div className="fin-inset fin-text-danger" role="alert" style={{ fontSize: 13, lineHeight: '20px', marginTop: 12 }}>{error}</div>}
 
               <div className="fin-summary-card__actions">
-                <button type="submit" className="tw-btn tw-btn--primary fin-rail-btn" style={{ width: '100%' }} disabled={!canSubmit || mutation.isPending}>
+                {/* Phones: the head carries "Create invoice", so it shows once. */}
+                <button type="submit" className="tw-btn tw-btn--primary fin-rail-btn fin-hide-phone-create" style={{ width: '100%' }} disabled={!canSubmit || mutation.isPending}>
                   {mutation.isPending ? 'Creating…' : 'Create invoice'}
                 </button>
                 <button type="button" className="tw-btn tw-btn--ghost fin-rail-btn" style={{ width: '100%' }} onClick={() => navigate('/finance/invoices')}>

@@ -27,6 +27,9 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
     try { return localStorage.getItem('tw-nav-collapsed') === '1'; } catch { return false; }
   });
   const [narrow, setNarrow] = useState<boolean>(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches);
+  // Phones (the top-bar theme button is hidden at <= 768px, shell.css): only
+  // there does the account menu carry "Dark theme"; desktop has the toggle.
+  const [phone, setPhone] = useState<boolean>(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches);
   const [moreOpen, setMoreOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const [agentQuery, setAgentQuery] = useState('');
@@ -165,9 +168,12 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   // Tablet widths get the rail automatically; the choice is remembered on desktop.
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 1100px)');
+    const mqPhone = window.matchMedia('(max-width: 768px)');
     const on = () => setNarrow(mq.matches);
+    const onPhone = () => setPhone(mqPhone.matches);
     mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
+    mqPhone.addEventListener('change', onPhone);
+    return () => { mq.removeEventListener('change', on); mqPhone.removeEventListener('change', onPhone); };
   }, []);
   const railed = collapsed || narrow;
   const toggleCollapsed = () => setCollapsed((c) => {
@@ -294,8 +300,8 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
                 </div>
               )}
               items={[
-                // A two-state item: "Dark theme" with a check when it is on.
-                { label: 'Dark theme', icon: <Moon size={16} strokeWidth={1.75} />, checked: theme === 'dark', onSelect: toggleTheme },
+                // Phones only: a two-state item, "Dark theme" with a check when it is on.
+                ...(phone ? [{ label: 'Dark theme', icon: <Moon size={16} strokeWidth={1.75} />, checked: theme === 'dark', onSelect: toggleTheme } as MenuItem] : []),
                 { label: 'Profile and settings', icon: <SettingsIcon size={16} strokeWidth={1.75} />, onSelect: () => navigate('/settings') },
                 ...(status.needsBilling ? [{ label: 'Go to billing', icon: <CreditCard size={16} strokeWidth={1.75} />, onSelect: () => navigate('/settings/billing') } as MenuItem] : []),
                 { label: 'Sign out', icon: <LogOut size={16} strokeWidth={1.75} />, danger: true, onSelect: handleLogout },

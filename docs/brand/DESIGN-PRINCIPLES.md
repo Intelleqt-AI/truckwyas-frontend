@@ -185,6 +185,14 @@ Every pair the palette ships was computed with the WCAG relative-luminance formu
 - **KPI tiles** (the reference agent-metrics pattern): label, value, one line (change versus a named period, "+8.2% vs last month"), optional sparkline beside the figure. Maximum four per row, 96px tall (§11.6, §12).
 - **Funnels and outcomes** (the reference detection-to-resolution pattern) for any process: show each stage's count and rate, and where items dropped out.
 - Every chart states its basis in its description (date basis, VAT, what is excluded) in plain words.
+- **Averages name their window (R6).** Every average says its period ("Delivered loads, last 12 months"), and a page that compares to "the fleet" uses the same figure: revenue per km comes only from `fleetRevenuePerKm()` / `perKmLoads()` in `src/lib/revenuePerKm.ts` (delivered loads with a distance, last 12 months).
+- **Lateness strips are context, not headlines (R6).** Neutral ramp, 6px; the accent marks the oldest band only as a 2px rule (`<AgeingStrip oldestMark>`).
+- **Pending money (R6).** A margin or profit figure with pending costs says what it becomes: "−R 60 698 if the R 87 129 pending is approved" (danger text when it is a loss).
+
+### 5.1 Stale work and day counts (R6)
+
+- One rule, `src/lib/staleWork.ts`: an open load (Pending, Assigned, Loading, In transit) is stale when past its delivery date or open more than 30 days. Use `staleWork()`, `staleLoads()`, `countStale()`, `staleLabel()` ("since 20 Jun 2026 (101 days)") and `staleAction()` (the action the page can really take). Never count stale work any other way.
+- Every day count is a South African calendar day (`saDaysBetween()` / `saDateISO()` in `src/lib/dates.ts`, the Debtors report's basis), whatever the viewer's time zone.
 
 ## 6. Copy
 
@@ -210,6 +218,7 @@ Every pair the palette ships was computed with the WCAG relative-luminance formu
 - R3: every control in a page head or toolbar (buttons, search, selects, the segmented track) is `--control-h` 36px. Form fields inside forms are `--field-h` 40px. On phones and coarse pointers both are 44px.
 - Row actions inside tables and inline link-style buttons may be 24 to 32px with a mouse so they sit inside 44 to 48px rows, but every one of them must reach a 44px target on touch screens (`@media (pointer: coarse)`, see `theme.css`).
 - Icon-only buttons: 44px target at every size.
+- R6: on coarse pointers segmented options are 44px (the track drops its vertical padding and keeps the inset chip with an inset ring), info tips have a 44px hit area, and `SectionHeader` back links are 44px tall without moving the line. These are floors in `theme.css` / `section-header.css`; pages do not override them.
 
 ## 9. Words (v3, owner review 28 Sep 2026: "far too much text", "looks babyish")
 

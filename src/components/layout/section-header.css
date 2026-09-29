@@ -60,6 +60,13 @@
   color: var(--text-secondary); text-decoration: none; flex-shrink: 0;
 }
 .section-header__back:hover { color: var(--text-primary); }
+/* Touch (R6): the back link is a 44px target. Padding grows the box, the
+   negative margin keeps the 20px line; the description's clip box grows the
+   same way so the extra hit area is not clipped by its line clamp. */
+@media (pointer: coarse) {
+  .section-header__description:has(.section-header__back) { padding-block: 12px; margin-block: -12px; }
+  .section-header__back { height: auto; padding-block: 12px; margin-block: -12px; padding-inline: 4px; margin-inline: -4px; }
+}
 .section-header__back:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: var(--radius-chip); }
 .section-header__sep { color: var(--text-tertiary); }
 .section-header__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 34px; }

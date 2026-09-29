@@ -1,5 +1,4 @@
 import '@/pages/table-heading-roles.css';
-import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import '@/pages/admin/admin-brand.css';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
@@ -78,7 +77,16 @@ export default function IntegrationsPanel() {
     <div className="card" style={cardStyle}>
       <h2 style={sectionTitleStyle}>Integrations</h2>
       {isLoading ? (
-        <TableSkeleton rows={3} cols={2} label="Loading integrations" />
+        // Same shape as the usual result (two integrations, one line each),
+        // so the stacked page below does not move when it arrives (R6).
+        <div aria-busy="true" aria-label="Loading integrations" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 24 }}>
+          {['Xero', 'CtrlFleet'].map(t => (
+            <div key={t}>
+              <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 8 }}>{t}</div>
+              <div style={{ height: 20, display: 'flex', alignItems: 'center' }}><span className="ops-skel" style={{ display: 'inline-block', width: '60%', height: 12 }} /></div>
+            </div>
+          ))}
+        </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 24 }}>
           <IntegrationTable

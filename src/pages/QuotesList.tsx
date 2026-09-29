@@ -585,6 +585,16 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           {view === 'board' && !billingBlocked ? 'Drag a card to change its status' : ''}
           {failedColumns.length === 0 && <>{view === 'board' && !billingBlocked ? ' · ' : ''}{totalQuotesCount} {totalQuotesCount === 1 ? 'quote' : 'quotes'}</>}
         </span>
+        {/* List view (R6): the status filter shares the search row, as on
+            Orders and History, so the table starts at the same height. */}
+        {!isPhone && view === 'list' && (
+          <StatusFilter
+            label="Filter quotes by status"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={statusOptions}
+          />
+        )}
       </div>
 
       {billingBlocked && (
@@ -692,17 +702,6 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
            queries as the board (plus a 5th "All" query with no status
            filter) — switching tabs reuses whatever's already loaded. */
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          {/* Status filters (phones: in the toolbar row above) */}
-          {!isPhone && (
-            <div style={{ marginBottom: 16, flexShrink: 0, maxWidth: '100%', overflowX: 'auto' }}>
-              <StatusFilter
-                label="Filter quotes by status"
-                value={statusFilter}
-                onChange={setStatusFilter}
-                options={statusOptions}
-              />
-            </div>
-          )}
 
           {loadFailed(activeListQuery) ? (
             <LoadError

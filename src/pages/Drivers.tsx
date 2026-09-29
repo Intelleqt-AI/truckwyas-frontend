@@ -303,7 +303,7 @@ export default function Drivers() {
         eyebrow="Fleet"
         title="Fleet"
         tabs={FLEET_TABS}
-        menuItems={fleetMenuItems({ phone: phoneHead, openActivity: () => navigate('/fleet/heatmap'), openImport: () => navigate('/fleet/vehicles?import=1'), importLabel: 'Import vehicles from Excel', importDisabled: isDemo })}
+        menuItems={fleetMenuItems({ phone: phoneHead, openActivity: () => navigate('/fleet/heatmap'), openImport: () => navigate('/fleet/vehicles?import=1'), importLabel: 'Vehicles: import from Excel', importDisabled: isDemo })}
         actions={
           <button data-fleet-control
             className="btn-action"

@@ -41,6 +41,7 @@
 }
 [data-theme="dark"] .insights-period .tw-seg__opt.is-active::before { background: #2C3037; box-shadow: none; }
 .insights-period .tw-seg__opt:focus-visible { outline-offset: -1px; }
+@media (pointer: coarse) { .insights-period .tw-seg__opt { margin-block: 0; } }
 .insights-period__menu { display: none; }
 .insights-period .insights-period__select.tw-select-trigger { width: auto; min-width: 168px; height: var(--control-h, 36px); min-height: var(--control-h, 36px); }
 .insights-custom { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }

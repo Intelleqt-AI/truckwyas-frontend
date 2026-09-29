@@ -14,7 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { postData } from '@/lib/Api';
 import { fetchAllPages } from '@/components/insights/findings';
 import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
-import { formatCurrency, formatMoneyWhole } from '@/lib/formatters';
+import { formatCurrency, formatDate, formatMoneyWhole } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { QuotesList, StatusFilter } from './QuotesList';
 import RowActions from '@/components/ui/RowActions';
@@ -22,7 +22,7 @@ import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { SkeletonRows, TilesSkeleton } from '@/components/fleet-detail/ContentSkeleton';
-import { staleSince } from './bookings-stale';
+import { staleWork, staleLabel, staleAction } from './bookings-stale';
 
 interface Load {
   id: number;
@@ -63,8 +63,11 @@ const plateOf = (info?: string) => {
 const ON_THE_MOVE = ['LOADING', 'IN_TRANSIT'];
 const missingVehicle = (l: { vehicle_info?: string; vehicle?: number | null; status: string }) =>
   !plateOf(l.vehicle_info) && l.vehicle == null && ON_THE_MOVE.includes(l.status);
+// On the move with no vehicle reads "No vehicle" here, in neutral text: the
+// row's one amber mark is the stale dot under Status (R6).
 const assignedLabel = (l: { driver_name?: string; vehicle_info?: string; vehicle?: number | null; status: string }) => {
   const bits = [l.driver_name, plateOf(l.vehicle_info)].filter(Boolean);
+  if (missingVehicle(l)) return <span className="bk-muted">{bits.length ? `${bits.join(' · ')} · no vehicle` : 'No vehicle'}</span>;
   return bits.length ? bits.join(' · ') : <span className="bk-muted">Not assigned</span>;
 };
 
@@ -76,7 +79,15 @@ const hasNoVehicle = (l: { vehicle_info?: string; vehicle?: number | null }) =>
 // Stale work (R5): an order still Assigned, Loading or In transit past its
 // delivery date, or older than 30 days, is not current work. The row says
 // so in one quiet line; the full sentence sits in the title.
-const longDate = (iso: string) => new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+// Phones: the same words without this year's year ("since 20 Jun (101 days)"),
+// so the stale line stays on one line under the chip.
+const shortStale = (since: string, days: string) => {
+  const y = String(new Date().getFullYear());
+  return since.endsWith(` ${y}`) ? `since ${since.slice(0, -(y.length + 1))} (${days})` : null;
+};
+// The step the booking page offers for a stale load (Loading can go on to
+// In transit, not straight to Delivered).
+const staleStep = (l: Load) => (l.status === 'LOADING' ? 'Mark it in transit or cancel it' : staleAction(l));
 
 // Newest first: delivered date, else due date, else pickup.
 const whenOf = (l: Load) => Date.parse(l.actual_delivered_at || l.delivery_date || l.pickup_date || l.created_at || '') || 0;
@@ -202,15 +213,16 @@ export default function LoadsList() {
         <thead>
           <tr>
             <th scope="col" className="bk-col-load">Load</th>
-            <th scope="col">Customer</th>
+            <th scope="col" className="bk-col-customer-head">Customer</th>
             <th scope="col" className="bk-col-route">Route</th>
             <th scope="col" className="bk-col-opt">Driver and vehicle</th>
+            {showInvoiceAction && <th scope="col" className="bk-col-date" title="Delivered date, or the due date when no delivery was recorded. Newest first.">Date</th>}
             <th scope="col">Status</th>
             <th scope="col" className="is-num">Amount</th>
             {showInvoiceAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Actions</span></th>}
           </tr>
         </thead>
-        <tbody><SkeletonRows rows={8} cols={showInvoiceAction ? 7 : 6} /></tbody>
+        <tbody><SkeletonRows rows={8} cols={showInvoiceAction ? 8 : 6} /></tbody>
       </table>
     </div>
   ) : (
@@ -219,9 +231,10 @@ export default function LoadsList() {
         <thead>
           <tr>
             <th scope="col" className="bk-col-load">Load</th>
-            <th scope="col">Customer</th>
+            <th scope="col" className="bk-col-customer-head">Customer</th>
             <th scope="col" className="bk-col-route">Route</th>
             <th scope="col" className="bk-col-opt">Driver and vehicle</th>
+            {showInvoiceAction && <th scope="col" className="bk-col-date" title="Delivered date, or the due date when no delivery was recorded. Newest first.">Date</th>}
             <th scope="col">Status</th>
             <th scope="col" className="is-num">Amount</th>
             {showInvoiceAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Actions</span></th>}
@@ -241,26 +254,41 @@ export default function LoadsList() {
                 {/* Phones: the load number rides under the customer (its column folds away). */}
                 <span className="bk-phone-sub" title={load.load_number}>{load.load_number}</span>
               </td>
-              <td className="is-truncate bk-col-route" title={`${load.pickup_location} to ${load.delivery_location}`}>
-                {routeText(load)}
+              <td className={`bk-col-route${showInvoiceAction ? ' is-truncate' : ' bk-route-cell'}`} title={`${load.pickup_location} to ${load.delivery_location}`}>
+                {showInvoiceAction ? routeText(load) : (
+                  // Orders rows are two lines (status and its stale line), so
+                  // the route stacks too instead of truncating (R6).
+                  <>
+                    <span className="bk-route-cell__from">{placeOf(load.pickup_location, load.pickup_city)}</span>
+                    <span className="bk-route-cell__to"><span aria-hidden="true">→ </span><span className="sr-only">to </span>{placeOf(load.delivery_location, load.delivery_city)}</span>
+                  </>
+                )}
               </td>
-              <td className="is-truncate bk-col-opt bk-col-assign" title={[load.driver_name, load.vehicle_info].filter(Boolean).join(', ')}>
-                {assignedLabel(load)}
+              <td className={`bk-col-opt bk-col-assign${showInvoiceAction ? ' is-truncate' : ' bk-assign-cell'}`} title={[load.driver_name, load.vehicle_info].filter(Boolean).join(', ')}>
+                {showInvoiceAction || !(load.driver_name && plateOf(load.vehicle_info)) ? assignedLabel(load) : (
+                  // Two lines like the rest of the row: driver, then the plate (never cut).
+                  <><span className="bk-assign-cell__driver">{load.driver_name}</span><span className="bk-assign-cell__plate">{plateOf(load.vehicle_info)}</span></>
+                )}
               </td>
+              {showInvoiceAction && <td className="is-date is-nowrap bk-col-date">{load.actual_delivered_at || load.delivery_date ? formatDate(load.actual_delivered_at || load.delivery_date!) : '—'}</td>}
               <td className="bk-col-status">
                 <StatusChip status={load.status} size="sm" />
-                {missingVehicle(load) && <span className="bk-status-flag">No vehicle</span>}
                 {(() => {
-                  const st = showInvoiceAction ? null : staleSince(load);
+                  // Stale work (R6, shared rule): "since <date> (N days)" with
+                  // one amber dot; the action sits in the title and for
+                  // screen readers.
+                  const st = showInvoiceAction ? null : staleWork(load);
                   if (!st) return null;
-                  const full = st.pastDue
-                    ? `Still ${formatStatus(load.status).toLowerCase()} since delivery was due on ${longDate(st.iso)} (${st.days} days). Close or reassign it.`
-                    : `${formatStatus(load.status)} since ${longDate(st.iso)} (${st.days} days). Close or reassign it.`;
-                  return <span className="bk-status-flag bk-status-flag--stale" title={full}><span className="sr-only">{full}</span><span aria-hidden="true">{st.pastDue ? `${st.days} days overdue` : `Open ${st.days} days`}</span></span>;
+                  const words = staleLabel(st);
+                  const full = `Still ${formatStatus(load.status).toLowerCase()}${st.overdue ? ', past its delivery date' : ''} ${words.text}. Open it to ${staleStep(load).charAt(0).toLowerCase()}${staleStep(load).slice(1)}.`;
+                  return <span className="bk-status-flag bk-status-flag--stale" title={full}><span className="sr-only">{full}</span><span aria-hidden="true" className="bk-stale-long">{words.text}</span><span aria-hidden="true" className="bk-stale-short">{shortStale(st.since, words.days) ?? words.text}</span></span>;
                 })()}
               </td>
-              <td className="is-money">
-                {formatCurrency(parseFloat(load.total_amount || '0'))}
+              <td className="is-money" title={formatCurrency(parseFloat(load.total_amount || '0'))}>
+                {showInvoiceAction ? formatCurrency(parseFloat(load.total_amount || '0')) : (
+                  // Phones show whole rands so the stale line keeps its one line.
+                  <><span className="bk-amt-long">{formatCurrency(parseFloat(load.total_amount || '0'))}</span><span className="bk-amt-short">{formatMoneyWhole(parseFloat(load.total_amount || '0'))}</span></>
+                )}
               </td>
               {showInvoiceAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
                 {/* One quiet row menu (R4): no column of blue "Create invoice" links. */}
@@ -323,6 +351,7 @@ export default function LoadsList() {
   const wholeRand = (n: number) => formatMoneyWhole(n);
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const noVehicleCount = activeLoads.filter(hasNoVehicle).length;
+  const staleNoVehicle = activeLoads.filter(l => hasNoVehicle(l) && staleWork(l)?.overdue).length;
   const deliveredNotInvoiced = historyLoads.filter(l => l.status === 'DELIVERED').length;
   const completedLoads = historyLoads.filter(l => l.status !== 'CANCELLED');
 
@@ -375,8 +404,12 @@ export default function LoadsList() {
             {
               label: 'Need a vehicle',
               value: noVehicleCount,
-              note: noVehicleCount > 0 ? 'Assign a vehicle' : 'All have a vehicle',
-              tip: 'Active orders with no vehicle, in any status, including loads already in transit.',
+              // Loads already past their delivery date need closing, not a
+              // vehicle (R6): the note says so instead of "Assign a vehicle".
+              note: noVehicleCount === 0 ? 'All have a vehicle'
+                : staleNoVehicle === noVehicleCount ? 'All past delivery date'
+                : staleNoVehicle > 0 ? `${staleNoVehicle} past delivery date` : 'Assign a vehicle',
+              tip: 'Active orders with no vehicle, in any status, including loads already in transit. Loads past their delivery date are flagged in the table.',
               attention: noVehicleCount > 0,
             },
             (() => {

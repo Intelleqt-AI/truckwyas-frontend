@@ -6,7 +6,6 @@
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
   gap: 24px 32px;
-  max-width: 1040px;
   padding: var(--card-pad, 20px);
   border-radius: var(--radius-card, 12px);
   box-shadow: none;

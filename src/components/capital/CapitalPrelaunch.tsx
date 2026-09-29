@@ -161,6 +161,8 @@ function WaitingCash({ aging, timing, listOpen }: { aging: Q<AgingReport>; timin
       : null;
     const pastDue = buckets.filter((b) => b.key !== 'current').reduce((s, b) => s + b.amount, 0);
     const pastDueCount = buckets.filter((b) => b.key !== 'current').reduce((s, b) => s + b.count, 0);
+    const over60 = buckets.filter((b) => b.key === '61-90' || b.key === '90+').reduce((s, b) => s + b.amount, 0);
+    const over90 = buckets.filter((b) => b.key === '90+').reduce((s, b) => s + b.amount, 0);
     // "Time to get paid" is the Invoices page tile: the same ledger function
     // (issue date to paid date, averaged over paid invoices), so the two agree.
     const paidCount = timing?.count ?? 0;
@@ -198,8 +200,11 @@ function WaitingCash({ aging, timing, listOpen }: { aging: Q<AgingReport>; timin
             <div>
               <dt>Past its due date</dt>
               {/* One fact, said once: the share that is late, then how many invoices (and the rand only when it differs from the total). */}
-              <dd className="fp-summary__value">{pct(pastDue, total)}%</dd>
-              <dd className="fp-summary__note">{pastDueCount} of {plural(count, 'invoice')}{pastDueCount === count ? '' : `, ${formatMoneyWhole(pastDue)}`}</dd>
+              {/* R6: when every invoice is late, the count would restate the headline; say how late instead. */}
+              <dd className="fp-summary__value">{pastDueCount === Number(count) ? 'All of it' : `${pct(pastDue, total)}%`}</dd>
+              <dd className="fp-summary__note">{pastDueCount === Number(count)
+                ? (over90 > total / 2 ? 'Most of it more than 90 days late' : over60 > total / 2 ? 'Most of it more than 60 days late' : 'Most of it within 60 days of due')
+                : `${pastDueCount} of ${plural(count, 'invoice')}, ${formatMoneyWhole(pastDue)}`}</dd>
             </div>
             {avgDays != null && (
               <div>
@@ -214,6 +219,7 @@ function WaitingCash({ aging, timing, listOpen }: { aging: Q<AgingReport>; timin
             <h3 className="fp-subhead">How late it is</h3>
             <AgeingStrip
               buckets={buckets}
+              oldestMark
               hideEmptyLabels
               ariaLabel={`Unpaid balance by how late it is: ${buckets.filter((b) => b.amount > 0).map((b) => `${b.label} ${formatMoneyWhole(b.amount)}`).join(', ')}`}
             />

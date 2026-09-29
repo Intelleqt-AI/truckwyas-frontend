@@ -14,9 +14,9 @@ const ONE_COLUMN_MQ = '(max-width: 1100px)';
  *
  * Before paint (useLayoutEffect) it tries each arrangement of those cards,
  * measures both columns, and keeps the one whose ends are closest, so the
- * page never paints an unbalanced state and then jumps. When no arrangement
- * lands within the tolerance, the shorter column's last card is given the
- * remaining height (equal-height columns) rather than leaving a ragged end.
+ * page never paints an unbalanced state and then jumps. Cards are never
+ * stretched to fake an even end (R6); a page whose arrangements cannot land
+ * within the tolerance should offer more movable cards or reflow.
  * It re-runs when `key` changes (new data) or the window is resized; below
  * the one-column breakpoint the default arrangement is kept.
  *
@@ -34,7 +34,6 @@ export function useBalancedColumns(opts: { toMain?: string[]; toSide?: string[] 
   const [mask, setMask] = useState(0);
   const [epoch, setEpoch] = useState(0);
   const search = useRef<{ id: string; next: number; best: number; bestDiff: number; done: boolean } | null>(null);
-  const stretched = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     let t: ReturnType<typeof setTimeout> | undefined;
@@ -49,7 +48,6 @@ export function useBalancedColumns(opts: { toMain?: string[]; toSide?: string[] 
     const id = `${String(key)}|${epoch}`;
     const s0 = search.current;
     if (!s0 || s0.id !== id) {
-      if (stretched.current) { stretched.current.style.minHeight = ''; stretched.current = null; }
       search.current = { id, next: 0, best: 0, bestDiff: Infinity, done: false };
       if (mask !== 0) { setMask(0); return; }
     }
@@ -64,25 +62,11 @@ export function useBalancedColumns(opts: { toMain?: string[]; toSide?: string[] 
       const diff = Math.abs(main.offsetHeight - side.offsetHeight);
       if (diff < st.bestDiff) { st.best = mask; st.bestDiff = diff; }
       st.next += 1;
-      if (st.bestDiff > BALANCE_TOLERANCE && st.next < combos) { setMask(st.next); return; }
+      // Try every arrangement (at most 2^3) and keep the closest ends, all before paint.
+      if (st.bestDiff > 8 && st.next < combos) { setMask(st.next); return; }
       st.done = true;
       if (st.best !== mask) { setMask(st.best); return; }
     }
-  });
-
-  // After the search settles: fill a remaining gap with the shorter column's last card.
-  useLayoutEffect(() => {
-    const st = search.current;
-    const main = mainRef.current;
-    const side = sideRef.current;
-    if (!st?.done || st.best !== mask || !main || !side || stretched.current || window.matchMedia(ONE_COLUMN_MQ).matches) return;
-    const diff = main.offsetHeight - side.offsetHeight;
-    if (Math.abs(diff) <= BALANCE_TOLERANCE) return;
-    const short = diff > 0 ? side : main;
-    const last = [...short.children].filter((c) => (c as HTMLElement).offsetHeight > 0).pop() as HTMLElement | undefined;
-    if (!last) return;
-    last.style.minHeight = `${last.offsetHeight + Math.abs(diff)}px`;
-    stretched.current = last;
   });
 
   const inMain = useCallback((name: string) => {

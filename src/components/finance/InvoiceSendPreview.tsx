@@ -3,6 +3,7 @@ import { fetchData } from '@/lib/Api';
 import { useAuth } from '@/lib/AuthContext';
 import { formatDate, formatDays, formatMoney } from '@/lib/formatters';
 import { invoiceBalance } from '@/lib/invoiceStatus';
+import { daysBetween, todayISO } from '@/components/reports/data';
 import SendPreviewDialog, { type SendPreviewRow } from '@/components/SendPreviewDialog';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -21,14 +22,12 @@ const toNum = (v: unknown) => {
 const serverRand = (n: number) =>
   `R ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+/** Whole days past due on the SA calendar (the Debtors report's count). */
 function daysLate(due: unknown): number {
   if (!due) return 0;
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(due));
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(due));
   if (!m) return 0;
-  const d = new Date(+m[1], +m[2] - 1, +m[3]);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.max(0, Math.round((today.getTime() - d.getTime()) / 86400000));
+  return Math.max(0, daysBetween(m[1], todayISO()));
 }
 
 /**
@@ -101,7 +100,8 @@ export default function InvoiceSendPreview({ kind, invoice, sending, onConfirm, 
     rows = [
       { label: 'Invoice', value: number },
       { label: 'Amount', value: `${formatMoney(total)} incl. VAT` },
-      { label: 'Due', value: dueLabel },
+      // A draft whose due date has passed goes out already overdue: said here too.
+      { label: 'Due', value: daysLate(due) > 0 ? `${dueLabel} · already passed` : dueLabel },
     ];
     note = 'The invoice PDF is attached and the email links to the online copy.';
   }

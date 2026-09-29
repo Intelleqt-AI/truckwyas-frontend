@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { fetchAllPages } from '@/components/insights/findings';
 import {
-  inPeriod, isApproved, isOpen, monthsIn, num, priorPeriod, resolvePeriod, shownMonths, todayISO, trimNote,
+  inPeriod, isApproved, isOpen, isPending, monthsIn, num, priorPeriod, resolvePeriod, shownMonths, todayISO, trimNote,
   vatShare, ymOf, type Ledger, type Period,
 } from '@/components/reports/data';
 
@@ -29,6 +29,9 @@ export interface HomeMoney {
   costs: number;
   margin: number | null;
   marginPrior: number | null;
+  /** Expenses still pending in the period (not deducted), as on the Margin tab. */
+  pending: number;
+  pendingCount: number;
   owed: number;
   pastDue: number;
   openInvoices: number;
@@ -74,6 +77,9 @@ export function computeHomeMoney(d: Ledger): HomeMoney {
   const margin = now.excl > 0.005 ? ((now.excl - c.total) / now.excl) * 100 : null;
   const marginPrior = before.excl > 0.005 ? ((before.excl - cPrior.total) / before.excl) * 100 : null;
 
+  let pending = 0; let pendingCount = 0;
+  d.expenses.filter((e) => isPending(e) && inPeriod(e.expense_date, period)).forEach((e) => { pending += num(e.amount); pendingCount += 1; });
+
   const today = todayISO();
   const open = d.invoices.filter(isOpen);
   const owed = open.reduce((s, i) => s + num(i.balance), 0);
@@ -90,6 +96,8 @@ export function computeHomeMoney(d: Ledger): HomeMoney {
     costs: c.total,
     margin,
     marginPrior,
+    pending,
+    pendingCount,
     owed,
     pastDue,
     openInvoices: open.length,

@@ -14,7 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDate, formatMoneyWhole } from '@/lib/formatters';
-import { ArrowLeft, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BlockSkeleton, TilesSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { usePipeline } from '@/components/overview/today';
@@ -22,6 +22,14 @@ import { useLedger, isOpen, num, todayISO, daysBetween } from '@/components/repo
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import { fetchAllPages } from '@/components/insights/findings';
+import { staleWork, staleLabel } from './bookings-stale';
+
+type OpenLoad = {
+  id: number; customer?: number | null; status: string; load_number: string; total_amount?: string;
+  pickup_location?: string; pickup_city?: string; delivery_location?: string; delivery_city?: string;
+  pickup_date?: string; delivery_date?: string; created_at?: string;
+};
 
 // Exact rand amounts, two decimals, shared formatter.
 const formatZAR = (v: number) => formatCurrency(v || 0);
@@ -115,15 +123,19 @@ export default function CustomerDetail() {
   // accepted or turned into a load, out of quotes actually sent. Drafts were
   // never offered, so they are neither won nor lost.
   const pipeline = usePipeline(quotes);
+  // Their open orders (R6): from the same list as Orders (shared cache), so a
+  // stale load is visible here too, with the same rule and words.
+  const loadsQuery = useQuery({
+    queryKey: ["loads-list"],
+    queryFn: () => fetchAllPages<OpenLoad>('api/v1/loads/').then(r => r.rows),
+  });
   // Their invoices, from the same ledger as Invoices and the Debtors report.
   const ledger = useLedger(['invoices']);
 
   // A failed request is not a missing record: only a 404 says "not found".
   if (customerFailed && customerError?.status !== 404) return (
-    <div className="bk-detail">
-      <button type="button" className="bk-back" onClick={() => navigate("/customers")}>
-        <ArrowLeft size={16} aria-hidden="true" /> Back to customers
-      </button>
+    <div className="bk-detail bookings-typography">
+      <SectionHeader title="Customer" back={{ to: '/customers', label: 'Customers' }} />
       <LoadError what="this customer" error={customerError} busy={customerQuery.isFetching} onRetry={() => customerQuery.refetch()} />
     </div>
   );
@@ -141,14 +153,11 @@ export default function CustomerDetail() {
   );
 
   if (!customer) return (
-    <div className="bk-detail">
-      <button type="button" className="bk-back" onClick={() => navigate("/customers")}>
-        <ArrowLeft size={16} aria-hidden="true" /> Back to customers
-      </button>
+    <div className="bk-detail bookings-typography">
+      <SectionHeader title="Customer not found" back={{ to: '/customers', label: 'Customers' }} />
       <div className="bk-card">
         <div className="bk-empty" style={{ padding: 16 }}>
-          <h1 className="bk-empty__title">Customer not found</h1>
-          <p className="bk-empty__text">It may have been removed, or the link is out of date.</p>
+          <p className="bk-empty__text">This customer may have been removed, or the link is out of date.</p>
           <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate("/customers")}>View customers</button>
         </div>
       </div>
@@ -402,7 +411,7 @@ export default function CustomerDetail() {
                   const late = isOpen(inv) && inv.due_date && inv.due_date.slice(0, 10) < today;
                   return (
                     <tr key={inv.id} className="is-clickable" {...rowLink(() => navigate(`/finance/invoices/${inv.id}`))} onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
-                      <td className="is-id">{inv.invoice_number}</td>
+                      <td className="is-id is-truncate cd-col-id" title={inv.invoice_number}>{inv.invoice_number}</td>
                       <td className="is-date bk-col-opt">{inv.issue_date ? formatDate(inv.issue_date) : "Not issued"}</td>
                       <td className="is-date bk-col-phone">
                         {inv.due_date ? formatDate(inv.due_date) : "Not set"}
@@ -454,7 +463,7 @@ export default function CustomerDetail() {
                     {...rowLink(() => navigate(`/bookings/quotes/${q.id}`))}
                     onClick={() => navigate(`/bookings/quotes/${q.id}`)}
                   >
-                    <td className="is-id">
+                    <td className="is-id is-truncate cd-col-id">
                       {q.quote_number || `#${q.id}`}
                     </td>
                     <td className="is-truncate bk-col-route" title={`${q.pickup_location || "—"} → ${q.delivery_location || "—"}`}>
@@ -489,6 +498,51 @@ export default function CustomerDetail() {
           </div>
         )}
       </section>
+
+      {/* Open orders: shown only when there are some, last on the page so
+          nothing above moves when they arrive. */}
+      {(() => {
+        const open = (loadsQuery.data || []).filter((l) => String(l.customer) === String(id) && ['PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'].includes(l.status));
+        if (open.length === 0) return null;
+        return (
+          <section className="bk-card" style={{ marginTop: "var(--section-gap, 24px)", padding: 0 }} aria-labelledby="cd-orders-title">
+            <div className="bk-card__head" style={{ padding: "var(--card-pad, 20px) var(--card-pad, 20px) 0" }}>
+              <h2 className="bk-card__title" id="cd-orders-title">Open orders</h2>
+              <span className="bk-toolbar__end">{open.length} {open.length === 1 ? 'order' : 'orders'}</span>
+            </div>
+            <div className="bk-table-wrap bk-table-wrap--bare">
+              <table className="table-heading-roles bk-table cd-orders">
+                <thead>
+                  <tr>
+                    <th scope="col">Load</th>
+                    <th scope="col" className="bk-col-route">Route</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" className="is-num">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {open.map((l) => {
+                    const st = staleWork(l);
+                    const from = String(l.pickup_location || '').split(',')[0].trim() || l.pickup_city || '—';
+                    const to = String(l.delivery_location || '').split(',')[0].trim() || l.delivery_city || '—';
+                    return (
+                      <tr key={l.id} className="is-clickable" {...rowLink(() => navigate(`/bookings/${l.id}`))} onClick={() => navigate(`/bookings/${l.id}`)}>
+                        <td className="is-id is-truncate cd-orders__load" title={l.load_number}>{l.load_number}</td>
+                        <td className="is-truncate bk-col-route" title={`${l.pickup_location} to ${l.delivery_location}`}>{from} → {to}</td>
+                        <td className="bk-col-status">
+                          <StatusChip status={l.status} size="sm" />
+                          {st && <span className="bk-status-flag bk-status-flag--stale"><span className="bk-stale-long">{staleLabel(st).text}</span><span className="bk-stale-short">{staleLabel(st).text.replace(` ${new Date().getFullYear()} (`, ' (')}</span></span>}
+                        </td>
+                        <td className="is-money" title={formatCurrency(parseFloat(l.total_amount || '0'))}><span className="bk-amt-long">{formatCurrency(parseFloat(l.total_amount || '0'))}</span><span className="bk-amt-short">{formatMoneyWhole(parseFloat(l.total_amount || '0'))}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Edit slide-out */}
       {showEdit && (

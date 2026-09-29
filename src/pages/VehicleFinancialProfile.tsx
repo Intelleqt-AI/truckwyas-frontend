@@ -6,11 +6,11 @@ import { fetchData, patchData } from '@/lib/Api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   DetailMessage, DetailSkeleton, InfoTip, Panel, RecordHeader, StatusChip, StatusControl,
-  capacityTonnes, dateText, formatStatus, isNotFound, kmText, num, plural,
+  capacityTonnes, dateText, formatStatus, isNotFound, kmText, num, plural, randWhole,
 } from '@/components/fleet-detail/parts';
 import {
   ComplianceCard, ConditionCard, FactsCard, LinkCard, LoadLink, NowLine, PerformanceCard,
-  daysSince, fleetPerKm, isDelivered, isOpenLoad, latest, perfFigures, perfLine, performance, dateToDo, staleWork, type ToDo,
+  daysSince, fleetPerKm, isDelivered, isOpenLoad, latest, perfFigures, perfLine, performance, dateToDo, staleWork, staleAction, staleLabel, type ToDo,
 } from '@/components/fleet-detail/record';
 import { useBalancedColumns } from '@/components/fleet-detail/useBalancedColumns';
 import { formatNumber, formatPercent, formatWeight, sentenceCaseLabel } from '@/lib/formatters';
@@ -190,8 +190,9 @@ export default function VehicleFinancialProfile() {
       <NowLine dot action={<Link className="fd-ghost" to={`/bookings/${openLoad.id}`}>Open order</Link>}>
         {status !== 'IN_USE' ? <><strong>Marked {formatStatus(status).toLowerCase()}</strong>, still on </> : <>Still on </>}
         <LoadLink load={openLoad} />
-        {driverName || openLoad.delivery_city ? <> ({[driverName, openLoad.delivery_city ? `to ${openLoad.delivery_city}` : ''].filter(Boolean).join(' ')})</> : null}
-        {' '}since {stale.since} ({plural(stale.days, 'day')}) — close or reassign
+        {driverName ? <> with {driverName}</> : null}
+        {openLoad.delivery_city ? <> to {openLoad.delivery_city}</> : null}
+        {' '}{staleLabel(stale).text} — {staleAction(openLoad).toLowerCase()} on the order
       </NowLine>
     );
   } else if (openLoad) {
@@ -253,7 +254,8 @@ export default function VehicleFinancialProfile() {
   const basis = <>
     Delivered and invoiced loads on this truck, counted in the month of delivery, over the last 12 months (the Reports definition).
     {' '}Margin after truck costs: revenue less approved expenses logged on this truck (fuel, tolls, maintenance, insurance) in the same months; expenses waiting for approval are not deducted, as in the P&L, and the line under the margin shows what it becomes if they are approved.
-    {' '}Revenue per km uses loads with a distance; the fleet figure is every delivered load with a distance over the same months. Days on a job count calendar days from pickup to delivery.
+    {perf.costCount > 0 ? ` Approved costs in these months: ${randWhole(perf.costs)}${perf.pending > 0 ? `; ${randWhole(perf.pending)} more is waiting for approval` : ''}.` : ''}
+    {' '}Revenue per km uses loads with a distance{perf.km > 0 ? ` (${kmText(perf.km)} here)` : ''}; the fleet figure is every delivered load with a distance over the same 12 months, the basis Insights uses. Days on a job count calendar days from pickup to delivery.
     {partial ? ` Based on the latest ${loads.length} of ${loadsTotal} loads.` : ''}
     {perf.older > 0 ? ` ${plural(perf.older, 'older delivered load')} fall outside the 12 months.` : ''}
   </>;
@@ -267,12 +269,17 @@ export default function VehicleFinancialProfile() {
   const driverId = vehicle.driver ?? null;
   const driverName = vehicle.driver_name || null;
   const noLoads = loads.length === 0;
-  // The driver on the vehicle record. An open order's driver is not "its"
-  // driver: the Now line names them; this card says none is assigned.
+  // The driver on the vehicle record, else the driver on its open order
+  // (named as the Now line does: "On LOAD-… with Riaan Venter"), else none.
+  const openDriver = openLoad && !(driverId && driverName) ? (openLoad.driver_name || null) : null;
   const driverCard = driverId && driverName ? (
     <LinkCard title="Driver" className="fd-o-driver"
       primary={<Link className="fd-inline-link" to={`/fleet/drivers/${driverId}`}>{driverName}</Link>}
       secondary="Assigned to this truck" />
+  ) : openLoad && openDriver ? (
+    <LinkCard title="Driver" className="fd-o-driver"
+      primary={openLoad.driver ? <Link className="fd-inline-link" to={`/fleet/drivers/${openLoad.driver}`}>{openDriver}</Link> : openDriver}
+      secondary={<>On {openLoad.load_number || 'an open order'}{stale ? `, ${staleLabel(stale).text}` : ''} · no regular driver</>} />
   ) : noLoads ? null : (
     <LinkCard title="Driver" className="fd-o-driver" primary={<span className="fd-muted">No driver assigned</span>}
       action={<button type="button" className="fd-ghost" onClick={openEdit}>Assign</button>} />
@@ -340,25 +347,32 @@ export default function VehicleFinancialProfile() {
             <ComplianceCard
               className="fd-o-todo"
               title="Getting started"
-              sub="No loads yet"
               lead={firstSteps}
               items={todos}
             />
           ) : (
-            <PerformanceCard
-              className="fd-o-perf"
-              perf={perf}
-              figures={figures}
-              basis={basis}
-              thinLine={perfLine(perf)}
-              empty={deliveredCount === 0 ? {
-                text: <>No delivered loads in the last 12 months{perf.older > 0 ? ` (${plural(perf.older, 'earlier load')})` : ''}.</>,
-              } : undefined}
-            />
+            // With loads but none delivered in the window, Performance has one
+            // sentence: it becomes the Loads card's sub line (R6).
+            deliveredCount > 0 ? (
+              <PerformanceCard
+                className="fd-o-perf"
+                perf={perf}
+                figures={figures}
+                basis={basis}
+                thinLine={perfLine(perf)}
+              />
+            ) : null
           )}
 
           {!noLoads && (
-            <Panel title="Loads" sub={loadsTotal > 1 ? plural(loadsTotal, 'load') : undefined} flush className="fd-o-loads">
+            <Panel
+              title="Loads"
+              sub={deliveredCount > 0
+                ? (loadsTotal > 1 ? plural(loadsTotal, 'load') : undefined)
+                : `${plural(loadsTotal, 'load')} · none delivered in the last 12 months${perf.older > 0 ? ` (${perf.older} earlier)` : ''}`}
+              flush
+              className="fd-o-loads"
+            >
               <LoadsTable loads={loads} />
             </Panel>
           )}

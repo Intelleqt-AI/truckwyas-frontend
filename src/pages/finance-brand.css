@@ -1130,3 +1130,30 @@ table.fin-table.fin-doc__table .fin-mobile-only { display: none; }
 @media (max-width: 640px) {
   .fin-months__col:not(.is-labelled) > .fin-months__val { visibility: hidden; }
 }
+
+/* ==== Round 6: invoice detail balance, not-found, new invoice ====
+   The document's facts block (bill to, dates, terms, and a draft's passed
+   due date) opens the document, or becomes the rail's first card when that
+   brings the two columns within 48px (useBalancedColumns). */
+.fin-main-col { display: flex; flex-direction: column; gap: var(--card-gap, 16px); min-width: 0; }
+.fin-docfacts { border-bottom: 1px solid var(--border-row); }
+.fin-docfacts > .fin-doc__facts { border-bottom: 0; }
+.fin-docfacts__note { margin: -4px var(--card-pad, 20px) 0; padding: 0 0 var(--card-pad, 20px); font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fin-page .card.fin-facts-card { padding: 0; }
+.fin-facts-card .fin-docfacts { border-bottom: 0; }
+.fin-facts-card .fin-doc__facts { grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 12px; }
+.fin-facts-card .fin-doc__facts dd { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 767px) { .fin-docfacts__note { margin-left: 16px; margin-right: 16px; padding-bottom: 16px; } }
+/* Not found: the message and "All invoices" share one row, the button
+   centred on the text (the load-error layout, with a neutral icon). */
+.fin-missing .load-error__icon { color: var(--text-tertiary); }
+/* New invoice: a three-field row when the details card is wide enough. */
+.fin-create-grid > .card { container-type: inline-size; }
+.fin-form__row--3 { row-gap: 16px; }
+@container (min-width: 600px) {
+  .fin-form__row--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .fin-form__row--3 > .fin-form__wide { grid-column: 1 / -1; }
+}
+@media (max-width: 768px) { .fin-hide-phone-create { display: none !important; } }
+/* The calendar button fills the field's height (it was 2px short: 38/42). */
+.fin-page .fin-form .fin-date-field .tw-date-field > button { margin: 0; height: var(--field-h, 40px); min-width: var(--field-h, 40px); justify-content: center; }

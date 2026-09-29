@@ -43,7 +43,7 @@ export default function Insurance() {
         <aside className="insurance-card__side" aria-labelledby="insurance-today">
           <h2 id="insurance-today" className="insurance-card__title">Until then</h2>
           <p className="insurance-card__description">
-            No cover is offered through TruckWys today. Log premiums as expenses in the Insurance category, so your P&amp;L counts them.
+            No cover through TruckWys yet. Log premiums as Insurance expenses so your P&amp;L counts them.
           </p>
           <Link to="/finance/expenses" className="tw-btn insurance-card__action">Go to expenses</Link>
         </aside>

@@ -43,7 +43,7 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'work',
     label: 'Work',
     items: [
-      { id: 'quote', key: '/bookings', label: 'Quotes and loads', short: 'Quote', to: '/bookings/quotes', match: ['/bookings', '/quotes'], icon: FileText },
+      { id: 'quote', key: '/bookings', label: 'Quotes and loads', short: 'Quotes', to: '/bookings/quotes', match: ['/bookings', '/quotes'], icon: FileText },
       { id: 'getpaid', key: '/invoices', label: 'Finance', to: '/finance/invoices', match: ['/finance', '/invoices', '/expenses'], exclude: ['/finance/reports'], icon: Receipt },
     ],
   },

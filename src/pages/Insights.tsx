@@ -15,6 +15,7 @@ import { marginFromLedger, chartMonths, type MarginMonth } from '@/components/in
 import { Waterfall, PaymentDotPlot, LaneScatter, Funnel, rand } from '@/components/viz';
 import { paymentRows, lanePoints } from '@/components/insights/insight-series';
 import { formatPercent } from '@/lib/formatters';
+import { fleetRevenuePerKm, perKmLoads, lastTwelveMonths } from '@/lib/revenuePerKm';
 
 /* Insights. The first tab is the findings feed: what to change and what it is
    worth. The other tabs keep the charts that answer one question each, with a
@@ -399,8 +400,8 @@ function laneTakeaway(points: ReturnType<typeof lanePoints>['points'], overall: 
   const top = ev[0];
   const low = ev.length > 1 ? ev[ev.length - 1] : null;
   const head = vs(top.perKm) > 0
-    ? `${top.label} earns ${rand(top.perKm, 0)}/km, ${vs(top.perKm)}% above your average`
-    : `Your best-evidenced lane, ${top.label}, earns ${rand(top.perKm, 0)}/km, ${Math.abs(vs(top.perKm))}% below your average`;
+    ? `${top.label} earns ${rand(top.perKm, 0)}/km, ${vs(top.perKm)}% above the fleet average`
+    : `Your best-evidenced lane, ${top.label}, earns ${rand(top.perKm, 0)}/km, ${Math.abs(vs(top.perKm))}% below the fleet average`;
   if (!low) return `${head}.`;
   return vs(low.perKm) < 0
     ? `${head}; ${low.label} is ${Math.abs(vs(low.perKm))}% below it.`
@@ -412,25 +413,30 @@ function LanesTab() {
   if (loads.isLoading || loads.isError) {
     return <TabState loading={loads.isLoading} error={loads.isError} onRetry={() => loads.refetch()} />;
   }
-  const rows = loads.data?.rows ?? [];
-  const { points, overall, noDistance } = lanePoints(rows, MIN_TRIPS);
-  const partial = loads.data && !loads.data.complete ? ` Based on the first ${rows.length} of ${loads.data.count} loads.` : '';
+  const all = loads.data?.rows ?? [];
+  // One basis with the vehicle and driver pages: delivered loads with a
+  // distance, last 12 months (src/lib/revenuePerKm.ts).
+  const period = lastTwelveMonths();
+  const rows = perKmLoads(all, period);
+  const { points, noDistance } = lanePoints(rows, MIN_TRIPS);
+  const overall = fleetRevenuePerKm(all, period).perKm;
+  const partial = loads.data && !loads.data.complete ? ` Based on the first ${all.length} of ${loads.data.count} loads.` : '';
   return (
     <Stack>
       <InsightCard
         title="Revenue per km by lane"
-        description="Revenue per kilometre against trip length"
-        info={`Revenue per kilometre against trip length, from every load with a pickup city, delivery city and distance. Shorter trips usually earn more per kilometre, so compare lanes of similar length. Lanes with fewer than ${MIN_TRIPS} trips are drawn hollow.${noDistance > 0 ? ` ${plural(noDistance, 'lane')} without a distance ${noDistance === 1 ? 'is' : 'are'} left out.` : ''}${partial}`}
+        description="Delivered loads, last 12 months"
+        info={`Revenue per kilometre against trip length, from delivered loads in the last 12 months (this month and the 11 before it) with a pickup city, delivery city and distance. "Your average" is the fleet's revenue per km on the same basis, the figure the vehicle and driver pages compare against. Shorter trips usually earn more per kilometre, so compare lanes of similar length. Lanes with fewer than ${MIN_TRIPS} trips are drawn hollow.${noDistance > 0 ? ` ${plural(noDistance, 'lane')} without a distance ${noDistance === 1 ? 'is' : 'are'} left out.` : ''}${partial}`}
       >
         {points.length === 0 ? (
           <div className="insights-empty">
-            <p>No loads with a route and distance yet.</p>
+            <p>No delivered loads with a route and distance in the last 12 months.</p>
             <Link className="ic-text-button" to="/bookings/quotes/new">Quote a load</Link>
           </div>
         ) : (
           <>
             <p className="insights-takeaway">{laneTakeaway(points, overall)}</p>
-            <LaneScatter points={points} overallPerKm={overall} minTrips={MIN_TRIPS} height={380} />
+            <LaneScatter points={points} overallPerKm={overall} minTrips={MIN_TRIPS} height={380} period="12 months" />
           </>
         )}
       </InsightCard>

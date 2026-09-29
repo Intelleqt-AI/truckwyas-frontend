@@ -32,6 +32,7 @@ import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 import { DELIVERED } from '@/components/reports/data';
 import { capacityTonnes } from '@/components/fleet-detail/parts';
+import { staleWork, staleLabel } from '@/lib/staleWork';
 
 interface Vehicle {
   id: number;
@@ -202,8 +203,15 @@ async function loadFleet(q: string) {
     return { id: d.id, name };
   });
 
+  // The open order naming each truck; a current order wins over a stale one
+  // (R6 shared stale rule), so a truck is only shown as stale when every
+  // order it is on has been left open.
   const activeLoadByVehicle: Record<number, any> = {};
-  for (const l of loadRows) if (l.vehicle != null && ACTIVE_LOAD.includes(l.status)) activeLoadByVehicle[l.vehicle] = l;
+  for (const l of loadRows) {
+    if (l.vehicle == null || !ACTIVE_LOAD.includes(l.status)) continue;
+    const had = activeLoadByVehicle[l.vehicle];
+    if (!had || (staleWork(had) && !staleWork(l))) activeLoadByVehicle[l.vehicle] = l;
+  }
 
   // Delivered work on the Reports definition (delivered, invoiced, completed,
   // paid), from every load: the same total as History and Reports. Rows show
@@ -236,7 +244,7 @@ export default function Vehicles() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const phoneHead = useFleetPhoneHead();
-  // Drivers' phone "⋯" sends "Import vehicles from Excel" here with ?import=1.
+  // Drivers' phone "⋯" ("Vehicles: import from Excel") sends the owner here with ?import=1.
   const [importParams, setImportParams] = useSearchParams();
   useEffect(() => {
     if (importParams.get('import') !== '1') return;
@@ -284,7 +292,10 @@ export default function Vehicles() {
   const deliveredByVehicle = data?.deliveredByVehicle ?? {};
   const revenueOf = (v: Vehicle) => deliveredByVehicle[v.id]?.revenue ?? 0;
   // A status the open orders contradict: on a job with no order, or free / in the workshop while on one.
-  const mismatch = (v: Vehicle) => (activeLoadByVehicle[v.id] != null) !== TILE_MATCH.job(v.status);
+  // Current work only: an order left open (stale, src/lib/staleWork.ts) is
+  // not a job, so it counts neither for "On a job" nor as a reason to be out.
+  const currentLoad = (v: Vehicle) => { const l = activeLoadByVehicle[v.id]; return l && !staleWork(l) ? l : null; };
+  const mismatch = (v: Vehicle) => (currentLoad(v) != null) !== TILE_MATCH.job(v.status);
   const filtered = tileFilter === 'mismatch' ? vehicles.filter(mismatch) : tileFilter ? vehicles.filter(v => TILE_MATCH[tileFilter](v.status)) : vehicles;
 
   // Sort vehicles
@@ -321,7 +332,7 @@ export default function Vehicles() {
   const onJob = vehicles.filter(v => TILE_MATCH.job(v.status));
   const free = vehicles.filter(v => TILE_MATCH.free(v.status));
   const shop = vehicles.filter(v => TILE_MATCH.shop(v.status));
-  const hasOrder = (v: Vehicle) => activeLoadByVehicle[v.id] != null;
+  const hasOrder = (v: Vehicle) => currentLoad(v) != null;
   const onJobNoOrder = onJob.filter(v => !hasOrder(v)).length;
   const freeOnOrder = free.filter(hasOrder).length;
   const outOfService = shop.filter(v => v.status === 'OUT_OF_SERVICE').length;
@@ -337,6 +348,15 @@ export default function Vehicles() {
   const doingNow = (v: Vehicle): ReactNode => {
     const l = activeLoadByVehicle[v.id];
     const driver = v.driver_name || l?.driver_name;
+    const stale = staleWork(l);
+    if (l && stale) {
+      // Left open (R6 shared rule): not current work. Neutral text, one amber
+      // dot, two lines; the order and its actions are on the truck's page.
+      return <>
+        <span className="fleet-doing--stale"><i className="fleet-doing__dot" aria-hidden="true" />{driver ? `${driver} · ` : ''}order left open</span>
+        <span className="fleet-table__sub" title={l.load_number || undefined}>{staleLabel(stale).text}</span>
+      </>;
+    }
     if (l) {
       const to = l.delivery_city || l.delivery_location;
       const sub = [to ? `to ${to}` : '', l.customer_name].filter(Boolean).join(' · ');
@@ -353,8 +373,8 @@ export default function Vehicles() {
       </>;
     }
     if (TILE_MATCH.job(v.status)) return reviewing
-      ? <StatusChip tone="warning" size="sm" label="On a job · no open order" />
-      : <span className="fleet-doing--mismatch">On a job · no open order</span>;
+      ? <StatusChip tone="warning" size="sm" label="On a job · no current order" />
+      : <span className="fleet-doing--mismatch">On a job · no current order</span>;
     if (TILE_MATCH.shop(v.status)) return <span>{v.status === 'OUT_OF_SERVICE' ? 'Out of service' : v.last_maintenance_date ? `In the workshop since ${formatDate(v.last_maintenance_date)}` : 'In the workshop'}</span>;
     if (TILE_MATCH.free(v.status)) return <span>{driver ? `Free, ${driver} assigned` : 'Free'}</span>;
     return <span>—</span>;
@@ -426,13 +446,13 @@ export default function Vehicles() {
             {...tileProps('job')}
             label="On a job"
             figure={loading ? skelFigure : <>{onJob.length}<span className="tw-kpi__of"> of {vehicles.length}</span></>}
-            note={loading ? 'Loading' : onJobNoOrder > 0 ? `${onJobNoOrder} with no open order` : onJob.length ? 'All on an open order' : 'No truck is out'}
+            note={loading ? 'Loading' : onJobNoOrder > 0 ? `${onJobNoOrder} with no current order` : onJob.length ? 'All on a current order' : 'No truck is out'}
           />
           <KpiTile
             {...tileProps('free')}
             label="Available"
             figure={loading ? skelFigure : free.length}
-            note={loading ? 'Loading' : freeOnOrder > 0 ? `${freeOnOrder} on an open order` : free.length ? 'Free to take a load' : 'Every truck is busy'}
+            note={loading ? 'Loading' : freeOnOrder > 0 ? `${freeOnOrder} on a current order` : free.length ? 'Free to take a load' : 'Every truck is busy'}
           />
           <KpiTile
             {...tileProps('shop')}
@@ -456,7 +476,7 @@ export default function Vehicles() {
               filters the list. It lives in the toolbar row (reserved while
               loading), so it never pushes the table down when it arrives. */}
           {!loading && !failed && mismatchCount > 0 && (
-            <span className="fleet-review" title={[onJobNoOrder ? `${onJobNoOrder} on a job with no open order` : '', freeOnOrder ? `${freeOnOrder} available but on an open order` : '', shopOnOrder ? `${shopOnOrder} in maintenance but on an open order` : ''].filter(Boolean).join(', ')}>
+            <span className="fleet-review" title={[onJobNoOrder ? `${onJobNoOrder} on a job with no current order` : '', freeOnOrder ? `${freeOnOrder} available but on a current order` : '', shopOnOrder ? `${shopOnOrder} in maintenance but on a current order` : ''].filter(Boolean).join(', ')}>
               <i className="fleet-review__dot" aria-hidden="true" />
               <span className="fleet-review__text">{mismatchCount} don’t match their orders</span>
               <button type="button" className="fleet-review__btn" aria-pressed={reviewing} onClick={() => setTileFilter(f => (f === 'mismatch' ? null : 'mismatch'))}>

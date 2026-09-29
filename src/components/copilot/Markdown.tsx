@@ -21,7 +21,7 @@ const components = {
   // whiteSpace:normal still swallows the parser's between-block newlines.
   p: ({ children }: any) => <p style={{ margin: '0 0 8px', whiteSpace: 'pre-wrap' }}>{children}</p>,
   a: ({ href, children }: any) => (
-    <a href={href} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)' }}>{children}</a>
+    <a href={href} target="_blank" rel="noreferrer" style={{ color: 'var(--link, var(--accent-primary))' }}>{children}</a>
   ),
   ul: ({ children }: any) => <ul style={{ margin: '0 0 8px', paddingLeft: "var(--cp-md-list-inset, 18px)" }}>{children}</ul>,
   ol: ({ children }: any) => <ol style={{ margin: '0 0 8px', paddingLeft: "var(--cp-md-list-inset, 18px)" }}>{children}</ol>,
@@ -32,20 +32,20 @@ const components = {
   code: ({ children, ...props }: any) => {
     // Block code is rendered inside our <pre> override; only style inline code here.
     const isBlock = typeof props.className === 'string' && props.className.includes('language-');
-    if (isBlock) return <code style={{ fontFamily: 'var(--font-mono)', fontSize: "var(--cp-support-size, 12px)", fontWeight: "var(--cp-code-weight, inherit)" as React.CSSProperties['fontWeight'], lineHeight: "var(--cp-support-line, inherit)" }}>{children}</code>;
+    if (isBlock) return <code style={{ fontFamily: 'var(--font-code, var(--font-mono))', fontSize: "var(--cp-support-size, 12px)", fontWeight: "var(--cp-code-weight, inherit)" as React.CSSProperties['fontWeight'], lineHeight: "var(--cp-support-line, inherit)" }}>{children}</code>;
     return (
-      <code style={{ fontFamily: 'var(--font-mono)', fontSize: "var(--cp-support-size, 12px)", fontWeight: "var(--cp-code-weight, inherit)" as React.CSSProperties['fontWeight'], lineHeight: "var(--cp-support-line, inherit)", background: 'var(--bg-base)', padding: "var(--cp-md-code-inset, 1px 5px)", borderRadius: 4 }}>
+      <code style={{ fontFamily: 'var(--font-code, var(--font-mono))', fontSize: "var(--cp-support-size, 12px)", fontWeight: "var(--cp-code-weight, inherit)" as React.CSSProperties['fontWeight'], lineHeight: "var(--cp-support-line, inherit)", background: 'var(--bg-raised)', padding: "var(--cp-md-code-inset, 1px 5px)", borderRadius: 'var(--radius-chip)' }}>
         {children}
       </code>
     );
   },
   pre: ({ children }: any) => (
-    <pre style={{ margin: '0 0 8px', padding: "var(--cp-md-pre-inset, 8px 10px)", background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', borderRadius: 4, overflowX: 'auto', fontFamily: 'var(--font-mono)', fontSize: "var(--cp-support-size, 12px)", fontWeight: "var(--cp-code-weight, inherit)" as React.CSSProperties['fontWeight'], lineHeight: "var(--cp-support-line, 1.55)" }}>
+    <pre style={{ margin: '0 0 8px', padding: "var(--cp-md-pre-inset, 8px 10px)", background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)', overflowX: 'auto', fontFamily: 'var(--font-code, var(--font-mono))', fontSize: "var(--cp-support-size, 12px)", fontWeight: "var(--cp-code-weight, inherit)" as React.CSSProperties['fontWeight'], lineHeight: "var(--cp-support-line, 1.55)" }}>
       {children}
     </pre>
   ),
   blockquote: ({ children }: any) => (
-    <blockquote style={{ margin: '0 0 8px', padding: '8px 12px', background: 'var(--bg-surface-hover)', borderRadius: 6, color: 'var(--text-secondary)' }}>
+    <blockquote style={{ margin: '0 0 8px', padding: '8px 12px', background: 'var(--bg-surface-hover)', borderRadius: 'var(--radius-nested)', color: 'var(--text-secondary)' }}>
       {children}
     </blockquote>
   ),
@@ -56,7 +56,7 @@ const components = {
     </div>
   ),
   th: ({ children }: any) => (
-    <th style={{ ...cellStyle, fontSize: undefined, background: 'var(--bg-base)' }}>
+    <th style={{ ...cellStyle, fontSize: undefined, background: 'var(--bg-raised)' }}>
       {children}
     </th>
   ),

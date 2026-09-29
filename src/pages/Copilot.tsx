@@ -1,20 +1,20 @@
-import './copilot-desktop-presentation.css';
+import './copilot-page.css';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { X, TriangleAlert, Check, Bot } from 'lucide-react';
+import { TriangleAlert, Check, Bot, Plus, ArrowUp, MessagesSquare, Trash2 } from 'lucide-react';
 import SectionHeader from '@/components/layout/SectionHeader';
+import OverflowMenu from '@/components/ui/OverflowMenu';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { CAPITAL_LAUNCHED } from '@/lib/features';
+import { toast } from '@/lib/toast';
+import { normaliseFigures, formatMoney } from '@/lib/formatters';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { postData, fetchData, deleteData } from '@/lib/Api';
 import { useAuth } from '@/lib/AuthContext';
 import Markdown from '@/components/copilot/Markdown';
 import ProposalCard, { Proposal } from '@/components/copilot/ProposalCard';
-
-function relTime(iso: string): string {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (d < 1) return 'now'; if (d < 60) return `${d}m`;
-  const h = Math.floor(d / 60); if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
-}
+import ConversationList, { ConversationSummary, conversationTitle } from '@/components/copilot/ConversationList';
+import ConversationsSheet from '@/components/copilot/ConversationsSheet';
 
 interface Action { label: string; route: string; }
 interface ProposedAction {
@@ -42,8 +42,22 @@ function looksLikeMarkdown(s: string): boolean {
     || /^\s*[-*]\s/m.test(s) || /^\s*\d+\.\s/m.test(s);
 }
 
-const STARTERS: { title: string; prompt: string; hint: string }[] = [
-  { title: "What's overdue?", prompt: "What's overdue?", hint: 'Chase the right accounts first' },
+/**
+ * House figures in replies (display only; the stored text is untouched).
+ * normaliseFigures skips an amount directly followed by a comma ("R28,443, 46
+ * days"), so those are rewritten here first.
+ */
+const houseFigures = (text: string) => normaliseFigures(
+  text.replace(/\bR\s?(\d{1,3}(?:,\d{3})+)(?=,(?:\s|$))/g, (_m, int: string) => formatMoney(Number(int.replace(/,/g, '')), 0)),
+);
+
+/** The one wording for the ask box (the top bar search uses it too). */
+const ASK = 'Ask Copilot about your business';
+
+type Starter = { title: string; prompt: string; hint: string };
+
+const STARTERS: Starter[] = [
+  { title: "What's overdue?", prompt: "What's overdue?", hint: 'Who to chase first' },
   // Fast Pay is not live: no starter invites a capacity or payout answer until it is.
   ...(CAPITAL_LAUNCHED ? [{ title: 'Fast Pay capacity', prompt: 'How much can I advance?', hint: 'Eligible invoices and net payout' }] : []),
   { title: 'Quotes pipeline', prompt: "How's my pipeline?", hint: 'Won, lost and open quotes' },
@@ -52,21 +66,32 @@ const STARTERS: { title: string; prompt: string; hint: string }[] = [
 
 // Extra starters for roles that can write — the agent drafts the record, the
 // user confirms via the proposal card. Hidden for VIEWER/DRIVER.
-const WRITE_STARTERS: { title: string; prompt: string; hint: string }[] = [
-  { title: 'Add a customer', prompt: 'Add a new customer', hint: 'Drafts the record. You confirm before it saves' },
-  { title: 'Draft a quote', prompt: 'Create a new quote', hint: 'Propose a quote for your confirmation' },
+const WRITE_STARTERS: Starter[] = [
+  { title: 'Add a customer', prompt: 'Add a new customer', hint: 'Drafts the record for you to check' },
+  { title: 'Draft a quote', prompt: 'Create a new quote', hint: 'Drafts a quote for you to check' },
 ];
 
-const GENERIC_INTRO_TEXT = CAPITAL_LAUNCHED
-  ? "I'm your TruckWys copilot. Ask me about your cash position, overdue invoices, quotes pipeline, fleet status or Fast Pay capacity. I answer from your live data."
-  : "I'm your TruckWys copilot. Ask me about your cash position, overdue invoices, quotes pipeline or fleet status. I answer from your live data.";
-
-function buildIntro(firstName?: string): Message {
-  return {
-    role: 'assistant',
-    content: firstName ? `Hi ${firstName}. ${GENERIC_INTRO_TEXT}` : GENERIC_INTRO_TEXT,
-  };
+/**
+ * Suggestion grid spans on a 6-column track, so no group leaves an orphan:
+ * 3 per row (span 2) or 2 per row (span 3); 4 = 2 + 2, 5 = 3 + 2, 1 = full.
+ */
+function groupSpans(n: number): number[] {
+  const rows: number[] = [];
+  let left = n;
+  while (left > 0) {
+    if (left === 4 || left === 2) { rows.push(2); left -= 2; }
+    else if (left === 1) { rows.push(1); left -= 1; }
+    else { rows.push(3); left -= 3; }
+  }
+  return rows.flatMap((size) => Array(size).fill(6 / size));
 }
+
+const TOPICS = CAPITAL_LAUNCHED
+  ? 'Ask about cash, overdue invoices, quotes, your fleet or Fast Pay.'
+  : 'Ask about cash, overdue invoices, quotes or your fleet.';
+
+// Kept as messages[0] (never rendered): the thread logic below counts on it.
+const INTRO: Message = { role: 'assistant', content: TOPICS };
 
 // Lightweight typewriter for the streaming feel (used on freshly-arrived replies).
 // Calls onDone when finished so the message can re-render through <Markdown>.
@@ -89,25 +114,23 @@ function Typewriter({ text, onDone }: { text: string; onDone?: () => void }) {
   return <>{text.slice(0, n)}</>;
 }
 
-const labelStyle: React.CSSProperties = {
-  fontSize: "var(--cp-support-size, 11px)", lineHeight: "var(--cp-support-line, inherit)", fontFamily: 'var(--cp-font, var(--font-mono))', color: 'var(--text-secondary)',
-  letterSpacing: "var(--cp-tracking, 0.1em)", textTransform: 'var(--cp-case, uppercase)' as React.CSSProperties['textTransform'], marginBottom: 4,
-};
-
 export default function Copilot() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const introMsg = useMemo(() => buildIntro((user?.name || '').split(' ')[0] || undefined), [user?.name]);
+  const firstName = (user?.name || '').split(' ')[0] || '';
+  const introMsg = INTRO;
   const [params, setParams] = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([introMsg]);
   const [conversationId, setConversationId] = useState<number | null>(null);
-  const [conversations, setConversations] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [conversationsLoaded, setConversationsLoaded] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ConversationSummary | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [proposalBusy, setProposalBusy] = useState(false);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   // The conversation the user is currently looking at. A reply must only be
   // applied if the user hasn't switched threads while it was in flight —
@@ -116,16 +139,27 @@ export default function Copilot() {
   useEffect(() => { activeConvRef.current = conversationId; }, [conversationId]);
 
   const canWrite = !['VIEWER', 'DRIVER'].includes(user?.role || '');
-  const starters = canWrite ? [...STARTERS, ...WRITE_STARTERS] : STARTERS;
+  const readSpans = useMemo(() => groupSpans(STARTERS.length), []);
+  const writeSpans = useMemo(() => groupSpans(WRITE_STARTERS.length), []);
+  const starters = canWrite
+    ? [...STARTERS.map((s, i) => ({ ...s, span: readSpans[i] })), ...WRITE_STARTERS.map((s, i) => ({ ...s, span: writeSpans[i] }))]
+    : STARTERS.map((s, i) => ({ ...s, span: readSpans[i] }));
   const isEmpty = messages.length <= 1;
+  const current = conversations.find((c) => c.id === conversationId) || null;
+  const threadTitle = conversationId ? (current ? conversationTitle(current) : 'Conversation') : 'New conversation';
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
+  // Keep the newest message in view (the thread scrolls inside its own column).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && !isEmpty) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [messages, loading, isEmpty]);
   useEffect(() => { document.title = 'Copilot - TruckWys'; }, []);
 
   const refreshConversations = useCallback(() => {
-    fetchData('api/v1/agent/conversations/')
+    return fetchData('api/v1/agent/conversations/')
       .then((d: any) => setConversations(d?.conversations || []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setConversationsLoaded(true));
   }, []);
 
   const openConversation = useCallback((id: number) => {
@@ -142,7 +176,7 @@ export default function Copilot() {
         setConversationId(id);
         setMessages(hist.length ? [introMsg, ...hist] : [introMsg]);
       })
-      .catch(() => {});
+      .catch(() => { toast.error("Couldn't open that conversation. Try again."); });
   }, [introMsg]);
 
   // On mount (e.g. clicking "Copilot" in the sidebar): always start a fresh
@@ -157,7 +191,7 @@ export default function Copilot() {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+    ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
   };
 
   const send = async (text?: string) => {
@@ -212,6 +246,18 @@ export default function Copilot() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A suggestion fills the ask box and focuses it; the user presses Send.
+  const applySuggestion = (prompt: string) => {
+    setInput(prompt);
+    requestAnimationFrame(() => {
+      const ta = taRef.current;
+      if (!ta) return;
+      ta.focus();
+      ta.setSelectionRange(prompt.length, prompt.length);
+      autoGrow();
+    });
+  };
 
   const runAction = async (msgIndex: number, a: ProposedAction) => {
     setMessages(prev => prev.map((m, i) => i === msgIndex ? { ...m, actionState: 'pending' } : m));
@@ -300,217 +346,236 @@ export default function Copilot() {
   // unused "New chat" never gets saved to history. The previous thread is KEPT.
   const newChat = () => {
     setShowHistory(false); setInput(''); setAiAvailable(null);
+    if (taRef.current) taRef.current.style.height = 'auto';
     activeConvRef.current = null;  // any in-flight reply from the previous thread is dropped
     setMessages([introMsg]); setConversationId(null);
+    requestAnimationFrame(() => taRef.current?.focus());
   };
 
-  const deleteConversation = async (id: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm('Delete this conversation?')) return;
-    await deleteData({ url: `api/v1/agent/conversations/${id}/` }).catch(() => {});
-    if (id === conversationId) { setMessages([introMsg]); setConversationId(null); }
-    refreshConversations();
-  };
-
-  const avatar = (role: 'user' | 'assistant') => {
-    const userAvatar = (user?.avatar as string) || undefined;
-    if (role === 'user' && userAvatar) {
-      return (
-        <img
-          src={userAvatar}
-          alt="You"
-          style={{ flexShrink: 0, width: 26, height: 26, borderRadius: "var(--cp-radius, 2px)", objectFit: 'cover' }}
-        />
-      );
+  // Delete asks first (accessible dialog), and a failure is reported, never swallowed.
+  const deleteConversation = async (c: ConversationSummary) => {
+    try {
+      await deleteData({ url: `api/v1/agent/conversations/${c.id}/` });
+    } catch (e: any) {
+      toast.error(e?.message ? `Couldn't delete the conversation. ${e.message}` : "Couldn't delete the conversation. Try again.");
+      return;
     }
-    // Neutral marks for both sides. The assistant mark does not say "AI":
-    // some replies come from the rules engine, and those are labelled below.
-    return (
-      <div className="cp-avatar" style={{
-        flexShrink: 0, minWidth: 28, height: 28, padding: role === 'user' ? '0 6px' : 0, boxSizing: 'border-box', borderRadius: 'var(--radius-chip)', display: 'grid', placeItems: 'center',
-        background: role === 'user' ? 'var(--bg-surface)' : 'var(--bg-surface-hover)',
-        border: '1px solid var(--border-subtle)',
-        color: 'var(--text-secondary)',
-        fontFamily: 'var(--font-sans)', fontSize: 12, lineHeight: '16px', fontWeight: 600,
-      }} aria-hidden="true">{role === 'user' ? 'You' : <Bot size={16} />}</div>
-    );
+    if (c.id === conversationId) { activeConvRef.current = null; setMessages([introMsg]); setConversationId(null); }
+    await refreshConversations();
+    toast.success('Conversation deleted');
+    requestAnimationFrame(() => taRef.current?.focus());
   };
+
+  const list = (
+    <ConversationList
+      conversations={conversations}
+      loaded={conversationsLoaded}
+      activeId={conversationId}
+      onOpen={openConversation}
+      onDelete={setPendingDelete}
+    />
+  );
+
+  const canSend = !!input.trim() && !loading;
 
   return (
-    <div className="copilot-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      <style>{`
-        @keyframes cp-rise { from { opacity:0; transform: translateY(5px) } to { opacity:1; transform:none } }
-        .cp-msg { animation: cp-rise .16s ease both; }
-        .cp-card:hover { background: var(--bg-surface-hover) !important; }
-        .cp-chip:hover { background: var(--bg-surface-hover) !important; }
-        .cp-conv:hover { background: var(--bg-surface-hover); }
-        .cp-conv:hover .cp-del { opacity: 1; }
-        .cp-del:hover { color: var(--status-danger) !important; }
-        .cp-md > :last-child { margin-bottom: 0 !important; }
-      `}</style>
-
+    <div className="copilot-page">
       <SectionHeader
         title="Copilot"
-        description="Answers come from your live TruckWys data. Anything it drafts waits for you to confirm."
+        description="Answers from your data. You approve every change."
         titleAdornment={aiAvailable === null ? undefined : (
-          <span className="cp-status" style={{
-            display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 'var(--radius-chip)',
-            background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-            color: 'var(--text-secondary)', font: '500 13px/20px var(--font-sans)', whiteSpace: 'nowrap',
-          }}>
-            {aiAvailable ? 'AI available' : 'Rules engine only'}
-          </span>
+          <StatusChip tone={aiAvailable ? 'success' : 'warning'} label={aiAvailable ? 'AI available' : 'Rules engine only'} />
         )}
+        actions={
+          <button type="button" className="tw-btn" onClick={newChat}>
+            <Plus size={16} aria-hidden="true" />
+            New chat
+          </button>
+        }
       />
 
-      {/* Two-pane: conversation history sidebar (left) + active chat (right) */}
-      <div className="cp-layout" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
-        {/* Sidebar */}
-        <div className="cp-panel cp-sidebar" style={{ width: 250, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-card)', overflow: 'hidden' }}>
-          <div style={{ padding: "var(--cp-space-10, 10px)", borderBottom: '1px solid var(--border-subtle)' }}>
-            <button onClick={newChat} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: "var(--cp-space-6, 6px)", background: 'var(--accent-primary)', color: 'var(--cp-on-accent, var(--bg-deep))', border: 'none', borderRadius: "var(--cp-radius, 2px)", padding: "var(--cp-inset-1, 9px 12px)", cursor: 'pointer', fontFamily: 'var(--cp-font, var(--font-mono))', fontSize: "var(--cp-control-size, 11px)", lineHeight: "var(--cp-support-line, inherit)", fontWeight: "var(--cp-control-weight, 600)" as React.CSSProperties['fontWeight'], letterSpacing: "var(--cp-tracking, 0.05em)" }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              New chat
-            </button>
+      <div className="cp-layout">
+        {/* Desktop: the conversation rail (hidden on phones; they use the sheet). */}
+        <nav className="tw-card tw-card--flush cp-rail" aria-labelledby="cp-rail-title">
+          <div className="cp-rail__head">
+            <h2 id="cp-rail-title" className="tw-card__title">Conversations</h2>
+            {conversationsLoaded && conversations.length > 0 && (
+              <span className="cp-rail__count">{conversations.length}</span>
+            )}
           </div>
-          <div style={{ padding: "var(--cp-inset-2, 10px 12px 4px)", fontFamily: 'var(--cp-font, var(--font-mono))', fontSize: "var(--cp-support-size, 9px)", lineHeight: "var(--cp-support-line, inherit)", color: 'var(--text-tertiary)', letterSpacing: "var(--cp-tracking, 0.08em)", textTransform: 'var(--cp-case, uppercase)' as React.CSSProperties['textTransform'] }}>Conversations</div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            {conversations.length === 0 ? (
-              <div style={{ padding: "var(--cp-space-18, 18px)", textAlign: 'center', color: 'var(--text-tertiary)', fontSize: "var(--cp-support-size, 11px)", lineHeight: "var(--cp-support-line, inherit)" }}>No conversations yet</div>
-            ) : conversations.map((c: any) => (
-              <div
-                key={c.id}
-                onClick={() => openConversation(c.id)}
-                className="cp-conv"
-                style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: "var(--cp-space-6, 6px)", padding: "var(--cp-inset-3, 10px 10px 10px 12px)", cursor: 'pointer', background: c.id === conversationId ? 'var(--bg-surface-hover)' : 'transparent' }}
-                aria-current={c.id === conversationId ? 'true' : undefined}
-              >
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: "var(--cp-body-size, 12.5px)", lineHeight: "var(--cp-body-line, inherit)", fontWeight: c.id === conversationId ? 500 : 400, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'New conversation'}</div>
-                  <div style={{ fontSize: "var(--cp-support-size, 10px)", lineHeight: "var(--cp-support-line, inherit)", color: 'var(--text-tertiary)', fontFamily: 'var(--cp-font, var(--font-mono))', marginTop: "var(--cp-space-2, 2px)" }}>{c.message_count} {c.message_count === 1 ? 'message' : 'messages'} · {relTime(c.updated_at)}</div>
-                </div>
-                <button onClick={(e) => deleteConversation(c.id, e)} className="cp-del" title="Delete conversation" aria-label={`Delete conversation ${c.title || 'New conversation'}`} style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: "var(--cp-control-size, 13px)", lineHeight: "var(--cp-body-line, inherit)", padding: "var(--cp-space-2, 2px)", opacity: "var(--cp-delete-opacity, 0.6)" as React.CSSProperties['opacity'] }}><X size={13} aria-hidden="true" /></button>
-              </div>
-            ))}
-          </div>
-        </div>
+          <div className="cp-rail__body">{list}</div>
+        </nav>
 
-      {/* Conversation card fills remaining height; input docked inside at the bottom */}
-      <div className="card cp-chat" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 20 }}>
-          {isEmpty ? (
-            <div>
-              <h2 className="cp-section-title" style={{ fontSize: "var(--cp-section-size, 18px)", lineHeight: "var(--cp-section-line, inherit)", fontWeight: 'var(--cp-title-weight, 500)' as React.CSSProperties['fontWeight'], color: 'var(--text-primary)', margin: 0, marginBottom: 8 }}>How can I help you run the business today?</h2>
-              <div style={{ fontSize: "var(--cp-body-size, 13px)", color: 'var(--text-secondary)', maxWidth: 620, marginBottom: "var(--cp-space-22, 22px)", lineHeight: "var(--cp-body-line, 1.55)" }}>{introMsg.content}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))', gap: "var(--cp-space-10, 10px)" }}>
-                {starters.map(s => (
-                  <button key={s.title} className="cp-card cp-panel" onClick={() => send(s.prompt)}
-                    style={{ textAlign: 'left', cursor: 'pointer', padding: "var(--cp-starter-inset, 14px)", background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: "var(--cp-radius, 2px)", transition: 'background-color .15s ease' }}>
-                    <div style={{ fontSize: "var(--cp-body-size, 12.5px)", lineHeight: "var(--cp-body-line, inherit)", fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>{s.title}</div>
-                    <div style={{ fontSize: "var(--cp-support-size, 11px)", lineHeight: "var(--cp-support-line, inherit)", color: 'var(--text-tertiary)' }}>{s.hint}</div>
-                  </button>
-                ))}
-              </div>
+        <section className="tw-card tw-card--flush cp-chat" aria-labelledby="cp-thread-title">
+          <div className="cp-chat__head">
+            <h2 id="cp-thread-title" className="cp-chat__title" title={threadTitle}>{threadTitle}</h2>
+            <div className="cp-chat__tools">
+              {conversationId && (
+                <OverflowMenu
+                  label="Conversation actions"
+                  items={() => [{
+                    label: 'Delete conversation', danger: true, icon: <Trash2 size={16} />,
+                    onSelect: () => setPendingDelete(current || { id: conversationId, title: threadTitle }),
+                  }]}
+                />
+              )}
+              <button
+                type="button"
+                className="tw-btn cp-chats-btn"
+                onClick={() => setShowHistory(true)}
+                aria-haspopup="dialog"
+                aria-expanded={showHistory}
+              >
+                <MessagesSquare size={16} aria-hidden="true" />
+                Conversations
+              </button>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: "var(--cp-space-18, 18px)" }}>
-              {messages.slice(1).map((m, i) => {
-                const realIndex = i + 1;
-                return (
-                  <div key={realIndex} className="cp-msg" style={{ display: 'flex', gap: "var(--cp-space-10, 10px)", flexDirection: m.role === 'user' ? 'row-reverse' : 'row' }}>
-                    {avatar(m.role)}
-                    <div style={{ maxWidth: '80%', display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                      <div style={{
-                        padding: "var(--cp-inset-4, 11px 14px)", borderRadius: 'var(--radius-nested)', fontSize: "var(--cp-body-size, 13.5px)", lineHeight: "var(--cp-body-line, 1.6)", whiteSpace: 'pre-wrap',
-                        background: m.role === 'user' ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                        color: m.role === 'user' ? 'var(--cp-on-accent, var(--bg-deep))' : 'var(--text-primary)',
-                        border: m.role === 'user' ? 'none' : '1px solid var(--border-subtle)',
-                      }}>
-                        {m.role === 'user'
-                          ? m.content
-                          : m.animate && !looksLikeMarkdown(m.content)
+          </div>
+
+          <div ref={scrollRef} className="cp-scroll">
+            {isEmpty ? (
+              <div className="cp-empty">
+                <h3 className="cp-empty__title">{firstName ? `Hi ${firstName}. What do you need to know?` : 'What do you need to know?'}</h3>
+                <p className="cp-empty__sub">{TOPICS}</p>
+                <ul className="cp-suggest" aria-label="Suggestions">
+                  {starters.map((s) => (
+                    <li key={s.title} style={{ gridColumn: `span ${s.span}` }}>
+                      <button
+                        type="button"
+                        className="cp-suggest__btn"
+                        onClick={() => applySuggestion(s.prompt)}
+                        aria-label={`${s.title}. ${s.hint}. Puts "${s.prompt}" in the ask box`}
+                      >
+                        <span className="cp-suggest__title">{s.title}</span>
+                        <span className="cp-suggest__hint">{s.hint}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="cp-thread" aria-live="polite" aria-relevant="additions">
+                {messages.slice(1).map((m, i) => {
+                  const realIndex = i + 1;
+                  if (m.role === 'user') {
+                    return (
+                      <div key={realIndex} className="cp-msg cp-msg--user">
+                        <span className="cp-sr">You said: </span>
+                        <div className="cp-bubble">{m.content}</div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={realIndex} className="cp-msg cp-msg--assistant">
+                      <span className="cp-mark" aria-hidden="true"><Bot size={16} /></span>
+                      <div className="cp-msg__body">
+                        <span className="cp-sr">Copilot: </span>
+                        <div className="cp-answer">
+                          {m.animate && !looksLikeMarkdown(m.content)
                             ? <Typewriter
-                                text={m.content}
+                                text={houseFigures(m.content)}
                                 onDone={() => setMessages(prev => prev.map((mm, j) =>
                                   j === realIndex ? { ...mm, animate: false } : mm))}
                               />
-                            : <Markdown>{m.content}</Markdown>}
-                      </div>
-
-                      {m.role === 'assistant' && m.degraded && (
-                        <div style={{ marginTop: "var(--cp-space-5, 5px)", fontSize: "var(--cp-support-size, 10.5px)", lineHeight: "var(--cp-support-line, inherit)", color: 'var(--text-tertiary)', fontFamily: 'var(--cp-font, var(--font-mono))', letterSpacing: "var(--cp-tracking, 0.04em)" }}>
-                          <TriangleAlert size={14} aria-hidden="true" style={{ verticalAlign: 'text-bottom', marginRight: 4 }} /> Answered by the rules engine because AI is unavailable, so it is basic. Try again shortly.
+                            : <Markdown>{houseFigures(m.content)}</Markdown>}
                         </div>
-                      )}
 
-                      {m.proposal && (
-                        <ProposalCard
-                          proposal={m.proposal}
-                          onConfirm={() => executeProposal(realIndex, m.proposal!.id)}
-                          onDismiss={() => dismissProposal(realIndex, m.proposal!.id)}
-                          busy={proposalBusy || loading}
-                        />
-                      )}
+                        {m.degraded && (
+                          <p className="cp-note">
+                            <TriangleAlert size={14} aria-hidden="true" /> Answered by the rules engine because AI is unavailable, so it is basic. Try again shortly.
+                          </p>
+                        )}
 
-                      {m.proposedAction && m.actionState === 'pending' && (
-                        <div className="cp-panel" style={{ marginTop: "var(--cp-space-10, 10px)", padding: "var(--cp-space-13, 13px)", width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-nested)' }}>
-                          <div style={{ fontSize: "var(--cp-body-size, 12.5px)", lineHeight: "var(--cp-body-line, inherit)", fontWeight: 600, color: 'var(--text-primary)', marginBottom: "var(--cp-space-3, 3px)" }}>{m.proposedAction.label}</div>
-                          {m.proposedAction.detail && <div style={{ fontSize: "var(--cp-support-size, 11.5px)", lineHeight: "var(--cp-support-line, inherit)", color: 'var(--text-secondary)', marginBottom: "var(--cp-space-11, 11px)" }}>{m.proposedAction.detail}</div>}
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn-action" onClick={() => runAction(realIndex, m.proposedAction!)} disabled={loading}
-                              style={{ background: 'var(--accent-primary)', color: 'var(--cp-on-accent, var(--bg-deep))', border: 'none' }}>
-                              {m.proposedAction.confirm_text || 'Confirm'}
-                            </button>
-                            <button className="btn-action" onClick={() => dismissAction(realIndex)} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>Dismiss</button>
+                        {m.proposal && (
+                          <ProposalCard
+                            proposal={m.proposal}
+                            onConfirm={() => executeProposal(realIndex, m.proposal!.id)}
+                            onDismiss={() => dismissProposal(realIndex, m.proposal!.id)}
+                            busy={proposalBusy || loading}
+                          />
+                        )}
+
+                        {m.proposedAction && m.actionState === 'pending' && (
+                          <div className="cp-proposed">
+                            <div className="cp-proposed__label">{m.proposedAction.label}</div>
+                            {m.proposedAction.detail && <div className="cp-proposed__detail">{m.proposedAction.detail}</div>}
+                            <div className="cp-proposed__actions">
+                              <button type="button" className="tw-btn tw-btn--primary" onClick={() => runAction(realIndex, m.proposedAction!)} disabled={loading}>
+                                {m.proposedAction.confirm_text || 'Confirm'}
+                              </button>
+                              <button type="button" className="tw-btn" onClick={() => dismissAction(realIndex)}>Dismiss</button>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      {m.proposedAction && m.actionState === 'done' && <div style={{ marginTop: "var(--cp-space-7, 7px)", fontSize: "var(--cp-support-size, 11px)", lineHeight: "var(--cp-support-line, inherit)", color: "var(--status-success-text, var(--status-success))", fontFamily: 'var(--cp-font, var(--font-mono))' }}><Check size={12} aria-hidden="true" style={{ verticalAlign: 'text-bottom', marginRight: 4 }} /> Confirmed</div>}
-                      {m.proposedAction && m.actionState === 'dismissed' && <div style={{ marginTop: "var(--cp-space-7, 7px)", fontSize: "var(--cp-support-size, 11px)", lineHeight: "var(--cp-support-line, inherit)", color: 'var(--text-tertiary)', fontFamily: 'var(--cp-font, var(--font-mono))' }}>Dismissed</div>}
+                        )}
+                        {m.proposedAction && m.actionState === 'done' && <p className="cp-note cp-note--ok"><Check size={14} aria-hidden="true" /> Confirmed</p>}
+                        {m.proposedAction && m.actionState === 'dismissed' && <p className="cp-note">Dismissed</p>}
 
-                      {m.actions && m.actions.length > 0 && (
-                        <div style={{ display: 'flex', gap: 8, marginTop: "var(--cp-space-9, 9px)", flexWrap: 'wrap' }}>
-                          {m.actions.map((a, j) => (
-                            <button key={j} className="cp-chip" onClick={() => navigate(a.route)}
-                              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: "var(--cp-inset-5, 6px 11px)", fontFamily: 'var(--cp-font, var(--font-mono))', fontSize: "var(--cp-control-size, 10.5px)", lineHeight: "var(--cp-support-line, inherit)", borderRadius: 'var(--radius-control)', cursor: 'pointer', letterSpacing: "var(--cp-tracking, 0.04em)", transition: 'background-color .12s ease', textTransform: 'var(--cp-case, uppercase)' as React.CSSProperties['textTransform'] }}>
-                              {a.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                        {m.actions && m.actions.length > 0 && (
+                          <div className="cp-links">
+                            {m.actions.map((a, j) => (
+                              <button key={j} type="button" className="tw-btn tw-btn--sm" onClick={() => navigate(a.route)}>
+                                {a.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {loading && (
+                  <div className="cp-msg cp-msg--assistant">
+                    <span className="cp-mark" aria-hidden="true"><Bot size={16} /></span>
+                    <div className="cp-msg__body">
+                      <p role="status" className="cp-working">Working on an answer…</p>
                     </div>
                   </div>
-                );
-              })}
-              {loading && (
-                <div className="cp-msg" style={{ display: 'flex', gap: "var(--cp-space-10, 10px)" }}>
-                  {avatar('assistant')}
-                  <div role="status" style={{ display: 'inline-flex', alignItems: 'center', padding: "var(--cp-inset-6, 13px 15px)", background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)', color: 'var(--text-secondary)' }}>
-                    Working on an answer
-                  </div>
-                </div>
-              )}
-              <div ref={endRef} />
-            </div>
-          )}
-        </div>
-
-        {/* Input dock */}
-        <div style={{ borderTop: '1px solid var(--border-subtle)', padding: 12, background: 'var(--bg-surface)' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: "var(--cp-space-10, 10px)" }}>
-            <textarea ref={taRef} value={input} rows={1}
-              onChange={e => { setInput(e.target.value); autoGrow(); }}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder="Ask your copilot anything about your operations…"
-              style={{ flex: 1, minWidth: 0, resize: 'none', maxHeight: 140, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: "var(--cp-radius, 2px)", color: 'var(--text-primary)', fontSize: "var(--cp-body-size, 13.5px)", lineHeight: "var(--cp-body-line, 1.5)", outline: 'var(--cp-input-outline, none)' as React.CSSProperties['outline'], fontFamily: 'var(--font-sans)', padding: "var(--cp-inset-7, 10px 12px)" }} />
-            <button className="btn-action" onClick={() => send()} disabled={loading || !input.trim()}
-              style={{ background: input.trim() && !loading ? 'var(--accent-primary)' : 'var(--bg-surface-hover)', color: input.trim() && !loading ? 'var(--cp-on-accent, var(--bg-deep))' : 'var(--text-tertiary)', border: 'none', padding: "var(--cp-inset-8, 10px 18px)" }}>
-              {loading ? 'Sending' : 'Send'}
-            </button>
+                )}
+              </div>
+            )}
           </div>
-        </div>
+
+          <form
+            className="cp-compose"
+            onSubmit={(e) => { e.preventDefault(); send(); }}
+          >
+            <div className="cp-compose__box">
+              <label htmlFor="cp-ask" className="cp-sr">{ASK}</label>
+              <textarea
+                id="cp-ask"
+                ref={taRef}
+                value={input}
+                rows={1}
+                onChange={e => { setInput(e.target.value); autoGrow(); }}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder={ASK}
+                aria-describedby="cp-ask-hint"
+                className="cp-compose__input"
+              />
+              <button type="submit" className="tw-btn tw-btn--primary cp-send" disabled={!canSend}>
+                <ArrowUp size={16} aria-hidden="true" />
+                <span className="cp-send__label">{loading ? 'Sending' : 'Send'}</span>
+              </button>
+            </div>
+            <p id="cp-ask-hint" className="cp-compose__hint">Enter sends. Shift+Enter adds a line.</p>
+          </form>
+        </section>
       </div>
-      </div>
+
+      {showHistory && (
+        <ConversationsSheet onClose={() => setShowHistory(false)}>{list}</ConversationsSheet>
+      )}
+
+      {pendingDelete && (
+        <ConfirmModal
+          title="Delete this conversation?"
+          message={`"${conversationTitle(pendingDelete)}" and its messages will be removed. This can't be undone.`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { const c = pendingDelete; deleteConversation(c); }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }

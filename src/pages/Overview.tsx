@@ -13,7 +13,7 @@ import { InfoTip } from "@/components/ui/InfoTip";
 import SectionHeader from "@/components/layout/SectionHeader";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { MicroBars, RevenueCostBars, PipelineBars, usePipeline } from "@/components/overview/today";
-import { presentSignal } from "@/components/overview/signals";
+import { presentSignal, staleSignal, isInTransitSignal } from "@/components/overview/signals";
 import { useAllQuotes, useHomeLedger } from "@/components/overview/ledger";
 
 // Fetches + derives all dashboard data. Lives in the queryFn so the result is
@@ -213,7 +213,7 @@ export default function Overview() {
   const failed = data?.failedSources ?? [];
   // Fast Pay is not live: its signals (advance amounts, fees, payout times)
   // describe money that is not available, so they are not shown.
-  const insights = (data?.insights ?? []).filter((i: any) => CAPITAL_LAUNCHED || !isFastPaySignal(i));
+  const signals = (data?.insights ?? []).filter((i: any) => CAPITAL_LAUNCHED || !isFastPaySignal(i));
   const recentQuotes = data?.recentQuotes ?? [];
   const allQuotes: any[] = data?.quotes ?? [];
   const quotesTotal: number | undefined = data?.quotesTotal;
@@ -231,6 +231,16 @@ export default function Overview() {
   const pipelineComplete = quotesAll.data ? quotesAll.data.complete : false;
   const allLoads: any[] = (ledger.data?.loads as any[] | undefined) ?? data?.loads ?? [];
   const pipeline = usePipeline(pipelineQuotes, allLoads);
+  // Needs you: stale open loads come from the shared rule (src/lib/staleWork.ts),
+  // the same count as Orders and Findings; the backend's "N loads in transit"
+  // signal is replaced by that row. Everything else is the backend's signals.
+  // Wait for the full loads ledger so the count never changes after paint.
+  const needsLoading = loading || (!ledger.data && !ledger.error);
+  const stale = !needsLoading && allLoads.length ? staleSignal(allLoads) : null;
+  const needs: { row: ReturnType<typeof presentSignal>; actionUrl: string | null; severity: string }[] = [
+    ...(stale ? [{ row: stale, actionUrl: stale.actionUrl, severity: "medium" }] : []),
+    ...signals.filter((i: any) => !(stale && isInTransitSignal(i))).map((i: any) => ({ row: presentSignal(i, allLoads), actionUrl: i.actionUrl as string | null, severity: String(i.severity || "low") })),
+  ];
 
   useEffect(() => {
     document.title = "Home - TruckWys";
@@ -258,6 +268,10 @@ export default function Overview() {
   const receivedChange = money && money.receivedPrior != null && money.receivedPrior > 0.005
     ? ((money.received - money.receivedPrior) / money.receivedPrior) * 100 : null;
   const marginChange = money && money.margin != null && money.marginPrior != null ? money.margin - money.marginPrior : null;
+  // Net after pending costs: revenue excl. VAT less approved and pending costs (Margin tab "With pending costs").
+  const afterPending = money ? money.revenueExcl - money.costs - money.pending : 0;
+  const marginDeltaText = marginChange != null && money && money.pending > 0.005
+    ? `${marginChange >= 0 ? "Up" : "Down"} ${formatPercent(Math.abs(marginChange)).replace("%", "")} pts vs the prior 12 months` : "";
 
   // Active loads and the 28-day bars use every load (all pages), not page 1.
   const TERMINAL_LOAD_STATUSES = ["DELIVERED", "INVOICED", "CANCELLED", "COMPLETED", "PAID"];
@@ -384,17 +398,27 @@ export default function Overview() {
           <div className="td-kpi__head">
             <h2 className="td-kpi__label">
               <span><span className="td-hide-sm">Net margin</span><span className="td-show-sm">Margin</span>, 12 months</span>
-              <InfoTip>Revenue received excl. VAT, minus approved expenses, as a share of that revenue. The same figure as the Profit and loss report, cash basis, last 12 months. Pending expenses are not deducted.</InfoTip>
+              <InfoTip>Revenue received excl. VAT, minus approved expenses, as a share of that revenue. The same figure as the Profit and loss report, cash basis, last 12 months. Pending expenses are not deducted{money && money.pending > 0.005 ? `: ${money.pendingCount} (${wholeRand(money.pending)}) are waiting for approval, and approving them leaves ${wholeRand(afterPending)}` : ""}.{marginDeltaText ? ` ${marginDeltaText}.` : ""}</InfoTip>
             </h2>
           </div>
           <div className="td-kpi__body">
             <div className="td-kpi__value">
               {moneyLoading ? skeleton : money && money.margin != null ? formatPercent(money.margin) : "—"}
             </div>
+            {/* The figure it becomes, read with the note under it: "−R 60 698 · if the R 87 129 pending is approved". */}
+            {money && money.margin != null && money.pending > 0.005 && (
+              <span className={`td-kpi__alt td-hide-sm${afterPending < 0 ? " is-loss" : ""}`}>{wholeRand(afterPending)}</span>
+            )}
           </div>
           <div className="td-kpi__meta">
             {money ? (
               money.margin == null ? <span>No revenue yet</span>
+                // R6: pending costs change the answer, so the tile says what it becomes (the Margin tab's rule).
+                : money.pending > 0.005 ? (
+                  <span className="td-kpi__if">
+                    <span className={`td-show-sm${afterPending < 0 ? " is-loss" : ""}`}>{wholeRand(afterPending)} </span>if <span className="td-hide-sm">the </span>{wholeRand(money.pending)} pending is approved
+                  </span>
+                )
                 : marginChange != null ? <Delta value={Math.round(marginChange * 10) / 10} unit="pts" period="vs prior 12 months" />
                   : <span>Excl. VAT, cash basis</span>
             ) : unavailable ? <span>Unavailable</span> : null}
@@ -544,14 +568,13 @@ export default function Overview() {
               <h2 id="td-needs-title" className="tw-card__title">Needs you</h2>
               <p className="tw-card__sub">Invoices, quotes and fleet</p>
             </div>
-            {insights.length > 0 && <span className="tw-chip">{insights.length}</span>}
+            {!needsLoading && needs.length > 0 && <span className="tw-chip">{needs.length}</span>}
           </div>
-          {loading ? (
+          {needsLoading ? (
             <div className="ov-skel-block ov-skel-block--short" />
-          ) : insights.length > 0 ? (
+          ) : needs.length > 0 ? (
             <ul className="td-needs__list">
-              {insights.slice(0, 5).map((insight: any, idx: number) => {
-                const row = presentSignal(insight, allLoads);
+              {needs.slice(0, 5).map(({ row, actionUrl, severity }, idx: number) => {
                 const Icon = row.kind === "invoice" ? FileText : row.kind === "fleet" ? Truck : CircleAlert;
                 return (
                   <li key={idx} className="td-needs__row">
@@ -565,10 +588,10 @@ export default function Overview() {
                       ) : <div className="td-needs__title">{row.title}</div>}
                       {row.detail && <div className="td-needs__body" title={row.detailTitle || row.detail}>{row.detail}</div>}
                     </div>
-                    {row.actionLabel && insight.actionUrl && (
-                      <Link to={insight.actionUrl} className="tw-btn tw-btn--sm td-needs__action" aria-label={`${row.actionLabel}: ${row.title}`}>{row.actionLabel}</Link>
+                    {row.actionLabel && actionUrl && (
+                      <Link to={actionUrl} className="tw-btn tw-btn--sm td-needs__action" aria-label={`${row.actionLabel}: ${row.title}`}>{row.actionLabel}</Link>
                     )}
-                    <span className="ov-sr-only">{titleCase(String(insight.severity || "low"))} priority</span>
+                    <span className="ov-sr-only">{titleCase(severity)} priority</span>
                   </li>
                 );
               })}

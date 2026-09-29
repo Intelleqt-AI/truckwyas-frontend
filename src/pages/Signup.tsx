@@ -16,7 +16,7 @@ const TAKE_RATE = formatPercent(0.25, 2); // "0,25%"
 const SIGNUP_STEPS = [
   { label: "Create your account", detail: "Name, email and password, just below" },
   { label: "Verify your email", detail: "We send a 6-digit code, valid for 10 minutes" },
-  { label: "Add card and pay", detail: `${MONTHLY_FEE}/month, charged via Paystack. Your fleet goes live the moment it clears` },
+  { label: "Add card and pay", detail: "The monthly fee, charged via Paystack. Your fleet goes live the moment it clears" },
 ];
 
 // Same list BillingSettings.tsx shows for an active subscription — kept
@@ -243,7 +243,22 @@ const Signup = () => {
   // title (those become MobileAuthLayout's own header props on mobile) —
   // demoted to a footer below the form there, since none of it blocks
   // completing the form above it.
-  const extraContent = (
+  // Phones (R6): the plan in one compact card above the form, so the price is
+  // in view before anything is asked; the footer keeps the steps and features.
+  const planSummary = (
+    <div style={{
+      width: '100%', maxWidth: 400, boxSizing: 'border-box', marginBottom: 12,
+      display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '0 8px',
+      padding: '12px 16px', border: '1px solid var(--border-active)', borderRadius: 'var(--radius-card)', background: 'var(--bg-surface-hover)',
+    }}>
+      <span style={{ fontSize: 20, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{MONTHLY_FEE}</span>
+      <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>/ month</span>
+      <span style={{ flexBasis: '100%', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>+ {TAKE_RATE} of every delivered load's value</span>
+      <span style={{ flexBasis: '100%', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>Cancel anytime, no long-term contract</span>
+    </div>
+  );
+
+  const priceCard = (
     <>
       {/* Price card — the thing users currently only discover on step 3 */}
       <div style={{
@@ -263,7 +278,11 @@ const Signup = () => {
           Cancel anytime, no long-term contract
         </div>
       </div>
+    </>
+  );
 
+  const extraContent = (
+    <>
       {/* The 3 steps — sets the expectation up front instead of surprising
           people at the payment step */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
@@ -308,7 +327,10 @@ const Signup = () => {
         title={<>Everything your fleet needs in <span style={{ color: 'var(--text-tertiary)' }}>one subscription</span>.</>}
         footer={extraContent}
       >
-        {formCard}
+        <div style={{ width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column' }}>
+          {planSummary}
+          {formCard}
+        </div>
       </MobileAuthLayout>
     );
   }
@@ -355,6 +377,7 @@ const Signup = () => {
             Everything your fleet needs in <span style={{ color: 'var(--text-tertiary)' }}>one subscription</span>.
           </div>
 
+          {priceCard}
           {extraContent}
         </div>
       </div>

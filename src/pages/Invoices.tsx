@@ -20,7 +20,7 @@ import LoadError, { loadFailed } from "@/components/data/LoadError";
 import InvoiceSendPreview, { type InvoiceMessageKind } from "@/components/finance/InvoiceSendPreview";
 import { canSendReminder, invoiceBalance, isInvoiceOverdue } from "@/lib/invoiceStatus";
 import { rowLink } from "@/lib/rowLink";
-import { isIssued, paidInvoiceTiming, type Invoice as LedgerInvoice } from "@/components/reports/data";
+import { daysBetween, isIssued, paidInvoiceTiming, todayISO, type Invoice as LedgerInvoice } from "@/components/reports/data";
 
 // External Fast Pay application link. The applied-state key is unchanged so
 // invoices already marked "Applied" stay marked.
@@ -551,15 +551,15 @@ export default function Invoices() {
                 </tr>
               ) : (
                 rows.map((inv) => {
+                  const today = todayISO();
                   const invStatus = inv.status?.toUpperCase();
                   const amount = parseFloat(inv.total_amount || inv.amount) || 0;
                   const invNumber = inv.invoice_number || inv.invoiceNumber;
                   const custName = inv.customer_name || inv.customerName;
                   const dueDate = inv.due_date || inv.dueDate;
-                  // Days relative to the due date, stated in words next to it.
-                  const ageDays = dueDate
-                    ? Math.floor((Date.now() - new Date(dueDate).getTime()) / 86400000)
-                    : 0;
+                  // Days relative to the due date, stated in words next to it:
+                  // whole SA calendar days, the Debtors report's count.
+                  const ageDays = dueDate ? daysBetween(String(dueDate), today) : 0;
                   const open = invStatus !== "PAID" && invStatus !== "DRAFT" && !!dueDate;
                   const agingLabel = !open
                     ? null

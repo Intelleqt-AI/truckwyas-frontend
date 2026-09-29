@@ -126,9 +126,17 @@ export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n ==
 // ------------------------------------------------------------------- dates
 
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** Today's calendar date in South African time (YYYY-MM-DD), whatever the
+ *  browser's zone, so day counts (Debtors "days overdue", invoice "days late")
+ *  are date-only differences on the SA calendar. */
 export const todayISO = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  try {
+    // en-CA formats as YYYY-MM-DD.
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
 };
 export const ymOf = (iso?: string | null) => (iso ? iso.slice(0, 7) : '');
 export const ymNow = () => todayISO().slice(0, 7);

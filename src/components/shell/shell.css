@@ -294,7 +294,7 @@
 }
 .tw-pill--warn { background: var(--status-warning-bg); color: var(--status-warning-text); }
 
-.tw-profile { position: relative; margin-left: 4px; }
+.tw-profile { position: relative; margin-left: 0; } /* R6: 40px centre spacing like bell to theme */
 .tw-profile__trigger {
   display: grid; place-items: center;
   width: 36px; height: 36px; padding: 0;

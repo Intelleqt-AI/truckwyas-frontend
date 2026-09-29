@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BellRing, Banknote, Send } from "lucide-react";
+import { BellRing, Banknote, Send, FileSearch } from "lucide-react";
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,6 +12,9 @@ import { InfoTip } from "@/components/ui/InfoTip";
 import SectionHeader from "@/components/layout/SectionHeader";
 import { StatusChip } from "@/components/ui/StatusChip";
 import LoadError, { loadFailed } from "@/components/data/LoadError";
+import "@/components/data/load-error.css";
+import { useBalancedColumns } from "@/components/fleet-detail/useBalancedColumns";
+import { daysBetween, todayISO } from "@/components/reports/data";
 import InvoiceSendPreview, { type InvoiceMessageKind } from "@/components/finance/InvoiceSendPreview";
 import { canSendReminder, invoiceBalance, REMINDER_STATUSES } from "@/lib/invoiceStatus";
 
@@ -76,7 +79,8 @@ export default function InvoiceDetail() {
     queryKey: ['invoice', id],
     queryFn: () => fetchData(`api/v1/invoices/${id}/`),
     enabled: !!id,
-    retry: 2,
+    // A 404 is an answer, not a failure: no retries, straight to "not found".
+    retry: (n, e) => (e as { status?: number } | null)?.status !== 404 && n < 2,
   });
   const { data: invoice, isLoading, isError, refetch } = invoiceQuery;
   const invoiceFailed = loadFailed(invoiceQuery);
@@ -105,6 +109,14 @@ export default function InvoiceDetail() {
   // Only show payments that belong to this invoice (guards against the list
   // endpoint returning payments for other invoices).
   const payments = allPayments.filter((p: any) => p?.invoice == null || String(p.invoice) === String(id));
+
+  // Two columns end within 48px (R6): the document's facts (bill to, dates,
+  // terms) may move to the top of the rail when that balances the page; below
+  // the one-column breakpoint they always open the document.
+  const bal = useBalancedColumns(
+    { toSide: ['facts'] },
+    `${id}-${invoice ? invoice.updated_at ?? 'ok' : 'none'}-${payments.length}-${showPaymentForm}-${capitalData ? 'c' : ''}`,
+  );
 
   const handleSendInvoice = async () => {
     if (!id) return;
@@ -247,13 +259,19 @@ export default function InvoiceDetail() {
       </div>
     );
   }
+  // Not found (404): the head and back link stay, as in the loading state;
+  // the message and its one action share a row, like the load-error state.
   if (isError || !invoice) {
     return (
       <div className="fin-page">
-        <div className="card fin-empty">
-          <h1 className="fin-empty__title">Invoice not found</h1>
-          <p className="fin-empty__body">It may have been removed, or the link is wrong.</p>
-          <button className="btn-action" onClick={() => navigate('/finance/invoices')}>Back to invoices</button>
+        <SectionHeader title="Invoice not found" back={{ to: '/finance/invoices', label: 'Invoices' }} />
+        <div className="load-error fin-missing" role="status">
+          <FileSearch className="load-error__icon" size={20} aria-hidden="true" />
+          <div className="load-error__text">
+            <p className="load-error__title">There is no invoice at this link</p>
+            <p className="load-error__hint">It may have been deleted, or the link is wrong.</p>
+          </div>
+          <button type="button" className="tw-btn load-error__retry" onClick={() => navigate('/finance/invoices')}>All invoices</button>
         </div>
       </div>
     );
@@ -274,9 +292,11 @@ export default function InvoiceDetail() {
   const paidToDate = invoice.paid_amount != null ? num(invoice.paid_amount) : null;
   const vat = (invoice.vat_amount ?? invoice.tax_amount) != null ? num(invoice.vat_amount ?? invoice.tax_amount) : null;
   const taxRate = invoice.tax_rate != null ? num(invoice.tax_rate) : null;
-  const daysLate = invoice.due_date && showBalance
-    ? Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / 86400000)
-    : null;
+  // Whole calendar days in SA time, the same count as the Debtors report.
+  const daysPastDue = invoice.due_date ? daysBetween(String(invoice.due_date), todayISO()) : null;
+  const daysLate = showBalance ? daysPastDue : null;
+  // A draft whose due date has already passed: said once, calmly, before it is sent.
+  const draftPastDue = status === 'DRAFT' && daysPastDue != null && daysPastDue > 0;
   // Part-paid: the document ends with "Paid to date" and "Balance due".
   const partPaid = showBalance && Math.abs(balance - total) > 0.005;
   const paidInDoc = partPaid ? (paidToDate ?? total - balance) : null;
@@ -347,6 +367,45 @@ export default function InvoiceDetail() {
       : []),
   ];
 
+  // Bill to, dates and terms: the top of the document, or the rail's first
+  // card. In the rail the customer is left out: the head already names it.
+  const facts = (inRail: boolean) => (
+    <div className="fin-docfacts">
+      <dl className="fin-doc__facts">
+        {!inRail && (
+          <div>
+            <dt>Bill to</dt>
+            <dd title={invoice.customer_name}>{invoice.customer_name || '—'}</dd>
+          </div>
+        )}
+        <div>
+          <dt>Issued</dt>
+          <dd>{safeDate(invoice.issue_date || invoice.created_at)}</dd>
+        </div>
+        <div>
+          <dt>Due</dt>
+          <dd>
+            {safeDate(invoice.due_date)}
+            {daysLate != null && daysLate > 0 && (
+              <span className="fin-doc__late fin-text-danger">{daysLate} {daysLate === 1 ? 'day' : 'days'} late</span>
+            )}
+          </dd>
+        </div>
+        {terms && (
+          <div>
+            <dt>Terms</dt>
+            <dd>{terms}</dd>
+          </div>
+        )}
+      </dl>
+      {draftPastDue && (
+        <p className="fin-docfacts__note">
+          Draft · due date {safeDate(invoice.due_date)} has passed. Sent as it is, it arrives {daysPastDue} {daysPastDue === 1 ? 'day' : 'days'} overdue.
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <div className="fin-page fin-page--invoice">
       {toast && (
@@ -409,33 +468,10 @@ export default function InvoiceDetail() {
           rail, so the two columns read as document + rail, not as a gap.
           Dates are facts in the document, not KPI tiles; each figure once. */}
       <div className="fin-detail-grid">
+        <div className="fin-main-col" ref={bal.mainRef}>
         <section className="card fin-table-card fin-doc" aria-labelledby="invoice-doc-title">
           <h2 id="invoice-doc-title" className="fin-sr">Invoice {invoice.invoice_number}</h2>
-          <dl className="fin-doc__facts">
-            <div>
-              <dt>Bill to</dt>
-              <dd title={invoice.customer_name}>{invoice.customer_name || '—'}</dd>
-            </div>
-            <div>
-              <dt>Issued</dt>
-              <dd>{safeDate(invoice.issue_date || invoice.created_at)}</dd>
-            </div>
-            <div>
-              <dt>Due</dt>
-              <dd>
-                {safeDate(invoice.due_date)}
-                {daysLate != null && daysLate > 0 && (
-                  <span className="fin-doc__late fin-text-danger">{daysLate} {daysLate === 1 ? 'day' : 'days'} late</span>
-                )}
-              </dd>
-            </div>
-            {terms && (
-              <div>
-                <dt>Terms</dt>
-                <dd>{terms}</dd>
-              </div>
-            )}
-          </dl>
+          {bal.inMain('facts') && facts(false)}
 
           {/* Charges: the itemised lines, or (an invoice charged as one amount
               from its load) a single line that says so, then the totals, so
@@ -500,8 +536,13 @@ export default function InvoiceDetail() {
           )}
         </section>
 
+        </div>
+
         {/* Side rail: sticky, same top as the document. */}
-        <aside className="fin-rail" aria-label="Payments and activity">
+        <aside className="fin-rail" ref={bal.sideRef} aria-label="Invoice details, payments and activity">
+          {!bal.inMain('facts') && (
+            <section className="card fin-facts-card" aria-label="Invoice dates and terms">{facts(true)}</section>
+          )}
           {showPaymentForm && (
             <section className="card" id="record-payment" aria-labelledby="record-payment-title">
               <div className="fin-panel-head">

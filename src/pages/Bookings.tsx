@@ -71,7 +71,7 @@ export default function Bookings() {
   // difference between the Route card and the rail, before paint.
   const [factsInRail, setFactsInRail] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState(false);
-  const fill = useMapFill({ base: 220, min: 180, max: 380, paused: editingAssignment, onStuck: () => setFactsInRail(true) });
+  const fill = useMapFill({ base: 240, min: 240, max: 380, paused: editingAssignment, onStuck: () => setFactsInRail(true) });
   const railRef = useCallback((node: HTMLDivElement | null) => { fill.sideRef.current = node; stickyRail(node); }, [stickyRail, fill.sideRef]);
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);

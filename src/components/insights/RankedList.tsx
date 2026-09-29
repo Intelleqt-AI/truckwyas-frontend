@@ -49,6 +49,11 @@ export interface RankedListProps {
   ascending?: boolean;
   /** How many ranked rows to show before "Show all". */
   topN?: number;
+  /**
+   * A single-series ranking reads calmer with neutral bars: 'top' puts the one
+   * accent on the first ranked row, 'none' keeps every bar neutral.
+   */
+  emphasis?: 'top' | 'none';
   /** Accessible name for the list. */
   ariaLabel: string;
   /** Shown when there are no rows at all. */
@@ -72,6 +77,7 @@ export default function RankedList({
   preserveOrder = false,
   ascending = false,
   topN = 8,
+  emphasis = 'top',
   ariaLabel,
   empty = 'Nothing to show yet.',
   noRankedMessage,
@@ -117,6 +123,7 @@ export default function RankedList({
   const labelOf = (r: RankedRow) => r.labelText ?? (typeof r.label === 'string' ? r.label : r.id);
   const share = (v: number) => (total > 0 ? `${((v / total) * 100).toFixed(0)}%` : '');
 
+  const topId = emphasis === 'top' && !preserveOrder ? ranked.find(r => !isThin(r))?.id : undefined;
   const renderRow = (r: RankedRow, opts: { muted?: string; hideValue?: boolean }) => {
     const v = isNum(r.value) && !opts.hideValue ? r.value : null;
     const pct = v != null && max > 0 ? Math.max(0, Math.min(100, (Math.abs(v) / max) * 100)) : 0;
@@ -137,7 +144,7 @@ export default function RankedList({
             <span className="rl-bar rl-bar--custom">{r.bar}</span>
           ) : (
             <span className="rl-bar" aria-hidden="true">
-              {!opts.muted && <span className="rl-bar__fill" style={{ width: `${pct}%` }} />}
+              {!opts.muted && <span className={`rl-bar__fill${r.id === topId ? ' rl-bar__fill--top' : ''}`} style={{ width: `${pct}%` }} />}
             </span>
           )
         )}

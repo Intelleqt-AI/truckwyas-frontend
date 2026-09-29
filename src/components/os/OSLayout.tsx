@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Search, Moon, Sun, ChevronDown, Settings as SettingsIcon, CreditCard, LogOut } from 'lucide-react';
+import OverflowMenu, { type MenuItem } from '@/components/ui/OverflowMenu';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LiveEvents } from '@/components/LiveEvents';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useAuth } from '@/lib/AuthContext';
@@ -8,6 +10,12 @@ import { fetchData, postData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { useIdleLogout } from '@/hooks/useIdleLogout';
 import { isSubscriptionBlocked, subscriptionStatusDetail, subscriptionStatusLabel } from '@/lib/subscriptionStatus';
+import { Sidebar } from '@/components/shell/Sidebar';
+import { PhoneBar } from '@/components/shell/PhoneBar';
+import '@/components/shell/shell.css';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { PageHeadSkeleton } from '@/components/layout/SectionHeader';
+import { warmRoutesWhenIdle } from '@/components/shell/routePrefetch';
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // "Auto sign out after 30 minutes of inactivity"
 
@@ -15,20 +23,25 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('tw-theme') as 'dark' | 'light') || 'dark';
   });
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showStatusPopover, setShowStatusPopover] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('tw-nav-collapsed') === '1'; } catch { return false; }
+  });
+  const [narrow, setNarrow] = useState<boolean>(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches);
+  // Phones (the top-bar theme button is hidden at <= 768px, shell.css): only
+  // there does the account menu carry "Dark theme"; desktop has the toggle.
+  const [phone, setPhone] = useState<boolean>(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [agentQuery, setAgentQuery] = useState('');
   // Default ON to match the backend default; corrected by the fetch below.
   const [sessionTimeoutEnabled, setSessionTimeoutEnabled] = useState(true);
-  const profileRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const location = useLocation();
   const queryClient = useQueryClient();
 
   const { user: authUser } = useAuth();
   const subStatus = authUser?.subscription_status;
   const cancelAtPeriodEnd = !!authUser?.cancel_at_period_end;
-  const statusBadgeClass = isSubscriptionBlocked(subStatus) ? 'delayed' : (subStatus === 'grace_period' || cancelAtPeriodEnd) ? 'warning' : 'active';
+  const statusTone: 'ok' | 'warn' | 'bad' = isSubscriptionBlocked(subStatus) ? 'bad' : (subStatus === 'grace_period' || cancelAtPeriodEnd) ? 'warn' : 'ok';
   const userName = authUser?.name || authUser?.username || 'User';
   const userRole = (authUser?.role || 'VIEWER').toUpperCase();
   const avatarUrl = (authUser?.avatar as string) || undefined;
@@ -39,17 +52,6 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
       .join('')
       .toUpperCase()
       .slice(0, 2) || 'TW';
-
-  // Close menu on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
-        setShowProfileMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   const signOut = (message?: string) => {
     // Best-effort server-side session kill; the local token is cleared regardless.
@@ -111,373 +113,228 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
     DRIVER: ['/', '/bookings'],
   };
 
-  const navItems = [
-    {
-      path: '/',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-          <polyline points="9 22 9 12 15 12 15 22" />
-        </svg>
-      ),
-      label: 'Home',
-    },
-    {
-      path: '/bookings',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <rect x="3" y="4" width="18" height="18" rx="2" />
-          <line x1="16" y1="2" x2="16" y2="6" />
-          <line x1="8" y1="2" x2="8" y2="6" />
-          <line x1="3" y1="10" x2="21" y2="10" />
-        </svg>
-      ),
-      label: 'Bookings',
-    },
-    {
-      path: '/fleet',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <rect x="1" y="3" width="15" height="13" rx="1" />
-          <path d="M16 8h4l3 5v3h-7V8z" />
-          <circle cx="5.5" cy="18.5" r="2.5" />
-          <circle cx="18.5" cy="18.5" r="2.5" />
-        </svg>
-      ),
-      label: 'Fleet',
-    },
-    {
-      path: '/customers',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-      ),
-      label: 'Customers',
-    },
-    {
-      path: '/invoices',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <line x1="12" y1="1" x2="12" y2="23" />
-          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-        </svg>
-      ),
-      label: 'Finance',
-    },
-    {
-      path: '/capital',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M12 2L2 7l10 5 10-5-10-5z" />
-          <path d="M2 17l10 5 10-5" />
-          <path d="M2 12l10 5 10-5" />
-        </svg>
-      ),
-      label: 'Capital',
-    },
-    {
-      path: '/insights',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <line x1="18" y1="20" x2="18" y2="10" />
-          <line x1="12" y1="20" x2="12" y2="4" />
-          <line x1="6" y1="20" x2="6" y2="14" />
-        </svg>
-      ),
-      label: 'Insights',
-    },
-    {
-      path: '/insurance',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M12 2l8 4v6c0 5-3.4 9.2-8 10-4.6-.8-8-5-8-10V6l8-4z" />
-          <polyline points="9 12 11 14 15 10" />
-        </svg>
-      ),
-      label: 'Insurance',
-    },
-    {
-      path: '/copilot',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M12 2a2 2 0 0 1 2 2v1h3a2 2 0 0 1 2 2v3a2 2 0 0 1 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 0-4V7a2 2 0 0 1 2-2h3V4a2 2 0 0 1 2-2z" />
-          <circle cx="9" cy="13" r="1" />
-          <circle cx="15" cy="13" r="1" />
-        </svg>
-      ),
-      label: 'Copilot',
-    },
-    // Partner page removed — partner portal is a separate app at partners.truckwys.com
-  ];
-
   const allowedPaths = NAV_ACCESS[userRole] || NAV_ACCESS['VIEWER'];
-  const visibleNavItems = navItems.filter(item => allowedPaths.includes(item.path));
   const canAccessSettings = !['VIEWER', 'DRIVER'].includes(userRole);
-
-  // `path` stays the permission key (NAV_ACCESS). A section links to its first
-  // sub-route and stays highlighted on every sub-route and legacy alias.
-  const NAV_TARGET: Record<string, { to: string; match: string[] }> = {
-    '/fleet': { to: '/fleet/vehicles', match: ['/fleet', '/vehicles', '/drivers'] },
-    '/invoices': { to: '/finance/invoices', match: ['/finance', '/invoices', '/expenses', '/finance-reports'] },
-    '/bookings': { to: '/bookings', match: ['/bookings', '/quotes'] },
+  const allowed = (key: string) => allowedPaths.includes(key);
+  // The Copilot page is gated to INSIGHTS_ROLES (App.tsx). Only offer Ask to
+  // roles that can reach it, so a DRIVER's query isn't swallowed by the guard.
+  const canAsk = ['ADMIN', 'MANAGER', 'OPERATOR', 'DISPATCHER', 'VIEWER'].includes(userRole);
+  const roleLabel = userRole.charAt(0) + userRole.slice(1).toLowerCase();
+  const companyName = (authUser?.company_name as string) || 'Your company';
+  const isAdmin = userRole === 'ADMIN';
+  // Company logo for the sidebar chip. Same query key and endpoint the quote
+  // builder already uses, so the cache is shared and Company settings'
+  // invalidation refreshes it. Failure just falls back to the initial.
+  const { data: companyProfile } = useQuery<any>({
+    queryKey: ['company-profile'],
+    queryFn: () => fetchData('api/v1/company/profile/'),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const companyLogo = (() => {
+    const url: string | undefined = companyProfile?.logo_url || companyProfile?.logo;
+    // The backend returns a placeholder when nothing was uploaded; show the initial then.
+    if (!url || typeof url !== 'string' || url.endsWith('/brand/logo.svg')) return undefined;
+    if (/^https?:/.test(url)) return url;
+    const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+    return `${apiBase}/${url.replace(/^\//, '')}`;
+  })();
+  // The sidebar's account line uses the SAME source as Settings > Billing
+  // (GET billing/status/, same query key shape), so it never says "Account
+  // active" on a free plan with no subscription. Roles that cannot read
+  // billing fall back to the auth user's subscription_status.
+  const { data: billingStatus } = useQuery<any>({
+    queryKey: ['billing-status-shell'],
+    queryFn: () => fetchData('api/v1/billing/status/'),
+    enabled: canAccessSettings,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const billingPlan = String(billingStatus?.subscription_plan ?? '').toLowerCase();
+  const billingSub = String(billingStatus?.subscription_status ?? subStatus ?? '').toLowerCase();
+  const onFreePlan = !!billingStatus && (!billingPlan || billingPlan === 'free' || billingPlan === 'starter' || !['active', 'grace_period', 'trialing'].includes(billingSub));
+  const baseLabel = subscriptionStatusLabel(billingSub || subStatus, cancelAtPeriodEnd);
+  const status = {
+    // 'Online' is the "active, or not loaded yet" label: say what the plan
+    // really is once Billing's status is known.
+    label: baseLabel === 'Online' ? (onFreePlan ? 'Free plan' : 'Account active') : baseLabel,
+    tone: (baseLabel === 'Online' && onFreePlan ? 'neutral' : statusTone) as 'ok' | 'warn' | 'bad' | 'neutral',
+    detail: baseLabel === 'Online' && onFreePlan
+      ? 'No active subscription. Subscribe from Settings, Billing.'
+      : subscriptionStatusDetail(billingSub || subStatus, cancelAtPeriodEnd),
+    needsBilling: isSubscriptionBlocked(subStatus) || cancelAtPeriodEnd || (baseLabel === 'Online' && onFreePlan),
   };
-  const underPrefix = (prefix: string) =>
-    location.pathname === prefix || location.pathname.startsWith(prefix + '/');
-  const isActive = (path: string) =>
-    path === '/'
-      ? location.pathname === '/'
-      : (NAV_TARGET[path]?.match ?? [path]).some(underPrefix);
-  const navTo = (path: string) => NAV_TARGET[path]?.to ?? path;
+
+  // Tablet widths get the rail automatically; the choice is remembered on desktop.
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1100px)');
+    const mqPhone = window.matchMedia('(max-width: 768px)');
+    const on = () => setNarrow(mq.matches);
+    const onPhone = () => setPhone(mqPhone.matches);
+    mq.addEventListener('change', on);
+    mqPhone.addEventListener('change', onPhone);
+    return () => { mq.removeEventListener('change', on); mqPhone.removeEventListener('change', onPhone); };
+  }, []);
+  const railed = collapsed || narrow;
+  const toggleCollapsed = () => setCollapsed((c) => {
+    try { localStorage.setItem('tw-nav-collapsed', c ? '0' : '1'); } catch { /* private mode */ }
+    return !c;
+  });
+
+  // Cmd/Ctrl+K focuses the Ask field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        if (!searchRef.current || searchRef.current.offsetParent === null) return;
+        e.preventDefault();
+        searchRef.current.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+  const closeMore = useCallback((v: boolean) => setMoreOpen(v), []);
+  const { pathname } = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
+  // After the first page has rendered, fetch the primary route chunks while idle.
+  useEffect(() => { warmRoutesWhenIdle(); }, []);
 
   return (
-    <div className="os-container os-app-shell" style={{ gridTemplateColumns: '60px 1fr', gridTemplateRows: 'minmax(60px, auto) minmax(0, 1fr)' }}>
+    <div
+      className={`os-app-shell tw-shell${railed ? ' is-railed' : ''}`}
+      data-rail={railed ? 'true' : 'false'}
+    >
+      {/* First focusable element: jumps past the sidebar and top bar. */}
+      <a
+        href="#main-content"
+        className="tw-skip-link"
+        onClick={(e) => { e.preventDefault(); mainRef.current?.focus(); mainRef.current?.scrollIntoView({ block: 'start' }); }}
+      >
+        Skip to content
+      </a>
       <LiveEvents />
-      <div className="ambient-glow" />
 
-      {/* HEADER */}
-      <header className="os-header">
-        <div className="logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-          <img
-            src="/brand/truckwys-logo.png"
-            alt="Truckwys"
-            style={{
-              height: 28,
-              width: 'auto',
-              display: 'block',
-              filter: theme === 'dark' ? 'invert(1) brightness(2)' : 'none',
-            }}
-          />
-        </div>
-        {/* Shared public demo account — always-visible reminder that this
-            isn't a real customer's data (emails aren't actually sent, etc). */}
-        {authUser?.is_demo && (
-          <div
-            className="status-badge warning"
-            style={{ cursor: 'default', fontWeight: 500, letterSpacing: 'normal' }}
-            title="Shared public demo account. Actions like emailing customers are simulated, not real."
-          >
-            Demo
-          </div>
-        )}
-        {/* The Copilot page is gated to INSIGHTS_ROLES (App.tsx). Only show the
-            omnibox to roles that can actually reach it, so a DRIVER's query isn't
-            silently swallowed by the route guard on Enter. */}
-        {['ADMIN', 'MANAGER', 'OPERATOR', 'DISPATCHER', 'VIEWER'].includes(userRole) && (
-          <div className="agent-command">
-            <div className="agent-icon" />
+      <Sidebar
+        allowed={allowed}
+        canAccessSettings={canAccessSettings}
+        isAdmin={isAdmin}
+        collapsed={railed}
+        onToggle={toggleCollapsed}
+        companyName={companyName}
+        companyLogo={companyLogo}
+        onSignOut={handleLogout}
+        theme={theme}
+        status={status}
+      />
+
+      {/* TOP BAR */}
+      <header className="os-header tw-top">
+        <a href="/" className="tw-top__mark" aria-label="TruckWys home" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
+          <img src="/brand/truckwys-logo.png" alt="" style={{ filter: theme === 'dark' ? 'invert(1)' : 'none' }} />
+        </a>
+
+        {canAsk && (
+          <div className="tw-topsearch">
+            <Search className="tw-topsearch__icon" size={16} strokeWidth={1.75} aria-hidden="true" />
             <input
+              ref={searchRef}
               type="text"
-              className="agent-input"
+              className="tw-topsearch__input"
               aria-label="Ask Copilot"
-              placeholder="Ask Copilot anything..."
+              placeholder="Ask Copilot about your business"
               value={agentQuery}
               onChange={e => setAgentQuery(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter' && agentQuery.trim()) {
                   navigate(`/copilot?q=${encodeURIComponent(agentQuery.trim())}`);
                   setAgentQuery('');
+                  searchRef.current?.blur();
                 }
+                if (e.key === 'Escape') searchRef.current?.blur();
               }}
             />
+            <kbd className="tw-kbd" aria-hidden="true">{isMac ? '⌘K' : 'Ctrl K'}</kbd>
           </div>
         )}
-        <div className="os-header-actions">
-          <div
-            className={`status-badge os-subscription-trigger ${statusBadgeClass}`}
-            style={{ cursor: 'default' }}
-            onMouseEnter={() => setShowStatusPopover(true)}
-            onMouseLeave={() => setShowStatusPopover(false)}
-          >
-            <span style={{ width: 6, height: 6, background: 'currentColor', borderRadius: '50%', display: 'inline-block' }} />
-            {subscriptionStatusLabel(subStatus, cancelAtPeriodEnd)}
-            {showStatusPopover && (
-              <div className="os-header-popover" style={{
-                position: 'absolute', top: '100%', marginTop: 8,
-                width: 260, maxWidth: 'calc(100vw - 32px)', padding: 16, background: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-card)',
-                zIndex: 1000,
-                textAlign: 'left' as const, fontWeight: 400, whiteSpace: 'normal' as const,
-              }}>
-                <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: '20px', marginBottom: (isSubscriptionBlocked(subStatus) || cancelAtPeriodEnd) ? 12 : 0 }}>
-                  {subscriptionStatusDetail(subStatus, cancelAtPeriodEnd)}
-                </div>
-                {(isSubscriptionBlocked(subStatus) || cancelAtPeriodEnd) && (
-                  <button
-                    onClick={() => navigate('/settings/billing')}
-                    className="btn-action"
-                    style={{ width: '100%', fontSize: 14, lineHeight: '20px' }}
-                  >
-                    Go to billing
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          <NotificationBell />
-          <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
-            {theme === 'dark' ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="12" cy="12" r="5" />
-                <line x1="12" y1="1" x2="12" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" />
-                <line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
-          </button>
-          <div ref={profileRef} className="os-profile-anchor">
-            <button type="button" className="os-profile-trigger" aria-label="Open profile menu" aria-expanded={showProfileMenu}
-              onClick={() => setShowProfileMenu(p => !p)}
-              style={{
-                width: 44,
-                height: 44,
-                background: avatarUrl ? 'transparent' : 'var(--accent-dim)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '50%',
-                overflow: 'hidden',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 14, lineHeight: '20px',
-                /* accent-primary on accent-dim measures 4.1:1 in dark — the
-                   info text role passes on the same surface in both themes. */
-                color: 'var(--avatar-on-dim, var(--accent-primary))',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-              title={userName}
-            >
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={userName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                initials
-              )}
+
+        <div className="tw-top__actions os-header-actions">
+          {/* Shared public demo account: always-visible reminder that this
+              isn't a real customer's data (emails aren't actually sent, etc). */}
+          {authUser?.is_demo && (
+            <span className="tw-pill tw-pill--warn" title="Shared public demo account. Actions like emailing customers are simulated, not real.">
+              Demo
+            </span>
+          )}
+          {canAsk && (
+            // Phones: the same Ask glyph as the desktop Ask box (a search mark, not a chat bubble).
+            <button type="button" className="tw-icon-btn tw-top__ask" aria-label="Ask Copilot" onClick={() => navigate('/copilot')}>
+              <Search size={18} strokeWidth={1.75} aria-hidden="true" />
             </button>
-            {showProfileMenu && (
-              <div
-                className="os-header-popover"
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  marginTop: 8,
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-card)',
-                  width: 280,
-                  maxHeight: 'calc(100dvh - 160px)',
-                  overflowY: 'auto',
-                  maxWidth: 'calc(100vw - 32px)',
-                  zIndex: 1000,
-                }}
-              >
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {avatarUrl && (
-                    <img
-                      src={avatarUrl}
-                      alt={userName}
-                      style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-                    />
-                  )}
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', fontWeight: 600, overflowWrap: 'anywhere' }}>
-                      {userName}
-                    </div>
-                    <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', marginTop: 4, overflowWrap: 'anywhere' }}>
-                      {authUser?.email || authUser?.username || ''}
-                    </div>
-                  </div>
+          )}
+          <NotificationBell />
+          <button type="button" className="tw-icon-btn tw-top__theme" onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            title={theme === 'dark' ? 'Light theme' : 'Dark theme'}>
+            {theme === 'dark' ? <Sun size={18} strokeWidth={1.75} /> : <Moon size={18} strokeWidth={1.75} />}
+          </button>
+          <div className="os-profile-anchor tw-profile">
+            <OverflowMenu
+              label={`Account: ${userName}`}
+              triggerLabel={`Account menu for ${userName}`}
+              triggerTitle={userName}
+              triggerClassName="os-profile-trigger tw-profile__trigger"
+              trigger={(
+                <span className="tw-avatar" aria-hidden="true">
+                  {avatarUrl ? <img src={avatarUrl} alt="" /> : initials}
+                </span>
+              )}
+              portal={false}
+              menuClassName="os-header-popover tw-menu"
+              itemClassName="os-profile-action tw-menu__item"
+              header={(
+                <div className="tw-menu__head">
+                  <div className="tw-menu__name">{userName}</div>
+                  <div className="tw-menu__email">{authUser?.email || authUser?.username || ''}</div>
+                  {roleLabel && <div className="tw-menu__email">{roleLabel}</div>}
                 </div>
-                <button type="button" className="os-profile-action"
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    navigate('/settings');
-                  }}
-                  style={{
-                    padding: '10px 16px', minHeight: 40,
-                    fontSize: 14, lineHeight: '20px',
-                    fontFamily: 'var(--font-sans)',
-                    color: 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    letterSpacing: 'normal',
-                  }}
-                >
-                  Profile & settings
-                </button>
-                <button type="button" className="os-profile-action"
-                  onClick={handleLogout}
-                  style={{
-                    padding: '10px 16px', minHeight: 40,
-                    fontSize: 14, lineHeight: '20px',
-                    fontFamily: 'var(--font-sans)',
-                    color: 'var(--status-danger-text, var(--status-danger))',
-                    cursor: 'pointer',
-                    letterSpacing: 'normal',
-                    borderTop: '1px solid var(--border-subtle)',
-                  }}
-                >
-                  Sign out
-                </button>
-              </div>
-            )}
+              )}
+              items={[
+                // Phones only: a two-state item, "Dark theme" with a check when it is on.
+                ...(phone ? [{ label: 'Dark theme', icon: <Moon size={16} strokeWidth={1.75} />, checked: theme === 'dark', onSelect: toggleTheme } as MenuItem] : []),
+                { label: 'Profile and settings', icon: <SettingsIcon size={16} strokeWidth={1.75} />, onSelect: () => navigate('/settings') },
+                ...(status.needsBilling ? [{ label: 'Go to billing', icon: <CreditCard size={16} strokeWidth={1.75} />, onSelect: () => navigate('/settings/billing') } as MenuItem] : []),
+                { label: 'Sign out', icon: <LogOut size={16} strokeWidth={1.75} />, danger: true, onSelect: handleLogout },
+              ]}
+            />
           </div>
         </div>
       </header>
 
-      {/* LEFT NAV */}
-      <nav className="os-nav" aria-label="Main navigation">
-        {visibleNavItems.map(item => (
-          <Link
-            key={item.path}
-            className={`nav-item${isActive(item.path) ? ' active' : ''}`}
-            to={navTo(item.path)}
-            aria-label={item.label}
-            aria-current={isActive(item.path) ? 'page' : undefined}
-          >
-            {item.icon}
-            <div className="nav-tooltip">{item.label}</div>
-          </Link>
-        ))}
-        {canAccessSettings && (
-          <Link
-            className={`nav-item${underPrefix('/settings') ? ' active' : ''}`}
-            to="/settings"
-            aria-label="Settings"
-            aria-current={underPrefix('/settings') ? 'page' : undefined}
-            style={{ marginTop: 'auto', marginBottom: 16 }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-            <div className="nav-tooltip">Settings</div>
-          </Link>
-        )}
-      </nav>
-
       {/* CONTENT */}
-      <main
-        className="os-app-main"
-        style={{
-          overflowY: 'auto',
-          background: 'var(--bg-deep)',
-          color: 'var(--text-primary)',
-          fontFamily: 'var(--font-sans)',
-        }}
-      >
-        {children}
+      {/* The route Suspense boundary lives here, inside <main>: a lazy page
+          that is still loading shows the page-head skeleton at the exact head
+          geometry, and the sidebar and top bar are never hidden or remounted
+          (the app-level boundary in App.tsx would otherwise blank the shell). */}
+      <main id="main-content" ref={mainRef} tabIndex={-1} className="os-app-main tw-main" data-route={pathname}>
+        <ErrorBoundary variant="page" resetKey={pathname}>
+          <Suspense fallback={<PageHeadSkeleton />}>
+            {children}
+          </Suspense>
+        </ErrorBoundary>
       </main>
+
+      <PhoneBar
+        allowed={allowed}
+        canAccessSettings={canAccessSettings}
+        canAsk={canAsk}
+        open={moreOpen}
+        setOpen={closeMore}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onSignOut={handleLogout}
+        status={status}
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { fetchData, postData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -51,6 +52,9 @@ const inputStyle: React.CSSProperties = {
 };
 
 export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
+  // Modal drawer: focus moves in, Tab stays inside, focus returns to the trigger on close.
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef, open);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -140,7 +144,7 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={onClose} />
-      <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 24, overflowY: 'auto' }}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Add vehicle" style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 24, overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Add vehicle</h2>
           <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-control)', margin: '-13px -13px 0 0' }}>✕</button>
@@ -157,7 +161,7 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
             alignItems: 'flex-start',
             gap: 10,
           }}>
-            <span style={{ color: 'var(--status-danger, #dc2626)', fontWeight: 700, fontSize: 15, lineHeight: 1 }}>!</span>
+            <span style={{ color: 'var(--status-danger, #dc2626)', fontWeight: 600, fontSize: 15, lineHeight: 1 }}>!</span>
             <div>
               <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 2 }}>
                 Failed to create vehicle

@@ -1,116 +1,121 @@
-/* Insights page (design principles v2). Presentation only. Card, KPI tile and
-   ranked list styles live with their components in src/components/insights/. */
+/* Insights page (design principles v3). Tokens come from src/styles/theme.css;
+   card, KPI, ranked-list and findings styles live with their components. */
 
 .insights-page-brand {
   min-width: 0;
   font: 400 14px/20px var(--font-sans);
   letter-spacing: normal;
   font-variant-numeric: tabular-nums;
-
-  /* Semantic TEXT colours (AA on the card surface). Fills keep --status-*. */
-  --status-success-text: #86EFAC;
-  --status-warning-text: #FCD34D;
-  --status-danger-text: #FCA5A5;
-  --insights-success-surface: #10271B;
-  --insights-warning-surface: #302410;
-  --insights-danger-surface: #321919;
-  /* Dark tertiary (#6E757D) is ~3.9:1 on the card; lift it for small text. */
-  --text-tertiary: #8E959D;
-  /* Charts: comparison series in neutral grey, bar tracks muted. */
-  --ins-series-neutral: #5B626B;
-  --ins-track: #1E2227;
-}
-[data-theme="light"] .insights-page-brand {
-  --status-success-text: #166534;
-  --status-warning-text: #92400E;
-  --status-danger-text: #B91C1C;
-  --insights-success-surface: #F0FDF4;
-  --insights-warning-surface: #FFFBEB;
-  --insights-danger-surface: #FEF2F2;
-  --text-tertiary: #6B7280;
-  --ins-series-neutral: #C3C8CF;
-  --ins-track: #EEF0F3;
+  /* Aliases the Insights components read, mapped onto shared tokens. */
+  --insights-success-surface: var(--status-success-bg);
+  --insights-warning-surface: var(--status-warning-bg);
+  --insights-danger-surface: var(--status-danger-bg);
+  --ins-track: var(--surface-tint-active);
 }
 
-/* Page intro sits on the page ground, not in a card. */
-.insights-header { margin-bottom: 24px; }
-.insights-eyebrow { margin: 0 0 4px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
-.insights-title { margin: 0; font: 600 22px/28px var(--font-sans); color: var(--text-primary); }
-.insights-intro { margin: 4px 0 0; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); max-width: 72ch; }
+/* Page head: the shared SectionHeader, the same shape on every tab. Its tabs
+   row follows at --head-to-tabs, exactly where SectionHeader draws its own. */
+.os-app-shell .insights-page-brand > .section-header { margin-bottom: 0; }
+.insights-page-brand > .section-header + .insights-tabs { margin-top: var(--head-to-tabs, 16px); }
 
-/* Legacy .card surfaces on this page (the briefing card): 12px radius, no
-   hover border or shadow change on a non-interactive card. */
-.insights-page-brand .card {
-  min-width: 0; padding: 24px; border-radius: var(--radius-card, 12px); box-shadow: none;
+/* Margin period: the tab's toolbar, its first content block (.tw-toolbar sets
+   the 36px control height and the gap to the first card). */
+.insights-period { margin: 0; }
+.insights-period__seg { display: contents; }
+/* R5: the options' boxes span the full 36px track, so the tab's first content
+   starts at 226 like every other tabbed page (the chip is still drawn 30px
+   tall, 3px in, by the ::before below; the track stays the same). */
+.insights-period .tw-seg { isolation: isolate; padding-block: 3px; }
+.insights-period .tw-seg__opt {
+  position: relative; height: var(--control-h, 36px); margin-block: -3px;
+  background: transparent !important; box-shadow: none !important;
 }
-.insights-page-brand .card:hover { border-color: var(--border-subtle); box-shadow: none; }
-
-.insights-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-
-/* Period filters: 40px desktop / 48px phone, 8px control radius. */
-.insights-periods { margin-bottom: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.insights-period-control {
-  min-height: 40px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-control, 8px);
+.insights-period .tw-seg__opt::before {
+  content: ''; position: absolute; inset: 3px 0; z-index: -1; border-radius: 6px;
+  transition: background-color 0.12s;
+}
+.insights-period .tw-seg__opt:hover:not(.is-active):not(:disabled)::before { background: var(--surface-tint-hover); }
+.insights-period .tw-seg__opt.is-active::before {
   background: var(--bg-surface);
-  color: var(--text-secondary);
-  font: 500 14px/20px var(--font-sans);
-  letter-spacing: normal;
-  text-transform: none;
-  white-space: nowrap;
-  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--border-default), 0 1px 2px rgba(14, 17, 22, 0.06);
 }
-.insights-period-control:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
-.insights-period-control[aria-pressed="true"] {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: var(--btn-action-color);
-}
-.insights-period-control:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+[data-theme="dark"] .insights-period .tw-seg__opt.is-active::before { background: #2C3037; box-shadow: none; }
+.insights-period .tw-seg__opt:focus-visible { outline-offset: -1px; }
+@media (pointer: coarse) { .insights-period .tw-seg__opt { margin-block: 0; } }
+.insights-period__menu { display: none; }
+.insights-period .insights-period__select.tw-select-trigger { width: auto; min-width: 168px; height: var(--control-h, 36px); min-height: var(--control-h, 36px); }
+.insights-custom { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.insights-custom__to { color: var(--text-secondary); font-size: 13px; line-height: 20px; }
+.insights-month { width: 150px; max-width: 100%; }
 
-/* Section tabs: 14/20, 2px active underline. Scroll locally on phones. */
-.insights-tabs {
-  display: flex; gap: 24px; margin-bottom: 24px;
-  border-bottom: 1px solid var(--border-subtle);
-  overflow-x: auto; scrollbar-width: none;
-}
-.insights-tabs::-webkit-scrollbar { display: none; }
-.insights-brand-tab {
-  flex-shrink: 0; min-height: 44px; padding: 12px 0; margin-bottom: -1px;
-  background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer;
-  font: 400 14px/20px var(--font-sans); letter-spacing: normal; white-space: nowrap;
-  color: var(--text-secondary);
-}
-.insights-brand-tab:hover { color: var(--text-primary); }
-.insights-brand-tab[aria-current="page"] { color: var(--text-primary); font-weight: 500; border-bottom-color: var(--accent-primary); }
-.insights-brand-tab:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; border-radius: 4px; }
+.insights-stack { display: flex; flex-direction: column; gap: var(--card-gap, 16px); min-width: 0; }
 
-/* Summary figures beneath a chart. */
-.insights-divided { padding-top: 16px; border-top: 1px solid var(--border-row); }
-
-/* Net margin per month, aligned under the chart columns. */
-.insights-month-margins {
-  display: grid; grid-template-columns: 80px repeat(6, minmax(0, 1fr)); gap: 0; /* first column = y-axis width */
-  align-items: baseline; padding-top: 12px; border-top: 1px solid var(--border-row);
+/* Section tabs: the shared .section-header__tabs / __tab style (40px, 2px ink
+   underline drawn inside the box). Only the <button> reset and the spacing that
+   the head already supplies are set here. */
+.insights-tabs.section-header__tabs { margin-bottom: var(--tabs-to-content, 24px); }
+.insights-brand-tab.section-header__tab {
+  flex-shrink: 0; margin: 0; background: none; cursor: pointer;
+  border-width: 0 0 2px; border-style: solid; border-color: transparent;
+  font-family: var(--font-sans); letter-spacing: normal;
 }
-.insights-month-margins__label { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); white-space: nowrap; }
-.insights-month-margin { min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
-.insights-month-margin__m { display: none; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
-.insights-month-margin strong { font: 500 13px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; }
-.insights-month-margin strong.ic-text--danger { color: var(--status-danger-text); }
+.insights-brand-tab.section-header__tab.is-active { border-bottom-color: var(--text-primary); }
+
+/* KPI row inside the margin card, separated from the chart beneath. */
+.insights-kpis { padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border-row); }
+
+/* One-line takeaway at the top of a chart card: the answer before the evidence. */
+.insights-takeaway { margin: 0 0 4px; font: 500 14px/20px var(--font-sans); color: var(--text-primary); }
+
+/* Small stats: under a funnel (where items dropped out) or at the head of a card. */
+.insights-stats {
+  margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--border-row);
+  display: flex; flex-wrap: wrap; gap: 8px 32px;
+}
+.insights-stats > div { display: flex; align-items: baseline; gap: 8px; }
+.insights-stats dt { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.insights-stats dd { margin: 0; font: 600 16px/24px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.insights-stats__note, .insights-stats dd.insights-stats__note { margin: 0; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
+.insights-stats--head { margin: 0 0 12px; padding: 0 0 12px; border-top: 0; border-bottom: 1px solid var(--border-row); }
+
+/* Empty, error and loading states: one line and one action. */
+.insights-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.insights-empty p { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+.insights-state {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px;
+  padding: var(--card-pad, 20px); background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card, 12px);
+}
+.insights-state p { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-primary); }
+.insights-state__action {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: var(--radius-control, 8px);
+  background: var(--btn-primary-bg); color: var(--btn-primary-fg); font: 500 14px/20px var(--font-sans); text-decoration: none; cursor: pointer;
+}
+.insights-state__action:hover { background: var(--btn-primary-hover, var(--btn-primary-bg)); }
+.insights-state__action:active { background: var(--btn-primary-pressed, var(--btn-primary-bg)); }
+.insights-state__action:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 3px; }
+.insights-skel { min-height: 240px; border-radius: var(--radius-card, 12px); background: var(--surface-tint-hover); }
+.insights-skel--card { min-height: 360px; }
+/* Reserve the Margin cards' height while the ledgers load, so nothing moves when they land. */
+.insights-skel--margin { min-height: 470px; }
 
 @media (max-width: 767px) {
-  .insights-page-brand .card { padding: 16px; }
-  .insights-period-control { min-height: 48px; }
-  .insights-brand-tab { min-height: 48px; }
+  /* Six periods: a compact menu on phones (R4: segmented controls with more than 4 options). */
+  .insights-period__seg { display: none; }
+  .insights-period__menu { display: inline-flex; }
+  .insights-period .tw-toolbar__meta { white-space: normal; flex: 1 1 140px; min-width: 0; }
+  .insights-custom { width: 100%; }
+  .insights-month { flex: 1 1 0; width: auto; }
+  .insights-state__action { min-height: 48px; }
+  .ic-kpis.insights-kpis { --ic-cols: 2; }
+  .insights-kpis .ic-kpi__value { font-size: 22px; line-height: 28px; }
+  .insights-stats { gap: 4px 24px; }
+  /* R8: the Fleet head stats as a clean list on phones: label left, figure
+     right, the note on its own line under the label (no ragged wrap). */
+  .insights-stats--head { flex-direction: column; flex-wrap: nowrap; gap: 0; padding-bottom: 8px; }
+  .insights-stats--head > div {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 0 12px; padding: 4px 0;
+  }
+  .insights-stats--head dt { grid-column: 1; grid-row: 1; }
+  .insights-stats--head dd { grid-column: 2; grid-row: 1; text-align: right; }
+  .insights-stats--head dd.insights-stats__note { grid-column: 1 / -1; grid-row: 2; text-align: left; }
 }
-@media (max-width: 640px) {
-  .insights-month-margins { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 8px; }
-  .insights-month-margins__label { grid-column: 1 / -1; }
-  .insights-month-margin__m { display: block; }
-}
-
-/* Sub-heading inside a chart card (e.g. the per-customer list under the ageing strip). */
-.insights-subhead { margin: 8px 0 0; font: 600 14px/20px var(--font-sans); color: var(--text-primary); }

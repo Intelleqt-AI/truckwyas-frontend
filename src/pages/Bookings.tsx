@@ -1,18 +1,27 @@
 import "./bookings-typography.css";
 import "./bookings-section.css";
-import { useState, useRef } from "react";
-import { ArrowLeft, Upload, X } from "lucide-react";
+import SectionHeader from '@/components/layout/SectionHeader';
+import { StatusChip } from "@/components/ui/StatusChip";
+import { useStickyRail } from "@/components/fleet-detail/useStickyRail";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { useState, useRef, useCallback } from "react";
+import { FileSearch, Upload, X } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, postData, patchData } from "@/lib/Api";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatDistance, formatMoney, formatNumber } from "@/lib/formatters";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/AuthContext';
 import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
 import { ExpandableRouteMap } from "@/components/ExpandableRouteMap";
-import { Loader } from '@/components/Loader';
+import { StatusMenu } from '@/components/fleet-detail/StatusMenu';
+import { BlockSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import { staleWork, staleLabel, staleAction } from './bookings-stale';
+import { useMapFill } from './useMapFill';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   PENDING: 'neutral',
@@ -35,11 +44,21 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 };
 
 const fmt = (dateStr?: string) =>
-  dateStr ? formatDate(dateStr) : '—';
+  dateStr ? formatDate(dateStr) : 'Not set';
 
 // Sentence-case a raw status token for display: "IN_TRANSIT" → "In transit".
 const titleCase = (s?: string) =>
   s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+
+// "UD Trucks Quon GW26.450 - MP 567 MNO": the plate first and never broken
+// across lines, then the make and model (R6).
+const vehicleValue = (info?: string | null): React.ReactNode => {
+  if (!info) return null;
+  const parts = info.split(' - ');
+  if (parts.length < 2) return <span className="bk-plate">{info}</span>;
+  const plate = parts.pop()!.trim();
+  return <><span className="bk-plate">{plate}</span> <span className="bk-vehicle-model">· {parts.join(' - ')}</span></>;
+};
 
 export default function Bookings() {
   const { id } = useParams();
@@ -47,13 +66,19 @@ export default function Bookings() {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const podModalFileRef = useRef<HTMLInputElement>(null);
+  const stickyRail = useStickyRail<HTMLDivElement>();
+  // Columns end together (R6, within 48px): the route map takes up the
+  // difference between the Route card and the rail, before paint.
+  const [factsInRail, setFactsInRail] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState(false);
+  const fill = useMapFill({ base: 240, min: 240, max: 380, paused: editingAssignment, onStuck: () => setFactsInRail(true) });
+  const railRef = useCallback((node: HTMLDivElement | null) => { fill.sideRef.current = node; stickyRail(node); }, [stickyRail, fill.sideRef]);
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
 
   const [confirmOpts, setConfirmOpts] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
-  const [editingAssignment, setEditingAssignment] = useState(false);
   const [assignDriverId, setAssignDriverId] = useState('');
   const [assignVehicleId, setAssignVehicleId] = useState('');
   const [assignSaving, setAssignSaving] = useState(false);
@@ -63,12 +88,19 @@ export default function Bookings() {
   const [podSkipping, setPodSkipping] = useState(false);
   const [podButtonUploading, setPodButtonUploading] = useState(false);
   const [podPreviewOpen, setPodPreviewOpen] = useState(false);
+  // Dialogs: focus moves in, Tab stays inside, focus returns on close.
+  useFocusTrap(latestModal, assignModalOpen);
+  useFocusTrap(latestModal, podModalOpen);
+  useFocusTrap(latestModal, podPreviewOpen);
 
-  const { data: load, isLoading } = useQuery({
+  const loadQuery = useQuery({
     queryKey: ['load', id],
     queryFn: () => fetchData(`api/v1/loads/${id}/`),
     enabled: !!id,
   });
+  const { data: load, isLoading } = loadQuery;
+  const loadFailedNow = loadFailed(loadQuery);
+  const loadError = (loadQuery.error ?? loadQuery.failureReason) as { status?: number } | null;
 
   const { data: driversData } = useQuery({
     queryKey: ['drivers-active'],
@@ -85,6 +117,15 @@ export default function Bookings() {
     queryFn: () => fetchData(`api/v1/vehicles/${load.vehicle}/`),
     enabled: !!load?.vehicle,
   });
+  // The driver's own status: an inactive driver still on this order is said
+  // once, on the Driver row (R7).
+  const { data: driverDetail } = useQuery({
+    queryKey: ['driver', String(load?.driver ?? '')],
+    queryFn: () => fetchData(`api/v1/drivers/${load.driver}/`),
+    enabled: !!load?.driver,
+    retry: false,
+  });
+  const driverInactive = !!load?.driver && driverDetail?.status === 'INACTIVE';
   const [syncingLocation, setSyncingLocation] = useState(false);
   const handleSyncLocation = async () => {
     setSyncingLocation(true);
@@ -276,22 +317,66 @@ export default function Bookings() {
     }
   };
 
-  if (isLoading) return <Loader fullScreen />;
+  // A failed request is not a missing record: only a 404 says "not found".
+  if (loadFailedNow && loadError?.status !== 404) return (
+    <div className="bk-detail bookings-typography">
+      <SectionHeader title="Order" back={{ to: '/bookings/orders', label: 'Orders' }} />
+      <LoadError what="this order" error={loadError} busy={loadQuery.isFetching} onRetry={() => loadQuery.refetch()} />
+    </div>
+  );
 
+  // Loading: keep the back link and page frame; only the content waits.
+  if (isLoading && !loadFailedNow) return (
+    <div className="bk-detail bookings-typography">
+      <SectionHeader
+        title="Loading order"
+        back={{ to: '/bookings/orders', label: 'Orders' }}
+      />
+      <BlockSkeleton height={96} label="Loading order" />
+      <div style={{ height: 24 }} />
+      <BlockSkeleton height={360} label="Loading order" />
+    </div>
+  );
+
+  // Not found (404): head and back link stay; message and action share a row.
   if (!load) return (
-    <div className="bk-detail">
-      <button type="button" className="bk-back" onClick={() => navigate('/bookings/orders')}>
-        <ArrowLeft size={16} aria-hidden="true" /> Back to orders
-      </button>
-      <div className="bk-card">
-        <div className="bk-empty" style={{ padding: 16 }}>
-          <h1 className="bk-empty__title">Load not found</h1>
-          <p className="bk-empty__text">It may have been removed, or the link is out of date.</p>
-          <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate('/bookings/orders')}>View orders</button>
+    <div className="bk-detail bookings-typography">
+      <SectionHeader title="Order not found" back={{ to: '/bookings/orders', label: 'Orders' }} />
+      <div className="load-error bk-missing" role="status">
+        <FileSearch className="load-error__icon" size={20} aria-hidden="true" />
+        <div className="load-error__text">
+          <p className="load-error__title">There is no order at this link</p>
+          <p className="load-error__hint">It may have been deleted, or the link is wrong.</p>
         </div>
+        <button type="button" className="tw-btn load-error__retry" onClick={() => navigate('/bookings/orders')}>All orders</button>
       </div>
     </div>
   );
+
+  const jobFacts = (cls: string) => {
+    const distance = parseFloat(load.distance || '0');
+    const weight = parseFloat(load.weight || '0');
+    const distanceText = distance > 0 ? formatDistance(distance) : 'Not recorded';
+    const cargoText = [weight > 0 ? `${formatNumber(weight)} kg` : '', load.cargo_description || ''].filter(Boolean).join(', ') || 'Not recorded';
+    if (cls === 'rail') return [{ label: 'Distance', value: distanceText }, { label: 'Cargo', value: cargoText }].map(r => (
+      <div key={r.label} className="bk-kv">
+        <span className="bk-kv__label">{r.label}</span>
+        <span className={`bk-kv__value${r.value === 'Not recorded' ? ' bk-muted' : ''}`}>{r.value}</span>
+      </div>
+    ));
+    return (
+      <dl className={cls} aria-label="Job figures">
+        <div>
+          <dt className="bk-fact__label">Distance</dt>
+          <dd className="bk-fact__value">{distance > 0 ? formatDistance(distance) : 'Not recorded'}</dd>
+        </div>
+        <div>
+          <dt className="bk-fact__label">Cargo</dt>
+          <dd className="bk-fact__value">{[weight > 0 ? `${formatNumber(weight)} kg` : '', load.cargo_description || ''].filter(Boolean).join(', ') || 'Not recorded'}</dd>
+        </div>
+      </dl>
+    );
+  };
 
   const hasPOD = !!(load.pod_signature || load.pod_received_by);
   const invoiceId = load.invoice_id;
@@ -301,145 +386,122 @@ export default function Bookings() {
   const assignmentLocked = !['PENDING', 'ASSIGNED'].includes(load.status);
   const hasInvoice = !!invoiceId;
   const allowedNextStatuses = VALID_TRANSITIONS[load.status] || [];
+  const noVehicleFlag = !load.vehicle && ['LOADING', 'IN_TRANSIT'].includes(load.status) && !editingAssignment;
 
   return (
     <>
     <div className="bk-detail bookings-typography">
       {/* Header */}
-      <button type="button" className="bk-back" onClick={() => navigate('/bookings')}>
-        <ArrowLeft size={16} aria-hidden="true" /> Back to orders
-      </button>
-      <div className="bk-detail-header">
-        <div className="bk-detail-header__titles">
-          <div className="bk-eyebrow">Order</div>
-          <div className="bk-title-row">
-            <h1 className="bk-title">{load.load_number}</h1>
-            <span className={`bk-status bk-status--${STATUS_TONE[load.status] || 'neutral'}`}>{titleCase(load.status)}</span>
-          </div>
-          <p className="bk-subtitle">{load.customer_name}</p>
-        </div>
-        <div className="bk-amount">
-          <span className="bk-amount__label">Order total</span>
-          <span className="bk-amount__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</span>
-        </div>
-      </div>
+      <SectionHeader
+        title={load.load_number}
+        back={{ to: '/bookings/orders', label: 'Orders' }}
+        // Phones: the stepper below already marks the current status, so the
+        // chip steps aside and the load number keeps the title row whole.
+        titleAdornment={<span className={['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED'].includes(load.status) ? 'bk-head-chip bk-head-chip--stepper' : 'bk-head-chip'}><StatusChip status={load.status} /></span>}
+        description={<>{load.customer_name}</>}
+        actions={<>
+          <StatusMenu
+            subject={load.load_number}
+            current={load.status}
+            options={[
+              { value: load.status, label: titleCase(load.status) },
+              ...allowedNextStatuses.map(s => ({
+                value: s,
+                label: titleCase(s),
+                hint: s === 'DELIVERED' ? 'Asks for the proof of delivery'
+                  : s === 'ASSIGNED' && !load.vehicle ? 'Asks for a vehicle first'
+                  : s === 'CANCELLED' ? 'Hard to reverse' : undefined,
+              })),
+            ]}
+            disabledReason={billingBlocked ? 'Status changes are blocked until billing is sorted.' : allowedNextStatuses.length === 0 ? 'No further status for this order.' : undefined}
+            // These steps open their own dialog (vehicle, proof of delivery,
+            // cancel warning), so they skip the generic confirmation.
+            intercept={(v) => {
+              const own = v === 'DELIVERED' || (v === 'ASSIGNED' && !load.vehicle) || (v === 'CANCELLED' && !['PENDING', 'LOADING'].includes(load.status));
+              if (own) updateStatus(v);
+              return own;
+            }}
+            onChange={updateStatus}
+          />
+        </>}
+      />
 
       {/* Status bar */}
       {(() => {
         const STEPS = ['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED'];
         const currentIdx = STEPS.indexOf(load.status);
+        // Passed Assigned without a vehicle (the app's rule for Assigned):
+        // the step is shown as skipped, not done (R5).
+        const assignedSkipped = currentIdx >= 1 && !load.vehicle;
+        // Stale work (R5): still Assigned, Loading or In transit past the
+        // delivery date, or older than 30 days. Same loads Home and Findings
+        // call out; one neutral line with one amber dot.
+        const stale = staleWork(load);
+        // The one step this page can actually take (R6). Assignment is
+        // locked once a load is Loading or In transit, so those are closed
+        // through Change status, never "reassigned".
+        // The shared action words (staleAction), plus where on this page to
+        // do it. Loading cannot go straight to Delivered here, so it says
+        // "in transit" instead.
+        // Phones: Change status lives in the title row's ⋯ menu, so the
+        // line says where to find it (R7).
+        const viaStatus = <>Change status<span className="bk-phone-note"> in the ⋯ menu</span></>;
+        // An Assigned load whose driver is marked inactive can't be started:
+        // say only what is possible (R8).
+        const staleAct = load.status === 'LOADING'
+          ? <>Mark it in transit or cancel it via {viaStatus}</>
+          : load.status === 'ASSIGNED' && driverInactive
+            ? (billingBlocked ? <>Reassign it or cancel it via {viaStatus}</> : <>Reassign it with Edit or cancel it via {viaStatus}</>)
+          : ['PENDING', 'ASSIGNED'].includes(load.status) && !billingBlocked
+            ? <>{staleAction(load)} with Edit or {viaStatus}</>
+            : <>{staleAction(load)} via {viaStatus}</>;
         return (
-          <section className="bk-card" style={{ padding: '16px 24px', marginBottom: 24 }} aria-label="Order progress">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-          <div className="bk-stepper" style={{ flex: 1, minWidth: 0 }}>
-            <ol aria-label="Order progress" style={{ display: 'flex', gap: 0, listStyle: 'none', margin: 0, padding: 0 }}>
-              {STEPS.map((step, stepIdx) => {
-                const isActive = stepIdx === currentIdx;
-                const isPast   = stepIdx <= currentIdx;
-                // Forward-only: a step is clickable when it's a valid next
-                // status from where the load is now — this also naturally
-                // blocks skipping ahead, since VALID_TRANSITIONS only ever
-                // lists the immediate next step(s).
-                const isClickable = !billingBlocked && allowedNextStatuses.includes(step);
-                const label = titleCase(step);
-                // Done steps are filled, the current step is larger, a step you
-                // can move to next is an outlined ring. No glows.
-                const dot = (
-                  <span style={{
-                    width: isActive ? 12 : 10,
-                    height: isActive ? 12 : 10,
-                    boxSizing: 'border-box',
-                    borderRadius: '50%',
-                    background: isPast ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                    border: `2px solid ${isPast || isClickable ? 'var(--accent-primary)' : 'var(--border-active)'}`,
-                  }} />
-                );
-                const text = (
-                  <span style={{
-                    fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)',
-                    color: isActive ? 'var(--text-primary)' : isPast ? 'var(--text-secondary)' : (isClickable ? 'var(--accent-primary)' : 'var(--text-secondary)'),
-                    fontWeight: isActive ? 600 : 400,
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {label}
-                  </span>
-                );
-                return (
-                  <li key={step} aria-current={isActive ? 'step' : undefined} style={{ flex: 1, display: 'flex', alignItems: 'center', minWidth: 0 }}>
-                    <span aria-hidden="true" style={{ flex: 1, height: 2, background: isPast ? 'var(--accent-primary)' : 'var(--border-subtle)' }} />
-                    {isClickable ? (
-                      <button
-                        type="button"
-                        onClick={() => updateStatus(step)}
-                        title={`Mark as ${label}`}
-                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '4px 8px', minHeight: 40, background: 'none', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-                      >
-                        {dot}{text}
-                      </button>
-                    ) : (
-                      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '4px 8px' }}>
-                        {dot}{text}
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="bk-field__label" id="load-status-label">Status</span>
-              <Select value={load.status} onValueChange={updateStatus} disabled={billingBlocked}>
-                <SelectTrigger aria-labelledby="load-status-label" style={{ minWidth: 160, minHeight: 40 }}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={load.status}>{titleCase(load.status)}</SelectItem>
-                  {allowedNextStatuses.map(s => <SelectItem key={s} value={s}>{titleCase(s)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            {billingBlocked && (
-              <p className="bk-help bk-help--danger" style={{ textAlign: 'right', maxWidth: 260 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
-                Status changes are blocked.{' '}
-                <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>Go to billing</button>
-              </p>
-            )}
-          </div>
-          </div>
+          <section className="bk-card bk-progress" aria-label="Order progress">
+          {/* One grid column per step: the dot sits at the column centre and
+              each connector runs from the previous dot to this one, so line
+              segments always meet the dots. Status changes go through
+              "Change status"; the steps only show progress. */}
+          <ol className="bk-steps" aria-label="Order progress">
+            {STEPS.map((step, stepIdx) => {
+              const isActive = stepIdx === currentIdx;
+              const isPast = stepIdx <= currentIdx;
+              const skipped = step === 'ASSIGNED' && assignedSkipped;
+              return (
+                <li key={step} aria-current={isActive ? 'step' : undefined} className={`bk-step${isPast ? ' is-done' : ''}${isActive ? ' is-current' : ''}${skipped ? ' is-skipped' : ''}`} title={skipped ? 'Skipped: no vehicle or driver was assigned' : undefined}>
+                  <span className="bk-step__dot" aria-hidden="true" />
+                  <span className="bk-step__label">{titleCase(step)}{skipped && <span className="sr-only"> (skipped, nothing assigned)</span>}</span>
+                </li>
+              );
+            })}
+          </ol>
+          {stale && (
+            <p className="bk-stale" role="status">
+              <span className="bk-dot bk-dot--warning" aria-hidden="true" />
+              <span>
+                {/* Overdue: the delivery date is already on the route, so
+                    the line gives the day count only (R9). */}
+                Still {titleCase(load.status).toLowerCase()},{' '}
+                {stale.overdue
+                  ? <><b>{staleLabel(stale).days}</b> past its delivery date</>
+                  : <>open <b>{staleLabel(stale).text}</b></>}. {staleAct}.
+              </span>
+            </p>
+          )}
+          {billingBlocked && (
+            <p className="bk-help bk-help--danger bk-progress__note" title={subscriptionStatusDetail(authUser?.subscription_status)}>
+              Status changes are blocked.{' '}
+              <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>Go to billing</button>
+            </p>
+          )}
           </section>
         );
       })()}
 
-      {/* The job in three figures. A zero means the value was never captured,
-          so it shows as missing rather than as 0 km or 0 kg. */}
-      {(() => {
-        const distance = parseFloat(load.distance || '0');
-        const weight = parseFloat(load.weight || '0');
-        return (
-          <section className="bk-summary" aria-label="Job figures">
-            <div className="bk-summary__cell">
-              <div className="bk-summary__label">Distance</div>
-              <div className="bk-summary__value">{distance > 0 ? `${Math.round(distance).toLocaleString('en-ZA')} km` : '—'}</div>
-              <div className="bk-summary__note">{distance > 0 ? 'Planned route distance.' : 'No route distance recorded.'}</div>
-            </div>
-            <div className="bk-summary__cell">
-              <div className="bk-summary__label">Base rate per km</div>
-              <div className="bk-summary__value">{distance > 0 ? `R ${(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)).toFixed(2)}` : '—'}</div>
-              <div className="bk-summary__note">Base rate divided by distance, before surcharges.</div>
-            </div>
-            <div className="bk-summary__cell">
-              <div className="bk-summary__label">Cargo weight</div>
-              <div className="bk-summary__value">{weight > 0 ? `${Math.round(weight).toLocaleString('en-ZA')} kg` : '—'}</div>
-              <div className="bk-summary__note">{load.cargo_description || (weight > 0 ? 'As captured on the order.' : 'No weight recorded.')}</div>
-            </div>
-          </section>
-        );
-      })()}
 
-      <div className="bk-detail-grid">
+      {/* Main column plus a sticky rail, so unequal heights read as a rail. */}
+      <div className="bk-detail-grid bk-detail-grid--rail">
         {/* Route */}
-        <section className="bk-card" aria-labelledby="bk-route-title">
+        <section ref={fill.mainRef} className="bk-card" aria-labelledby="bk-route-title">
           <div className="bk-card__head"><h2 className="bk-card__title" id="bk-route-title">Route</h2></div>
           <ol className="bk-route">
             <li className="bk-route__stop">
@@ -447,7 +509,7 @@ export default function Bookings() {
               <div>
                 <div className="bk-route__label">Pickup</div>
                 <div className="bk-route__place">{load.pickup_location}</div>
-                <div className="bk-route__meta">{[load.pickup_city, load.pickup_state].filter(Boolean).join(', ')}{load.pickup_date ? `. ${fmt(load.pickup_date)}` : ''}</div>
+                <div className="bk-route__meta">{[load.pickup_city, load.pickup_state].filter(Boolean).join(', ')}{load.pickup_date ? ` · ${fmt(load.pickup_date)}` : ''}</div>
               </div>
             </li>
             {Array.isArray(load.stops) && load.stops.map((s: { location: string }, i: number) => (
@@ -464,10 +526,12 @@ export default function Bookings() {
               <div>
                 <div className="bk-route__label">Delivery</div>
                 <div className="bk-route__place">{load.delivery_location}</div>
-                <div className="bk-route__meta">{[load.delivery_city, load.delivery_state].filter(Boolean).join(', ')}{load.delivery_date ? `. ${fmt(load.delivery_date)}` : ''}</div>
+                <div className="bk-route__meta">{[load.delivery_city, load.delivery_state].filter(Boolean).join(', ')}{load.delivery_date ? ` · ${fmt(load.delivery_date)}` : ''}</div>
               </div>
             </li>
           </ol>
+
+          {!factsInRail && jobFacts('bk-facts bk-facts--job')}
 
           {/* Live map — pickup, delivery, and (if the assigned vehicle is CtrlFleet-linked) its last known position */}
           <div style={{ marginTop: 16 }}>
@@ -486,19 +550,22 @@ export default function Bookings() {
               }
               currentLocationLabel={
                 vehicleDetail?.last_location_at
-                  ? `${vehicleDetail.plate}, last seen ${new Date(vehicleDetail.last_location_at).toLocaleString('en-ZA')}`
+                  ? `${vehicleDetail.plate}, last seen ${formatDateTime(vehicleDetail.last_location_at)}`
                   : undefined
               }
-              height={220}
+              height={fill.height}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
               <p className="bk-help">
                 {!load.vehicle
-                  ? 'No vehicle assigned yet'
+                  ? assignmentLocked
+                    // The Assignment flag already names the missing vehicle (R9).
+                    ? 'No live position for this order.'
+                    : 'Live position shows once a vehicle is assigned.'
                   : !vehicleDetail?.ctrlfleet_vehicle_code
                     ? 'The assigned vehicle is not linked to CtrlFleet, so there is no live tracking.'
                     : vehicleDetail?.last_location_at
-                      ? `Last synced ${new Date(vehicleDetail.last_location_at).toLocaleString('en-ZA')}`
+                      ? `Last synced ${formatDateTime(vehicleDetail.last_location_at)}`
                       : 'Linked to CtrlFleet. No position synced yet.'}
               </p>
               {load.vehicle && vehicleDetail?.ctrlfleet_vehicle_code && (
@@ -515,70 +582,76 @@ export default function Bookings() {
           </div>
         </section>
 
-        {/* Right column */}
-        <div className="bk-stack">
+        {/* Right column: sticky rail */}
+        <div ref={railRef} className="bk-stack">
           {/* Financials */}
           <section className="bk-card" aria-labelledby="bk-fin-title">
             <div className="bk-card__head"><h2 className="bk-card__title" id="bk-fin-title">Financials</h2></div>
-            {[
-              { label: 'Base rate', value: formatCurrency(parseFloat(load.rate || '0')) },
-              { label: 'Fuel surcharge', value: formatCurrency(parseFloat(load.fuel_surcharge || '0')) },
-              { label: 'Additional charges', value: formatCurrency(parseFloat(load.additional_charges || '0')) },
-            ].map(r => (
-              <div key={r.label} className="bk-kv">
-                <span className="bk-kv__label">{r.label}</span>
-                <span className="bk-kv__value">{r.value}</span>
-              </div>
-            ))}
+            {(() => {
+              // The shown lines must add up to the total (R9). When the stored
+              // total carries charges not broken down on the order, say so in
+              // one muted line instead of leaving a gap.
+              const rate = parseFloat(load.rate || '0') || 0;
+              const fuel = parseFloat(load.fuel_surcharge || '0') || 0;
+              const extra = parseFloat(load.additional_charges || '0') || 0;
+              const total = parseFloat(load.total_amount || '0') || 0;
+              const gap = Math.round((total - (rate + fuel + extra)) * 100) / 100;
+              // The per-km figure is a rate, not a summand, so it sits as a
+              // note under Base rate rather than among the lines (R10).
+              const dist = parseFloat(load.distance || '0') || 0;
+              const perKm = dist > 0 ? `${formatMoney(rate / Math.max(dist, 1))}/km` : null;
+              const rows: { label: React.ReactNode; key?: string; value: string; note?: React.ReactNode; noteTitle?: string; muted?: boolean }[] = [
+              { label: 'Base rate', value: formatCurrency(rate), note: perKm, noteTitle: 'Base rate divided by distance, before surcharges' },
+              { label: 'Fuel surcharge', value: formatCurrency(fuel) },
+              { label: 'Additional charges', value: formatCurrency(extra) },
+              ];
+              // Normal weight: when it is a large share of the total it is the
+              // line a reader most needs to see, never the faintest one.
+              if (Math.abs(gap) > 0.5) rows.push({
+                key: 'not-itemised',
+                label: <>Not itemised <InfoTip>{load.quote_number
+                  ? `The order total includes charges not broken down here. Quote ${load.quote_number} has the full breakdown.`
+                  : 'Set on the order when it was created: its total includes charges that were not entered as separate lines.'}</InfoTip></>,
+                value: formatCurrency(gap),
+                // The tip names the quote; this line takes you there (R11).
+                note: load.quote != null && load.quote_number ? (
+                  <a className="bk-link bk-link--sm" style={{ display: 'inline-block', padding: '12px 0', margin: '-12px 0', whiteSpace: 'nowrap' }} title="Open the quote with the full breakdown" href={`/bookings/quotes/${load.quote}`} onClick={(e) => { e.preventDefault(); navigate(`/bookings/quotes/${load.quote}`); }}>
+                    Quote {load.quote_number}
+                  </a>
+                ) : null,
+              });
+              return rows.map(r => (
+                <div key={r.key ?? String(r.label)} className={`bk-kv${r.muted ? ' bk-muted' : ''}`}>
+                  <span className="bk-kv__label">{r.label}</span>
+                  <span className={`bk-kv__value${r.muted || r.value === 'Not recorded' ? ' bk-muted' : ''}`}>
+                    {r.value}
+                    {r.note && <span className="bk-kv__note" title={r.noteTitle}>{r.note}</span>}
+                  </span>
+                </div>
+              ));
+            })()}
             <div className="bk-kv bk-kv--total">
               <span className="bk-kv__label">Total</span>
               <span className="bk-kv__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</span>
             </div>
           </section>
 
-          {/* Actions — nothing to do here before the load has a vehicle, so
-              hide the whole card until it's at least Assigned. Invoicing
-              itself is automatic on delivery (see convert_to_invoice from
-              the delivery signal) — no manual "create invoice" trigger. */}
-          {load.status !== 'PENDING' && (
-            <section className="bk-card" aria-labelledby="bk-actions-title">
-              <div className="bk-card__head"><h2 className="bk-card__title" id="bk-actions-title">Actions</h2></div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {hasInvoice && (
-                  <button
-                    type="button"
-                    className="bk-btn bk-btn--primary bk-btn--block"
-                    onClick={() => navigate(`/finance/invoices/${invoiceId}`)}
-                  >
-                    View invoice
-                  </button>
-                )}
-
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  style={{ display: 'none' }}
-                  onChange={e => { if (e.target.files?.[0]) uploadPOD(e.target.files[0]); }}
-                />
-                <button
-                  type="button"
-                  className="bk-btn bk-btn--block bk-btn--secondary"
-                  onClick={() => (hasPOD ? setPodPreviewOpen(true) : fileRef.current?.click())}
-                  disabled={podButtonUploading}
-                >
-                  {podButtonUploading ? 'Uploading…' : hasPOD ? (load.pod_received_by ? `View POD, received by ${load.pod_received_by}` : 'View POD') : <><Upload size={16} aria-hidden="true" /> Upload POD</>}
-                </button>
-              </div>
+          {/* Job figures join the rail when the main column would otherwise
+              run long even with the smallest map (Pending loads have no
+              document buttons, so their rail is short). */}
+          {factsInRail && (
+            <section className="bk-card" aria-labelledby="bk-job-title">
+              <div className="bk-card__head"><h2 className="bk-card__title" id="bk-job-title">Job</h2></div>
+              {jobFacts('rail')}
             </section>
           )}
 
-          {/* Assignment */}
+          {/* Assignment and the order's documents */}
           <section className="bk-card" aria-labelledby="bk-assign-title">
             <div className="bk-card__head">
               <h2 className="bk-card__title" id="bk-assign-title">Assignment</h2>
               {!editingAssignment && !billingBlocked && !assignmentLocked && (
-                <button type="button" className="bk-btn bk-btn--secondary" onClick={startEditAssignment} style={{ margin: '-8px 0' }}>
+                <button type="button" className="bk-btn bk-btn--secondary bk-btn--sm" onClick={startEditAssignment} style={{ margin: '-6px 0' }}>
                   Edit
                 </button>
               )}
@@ -590,14 +663,28 @@ export default function Bookings() {
               </p>
             )}
 
+            {/* An order on the move with no vehicle is not a normal state: say so once, calmly. */}
+            {noVehicleFlag && (
+              <div className="bk-assign__flag">
+                <StatusChip tone="warning" size="sm" label={`${load.status === 'IN_TRANSIT' ? 'In transit' : 'Loading'} · no vehicle${load.driver_name ? '' : ' or driver'} assigned`} />
+                <p className="bk-help">
+                  {load.status === 'LOADING'
+                    ? 'To add the vehicle, move it back to Assigned via Change status; that asks for one.'
+                    : `The vehicle can't be changed once a load is in transit.${staleWork(load) ? '' : ' Mark it delivered or cancel it via Change status.'}`}
+                </p>
+              </div>
+            )}
             {!editingAssignment || assignmentLocked ? (
               [
-                { label: 'Vehicle', value: load.vehicle_info || '—' },
-                { label: 'Driver', value: load.driver_name || '—' },
-              ].map(r => (
+                { label: 'Vehicle', value: load.vehicle_info || 'Not assigned', node: vehicleValue(load.vehicle_info) },
+                { label: 'Driver', value: load.driver_name || 'Not assigned', node: load.driver_name && driverInactive ? <>{load.driver_name} <span className="bk-muted">· marked inactive</span></> : undefined },
+              ]
+                // The flag above already says what is missing (R9): say it once.
+                .filter(r => !(noVehicleFlag && r.value === 'Not assigned'))
+                .map((r: { label: string; value: string; node?: React.ReactNode }) => (
                 <div key={r.label} className="bk-kv">
                   <span className="bk-kv__label">{r.label}</span>
-                  <span className="bk-kv__value">{r.value}</span>
+                  <span className={`bk-kv__value${r.value === 'Not assigned' ? ' bk-muted' : ''}`}>{r.node ?? r.value}</span>
                 </div>
               ))
             ) : (
@@ -652,6 +739,38 @@ export default function Bookings() {
                   </button>
                 </div>
               </>
+            )}
+            {/* Documents for the order (was a separate one-button Actions card).
+                Nothing to do before the load has a vehicle, so hidden while
+                Pending. Invoicing itself is automatic on delivery. */}
+            {load.status !== 'PENDING' && !editingAssignment && (
+              <div className="bk-assign__actions">
+                {hasInvoice && (
+                  <button
+                    type="button"
+                    className="bk-btn bk-btn--primary bk-btn--block"
+                    onClick={() => navigate(`/finance/invoices/${invoiceId}`)}
+                  >
+                    View invoice
+                  </button>
+                )}
+
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  style={{ display: 'none' }}
+                  onChange={e => { if (e.target.files?.[0]) uploadPOD(e.target.files[0]); }}
+                />
+                <button
+                  type="button"
+                  className="bk-btn bk-btn--block bk-btn--secondary"
+                  onClick={() => (hasPOD ? setPodPreviewOpen(true) : fileRef.current?.click())}
+                  disabled={podButtonUploading}
+                >
+                  {podButtonUploading ? 'Uploading…' : hasPOD ? (load.pod_received_by ? `View POD, received by ${load.pod_received_by}` : 'View POD') : <><Upload size={16} aria-hidden="true" /> Upload POD</>}
+                </button>
+              </div>
             )}
           </section>
         </div>

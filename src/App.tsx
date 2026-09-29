@@ -59,7 +59,6 @@ const LoadsList = lazy(() => import('./pages/LoadsList'));
 const Vehicles = lazy(() => import('./pages/Vehicles'));
 const Drivers = lazy(() => import('./pages/Drivers'));
 const DriverProfile = lazy(() => import('./pages/DriverProfile'));
-const FleetDashboard = lazy(() => import('./pages/FleetDashboard'));
 const Customers = lazy(() => import('./pages/Customers'));
 const CustomerDetail = lazy(() => import('./pages/CustomerDetail'));
 const Invoices = lazy(() => import('./pages/Invoices'));
@@ -275,7 +274,9 @@ const App = () => (
 
                 {/* Fleet */}
                 <Route path="/fleet" element={<SectionRedirect to="/fleet/vehicles" />} />
-                <Route path="/fleet/overview" element={<FleetDashboard />} />
+                {/* Fleet status is folded into Vehicles (R3): old links land there. */}
+                <Route path="/fleet/overview" element={<SectionRedirect to="/fleet/vehicles" />} />
+                <Route path="/fleet/status" element={<SectionRedirect to="/fleet/vehicles" />} />
                 <Route path="/fleet/vehicles" element={<Vehicles />} />
                 <Route path="/fleet/vehicles/:id" element={<VehicleFinancialProfile />} />
                 <Route path="/fleet/drivers" element={<Drivers />} />

@@ -1,10 +1,13 @@
 import '@/pages/admin/admin-brand.css';
+import { formatMoney } from '@/lib/formatters';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData, deleteData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import RowActions from '@/components/ui/RowActions';
+import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 
 // Platform-wide vehicle type catalog (company=None rows) — every company's
 // New Quote / Add Vehicle pickers show these plus whatever custom types that
@@ -16,7 +19,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 // VehicleTypeViewSet._forbid_shared_type_write), this is the only place they
 // can actually be changed.
 
-const cardStyle: React.CSSProperties = { padding: 24 };
+const cardStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
 const sectionTitleStyle: React.CSSProperties = { fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16 };
 const thStyle: React.CSSProperties = {
   textAlign: 'left', padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
@@ -26,12 +29,10 @@ const thStyle: React.CSSProperties = {
 const tdStyle: React.CSSProperties = {
   padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
-const secondaryBtnStyle: React.CSSProperties = {
-  padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer',
-};
 // Cells holding 40px controls trim their vertical padding so the row stays 48px.
 const controlTdStyle: React.CSSProperties = { ...tdStyle, paddingTop: 4, paddingBottom: 4 };
+// The one row action (RowActions) stays pinned right, so wide tables never hide it.
+const actionTdStyle: React.CSSProperties = { ...controlTdStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' };
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500,
   fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', marginBottom: 6,
@@ -60,7 +61,7 @@ const emptyForm = {
   fuel_consumption_l_per_100km: '', fuel_consumption_sensitivity_pct: '2.0', fuel_type: 'Diesel', active: true,
 };
 
-const fmtRate = (v: any) => (v || v === 0) ? `R${parseFloat(v).toFixed(2)}` : '—';
+const fmtRate = (v: any) => (v || v === 0) ? formatMoney(parseFloat(v)) : 'Not set';
 
 export default function VehicleTypesPanel() {
   const qc = useQueryClient();
@@ -214,7 +215,7 @@ export default function VehicleTypesPanel() {
           display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12,
         }}>
           {formErr && (
-            <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px' }}>
+            <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px' }}>
               {formErr}
             </div>
           )}
@@ -239,7 +240,7 @@ export default function VehicleTypesPanel() {
                 <th className="num" style={thStyle}>Base rate</th>
                 <th className="num" style={thStyle}>Fuel</th>
                 <th style={thStyle}>Status</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
+                <th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -253,23 +254,17 @@ export default function VehicleTypesPanel() {
                   <td className="num" style={tdStyle}>{fmtRate(t.base_rate)}<span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>/km</span></td>
                   <td className="num" style={tdStyle}>{t.fuel_consumption_l_per_100km}L/100km</td>
                   <td style={tdStyle}>
-                    <span className={`status-badge ${t.active ? 'active' : 'delayed'}`}>{t.active ? 'Active' : 'Inactive'}</span>
+                    <StatusChip status={t.active ? 'ACTIVE' : 'INACTIVE'} size="sm" />
                   </td>
-                  <td style={controlTdStyle}>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <button className="admin-control" style={secondaryBtnStyle} disabled={pending === t.id} onClick={() => openEdit(t)}>Edit</button>
-                      <button className="admin-control" style={secondaryBtnStyle} disabled={pending === t.id} onClick={() => toggleActive(t)}>
-                        {t.active ? 'Deactivate' : 'Activate'}
-                      </button>
-                      <button
-                        className="admin-control"
-                        style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }}
-                        disabled={pending === t.id}
-                        onClick={() => setDeleteTarget(t)}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                  <td style={actionTdStyle}>
+                    <RowActions
+                      label={t.name}
+                      items={[
+                        { label: 'Edit', onSelect: () => openEdit(t), disabled: pending === t.id },
+                        { label: t.active ? 'Deactivate' : 'Activate', onSelect: () => toggleActive(t), disabled: pending === t.id },
+                        { label: 'Delete', danger: true, onSelect: () => setDeleteTarget(t), disabled: pending === t.id },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
@@ -290,7 +285,7 @@ export default function VehicleTypesPanel() {
               <button className="admin-control admin-tint-hover" aria-label="Close" onClick={() => setEditTarget(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, width: 40, height: 40, borderRadius: 'var(--radius-control)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
             {formErr && (
-              <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
+              <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
                 {formErr}
               </div>
             )}
@@ -300,7 +295,7 @@ export default function VehicleTypesPanel() {
                 className="admin-control"
                 disabled={saving}
                 onClick={handleEditSave}
-                style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control)', cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
+                style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: 'var(--radius-control)', cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
               >
                 {saving ? 'Saving…' : 'Save changes'}
               </button>

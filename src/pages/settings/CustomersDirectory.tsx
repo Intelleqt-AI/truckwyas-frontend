@@ -1,4 +1,5 @@
 import './customers-directory-controls.css';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { useState, useEffect } from "react";
 import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
@@ -7,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
+import RowActions from "@/components/ui/RowActions";
 import { settingsCardStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, SettingsPageHeader } from "./settingsUi";
+import { StatusChip } from '@/components/ui/StatusChip';
 
 interface Customer {
   id: number;
@@ -26,8 +29,8 @@ const STATUS_LABEL: Record<string, string> = { ACTIVE: 'Active', INACTIVE: 'Inac
 
 const STATUS_COLOR: Record<string, string> = {
   ACTIVE: 'var(--accent-primary)',
-  INACTIVE: 'var(--status-danger-text, var(--status-danger))',
-  PENDING: 'var(--status-warning-text, var(--status-warning))',
+  INACTIVE: 'var(--status-danger-text)',
+  PENDING: 'var(--status-warning-text)',
 };
 
 const sectionStyle: React.CSSProperties = { ...settingsCardStyle, marginBottom: 0 };
@@ -139,12 +142,12 @@ export function CustomersDirectory() {
   };
 
   return (
-    <div className="customer-directory-controls" style={{ maxWidth: 960, minWidth: 0, margin: "0 auto" }}>
+    <div className="customer-directory-controls settings-wide" style={{ minWidth: 0 }}>
       <SettingsPageHeader title="Customers" description="Your customer directory" />
 
       <div style={sectionStyle}>
         <div style={{
-          padding: '12px 24px', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)',
+          padding: '12px var(--card-pad, 20px)', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)',
           display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between',
         }}>
           <h2 style={settingsCardTitleStyle}>
@@ -179,7 +182,7 @@ export function CustomersDirectory() {
 
         {/* Add form */}
         {showAdd && (
-          <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-deep)' }}>
+          <div style={{ padding: '16px var(--card-pad, 20px)', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-deep)' }}>
             <div className="customer-directory-add-grid" style={{ display: 'grid', gap: 12, marginBottom: 12 }}>
               {([
                 { k: 'name', ph: 'Name *' },
@@ -198,7 +201,7 @@ export function CustomersDirectory() {
                 />
               ))}
             </div>
-            {addErr && <div role="alert" style={{ color: 'var(--status-danger-text, var(--status-danger))', fontSize: 13, lineHeight: '20px', marginBottom: 12 }}>{addErr}</div>}
+            {addErr && <div role="alert" style={{ color: 'var(--status-danger-text)', fontSize: 13, lineHeight: '20px', marginBottom: 12 }}>{addErr}</div>}
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 className="btn-action settings-control"
@@ -222,10 +225,10 @@ export function CustomersDirectory() {
 
         {/* Table */}
         {loading ? (
-          <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
+          <TableSkeleton rows={6} cols={4} label="Loading customers" />
         ) : (
           <div role="region" aria-label="Customer directory table" tabIndex={0} style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'auto' }}>
-          <table className="table-heading-roles settings-table" style={{ minWidth: 830, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
+          <table className="table-heading-roles settings-table settings-table--pin-actions" style={{ minWidth: 830, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
             <thead>
               <tr>
                 <th style={{ width: 32, fontSize: 13, lineHeight: '20px', fontWeight: 500, }}>
@@ -263,38 +266,16 @@ export function CustomersDirectory() {
                     {c.payment_terms || '30 days'}
                   </td>
                   <td>
-                    <span style={{
-                      fontFamily: 'var(--font-sans)', fontSize: 13,
-                      color: Object.prototype.hasOwnProperty.call(STATUS_COLOR, c.status) ? STATUS_COLOR[c.status] : 'var(--text-tertiary)',
-                      textTransform: 'none' as const,
-                    }}>{Object.prototype.hasOwnProperty.call(STATUS_LABEL, c.status) ? STATUS_LABEL[c.status] : c.status}</span>
+                    <StatusChip status={c.status} label={Object.prototype.hasOwnProperty.call(STATUS_LABEL, c.status) ? STATUS_LABEL[c.status] : undefined} size="sm" />
                   </td>
                   <td style={{ textAlign: 'right' as const }}>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button
-                        onClick={() => openEdit(c)}
-                        disabled={isDemo}
-                        title={isDemo ? 'Not available in the demo' : undefined}
-                        style={{
-                          background: 'none', border: '1px solid var(--border-subtle)',
-                          color: 'var(--text-secondary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 'var(--radius-control)', cursor: isDemo ? 'not-allowed' : 'pointer',
-                          letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1,
-                        }}
-                      >Edit</button>
-                      <button
-                        onClick={() => setDeleteTarget({ id: c.id, name: c.name })}
-                        disabled={isDemo}
-                        title={isDemo ? 'Not available in the demo' : undefined}
-                        style={{
-                          /* Neutral in the row; the confirmation carries the danger colour. */
-                          background: 'none', border: '1px solid var(--border-subtle)',
-                          color: 'var(--text-secondary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 'var(--radius-control)', cursor: isDemo ? 'not-allowed' : 'pointer',
-                          letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1,
-                        }}
-                      >Delete</button>
-                    </div>
+                    <RowActions
+                      label={c.name}
+                      items={[
+                        { label: 'Edit', onSelect: () => openEdit(c), disabled: isDemo },
+                        { label: 'Delete', danger: true, onSelect: () => setDeleteTarget({ id: c.id, name: c.name }), disabled: isDemo },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
@@ -319,13 +300,13 @@ export function CustomersDirectory() {
       {editCustomer && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditCustomer(null)} />
-          <div style={{ position: 'relative', width: 'min(420px, 100vw)', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 24, overflowY: 'auto' }}>
+          <div style={{ position: 'relative', width: 'min(420px, 100vw)', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 'var(--card-pad, 20px)', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h2 style={{ ...settingsCardTitleStyle }}>Edit customer</h2>
               <button type="button" className="settings-control" aria-label="Close" onClick={() => setEditCustomer(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 18, lineHeight: 1, width: 40, height: 40, borderRadius: 'var(--radius-control)' }}>✕</button>
             </div>
             {editErr && (
-              <div role="alert" style={{ padding: '8px 12px', background: 'var(--status-danger-bg, rgba(239,68,68,0.1))', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
+              <div role="alert" style={{ padding: '8px 12px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
                 {editErr}
               </div>
             )}
@@ -361,7 +342,7 @@ export function CustomersDirectory() {
                 onClick={handleEditSave}
                 title={isDemo ? 'Not available in the demo' : undefined}
                 className="settings-control"
-                style={{ flex: '1 1 140px', minHeight: 40, padding: '8px 16px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control)', cursor: isDemo ? 'not-allowed' : editSaving ? 'wait' : 'pointer', fontWeight: 500, textTransform: 'none', opacity: isDemo ? 0.5 : 1 }}
+                style={{ flex: '1 1 140px', minHeight: 40, padding: '8px 16px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: 'var(--radius-control)', cursor: isDemo ? 'not-allowed' : editSaving ? 'wait' : 'pointer', fontWeight: 500, textTransform: 'none', opacity: isDemo ? 0.5 : 1 }}
               >
                 {editSaving ? 'Saving…' : 'Save changes'}
               </button>

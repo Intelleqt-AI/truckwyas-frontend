@@ -1,3 +1,6 @@
+import { StatusChip } from '@/components/ui/StatusChip';
+import { formatDateTime } from '@/lib/formatters';
+import { BlockSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { useEffect, useState } from "react";
 import useFetch from "@/hooks/useFetch";
 import { usePost } from "@/hooks/usePost";
@@ -172,13 +175,7 @@ export default function XeroIntegration() {
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Never";
-    return new Date(dateString).toLocaleString("en-ZA", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateTime(dateString);
   };
 
   const primaryBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 };
@@ -189,14 +186,21 @@ export default function XeroIntegration() {
   if (isLoading) {
     return (
       <SettingsShell activeId="integrations">
-        <Loader fullScreen />
+        {/* Head first; only the content waits. */}
+        <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
+          <SettingsPageHeader
+            title="Xero integration"
+            description="Connect your Xero account to automatically sync invoices and payments"
+          />
+          <BlockSkeleton height={200} label="Loading Xero connection" />
+        </div>
       </SettingsShell>
     );
   }
 
   return (
     <SettingsShell activeId="integrations">
-    <div style={{ maxWidth: 960, margin: '0 auto' }}>
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
       <SettingsPageHeader
         title="Xero integration"
         description="Connect your Xero account to automatically sync invoices and payments"
@@ -207,15 +211,9 @@ export default function XeroIntegration() {
         <div style={{ ...settingsCardHeaderStyle, justifyContent: 'space-between' }}>
           <h2 id="xero-status-title" style={settingsCardTitleStyle}>Connection status</h2>
           {connection?.is_connected ? (
-            <span style={{ ...settingsBadgeStyle, display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--status-success-text, var(--accent-primary))', borderColor: 'currentColor' }}>
-              <CheckCircle2 aria-hidden="true" style={{ width: 12, height: 12 }} />
-              Connected
-            </span>
+            <StatusChip status="CONNECTED" />
           ) : (
-            <span style={{ ...settingsBadgeStyle, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <XCircle aria-hidden="true" style={{ width: 12, height: 12 }} />
-              Not connected
-            </span>
+            <StatusChip status="DISCONNECTED" />
           )}
         </div>
         <div style={settingsCardBodyStyle}>
@@ -297,7 +295,7 @@ export default function XeroIntegration() {
               <div style={{
                 width: 48, height: 48, borderRadius: '50%', margin: '0 auto 16px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(var(--accent-primary-rgb, 37,99,235), 0.1)', color: 'var(--accent-primary)',
+                background: 'var(--accent-dim)', color: 'var(--accent-primary)',
               }}>
                 <Building2 aria-hidden="true" style={{ width: 24, height: 24 }} />
               </div>
@@ -342,21 +340,21 @@ export default function XeroIntegration() {
                 key={log.id}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
-                  padding: '12px 24px',
+                  padding: '12px var(--card-pad, 20px)',
                   borderBottom: i < syncLogs.length - 1 ? '1px solid var(--border-row)' : 'none',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                   {log.status === "success" ? (
-                    <CheckCircle2 aria-hidden="true" style={{ width: 20, height: 20, flexShrink: 0, color: 'var(--status-success-text, var(--accent-primary))' }} />
+                    <CheckCircle2 aria-hidden="true" style={{ width: 20, height: 20, flexShrink: 0, color: 'var(--status-success-text)' }} />
                   ) : (
-                    <XCircle aria-hidden="true" style={{ width: 20, height: 20, flexShrink: 0, color: 'var(--status-danger-text, var(--status-danger))' }} />
+                    <XCircle aria-hidden="true" style={{ width: 20, height: 20, flexShrink: 0, color: 'var(--status-danger-text)' }} />
                   )}
                   <div style={{ minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>
                       {log.sync_type === "invoice" ? "Invoice sync" : "Payment sync"}
                     </p>
-                    <p style={{ margin: 0, fontSize: 13, lineHeight: '20px', color: log.status === "success" ? 'var(--text-tertiary)' : 'var(--status-danger-text, var(--status-danger))' }}>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: '20px', color: log.status === "success" ? 'var(--text-tertiary)' : 'var(--status-danger-text)' }}>
                       {log.status === "success"
                         ? `${log.records_synced} records synced`
                         : log.error_message || "Sync failed"}

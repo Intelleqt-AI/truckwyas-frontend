@@ -6,14 +6,16 @@ import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { SettingsShell } from "./SettingsShell";
 import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
+import { Segmented } from '@/components/ui/Segmented';
+import { StatusChip } from '@/components/ui/StatusChip';
 
 const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle: React.CSSProperties = { ...settingsCardHeaderStyle, justifyContent: 'space-between' };
 const sectionTitleStyle = settingsCardTitleStyle;
 
 const STATUS_COLOR: Record<string, string> = {
-  complete: 'var(--status-success-text, var(--accent-primary))',
-  pending: 'var(--status-warning-text, var(--status-warning))',
+  complete: 'var(--status-success-text)',
+  pending: 'var(--status-warning-text)',
 };
 
 // Presentation-only labels for known status payload values — unknown strings
@@ -37,7 +39,8 @@ interface BillingTransaction {
 // Exact ZAR with cents (brand: two decimals for exact totals).
 const formatRand = (amount?: string | number | null) => formatCurrency(Number(amount ?? 0));
 
-const PERIODS = ['All time', 'Today', 'This week', 'This month', 'This year'] as const;
+// No "Today": a single day of platform charges is never a useful view.
+const PERIODS = ['All time', 'This week', 'This month', 'This year'] as const;
 type Period = typeof PERIODS[number];
 
 function startOfWeek(d: Date): Date {
@@ -52,7 +55,6 @@ function startOfWeek(d: Date): Date {
 function matchesPeriod(isoDate: string, period: Period, now: Date): boolean {
   if (period === 'All time') return true;
   const d = new Date(isoDate);
-  if (period === 'Today') return d.toDateString() === now.toDateString();
   if (period === 'This week') return d >= startOfWeek(now);
   if (period === 'This month') return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
   if (period === 'This year') return d.getFullYear() === now.getFullYear();
@@ -87,7 +89,7 @@ function HistoryTable({ title, rows }: { title: string; rows: BillingTransaction
             {rows.map((tx, i) => (
               <tr key={tx.id} style={{ borderBottom: i < rows.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
                 <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{tx.label}</td>
-                <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                <td style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                   {tx.reference || '—'}
                 </td>
                 <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
@@ -97,10 +99,7 @@ function HistoryTable({ title, rows }: { title: string; rows: BillingTransaction
                   {formatRand(tx.amount)}
                 </td>
                 <td>
-                  <span style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-                    color: STATUS_COLOR[tx.status] ?? 'var(--status-danger-text, var(--status-danger))',
-                  }}>{statusDisplay(tx.status)}</span>
+                  <StatusChip tone={tx.status === 'complete' ? 'success' : tx.status === 'pending' ? 'warning' : tx.status === 'refunded' ? 'neutral' : 'danger'} label={statusDisplay(tx.status)} size="sm" />
                 </td>
               </tr>
             ))}
@@ -135,12 +134,12 @@ export default function BillingHistoryPage() {
 
   return (
     <SettingsShell activeId="billing">
-    <div style={{ maxWidth: 960, margin: '0 auto' }}>
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
       {/* Title block sits at the same y as every other settings section; the
           way back lives beside it instead of pushing the h1 down. */}
       <SettingsPageHeader
         title="Billing history"
-        description="Every charge to your card on file: the monthly plan and the per-delivery platform fee"
+        description="Plan and per-delivery fees charged to your card"
         actions={
           <button type="button" className="settings-control" onClick={() => navigate('/settings/billing')} style={{ ...settingsSecondaryButtonStyle, flexShrink: 0 }}>
             Back to billing
@@ -148,43 +147,20 @@ export default function BillingHistoryPage() {
         }
       />
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-        {PERIODS.map(p => (
-          <button
-            key={p}
-            className="settings-control"
-            onClick={() => setPeriod(p)}
-            aria-pressed={period === p}
-            style={{
-              background: period === p ? 'var(--accent-primary)' : 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              color: period === p ? 'var(--btn-action-color, var(--bg-deep))' : 'var(--text-secondary)',
-              padding: '8px 12px',
-              borderRadius: 'var(--radius-control)',
-              minHeight: 40,
-              fontSize: 14,
-              lineHeight: '20px',
-              fontFamily: 'var(--font-sans)',
-              cursor: 'pointer',
-              fontWeight: period === p ? 500 : 400,
-              transition: 'all 0.2s ease',
-            }}
-          >
-            {p}
-          </button>
-        ))}
+      <div className="tw-toolbar" style={{ maxWidth: '100%', overflowX: 'auto' }}>
+        <Segmented label="Period" value={period} onChange={setPeriod} options={PERIODS.map(p => ({ value: p, label: p }))} />
       </div>
 
       {loading ? (
         <div style={sectionStyle}>
-          <div style={{ padding: 24 }}>
+          <div style={{ padding: 'var(--card-pad, 20px)' }}>
             <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', width: '40%' }} />
           </div>
         </div>
       ) : (
         <>
           <HistoryTable title="Plan purchased" rows={planCharges} />
-          <HistoryTable title="Platform fee (0.25% per delivery)" rows={feeCharges} />
+          <HistoryTable title="Platform fee (0,25% per delivery)" rows={feeCharges} />
         </>
       )}
     </div>

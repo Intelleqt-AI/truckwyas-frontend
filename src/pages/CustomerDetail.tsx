@@ -2,15 +2,35 @@ import './quote-invoice-roles.css';
 import './table-heading-roles.css';
 import './bookings-typography.css';
 import './bookings-section.css';
+import './ops-tiles.css';
+import SectionHeader from '@/components/layout/SectionHeader';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
+import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
+import { InfoTip } from '@/components/ui/InfoTip';
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
-import { formatCurrency, formatDate } from "@/lib/formatters";
-import { ArrowLeft, X } from "lucide-react";
+import { formatCurrency, formatDate, formatMoneyWhole } from '@/lib/formatters';
+import { FileSearch, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader } from '@/components/Loader';
+import { BlockSkeleton, TilesSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import { boardStage, usePipeline } from '@/components/overview/today';
+import { useLedger, isOpen, num, todayISO, daysBetween } from '@/components/reports/data';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { rowLink } from '@/lib/rowLink';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import { fetchAllPages } from '@/components/insights/findings';
+import { staleWork, staleLabel } from './bookings-stale';
+import { RecordId } from './recordNo';
+
+type OpenLoad = {
+  id: number; customer?: number | null; status: string; load_number: string; total_amount?: string;
+  pickup_location?: string; pickup_city?: string; delivery_location?: string; delivery_city?: string;
+  pickup_date?: string; delivery_date?: string; created_at?: string;
+};
 
 // Exact rand amounts, two decimals, shared formatter.
 const formatZAR = (v: number) => formatCurrency(v || 0);
@@ -70,55 +90,112 @@ const PAYMENT_TERMS = [
   { value: "NET90", label: "Net 90 days" },
 ];
 
+const QUOTES_SHOWN = 5;
+
 export default function CustomerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const railRef = useStickyRail<HTMLElement>();
   const [showEdit, setShowEdit] = useState(false);
+  useFocusTrap(latestModal, showEdit);
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [updating, setUpdating] = useState(false);
+  // Quotes: the 5 most recent, the rest behind "Show all" (many are repeat drafts).
+  const [allQuotes, setAllQuotes] = useState(false);
 
-  const { data: customer, isLoading } = useQuery({
+  const customerQuery = useQuery({
     queryKey: ["customer", id],
     queryFn: () => fetchData(`api/v1/customers/${id}/`),
     enabled: !!id,
   });
+  const { data: customer, isLoading } = customerQuery;
+  const customerFailed = loadFailed(customerQuery);
+  const customerError = (customerQuery.error ?? customerQuery.failureReason) as { status?: number } | null;
 
   const { data: quotesData } = useQuery({
     queryKey: ["customer-quotes", id],
     queryFn: () => fetchData(`api/v1/quotes/?customer=${id}&page_size=50`),
     enabled: !!id,
   });
+  const quotes: any[] = Array.isArray(quotesData) ? quotesData : (quotesData?.results || []);
+  // Win rate uses Home's definition (components/overview/today.tsx): quotes
+  // accepted or turned into a load, out of quotes actually sent. Drafts were
+  // never offered, so they are neither won nor lost.
+  const pipeline = usePipeline(quotes);
+  // Their open orders (R6): from the same list as Orders (shared cache), so a
+  // stale load is visible here too, with the same rule and words.
+  const loadsQuery = useQuery({
+    queryKey: ["loads-list"],
+    queryFn: () => fetchAllPages<OpenLoad>('api/v1/loads/').then(r => r.rows),
+  });
+  // Their invoices, from the same ledger as Invoices and the Debtors report.
+  const ledger = useLedger(['invoices']);
 
-  if (isLoading) return <Loader fullScreen />;
+  // A failed request is not a missing record: only a 404 says "not found".
+  if (customerFailed && customerError?.status !== 404) return (
+    <div className="bk-detail bookings-typography">
+      <SectionHeader title="Customer" back={{ to: '/customers', label: 'Customers' }} />
+      <LoadError what="this customer" error={customerError} busy={customerQuery.isFetching} onRetry={() => customerQuery.refetch()} />
+    </div>
+  );
+
+  // Loading: keep the back link and page frame; only the content waits.
+  if (isLoading && !customerFailed) return (
+    <div className="bk-detail bookings-typography">
+      <SectionHeader
+        title="Loading customer"
+        back={{ to: '/customers', label: 'Customers' }}
+      />
+      <TilesSkeleton count={4} />
+      <BlockSkeleton height={280} label="Loading customer" />
+    </div>
+  );
 
   if (!customer) return (
-    <div className="bk-detail">
-      <button type="button" className="bk-back" onClick={() => navigate("/customers")}>
-        <ArrowLeft size={16} aria-hidden="true" /> Back to customers
-      </button>
-      <div className="bk-card">
-        <div className="bk-empty" style={{ padding: 16 }}>
-          <h1 className="bk-empty__title">Customer not found</h1>
-          <p className="bk-empty__text">It may have been removed, or the link is out of date.</p>
-          <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate("/customers")}>View customers</button>
+    <div className="bk-detail bookings-typography">
+      <SectionHeader title="Customer not found" back={{ to: '/customers', label: 'Customers' }} />
+      {/* Not found (404): the head and back link stay; the message and its
+          one action share a row (the Invoice and Quote pattern, R8). */}
+      <div className="load-error bk-missing" role="status">
+        <FileSearch className="load-error__icon" size={20} aria-hidden="true" />
+        <div className="load-error__text">
+          <p className="load-error__title">There is no customer at this link</p>
+          <p className="load-error__hint">It may have been deleted, or the link is wrong.</p>
         </div>
+        <button type="button" className="tw-btn load-error__retry" onClick={() => navigate("/customers")}>All customers</button>
       </div>
     </div>
   );
 
-  const quotes = Array.isArray(quotesData) ? quotesData : (quotesData?.results || []);
   const totalQuotes = quotes.length;
+  const sortedQuotes = [...quotes].sort((a: any, b: any) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
   // The quotes endpoint is paginated (page_size=50): every figure below is
   // computed from the quotes actually loaded, and says so when that is not all of them.
   const quotesOnServer: number = Array.isArray(quotesData) ? quotes.length : (quotesData?.count ?? quotes.length);
   const basis = quotesOnServer > totalQuotes ? `the latest ${totalQuotes} of ${quotesOnServer} quotes` : `${totalQuotes} ${totalQuotes === 1 ? "quote" : "quotes"}`;
-  const acceptedQuotes = quotes.filter((q: any) => q.status === "ACCEPTED").length;
-  const totalRevenue = quotes
-    .filter((q: any) => q.status === "ACCEPTED")
-    .reduce((s: number, q: any) => s + parseFloat(q.total_amount || q.quote_price || "0"), 0);
+  const WON = ["ACCEPTED", "IT", "COMPLETED"];
+  const wonQuotes = quotes.filter((q: any) => WON.includes(String(q.status || "").toUpperCase()));
+  const sentQuotes = quotes.length - pipeline.draftsAll;
+  const totalRevenue = wonQuotes.reduce((s: number, q: any) => s + parseFloat(q.total_amount || q.quote_price || "0"), 0);
   const isActive = customer.is_active !== false && customer.status !== "INACTIVE";
+
+  // Money: open invoices (issued, unpaid, balance above zero, incl. VAT).
+  const today = todayISO();
+  const theirInvoices = (ledger.data?.invoices ?? [])
+    .filter(i => i.customer === customer.id)
+    .sort((a, b) => (b.issue_date || "").localeCompare(a.issue_date || ""));
+  const openInvoices = theirInvoices.filter(isOpen);
+  const owed = openInvoices.reduce((t, i) => t + num(i.balance), 0);
+  const lateInvoices = openInvoices.filter(i => i.due_date && i.due_date.slice(0, 10) < today);
+  const overdue = lateInvoices.reduce((t, i) => t + num(i.balance), 0);
+  const oldestLate = lateInvoices.reduce((m, i) => Math.max(m, daysBetween(i.due_date, today)), 0);
+  const invoiceRows = [...openInvoices, ...theirInvoices.filter(i => !isOpen(i))].slice(0, 10);
+  // Company first; the contact person only when they differ.
+  const displayName = (customer.company_name || "").trim() || customer.name;
+  const contact = (customer.name || "").trim();
+  const showContact = contact && contact.toLowerCase() !== displayName.toLowerCase();
 
   function openEdit() {
     setEditForm({
@@ -168,111 +245,216 @@ export default function CustomerDetail() {
     setSaving(false);
   }
 
+  // Tiles show whole rands; the exact amount sits in the title.
+  const wholeRand = (n: number) => formatMoneyWhole(n);
+
+  // Phones (R7): the figure tiles wrap to one or two rows depending on the
+  // data, so until quotes and invoices arrive the cards below wait too (one
+  // placeholder), and nothing already on screen moves when the tiles land.
+  const figuresWaiting = quotesData === undefined || (!ledger.data && !ledger.error);
+
   return (
-    <div className="bk-detail bookings-typography">
+    <div className={`bk-detail bookings-typography${figuresWaiting ? ' cd-waiting' : ''}`}>
       {/* Back + Header */}
-      <button type="button" className="bk-back" onClick={() => navigate("/customers")}>
-        <ArrowLeft size={16} aria-hidden="true" /> Back to customers
-      </button>
-      <div className="bk-detail-header">
-        <div className="bk-detail-header__titles">
-          <div className="bk-eyebrow">Customer</div>
-          <div className="bk-title-row">
-            <h1 className="bk-title">{customer.name}</h1>
-            <span className={`bk-status bk-status--${isActive ? "success" : "neutral"}`}>{isActive ? "Active" : "Inactive"}</span>
-          </div>
-          {customer.company_name && customer.company_name !== customer.name && (
-            <p className="bk-subtitle">{customer.company_name}</p>
-          )}
-        </div>
-        <div className="bk-detail-header__actions">
-          <button
-            type="button"
-            className="bk-btn bk-btn--quiet"
-            disabled={updating}
-            onClick={handleStatusToggle}
-          >{updating ? "Updating…" : isActive ? "Mark inactive" : "Mark active"}</button>
+      <SectionHeader
+        title={displayName}
+        back={{ to: '/customers', label: 'Customers' }}
+        titleAdornment={<><StatusChip status={isActive ? "ACTIVE" : "INACTIVE"} /></>}
+        description={showContact ? <>Contact: {contact}</> : undefined}
+        actions={<>
           <button
             type="button"
             className="bk-btn bk-btn--secondary"
             onClick={() => navigate(`/customers/${id}/risk`)}
           >Payment risk profile</button>
           <button type="button" className="bk-btn bk-btn--primary" onClick={openEdit}>Edit customer</button>
-        </div>
-      </div>
+        </>}
+      />
 
-      {/* Key figure first: what this customer is worth, from their own quotes. */}
-      {totalQuotes > 0 ? (
-        <section className="bk-summary" aria-label="Customer value">
-          <div className="bk-summary__cell">
-            <div className="bk-summary__label">Won from accepted quotes</div>
-            <div className="bk-summary__value">{formatZAR(totalRevenue)}</div>
-            <div className="bk-summary__note">Quote totals, from {basis}.</div>
-          </div>
-          <div className="bk-summary__cell">
-            <div className="bk-summary__label">Quotes accepted</div>
-            <div className="bk-summary__value">{acceptedQuotes}<span className="bk-summary__of">of {totalQuotes}</span></div>
-            <div className="bk-summary__note">{Math.round((acceptedQuotes / totalQuotes) * 100)}% of their quotes, drafts included, were accepted.</div>
-          </div>
-          <div className="bk-summary__cell">
-            <div className="bk-summary__label">Credit limit</div>
-            <div className="bk-summary__value">{customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : "—"}</div>
-            <div className="bk-summary__note">{customer.credit_limit ? `${paymentTermsLabel(customer.payment_terms_default)} payment terms.` : "No limit set. Add one under Edit customer."}</div>
-          </div>
-        </section>
-      ) : (
-        <div className="bk-notice">
-          <div>
-            <p className="bk-notice__text">You have not quoted {customer.name} yet.</p>
-            <p className="bk-notice__sub">Their value and win rate appear here once you send them a quote.</p>
-          </div>
-          <button type="button" className="bk-btn bk-btn--secondary" onClick={() => navigate("/bookings/quotes/new")}>New quote</button>
-        </div>
-      )}
-
-      <div className="bk-detail-grid">
-        {/* Contact Details */}
-        <section className="bk-card" aria-labelledby="cd-contact-title">
-          <div className="bk-card__head"><h2 className="bk-card__title" id="cd-contact-title">Contact details</h2></div>
-          {[
-            { label: "Email", value: customer.email },
-            { label: "Phone", value: customer.phone },
-            { label: "City", value: customer.city },
-            { label: "Province", value: customer.state },
-            { label: "Postal code", value: customer.zip_code },
-            { label: "Address", value: customer.address },
-            { label: "Billing address", value: customer.billing_address || customer.address },
-          ].map(r => (
-            <div key={r.label} className="bk-kv">
-              <span className="bk-kv__label">{r.label}</span>
-              <span className="bk-kv__value">{r.value || "—"}</span>
+      <div className="bk-detail-grid bk-detail-grid--rail">
+        <div className="bk-stack">
+          {/* Key figures first: what they owe you, then what they are worth.
+              Until quotes and invoices arrive, tile placeholders hold the row
+              (never the "not quoted yet" notice, which would then swap out). */}
+          {quotesData === undefined || (!ledger.data && !ledger.error) ? (
+            // Four placeholders: the usual row for a customer with invoices and
+            // quotes. On phones they take the same two rows the tiles will (R7).
+            <>
+              <div className="cd-tiles-skel"><TilesSkeleton count={4} /></div>
+              <div className="cd-wait-skel"><BlockSkeleton height={342} label="Loading customer" /></div>
+            </>
+          ) : (owed > 0 || totalQuotes > 0) ? (
+            <KpiRow>
+              {owed > 0 && (
+                <KpiTile
+                  aria-label="Owed to you"
+                  label="Owed to you"
+                  aside={<InfoTip>Unpaid balances on issued invoices, including VAT. Same basis as Invoices and the Debtors report.</InfoTip>}
+                  figure={<span title={formatZAR(owed)}>{wholeRand(owed)}</span>}
+                  note={`${openInvoices.length} ${openInvoices.length === 1 ? "invoice" : "invoices"}`}
+                />
+              )}
+              {overdue > 0 && (
+                <KpiTile
+                  aria-label="Overdue"
+                  label="Overdue"
+                  figure={<span title={formatZAR(overdue)}>{wholeRand(overdue)}</span>}
+                  note={`Oldest ${oldestLate} ${oldestLate === 1 ? "day" : "days"} late`}
+                  tone="danger"
+                />
+              )}
+              {wonQuotes.length > 0 && (
+                <KpiTile
+                  aria-label="Won from quotes"
+                  label="Won from quotes"
+                  aside={<InfoTip>Totals of quotes accepted or turned into a load, from {basis}.</InfoTip>}
+                  figure={<span title={formatZAR(totalRevenue)}>{wholeRand(totalRevenue)}</span>}
+                  note={`${wonQuotes.length} ${wonQuotes.length === 1 ? "quote" : "quotes"} won`}
+                />
+              )}
+              {pipeline.winRate != null && (
+                <KpiTile
+                  aria-label="Win rate"
+                  label="Win rate"
+                  aside={<InfoTip>Quotes accepted or turned into a load, out of quotes sent. Drafts are left out. Same definition as Home.</InfoTip>}
+                  figure={`${pipeline.winRate}%`}
+                  note={`${wonQuotes.length} of ${sentQuotes} sent`}
+                />
+              )}
+            </KpiRow>
+          ) : (
+            <div className="bk-notice" style={{ marginBottom: 0 }}>
+              <div>
+                <p className="bk-notice__text">You have not quoted {displayName} yet.</p>
+              </div>
+              <button type="button" className="bk-btn bk-btn--secondary" onClick={() => navigate("/bookings/quotes/new")}>New quote</button>
             </div>
-          ))}
-        </section>
+          )}
 
-        {/* Account Details */}
-        <section className="bk-card" aria-labelledby="cd-account-title">
+          {/* Contact details: a definition grid across the column, not
+              label/value rows with the value 700px from its label. */}
+          <section className="bk-card cd-after" aria-labelledby="cd-contact-title">
+            <div className="bk-card__head"><h2 className="bk-card__title" id="cd-contact-title">Contact details</h2></div>
+            <dl className="bk-facts bk-facts--auto cd-contact">
+              {[
+                ...(showContact ? [{ label: "Contact", value: contact }] : []),
+                { label: "Email", value: customer.email, wide: true },
+                { label: "Phone", value: customer.phone },
+                { label: "City", value: customer.city },
+                { label: "Province", value: customer.state },
+                { label: "Postal code", value: customer.zip_code },
+                { label: "Address", value: customer.address, wide: true },
+                { label: "Billing address", value: customer.billing_address || customer.address, wide: true },
+              ].map((r: { label: string; value?: string; wide?: boolean }) => (
+                <div key={r.label} className={r.wide ? 'bk-fact--wide' : undefined}>
+                  <dt className="bk-fact__label">{r.label}</dt>
+                  <dd className="bk-fact__value">{r.value || <span className="bk-muted">Not recorded</span>}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </div>
+
+        {/* Account Details: sticky rail */}
+        <section ref={railRef} className="bk-card cd-after" aria-labelledby="cd-account-title">
           <div className="bk-card__head"><h2 className="bk-card__title" id="cd-account-title">Account details</h2></div>
           {[
             { label: "Payment terms", value: paymentTermsLabel(customer.payment_terms_default) },
-            { label: "Credit limit", value: customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : "—" },
-            { label: "Status", value: isActive ? "Active" : "Inactive" },
-            { label: "Customer since", value: customer.created_at ? formatDate(customer.created_at) : "—" },
-          ].map(r => (
-            <div key={r.label} className="bk-kv">
-              <span className="bk-kv__label">{r.label}</span>
-              <span className="bk-kv__value">{r.value}</span>
+            { label: "Owed now", value: ledger.data ? (owed > 0 ? formatZAR(owed) : "Nothing owed") : ledger.error ? "Could not load" : "…" },
+            {
+              label: "Credit limit",
+              // Its source in one visible line (R5), not only behind a tip.
+              value: customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : "Not set",
+              note: customer.credit_limit ? "Set by your team; not enforced" : undefined,
+            },
+            { label: "Invoices", value: theirInvoices.length ? `${theirInvoices.length} issued` : ledger.data ? "None yet" : "…" },
+            { label: "Last quote", value: sortedQuotes[0]?.created_at ? formatDate(sortedQuotes[0].created_at) : "None yet" },
+            { label: "Customer since", value: customer.created_at ? formatDate(customer.created_at) : "Not recorded" },
+          ].map((r: { label: string; value: string; tip?: string; note?: string }) => (
+            <div key={r.label} className={r.note ? 'bk-kv cd-kv--noted' : 'bk-kv'}>
+              <span className="bk-kv__label">{r.label}{r.tip && <InfoTip label={`Where the ${r.label.toLowerCase()} comes from`}>{r.tip}</InfoTip>}</span>
+              <span className="bk-kv__value">{r.value}{r.note && <span className="cd-kv__note">{r.note}</span>}</span>
             </div>
           ))}
+          {/* Status lives with the account, not as a loose button in the head. */}
+          <div className="bk-kv">
+            <span className="bk-kv__label">Status</span>
+            <span className="bk-kv__value cd-status">
+              {isActive ? "Active" : "Inactive"}
+              <button type="button" className="bk-link" disabled={updating} onClick={handleStatusToggle}>
+                {updating ? "Updating…" : isActive ? "Mark inactive" : "Mark active"}
+              </button>
+            </span>
+          </div>
         </section>
       </div>
 
+      {/* Invoices: open ones first, then the most recent settled ones. */}
+      <section className="bk-card cd-after" style={{ marginTop: "var(--section-gap, 24px)", padding: 0 }} aria-labelledby="cd-invoices-title">
+        <div className="bk-card__head" style={{ padding: "var(--card-pad, 20px) var(--card-pad, 20px) 0" }}>
+          <h2 className="bk-card__title" id="cd-invoices-title">Invoices</h2>
+          <span className="bk-toolbar__end">
+            {theirInvoices.length > invoiceRows.length
+              ? `${invoiceRows.length} of ${theirInvoices.length}`
+              : `${theirInvoices.length} ${theirInvoices.length === 1 ? "invoice" : "invoices"}`}
+          </span>
+        </div>
+        {!ledger.data ? (
+          ledger.error ? (
+            <div className="bk-empty"><p className="bk-empty__text">Invoices could not be loaded. <button type="button" className="bk-link" onClick={ledger.retry}>Try again</button></p></div>
+          ) : (
+            // Header plus one row: most customers have one or two invoices.
+            <div style={{ padding: "var(--card-pad, 20px)" }}><div className="ops-skel" style={{ height: 52 }} /></div>
+          )
+        ) : theirInvoices.length === 0 ? (
+          <div className="bk-empty"><p className="bk-empty__text">No invoices for this customer yet.</p></div>
+        ) : (
+          <div className="bk-table-wrap bk-table-wrap--bare">
+            {/* The three tables share one column grid (R7): Date, Status and
+                Amount sit at the same x on Invoices, Quotes and Open orders. */}
+            <table className="table-heading-roles bk-table cd-grid">
+              <colgroup><col className="cd-c-id" /><col className="cd-c-2" /><col className="cd-c-3" /><col className="cd-c-date" /><col className="cd-c-status" /><col className="cd-c-amt" /></colgroup>
+              <thead>
+                <tr>
+                  <th scope="col">Invoice</th>
+                  <th scope="col" className="bk-col-opt">Issued</th>
+                  <th scope="col" className="is-num bk-col-narrow">Total</th>
+                  <th scope="col" className="bk-col-phone">Due</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" className="is-num">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoiceRows.map(inv => {
+                  const late = isOpen(inv) && inv.due_date && inv.due_date.slice(0, 10) < today;
+                  return (
+                    <tr key={inv.id} className="is-clickable" {...rowLink(() => navigate(`/finance/invoices/${inv.id}`))} onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
+                      <td className="is-id is-truncate cd-col-id"><RecordId value={inv.invoice_number} /></td>
+                      <td className="is-date bk-col-opt">{inv.issue_date ? formatDate(inv.issue_date) : "Not issued"}</td>
+                      <td className="is-num bk-col-narrow" title={formatZAR(num(inv.total_amount))}>{wholeRand(num(inv.total_amount))}</td>
+                      <td className="is-date bk-col-phone cd-due">
+                        {inv.due_date ? formatDate(inv.due_date) : "Not set"}
+                        {late && <span className="bk-muted cd-due__late"> · {daysBetween(inv.due_date, today)} days late</span>}
+                      </td>
+                      <td><StatusChip status={late && String(inv.status).toUpperCase() === "SENT" ? "OVERDUE" : inv.status} size="sm" /></td>
+                      <td className="is-money" title={isOpen(inv) ? formatZAR(num(inv.balance)) : undefined}>{isOpen(inv) ? wholeRand(num(inv.balance)) : <span className="bk-muted" aria-label="Nothing due">—</span>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       {/* Quotes table */}
-      <section className="bk-card" style={{ marginTop: 24, padding: 0 }} aria-labelledby="cd-quotes-title">
-        <div className="bk-card__head" style={{ padding: "24px 24px 0" }}>
+      <section className="bk-card cd-after" style={{ marginTop: "var(--section-gap, 24px)", padding: 0 }} aria-labelledby="cd-quotes-title">
+        <div className="bk-card__head" style={{ padding: "var(--card-pad, 20px) var(--card-pad, 20px) 0" }}>
           <h2 className="bk-card__title" id="cd-quotes-title">Quotes</h2>
           <span className="bk-toolbar__end">
-            {totalQuotes > 15 ? `Showing 15 of ${totalQuotes}` : `${totalQuotes} ${totalQuotes === 1 ? "quote" : "quotes"}`}
+            {quotesOnServer > totalQuotes
+              ? `Latest ${totalQuotes} of ${quotesOnServer}`
+              : `${totalQuotes} ${totalQuotes === 1 ? "quote" : "quotes"}`}
           </span>
         </div>
         {quotes.length === 0 ? (
@@ -280,46 +462,110 @@ export default function CustomerDetail() {
             <p className="bk-empty__text">No quotes yet for this customer.</p>
           </div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table className="table-heading-roles bk-table">
+          <div className="bk-table-wrap bk-table-wrap--bare">
+            <table className="table-heading-roles bk-table cd-grid">
+              <colgroup><col className="cd-c-id" /><col className="cd-c-2" /><col className="cd-c-3" /><col className="cd-c-date" /><col className="cd-c-status" /><col className="cd-c-amt" /></colgroup>
               <thead>
                 <tr>
-                  <th scope="col">Quote #</th>
-                  <th scope="col">Route</th>
+                  <th scope="col">Quote</th>
+                  <th scope="col" className="bk-col-route" colSpan={2}>Route</th>
+                  <th scope="col" className="bk-col-narrow">Date</th>
                   <th scope="col">Status</th>
-                  <th scope="col">Date</th>
                   <th scope="col" className="is-num">Amount</th>
                 </tr>
               </thead>
               <tbody>
-                {quotes.slice(0, 15).map((q: any) => (
+                {(allQuotes ? sortedQuotes : sortedQuotes.slice(0, QUOTES_SHOWN)).map((q: any) => (
                   <tr
                     key={q.id}
                     className="is-clickable"
+                    {...rowLink(() => navigate(`/bookings/quotes/${q.id}`))}
                     onClick={() => navigate(`/bookings/quotes/${q.id}`)}
                   >
-                    <td className="is-id">
-                      {q.quote_number || `#${q.id}`}
+                    <td className="is-id is-truncate cd-col-id">
+                      {q.quote_number ? <RecordId value={q.quote_number} /> : `#${q.id}`}
                     </td>
-                    <td className="is-truncate" title={`${q.pickup_location || "—"} → ${q.delivery_location || "—"}`}>
+                    <td className="is-truncate bk-col-route" colSpan={2} title={`${q.pickup_location || "—"} → ${q.delivery_location || "—"}`}>
                       {q.pickup_location || "—"} → {q.delivery_location || "—"}
                     </td>
-                    <td>
-                      <span className={`bk-status bk-status--${QUOTE_STATUS_TONE[q.status] || "neutral"}`}>{formatStatus(q.status)}</span>
-                    </td>
-                    <td className="is-date">
+                    <td className="is-date bk-col-narrow">
                       {q.created_at ? formatDate(q.created_at) : "—"}
                     </td>
-                    <td className="is-money">
-                      {q.total_amount || q.quote_price ? formatZAR(parseFloat(q.total_amount || q.quote_price)) : "—"}
+                    <td>
+                      {/* A quote that became a load reads as booked, not as the load's own state. */}
+                      {String(q.status).toUpperCase() === "IT"
+                        ? <StatusChip tone="success" label="Booked" size="sm" />
+                        : q.outcome === 'rejected' && String(q.status).toUpperCase() === 'SENT'
+                          // Same reading as the Quotes board: a lost answer sits with the declined ones.
+                          ? <StatusChip status="LOST" label="Marked lost" size="sm" />
+                          // Past its valid-until date: Expired, as on the board and Home (R8).
+                          : boardStage(q) === 'EXPIRED'
+                            ? <StatusChip status="EXPIRED" label="Expired" size="sm" />
+                            : <StatusChip status={q.status} size="sm" />}
+                    </td>
+                    <td className="is-money" title={q.total_amount || q.quote_price ? formatZAR(parseFloat(q.total_amount || q.quote_price)) : undefined}>
+                      {q.total_amount || q.quote_price ? wholeRand(parseFloat(q.total_amount || q.quote_price)) : "—"}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            {sortedQuotes.length > QUOTES_SHOWN && (
+              <div className="cd-more">
+                <button type="button" className="bk-btn bk-btn--quiet" onClick={() => setAllQuotes(v => !v)} aria-expanded={allQuotes}>
+                  {allQuotes ? `Show the latest ${QUOTES_SHOWN}` : `Show all ${sortedQuotes.length}`}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </section>
+
+      {/* Open orders: shown only when there are some, last on the page so
+          nothing above moves when they arrive. */}
+      {(() => {
+        const open = (loadsQuery.data || []).filter((l) => String(l.customer) === String(id) && ['PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'].includes(l.status));
+        if (open.length === 0) return null;
+        return (
+          <section className="bk-card" style={{ marginTop: "var(--section-gap, 24px)", padding: 0 }} aria-labelledby="cd-orders-title">
+            <div className="bk-card__head" style={{ padding: "var(--card-pad, 20px) var(--card-pad, 20px) 0" }}>
+              <h2 className="bk-card__title" id="cd-orders-title">Open orders</h2>
+              <span className="bk-toolbar__end">{open.length} {open.length === 1 ? 'order' : 'orders'}</span>
+            </div>
+            <div className="bk-table-wrap bk-table-wrap--bare">
+              <table className="table-heading-roles bk-table cd-orders cd-grid">
+                <colgroup><col className="cd-c-id" /><col className="cd-c-2" /><col className="cd-c-3" /><col className="cd-c-date" /><col className="cd-c-status" /><col className="cd-c-amt" /></colgroup>
+                <thead>
+                  <tr>
+                    <th scope="col">Load</th>
+                    <th scope="col" className="bk-col-route" colSpan={3}>Route</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" className="is-num">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {open.map((l) => {
+                    const st = staleWork(l);
+                    const from = String(l.pickup_location || '').split(',')[0].trim() || l.pickup_city || '—';
+                    const to = String(l.delivery_location || '').split(',')[0].trim() || l.delivery_city || '—';
+                    return (
+                      <tr key={l.id} className="is-clickable" {...rowLink(() => navigate(`/bookings/${l.id}`))} onClick={() => navigate(`/bookings/${l.id}`)}>
+                        <td className="is-id is-truncate cd-orders__load"><RecordId value={l.load_number} /></td>
+                        <td className="is-truncate bk-col-route" colSpan={3} title={`${l.pickup_location} to ${l.delivery_location}`}>{from} → {to}</td>
+                        <td className="bk-col-status">
+                          <StatusChip status={l.status} size="sm" />
+                          {st && <span className="bk-status-flag bk-status-flag--stale"><span className="bk-stale-long">{staleLabel(st).text}</span><span className="bk-stale-short">{staleLabel(st).text.replace(` ${new Date().getFullYear()} (`, ' (')}</span></span>}
+                        </td>
+                        <td className="is-money" title={formatCurrency(parseFloat(l.total_amount || '0'))}>{formatMoneyWhole(parseFloat(l.total_amount || '0'))}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Edit slide-out */}
       {showEdit && (

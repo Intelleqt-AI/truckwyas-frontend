@@ -1,9 +1,13 @@
 import './fleet-vehicles-brand.css';
+import { fetchAllPages } from '@/components/insights/findings';
+import { formatDate, formatMoneyWhole, formatWeight, sentenceCaseLabel } from '@/lib/formatters';
+import { SkeletonRows } from '@/components/fleet-detail/ContentSkeleton';
 import StaleDataNotice from '@/components/data/StaleDataNotice';
 import './table-heading-roles.css';
-import { Truck as EmptyFleetIcon } from 'lucide-react';
-import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Plus, Truck as EmptyFleetIcon } from 'lucide-react';
+import { useEffect, useState, useRef, type ReactNode } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { fleetMenuItems, useFleetPhoneHead } from '@/components/fleet-detail/fleetHead';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -18,6 +22,17 @@ import { EditVehicleDrawer } from '@/components/EditVehicleDrawer';
 import { Loader } from '@/components/Loader';
 import SectionHeader, { FLEET_TABS } from '@/components/layout/SectionHeader';
 import { useAuth } from '@/lib/AuthContext';
+import RowActions from '@/components/ui/RowActions';
+import { InfoTip } from '@/components/ui/InfoTip';
+import './ops-tiles.css';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
+import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { rowLink } from '@/lib/rowLink';
+import { DELIVERED } from '@/components/reports/data';
+import { capacityTonnes } from '@/components/fleet-detail/parts';
+import { isOpenLoad, staleWork, staleLabel } from '@/lib/staleWork';
 
 interface Vehicle {
   id: number;
@@ -59,6 +74,7 @@ interface Vehicle {
   temp3?: number | string | null;
   temp4?: number | string | null;
   cartrack_current_driver_ref?: string;
+  driver_name?: string | null;
   door_open?: boolean | null;
   last_door_event_at?: string | null;
 }
@@ -98,40 +114,59 @@ interface FleetIntelligence {
 }
 
 // Status chip tone. Colour always sits next to the status word.
-const STATUS_TONE: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
-  ACTIVE: 'success',
-  AVAILABLE: 'success',
-  IN_USE: 'info',
-  MAINTENANCE: 'warning',
-  INACTIVE: 'neutral',
-  OUT_OF_SERVICE: 'neutral',
-};
-
 // Column headings. The API's revenue_generated / total_trips are all-time
 // sums over DELIVERED loads (see VehicleSerializer), so they are labelled as
 // such rather than "MTD". Health is the rule-based composite score
 // (maintenance, uptime, fuel, age), not a model output, so it is not called AI.
-const COLUMNS: { label: string; numeric?: boolean }[] = [
+// Make, model and type share one "Truck" column so Status and the money
+// columns stay in view at laptop widths; Driver drops first when narrow.
+// "Doing now" replaces the old Driver column (vehicle.driver is rarely set, so
+// it read "Unassigned" on every row): it comes from the open order naming the
+// truck, like the retired Fleet status page did.
+const COLUMNS: { label: string; numeric?: boolean; cls?: string; tip?: ReactNode }[] = [
   { label: 'Registration' },
-  { label: 'Make and model' },
-  { label: 'Type' },
-  { label: 'Driver' },
-  { label: 'Status' },
-  { label: 'Delivered revenue', numeric: true },
-  { label: 'Delivered loads', numeric: true },
-  { label: 'Health score', numeric: true },
+  { label: 'Truck', cls: 'fleet-col-phone' },
+  { label: 'Doing now', cls: 'fleet-col-opt' },
+  { label: 'Status', cls: 'fleet-col-status' },
+  { label: 'Revenue', numeric: true },
+  { label: 'Health', numeric: true, cls: 'fleet-col-opt2', tip: <>A rule-based score out of 100 from maintenance, uptime, fuel use and age. 80 or more is good, 60 to 79 fair, 40 to 59 low; below 40 needs action.</> },
   { label: '' },
 ];
+
+// Open orders: the ones that put a truck and a driver on the road.
+const ACTIVE_LOAD = ['ASSIGNED', 'LOADING', 'IN_TRANSIT'];
+const SOON_DAYS = 30;
+const DAY = 86_400_000;
+const daysUntil = (iso?: string | null) => {
+  if (!iso) return null;
+  const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - t.getTime()) / DAY);
+};
+
+/* Status tiles double as the list filter. Definitions (shared with Home's
+   "Vehicles idle" note, which counts status Available):
+     Marked in use   status In use (a status, not work: the note says how
+                     many are on a current order)
+     Available       status Available (or Active)
+     In maintenance  status Maintenance or Out of service */
+type TileKey = 'job' | 'free' | 'shop';
+/** Tiles, plus the "status doesn't match the orders" review filter. */
+type FilterKey = TileKey | 'mismatch';
+const TILE_MATCH: Record<TileKey, (s: string) => boolean> = {
+  job: s => s === 'IN_USE',
+  free: s => s === 'AVAILABLE' || s === 'ACTIVE',
+  shop: s => s === 'MAINTENANCE' || s === 'OUT_OF_SERVICE',
+};
+const TILE_LABEL: Record<TileKey, string> = { job: 'Marked in use', free: 'Available', shop: 'In maintenance' };
 
 // The API sends amounts as decimal strings; coerce before formatting.
 const formatZAR = (v: number | string | null | undefined) => {
   const n = Number(v);
-  return Number.isFinite(n) ? 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—';
+  return Number.isFinite(n) ? formatMoneyWhole(n) : '—';
 };
 
-// Sentence-case a status token for display: "IN_USE" → "In use".
-const formatStatus = (s?: string) =>
-  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
 
 // Fetches all fleet data + derives lists. Lives in the queryFn so the result is
 // cached by TanStack Query (keyed by search below) and survives navigation —
@@ -140,15 +175,18 @@ async function loadFleet(q: string) {
   const vehiclesUrl = q
     ? `api/v1/vehicles/?search=${encodeURIComponent(q)}`
     : 'api/v1/vehicles/';
-  const [vehData, overviewData, insightsData, vtData, driverData] = await Promise.all([
-    fetchData(vehiclesUrl),
+  const [vehData, overviewData, insightsData, vtData, driverData, loadRows] = await Promise.all([
+    // Every page (the API returns 20 at a time), so "of 23" matches Insights.
+    fetchAllPages<Vehicle>(vehiclesUrl).then(r => r.rows),
     fetchData('api/v1/fleet/overview/'),
     fetchData('api/v1/fleet/intelligence/'),
     fetchData('api/v1/vehicle-types/'),
     fetchData('api/v1/drivers/'),
+    // Every load, so "Doing now" can name the open order for each truck.
+    fetchAllPages<any>('api/v1/loads/').then(r => r.rows).catch(() => [] as any[]),
   ]);
 
-  const vehicles: Vehicle[] = Array.isArray(vehData) ? vehData : (vehData?.results || []);
+  const vehicles: Vehicle[] = vehData;
 
   const overview: FleetOverview | null = overviewData;
 
@@ -166,7 +204,41 @@ async function loadFleet(q: string) {
     return { id: d.id, name };
   });
 
-  return { vehicles, overview, insights, vehicleTypes, drivers };
+  // The open order naming each truck; a current order wins over a stale one
+  // (R6 shared stale rule), so a truck is only shown as stale when every
+  // order it is on has been left open.
+  const activeLoadByVehicle: Record<number, any> = {};
+  for (const l of loadRows) {
+    if (l.vehicle == null || !ACTIVE_LOAD.includes(l.status)) continue;
+    const had = activeLoadByVehicle[l.vehicle];
+    if (!had || (staleWork(had) && !staleWork(l))) activeLoadByVehicle[l.vehicle] = l;
+  }
+
+  // Home's idle rule (overview/signals.ts idleSignal): every open load
+  // (Pending included) per truck, so the Available note counts the same
+  // trucks "holding an order left open" as Home does.
+  const openByVehicle: Record<number, { current: boolean }> = {};
+  for (const l of loadRows) {
+    if (l.vehicle == null || !isOpenLoad(l)) continue;
+    const k = Number(l.vehicle);
+    openByVehicle[k] = { current: (openByVehicle[k]?.current ?? false) || !staleWork(l) };
+  }
+
+  // Delivered work on the Reports definition (delivered, invoiced, completed,
+  // paid), from every load: the same total as History and Reports. Rows show
+  // each truck's share; loads with no vehicle recorded belong to no row.
+  const delivered = { revenue: 0, loads: 0, noVehicleRevenue: 0, noVehicleLoads: 0 };
+  const deliveredByVehicle: Record<number, { revenue: number; loads: number }> = {};
+  for (const l of loadRows) {
+    if (!DELIVERED.has(String(l.status || '').toUpperCase())) continue;
+    const amt = Number(l.total_amount) || 0;
+    delivered.revenue += amt; delivered.loads += 1;
+    if (l.vehicle == null) { delivered.noVehicleRevenue += amt; delivered.noVehicleLoads += 1; continue; }
+    const row = deliveredByVehicle[l.vehicle] ?? (deliveredByVehicle[l.vehicle] = { revenue: 0, loads: 0 });
+    row.revenue += amt; row.loads += 1;
+  }
+
+  return { vehicles, overview, insights, vehicleTypes, drivers, activeLoadByVehicle, openByVehicle, delivered, deliveredByVehicle };
 }
 
 export default function Vehicles() {
@@ -175,13 +247,27 @@ export default function Vehicles() {
   // Shared public demo account — creation/edit/delete controls are fixed off,
   // viewing/filtering/search stay fully live.
   const isDemo = !!authUser?.is_demo;
-  const [statusFilter, setStatusFilter] = useState('All');
+  // ?tile=job|free|shop opens the list already filtered (Home's "vehicles idle" link).
+  const [tileFilter, setTileFilter] = useState<FilterKey | null>(() => {
+    const t = new URLSearchParams(window.location.search).get('tile');
+    return t === 'job' || t === 'free' || t === 'shop' ? t : null;
+  });
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
   const [sortBy, setSortBy] = useState('revenue');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const phoneHead = useFleetPhoneHead();
+  // Drivers' phone "⋯" ("Vehicles: import from Excel") sends the owner here with ?import=1.
+  const [importParams, setImportParams] = useSearchParams();
+  useEffect(() => {
+    if (importParams.get('import') !== '1') return;
+    const next = new URLSearchParams(importParams); next.delete('import');
+    setImportParams(next, { replace: true });
+    if (!isDemo) setShowImport(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importParams]);
   const [selected, setSelected] = useState<number[]>([]);
   const toggleOne = (id: number, on: boolean) =>
     setSelected(prev => (on ? [...prev, id] : prev.filter(x => x !== id)));
@@ -190,12 +276,16 @@ export default function Vehicles() {
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
 
-  const { data, isLoading: loading, refetch, dataUpdatedAt, isRefetchError } = useQuery({
+  const fleetQuery = useQuery({
     // search drives the vehicles fetch URL (server-side search), so it must be
-    // part of the key — statusFilter / sortBy are applied client-side in render.
+    // part of the key — the tile filter / sortBy are applied client-side in render.
     queryKey: ['vehicles-page', debouncedSearch],
     queryFn: () => loadFleet(debouncedSearch),
   });
+  const { data, refetch, dataUpdatedAt, isRefetchError } = fleetQuery;
+  // Failed (or failing and retrying) with nothing to show: say so, never "No vehicles yet".
+  const failed = loadFailed(fleetQuery);
+  const loading = fleetQuery.isLoading && !failed;
 
   // Cached data drives the view; defaults keep the first render safe.
   // vehicleTypes/drivers are fetched here too, but only AddVehicleDrawer /
@@ -213,15 +303,20 @@ export default function Vehicles() {
   useAutoRefresh(refetch);
 
   // Filter vehicles
-  const filtered = vehicles.filter(v => {
-    if (statusFilter === 'All') return true;
-    return v.status === statusFilter;
-  });
+  const activeLoadByVehicle = data?.activeLoadByVehicle ?? {};
+  const deliveredByVehicle = data?.deliveredByVehicle ?? {};
+  const revenueOf = (v: Vehicle) => deliveredByVehicle[v.id]?.revenue ?? 0;
+  // A status the open orders contradict: marked in use with no order, or free / in the workshop while on one.
+  // Current work only: an order left open (stale, src/lib/staleWork.ts) is
+  // not a job, so it counts neither as current work nor as a reason to be out.
+  const currentLoad = (v: Vehicle) => { const l = activeLoadByVehicle[v.id]; return l && !staleWork(l) ? l : null; };
+  const mismatch = (v: Vehicle) => (currentLoad(v) != null) !== TILE_MATCH.job(v.status);
+  const filtered = tileFilter === 'mismatch' ? vehicles.filter(mismatch) : tileFilter ? vehicles.filter(v => TILE_MATCH[tileFilter](v.status)) : vehicles;
 
   // Sort vehicles
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === 'revenue') {
-      return (b.revenue_generated || 0) - (a.revenue_generated || 0);
+      return revenueOf(b) - revenueOf(a);
     }
     return 0;
   });
@@ -238,23 +333,120 @@ export default function Vehicles() {
     const minutes = Math.floor(ageMs / 60_000);
     const label = minutes < 1 ? 'just now' : minutes < 60 ? `${minutes}m ago` : `${Math.floor(minutes / 60)}h ago`;
     return (
-      <span className="fleet-table__sub" style={{ color: isStale ? 'var(--text-tertiary)' : 'var(--status-success-text, var(--status-success))' }}>
+      <span className="fleet-table__sub" style={{ color: isStale ? 'var(--text-tertiary)' : 'var(--status-success-text)' }}>
         {isStale ? `Seen ${label}` : `Live, ${label}`}
       </span>
     );
   };
 
-  const getStatusBadge = (status: string) => (
-    <span className={`fleet-chip fleet-chip--${STATUS_TONE[status] || 'neutral'}`}>{formatStatus(status)}</span>
+  // One amber mark per row (R7): a truck with an order left open carries the
+  // amber stale dot, so its status chip reads neutral beside it.
+  const getStatusBadge = (v: Vehicle) => (
+    <StatusChip status={v.status} size="sm" tone={staleWork(activeLoadByVehicle[v.id]) ? 'neutral' : undefined} />
   );
 
   // Summary figures: only what changes a decision today.
-  const readyCount = vehicles.filter(v => v.status === 'AVAILABLE' || v.status === 'ACTIVE').length;
-  const onJobCount = vehicles.filter(v => v.status === 'IN_USE').length;
-  const maintenanceCount = vehicles.filter(v => v.status === 'MAINTENANCE').length;
-  const deliveredRevenue = vehicles.reduce((sum, v) => sum + (Number(v.revenue_generated) || 0), 0);
-  const deliveredLoads = vehicles.reduce((sum, v) => sum + (Number(v.total_trips) || 0), 0);
-  const notEarning = vehicles.filter(v => !Number(v.total_trips)).length;
+  const onJob = vehicles.filter(v => TILE_MATCH.job(v.status));
+  const free = vehicles.filter(v => TILE_MATCH.free(v.status));
+  const shop = vehicles.filter(v => TILE_MATCH.shop(v.status));
+  const hasOrder = (v: Vehicle) => currentLoad(v) != null;
+  const onJobNoOrder = onJob.filter(v => !hasOrder(v)).length;
+  const freeOnOrder = free.filter(hasOrder).length;
+  // Available but still holding an order left open (stale, src/lib/staleWork.ts):
+  // not free to take a load in practice. The same count as Home's idle row
+  // ("3 hold an order left open", overview/signals.ts idleSignal).
+  const openByVehicle = data?.openByVehicle ?? {};
+  const freeHolding = free.filter(v => openByVehicle[v.id] && !openByVehicle[v.id].current).length;
+  const holdingText = freeHolding === 0 ? '' : freeHolding === free.length
+    ? (freeHolding === 1 ? 'It holds an order left open' : 'All hold an order left open')
+    : `${freeHolding} ${freeHolding === 1 ? 'holds' : 'hold'} an order left open`;
+  const freeNoteText = !free.length ? 'Every truck is busy' : [
+    freeOnOrder > 0 ? `${freeOnOrder} on a current order` : '',
+    holdingText,
+  ].filter(Boolean).join(' · ') || 'Free to take a load';
+  // Phones keep the short form ("3 left open", the rows' own words) so the
+  // note never ends in an ellipsis; the full sentence is the tooltip.
+  const freeNote = freeOnOrder === 0 && freeHolding > 0 && freeHolding < free.length
+    ? <span title={freeNoteText}>{freeHolding} <span className="fleet-kpi-long">{freeHolding === 1 ? 'holds' : 'hold'} an order </span>left open</span>
+    : freeNoteText;
+  const outOfService = shop.filter(v => v.status === 'OUT_OF_SERVICE').length;
+  const shopOnOrder = shop.filter(hasOrder).length;
+  const mismatchCount = onJobNoOrder + freeOnOrder + shopOnOrder;
+  const deliveredRevenue = data?.delivered.revenue ?? 0;
+  const deliveredLoads = data?.delivered.loads ?? 0;
+  const noVehicleLoads = data?.delivered.noVehicleLoads ?? 0;
+  const reviewing = tileFilter === 'mismatch';
+
+  // What the truck is doing, from the open order that names it. A status that
+  // the orders contradict is flagged calmly, never shown as normal.
+  const doingNow = (v: Vehicle): ReactNode => {
+    const l = activeLoadByVehicle[v.id];
+    const driver = v.driver_name || l?.driver_name;
+    const stale = staleWork(l);
+    if (l && stale) {
+      // Left open (R6 shared rule): not current work. Neutral text, one amber
+      // dot, two lines; the order and its actions are on the truck's page.
+      return <>
+        <span className="fleet-doing--stale"><i className="fleet-doing__dot" aria-hidden="true" />{driver ? `${driver} · ` : ''}order left open</span>
+        <span className="fleet-table__sub fleet-stale-sub">
+          {staleLabel(stale).text}{' · '}
+          <Link className="fleet-stale-link" to={`/bookings/${l.id}`} onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()} aria-label={`Open order ${l.load_number || ''}`.trim()}>Open order</Link>
+        </span>
+      </>;
+    }
+    if (l) {
+      const to = l.delivery_city || l.delivery_location;
+      const sub = [to ? `to ${to}` : '', l.customer_name].filter(Boolean).join(' · ');
+      if (!TILE_MATCH.job(v.status)) {
+        // Status and orders disagree: worded as a mismatch in neutral text;
+        // amber only while the owner is reviewing these rows.
+        const as = TILE_MATCH.shop(v.status) ? 'In maintenance' : 'Marked available';
+        const text = `${as} · on ${l.load_number || 'an open order'}`;
+        return <>{reviewing ? <StatusChip tone="warning" size="sm" label={text} /> : <span className="fleet-doing--mismatch">{text}</span>}{sub && <span className="fleet-table__sub">{sub}</span>}</>;
+      }
+      return <>
+        <span className={driver ? 'is-primary' : 'fleet-doing--mismatch'}>{driver || 'No driver on the order'}</span>
+        {sub && <span className="fleet-table__sub">{sub}</span>}
+      </>;
+    }
+    if (TILE_MATCH.job(v.status)) return reviewing
+      ? <StatusChip tone="warning" size="sm" label="Marked in use · no current order" />
+      : <span className="fleet-doing--mismatch">Marked in use · no current order</span>;
+    if (TILE_MATCH.shop(v.status)) return <span>{v.status === 'OUT_OF_SERVICE' ? 'Out of service' : v.last_maintenance_date ? `In the workshop since ${formatDate(v.last_maintenance_date)}` : 'In the workshop'}</span>;
+    if (TILE_MATCH.free(v.status)) return <span>{driver ? `Free, ${driver} assigned` : 'Free'}</span>;
+    return <span>—</span>;
+  };
+
+  // A registration or insurance renewal due within 30 days, or already past.
+  const renewal = (v: Vehicle) => {
+    const due = ([['Licence disc', v.registration_expiry], ['Insurance', v.insurance_expiry]] as const)
+      .map(([what, iso]) => ({ what, d: daysUntil(iso) }))
+      .filter((x): x is { what: 'Licence disc' | 'Insurance'; d: number } => x.d != null && x.d <= SOON_DAYS)
+      .sort((a, b) => a.d - b.d)[0];
+    if (!due) return null;
+    const txt = due.d < 0 ? `${due.what} expired` : due.d === 0 ? `${due.what} expires today` : `${due.what} due in ${due.d} ${due.d === 1 ? 'day' : 'days'}`;
+    return <span className="fleet-table__sub fleet-table__sub--warn">{txt}</span>;
+  };
+
+  const healthCell = (score?: number) => {
+    if (!score) return '—';
+    const n = Math.round(score);
+    // "Low" is a neutral word; colour only below the action threshold (40), as on the vehicle page.
+    return (
+      <span className="fleet-health" title={`${n} out of 100`}>
+        {n < 60 && <span className={`fleet-health__low${n < 40 ? ' is-action' : ''}`}>{n < 40 ? 'Needs action' : 'Low'}</span>}
+        <span className="fleet-health__track" aria-hidden="true"><span className={`fleet-health__fill${n < 40 ? ' is-low' : ''}`} style={{ width: `${Math.min(100, n)}%` }} /></span>
+        <span className="fleet-health__n">{n}</span>
+      </span>
+    );
+  };
+
+  const tileProps = (key: TileKey) => ({
+    onClick: () => setTileFilter(f => (f === key ? null : key)),
+    className: tileFilter === key ? 'is-selected' : undefined,
+    'aria-label': `${TILE_LABEL[key]}: ${tileFilter === key ? 'showing only these, press to show all' : 'show only these'}`,
+  });
+  const skelFigure = <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} />;
 
   return (
     <div className="fleet-page">
@@ -262,8 +454,9 @@ export default function Vehicles() {
         eyebrow="Fleet"
         title="Fleet"
         tabs={FLEET_TABS}
+        menuItems={fleetMenuItems({ phone: phoneHead, openActivity: () => navigate('/fleet/heatmap'), openImport: () => setShowImport(true), importDisabled: isDemo })}
         actions={<>
-          <button data-fleet-control className="fleet-header-secondary" onClick={() => navigate('/fleet/heatmap')}>Activity heatmap</button>
+          <button data-fleet-control className="fleet-header-secondary" onClick={() => navigate('/fleet/heatmap')}>Activity</button>
           <button data-fleet-control
             className="fleet-header-secondary"
             onClick={() => setShowImport(true)}
@@ -276,60 +469,75 @@ export default function Vehicles() {
             disabled={isDemo}
             title={isDemo ? 'Fixed in demo mode' : undefined}
             style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-          >+ Add vehicle</button>
+          ><Plus size={16} aria-hidden="true" /> Add vehicle</button>
         </>}
       />
       <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
 
-      {/* Fleet summary: one strip, same geometry as Drivers so switching tabs
-          never moves the page. Hidden when there is no fleet yet; the table's
-          empty state carries the next action instead of a row of zeros. */}
-      {(loading || vehicles.length > 0) && (
-        <section className="card fleet-kpis" aria-label="Fleet summary" aria-busy={loading}>
-          <div className="fleet-kpi">
-            <div className="fleet-kpi__label">Available now</div>
-            <div className="fleet-kpi__value">{loading ? '—' : readyCount}{!loading && <span className="fleet-kpi__of">of {vehicles.length}</span>}</div>
-            <div className="fleet-kpi__note">{loading ? 'Loading' : `${onJobCount} on a job, ${maintenanceCount} in maintenance.`}</div>
-          </div>
-          <div className="fleet-kpi">
-            <div className="fleet-kpi__label">Delivered revenue</div>
-            <div className="fleet-kpi__value">{loading ? '—' : formatZAR(deliveredRevenue)}</div>
-            <div className="fleet-kpi__note">{loading ? 'Loading' : `From ${deliveredLoads} delivered ${deliveredLoads === 1 ? 'load' : 'loads'}, all time.`}</div>
-          </div>
-          <div className="fleet-kpi">
-            <div className="fleet-kpi__label">Not earning yet</div>
-            <div className="fleet-kpi__value">{loading ? '—' : notEarning}{!loading && <span className="fleet-kpi__of">of {vehicles.length}</span>}</div>
-            <div className="fleet-kpi__note">{loading ? 'Loading' : notEarning > 0 ? 'Vehicles with no delivered load yet.' : 'Every vehicle has delivered at least one load.'}</div>
-          </div>
-        </section>
+      {/* Fleet summary: separate tiles, same geometry as Drivers so switching
+          tabs never moves the page. Hidden when there is no fleet yet; the
+          table's empty state carries the next action instead of zeros. */}
+      {!failed && (loading || vehicles.length > 0) && (
+        <KpiRow className="fleet-kpis fleet-kpis--filter">
+          <KpiTile
+            {...tileProps('job')}
+            label="Marked in use"
+            figure={loading ? skelFigure : <>{onJob.length}<span className="tw-kpi__of"> of {vehicles.length}</span></>}
+            note={loading ? 'Loading' : !onJob.length ? 'None marked in use' : onJobNoOrder === onJob.length ? 'None on a current order' : onJobNoOrder > 0 ? `${onJob.length - onJobNoOrder} on a current order, ${onJobNoOrder} not` : 'All on a current order'}
+          />
+          <KpiTile
+            {...tileProps('free')}
+            label="Available"
+            figure={loading ? skelFigure : free.length}
+            note={loading ? 'Loading' : freeNote}
+          />
+          <KpiTile
+            {...tileProps('shop')}
+            label="In maintenance"
+            figure={loading ? skelFigure : shop.length}
+            note={loading ? 'Loading' : shop.length ? (outOfService ? `${outOfService} out of service` : 'In the workshop') : 'None in the workshop'}
+          />
+          <KpiTile
+            aria-label="Delivered revenue"
+            label="Delivered revenue"
+            aside={<InfoTip align="end">Order value of every delivered or invoiced load, all time: the same total as History and Reports. {noVehicleLoads > 0 ? `${noVehicleLoads} of them (${formatZAR(data?.delivered.noVehicleRevenue ?? 0)}) have no vehicle recorded, so they are in this total but in no row below.` : 'Every one has a vehicle, so the rows add up to it.'}</InfoTip>}
+            figure={loading ? skelFigure : formatZAR(deliveredRevenue)}
+            note={loading ? 'Loading' : `${deliveredLoads} ${deliveredLoads === 1 ? 'load' : 'loads'}${noVehicleLoads ? ` · ${noVehicleLoads} no truck` : ', all time'}`}
+          />
+        </KpiRow>
       )}
 
       {/* Search + status filter toolbar */}
-      <div className="fleet-toolbar">
-        <input data-fleet-control
-          type="text"
+      <Toolbar className="fleet-toolbar" end={<>
+          {/* One calm flag for every status the open orders contradict; it
+              filters the list. It lives in the toolbar row (reserved while
+              loading), so it never pushes the table down when it arrives. */}
+          {!loading && !failed && mismatchCount > 0 && (
+            <span className="fleet-review" title={[onJobNoOrder ? `${onJobNoOrder} marked in use with no current order` : '', freeOnOrder ? `${freeOnOrder} available but on a current order` : '', shopOnOrder ? `${shopOnOrder} in maintenance but on a current order` : ''].filter(Boolean).join(', ')}>
+              <i className="fleet-review__dot" aria-hidden="true" />
+              <span className="fleet-review__text">{mismatchCount} don’t match their orders</span>
+              <button type="button" className="fleet-review__btn" aria-pressed={reviewing} onClick={() => setTileFilter(f => (f === 'mismatch' ? null : 'mismatch'))}>
+                {reviewing ? 'Show all' : 'Review'}
+              </button>
+            </span>
+          )}
+          <span className="fleet-toolbar__count" aria-live="polite">
+            {/* A non-empty line while loading, so the count never pushes the table down on phones. */}
+            {loading ? 'Loading vehicles' : tileFilter ? (
+              <>
+                {sorted.length} {tileFilter === 'mismatch' ? 'to review' : TILE_LABEL[tileFilter].toLowerCase()} of {vehicles.length}
+                {tileFilter !== 'mismatch' && <button type="button" className="fleet-toolbar__clear" onClick={() => setTileFilter(null)}>Show all</button>}
+              </>
+            ) : `${vehicles.length} ${vehicles.length === 1 ? 'vehicle' : 'vehicles'}`}
+          </span>
+      </>}>
+        <SearchInput
           aria-label="Search vehicles"
           placeholder="Search VIN, plate, make or model"
           value={search}
           onChange={e => handleSearchChange(e.target.value)}
-          className="fleet-search"
         />
-        <div className="fleet-filters">
-          {['All', 'AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE'].map(status => {
-            const isActive = statusFilter === status;
-            return (
-              <button data-fleet-control
-                key={status}
-                aria-pressed={isActive}
-                onClick={() => setStatusFilter(status)}
-                className="fleet-filter"
-              >
-                {status === 'All' ? 'All' : formatStatus(status)}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      </Toolbar>
 
       {/* Above the table so it never covers the rows being chosen. */}
       <BulkDeleteBar
@@ -340,6 +548,14 @@ export default function Vehicles() {
       />
 
       {/* Table */}
+      {failed ? (
+        <LoadError
+          what="vehicles"
+          error={fleetQuery.error ?? fleetQuery.failureReason}
+          busy={fleetQuery.isFetching}
+          onRetry={() => refetch()}
+        />
+      ) : (
       <div className="card fleet-table-region" role="region" aria-label="Vehicles table" tabIndex={0}>
         <table className="table-heading-roles fleet-table">
           <thead>
@@ -354,19 +570,15 @@ export default function Vehicles() {
                 )}
               </th>
               {COLUMNS.map(c => (
-                <th key={c.label || 'actions'} className={c.numeric ? 'is-numeric' : undefined}>
-                  {c.label || <span className="sr-only">Actions</span>}
+                <th key={c.label || 'actions'} className={[c.numeric ? 'is-numeric' : '', c.cls ?? ''].filter(Boolean).join(' ') || undefined}>
+                  {c.tip ? <span className="fleet-th-tip">{c.label}<InfoTip label="What the health score means" align="end">{c.tip}</InfoTip></span> : c.label || <span className="sr-only">Actions</span>}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={10} className="fleet-table__state-cell">
-                  <div className="fleet-table-state"><Loader size={32} label="Loading vehicles" /></div>
-                </td>
-              </tr>
+              <SkeletonRows rows={10} cols={COLUMNS.length + 1} skipFirst />
             ) : sorted.length === 0 ? (
               vehicles.length === 0 ? (
                 <tr>
@@ -403,10 +615,13 @@ export default function Vehicles() {
             ) : sorted.map((v) => {
               const vehicleName = [v.make, v.model].filter(Boolean).join(' ');
               const lastSeen = formatLastSeen(v);
+              const tonnes = capacityTonnes(v);
+              const done = deliveredByVehicle[v.id];
               return (
                 <tr
                   key={v.id}
                   className="is-clickable"
+                  {...rowLink(() => navigate(`/fleet/vehicles/${v.id}`))}
                   onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
                 >
                   <td className="fleet-table__select">
@@ -418,47 +633,46 @@ export default function Vehicles() {
                   <td>
                     <span className="fleet-table__id">{v.plate || v.registration || '—'}</span>
                     {lastSeen}
+                    {renewal(v)}
+                    {/* Phone: the Status column steps aside so Revenue stays in view; the chip rides here. */}
+                    <span className="fleet-table__sub fleet-only-narrow">
+                      {getStatusBadge(v)}
+                      {staleWork(activeLoadByVehicle[v.id]) && (
+                        <Link className="fleet-stale-narrow fleet-stale-link" to={`/bookings/${activeLoadByVehicle[v.id].id}`} onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()} aria-label={`Order left open: open ${activeLoadByVehicle[v.id].load_number || 'the order'}`}>
+                          <i className="fleet-doing__dot" aria-hidden="true" />Left open
+                        </Link>
+                      )}
+                    </span>
                   </td>
-                  <td className="is-primary" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={vehicleName}>
-                    {vehicleName || '—'}
-                  </td>
-                  <td>
-                    {v.vehicle_type_name || '—'}
-                    {v.vehicle_type_capacity != null && (
-                      <span style={{ marginLeft: 4, color: 'var(--text-tertiary)' }}>
-                        · {v.vehicle_type_capacity}t
+                  <td className="is-primary fleet-col-truck fleet-col-phone" title={[vehicleName, v.vehicle_type_name, tonnes ? formatWeight(tonnes) : ''].filter(Boolean).join(', ')}>
+                    {vehicleName || 'Not recorded'}
+                    {(v.vehicle_type_name || tonnes) && (
+                      <span className="fleet-table__sub">
+                        {[v.vehicle_type_name ? sentenceCaseLabel(v.vehicle_type_name) : '', tonnes ? formatWeight(tonnes) : ''].filter(Boolean).join(', ')}
                       </span>
                     )}
                   </td>
-                  <td>{(v as any).driver_name || <span style={{ color: 'var(--text-tertiary)' }}>Unassigned</span>}</td>
-                  <td>{getStatusBadge(v.status)}</td>
-                  <td className="is-numeric" style={{ color: v.revenue_generated ? 'var(--text-primary)' : undefined }}>
-                    {v.revenue_generated ? formatZAR(v.revenue_generated) : '—'}
+                  <td className="fleet-col-opt fleet-col-doing">{doingNow(v)}</td>
+                  <td className="fleet-col-status">{getStatusBadge(v)}</td>
+                  <td className="is-numeric" style={{ color: done?.revenue ? 'var(--text-primary)' : undefined }}>
+                    {done?.revenue ? <>
+                      {formatZAR(done.revenue)}
+                      <span className="fleet-table__sub">{done.loads} {done.loads === 1 ? 'load' : 'loads'}</span>
+                    </> : '—'}
                   </td>
-                  <td className="is-numeric">
-                    {v.total_trips ?? 0}
-                  </td>
-                  <td className="is-numeric" title="Composite of maintenance, uptime, fuel and age scores">
-                    {v.ai_health_score ? Math.round(v.ai_health_score) : '—'}
+                  <td className="is-numeric fleet-col-opt2">
+                    {healthCell(v.ai_health_score)}
                   </td>
                   <td className="fleet-table__actions">
-                    <div>
-                      <button
-                        className="fleet-row-action"
-                        aria-label={`Edit ${v.plate || v.registration || 'vehicle'}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditVehicle(v);
-                        }}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                      >Edit</button>
-                      <button
-                        className="fleet-row-action fleet-row-action--danger"
-                        aria-label={`Delete ${v.plate || v.registration || 'vehicle'}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmOpts({
+                    <RowActions
+                      label={v.plate || v.registration || 'vehicle'}
+                      items={[
+                        { label: 'Edit', onSelect: () => setEditVehicle(v), disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined },
+                        {
+                          label: 'Delete',
+                          danger: true,
+                          disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined,
+                          onSelect: () => setConfirmOpts({
                             title: 'Delete vehicle',
                             message: `Remove ${v.plate || v.registration} from your fleet? This cannot be undone.`,
                             confirmLabel: 'Delete',
@@ -472,12 +686,10 @@ export default function Vehicles() {
                                 toast.error(err?.message || 'Failed to delete vehicle');
                               }
                             },
-                          });
-                        }}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                      >Delete</button>
-                    </div>
+                          }),
+                        },
+                      ]}
+                    />
                   </td>
                 </tr>
               );
@@ -485,6 +697,7 @@ export default function Vehicles() {
           </tbody>
         </table>
       </div>
+      )}
 
       <PasteImportDrawer
         entity="vehicles"

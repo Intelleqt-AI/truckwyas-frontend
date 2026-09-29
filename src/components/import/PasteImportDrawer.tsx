@@ -4,6 +4,7 @@ import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 import { secondaryButtonStyle } from '@/components/BulkDeleteBar';
 import * as XLSX from 'xlsx';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
 /** Spreadsheet formats SheetJS reads reliably. Everything becomes the same
  *  tab-separated text a paste produces, so a file and a paste follow one code
@@ -341,6 +342,7 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: {
   onClose: () => void;
   onImported: (count: number) => void;
 }) {
+  useFocusTrap(latestModal, open);
   if (!open) return null;
   return (
     <div

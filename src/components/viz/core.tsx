@@ -1,4 +1,5 @@
 import './viz.css';
+import { formatCompact, formatMoney, formatNumber, formatPercent } from '@/lib/formatters';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 
 /* Shared chart plumbing: measured width, nice ticks, compact money, the one
@@ -7,20 +8,17 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 
 // ---------------------------------------------------------------- formatting
 
-/** Full rand amount, e.g. "R 12 345,67". Missing values are the placeholder. */
-export const rand = (v: number | null | undefined, digits = 2) =>
-  v == null || !Number.isFinite(v)
-    ? '—'
-    : new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
+/** Full rand amount, e.g. "R 12 345,67" (the shared en-ZA formatter). Missing values are "—". */
+export const rand = (v: number | null | undefined, digits = 2) => formatMoney(v, digits);
 
-/** Compact rand for axes and direct labels: "R 45k", "-R 1,2m", "R 850". */
-export const randCompact = (v: number) => {
-  const a = Math.abs(v);
-  const sign = v < 0 ? '\u2212' : '';
-  if (a >= 1_000_000) return `${sign}R ${(a / 1_000_000).toFixed(a >= 10_000_000 ? 0 : 1).replace('.', ',')}m`;
-  if (a >= 1_000) return `${sign}R ${Math.round(a / 1_000)}k`;
-  return `${sign}R ${Math.round(a)}`;
-};
+/** Compact rand for axes and direct labels: "R 45k", "R 7,8k", "−R 1,2m", "R 850". */
+export const randCompact = (v: number) => formatCompact(v);
+
+/** Percent in percent units: "14,1%". */
+export const pctText = (v: number | null | undefined, decimals = 1) => formatPercent(v, decimals);
+
+/** Whole number with en-ZA grouping: "1 650". */
+export const num0 = (v: number) => formatNumber(Math.round(v));
 
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -110,7 +108,7 @@ export function TipRow({ color, value, label, keyShape = 'line' }: { color?: str
 
 // ------------------------------------------------------------------- legend
 
-export interface LegendItem { label: string; color?: string; shape: 'rect' | 'line' | 'dot' | 'ring' | 'wash' }
+export interface LegendItem { label: string; color?: string; shape: 'rect' | 'line' | 'dot' | 'ring' | 'wash' | 'hatch' }
 
 export function Legend({ items }: { items: LegendItem[] }) {
   if (items.length === 0) return null;
@@ -191,10 +189,67 @@ export const boxIn = (container: Element, el: Element) => {
   return { x: b.left - a.left + b.width / 2, y: b.top - a.top };
 };
 
+// --------------------------------------------------------- label placement
+
+/** A box in SVG user units. */
+export interface Box { x0: number; x1: number; y0: number; y1: number }
+
+/** Estimated width of 12px chart text (tabular figures run ~7px a glyph). */
+export const textW = (s: string, px = 12) => s.length * px * 0.58 + 2;
+
+/** Box of a 12px text label drawn with `textAnchor` at (x, baseline y). */
+export function textBox(s: string, x: number, y: number, anchor: 'start' | 'middle' | 'end' = 'middle', px = 12): Box {
+  const w = textW(s, px);
+  const x0 = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
+  return { x0, x1: x0 + w, y0: y - px * 0.92, y1: y + px * 0.3 };
+}
+
+export const overlaps = (a: Box, b: Box, gap = 0) =>
+  a.x0 < b.x1 + gap && b.x0 < a.x1 + gap && a.y0 < b.y1 + gap && b.y0 < a.y1 + gap;
+
+/** First candidate that stays inside `bounds` and keeps `gap` px clear of every obstacle, or null. */
+export function placeLabel<T extends { box: Box }>(candidates: T[], obstacles: Box[], bounds: Box, gap = 4): T | null {
+  for (const c of candidates) {
+    const b = c.box;
+    if (b.x0 < bounds.x0 || b.x1 > bounds.x1 || b.y0 < bounds.y0 || b.y1 > bounds.y1) continue;
+    if (obstacles.some((o) => overlaps(b, o, gap))) continue;
+    return c;
+  }
+  return null;
+}
+
+/** A stable id usable inside url(#…) references. */
+export function useSvgId(prefix: string) {
+  return `${prefix}-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+}
+
+/**
+ * Hatch for a comparison series: 45-degree strokes at 3:1 over a faint fill.
+ * Pair the filled shape with a 1px outline in `VIZ.hatch` so its edge reads too.
+ */
+export function HatchDef({ id }: { id: string }) {
+  return (
+    <defs>
+      <pattern id={id} width={6} height={6} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width={6} height={6} fill="var(--viz-hatch-fill)" />
+        <line x1={1} y1={0} x2={1} y2={6} stroke="var(--viz-hatch)" strokeWidth={1.5} />
+      </pattern>
+    </defs>
+  );
+}
+
+/** A horizontal rule as an obstacle box (1px tall). */
+export const hLine = (x0: number, x1: number, y: number): Box => ({ x0: Math.min(x0, x1), x1: Math.max(x0, x1), y0: y - 0.75, y1: y + 0.75 });
+
 export const VIZ = {
   accent: 'var(--viz-accent)',
-  warm: 'var(--viz-warm)',
+  /** Loss: a negative result only. Never a cost, never "below average". */
+  loss: 'var(--viz-loss)',
+  /** Legacy alias of loss. */
+  warm: 'var(--viz-loss)',
   neutral: 'var(--viz-neutral)',
   neutralStrong: 'var(--viz-neutral-strong)',
+  hatch: 'var(--viz-hatch)',
+  hoverBand: 'var(--viz-hover-band)',
   ord: ['var(--viz-ord-1)', 'var(--viz-ord-2)', 'var(--viz-ord-3)', 'var(--viz-ord-4)', 'var(--viz-ord-5)'],
 };

@@ -138,7 +138,7 @@ export function InviteAccept() {
                   fontWeight: 500,
                   padding: '2px 8px',
                   border: '1px solid currentColor',
-                  color: 'var(--status-info-text, var(--accent-primary))',
+                  color: 'var(--text-primary)',
                   borderRadius: 'var(--radius-chip)',
                 }}>
                   {/* Presentation only — the role enum is shown in sentence case. */}
@@ -288,7 +288,7 @@ export function InviteAccept() {
 
             <div style={{ textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
               Already have an account?{' '}
-              <a href="/login" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>
+              <a href="/login" style={{ color: 'var(--link)', textDecoration: 'none' }}>
                 Log in
               </a>
             </div>

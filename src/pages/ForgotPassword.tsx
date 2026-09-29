@@ -125,7 +125,7 @@ export function ForgotPassword() {
 
             <div style={{ textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
               Remember your password?{' '}
-              <Link to="/login" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>
+              <Link to="/login" style={{ color: 'var(--link)', textDecoration: 'none' }}>
                 Log in
               </Link>
             </div>

@@ -1,16 +1,26 @@
 import "./table-heading-roles.css";
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
-import "./expense-row-actions.css";
 import "./finance-brand.css";
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ellipsis } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatNumber, formatPercent } from "@/lib/formatters";
 import { fetchData, postData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { Loader } from "@/components/Loader";
 import SectionHeader, { FINANCE_TABS } from "@/components/layout/SectionHeader";
+import RowActions from "@/components/ui/RowActions";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { wholeRand } from "@/components/finance/FinTile";
+import { KpiRow, KpiTile } from "@/components/ui/KpiTile";
+import { Toolbar, SearchInput } from "@/components/ui/Toolbar";
+import { Segmented } from "@/components/ui/Segmented";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
+import LoadError, { loadFailed } from "@/components/data/LoadError";
+import InvoiceSendPreview, { type InvoiceMessageKind } from "@/components/finance/InvoiceSendPreview";
+import { canSendReminder, invoiceBalance, isInvoiceOverdue } from "@/lib/invoiceStatus";
+import { rowLink } from "@/lib/rowLink";
+import { daysBetween, isIssued, paidInvoiceTiming, todayISO, type Invoice as LedgerInvoice } from "@/components/reports/data";
 
 // External Fast Pay application link. The applied-state key is unchanged so
 // invoices already marked "Applied" stay marked.
@@ -30,25 +40,14 @@ function saveAppliedId(id: string, current: Set<string>): Set<string> {
   return next;
 }
 
-type Tone = "success" | "warning" | "danger" | "info" | "neutral";
-
-const STATUS_TONE: Record<string, Tone> = {
-  PAID: "success",
-  SENT: "info",
-  PARTIALLY_PAID: "warning",
-  OVERDUE: "danger",
-  DRAFT: "neutral",
-};
-
-const TIER_TONE: Record<string, Tone> = {
+// Invoice statuses use the product-wide StatusChip map (Sent is info
+// everywhere). Fast Pay risk tiers keep their own tone.
+const TIER_TONE: Record<string, StatusTone> = {
   prime: "success",
   standard: "info",
   elevated: "warning",
   high: "danger",
 };
-
-const chipClass = (tone: Tone, outline = false) =>
-  `fin-chip${tone === "neutral" ? "" : ` fin-chip--${tone}`}${outline ? " fin-chip--outline" : ""}`;
 
 // Sentence-case a status/token for display: "PARTIALLY_PAID" → "Partially paid".
 const formatStatus = (s?: string) =>
@@ -61,6 +60,7 @@ const safeDate = (d?: string) => {
 };
 
 const PAGE_SIZE = 10;
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const STATUSES = ["All", "SENT", "OVERDUE", "PAID", "DRAFT"];
 
 /** Finance tabs; on the legacy /invoices path the Invoices tab points at it so it stays active. */
@@ -73,13 +73,33 @@ function financeTabsFor(pathname: string) {
 // Fetches invoices + stats. Lives in the queryFn so the result is cached by
 // TanStack Query (keyed below) and survives navigation — revisiting the page
 // no longer refires these requests until the cache goes stale.
+// The list endpoint pages at 20. Filters and the Overdue tile must agree, so the
+// remaining pages are fetched too (same endpoint, `?page=n`, in parallel), up to
+// a bound that keeps request volume modest under the API's per-user rate limit.
+// A later page that fails leaves the list partial (and labelled so), never
+// failing the whole page.
+const MAX_INVOICE_PAGES = 10;
+
 async function loadInvoicesPage() {
   const [data, statsData] = await Promise.all([
     fetchData("/api/v1/invoices/"),
     fetchData("/api/v1/invoices/stats/").catch(() => null),
   ]);
   // API returns paginated {count, results} — extract results
-  const invoices = Array.isArray(data) ? data : data?.results || [];
+  const invoices = Array.isArray(data) ? [...data] : [...(data?.results || [])];
+  const pageSize = invoices.length;
+  if (!Array.isArray(data) && data?.next && typeof data?.count === "number" && pageSize > 0) {
+    const pages = Math.min(Math.ceil(data.count / pageSize), MAX_INVOICE_PAGES);
+    const rest = await Promise.all(
+      Array.from({ length: Math.max(0, pages - 1) }, (_, i) =>
+        fetchData(`/api/v1/invoices/?page=${i + 2}`).catch(() => null),
+      ),
+    );
+    for (const pageData of rest) {
+      if (!pageData) break; // keep pages in order; stop at the first gap
+      invoices.push(...(Array.isArray(pageData) ? pageData : pageData?.results || []));
+    }
+  }
   return {
     invoices,
     // The list endpoint is paginated; `count` is the tenant's full total, so
@@ -103,19 +123,21 @@ export default function Invoices() {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  // Outgoing messages are previewed and confirmed before they are sent.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [preview, setPreview] = useState<{ kind: InvoiceMessageKind; invoice: any } | null>(null);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
 
   // Invoices + stats, cached across navigations.
-  const {
-    data: invoicesData,
-    isLoading: loading,
-    isError,
-    refetch: refetchInvoices,
-  } = useQuery({
+  const invoicesQuery = useQuery({
     queryKey: ["invoices-page"],
     queryFn: loadInvoicesPage,
   });
+  const { data: invoicesData, refetch: refetchInvoices } = invoicesQuery;
+  // Nothing to show because the request failed (or is failing and retrying):
+  // the page says so instead of spinning or showing an empty list.
+  const failed = loadFailed(invoicesQuery);
+  const loading = invoicesQuery.isLoading && !failed;
   const invoices: any[] = invoicesData?.invoices ?? [];
   const stats: any = invoicesData?.stats ?? null;
   const totalInvoices: number = invoicesData?.total ?? invoices.length;
@@ -146,8 +168,8 @@ export default function Invoices() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSendInvoice = async (e: React.MouseEvent, invoiceId: string) => {
-    e.stopPropagation();
+  const handleSendInvoice = async (e: React.MouseEvent | null, invoiceId: string) => {
+    e?.stopPropagation();
     setSendingId(invoiceId);
     try {
       await postData({ url: `/api/v1/invoices/${invoiceId}/send_invoice/` });
@@ -162,8 +184,8 @@ export default function Invoices() {
     }
   };
 
-  const handleDownloadPDF = async (e: React.MouseEvent, invoiceId: string) => {
-    e.stopPropagation();
+  const handleDownloadPDF = async (e: React.MouseEvent | null, invoiceId: string) => {
+    e?.stopPropagation();
     // generate_pdf is POST-only and returns a pdf_url; window.open(GET) 405s.
     try {
       const result = await postData({
@@ -177,8 +199,8 @@ export default function Invoices() {
     }
   };
 
-  const handleSendReminder = async (e: React.MouseEvent, invoiceId: string) => {
-    e.stopPropagation();
+  const handleSendReminder = async (e: React.MouseEvent | null, invoiceId: string) => {
+    e?.stopPropagation();
     setSendingReminderId(invoiceId);
     try {
       await postData({
@@ -186,6 +208,7 @@ export default function Invoices() {
         data: {},
       });
       flash("Reminder sent");
+      refetchInvoices();
     } catch (error: any) {
       if (error?.response?.status === 404) {
         flash("Reminder recorded. The customer will be contacted.");
@@ -200,9 +223,20 @@ export default function Invoices() {
   // Never fall back to mock data — show empty state if API returns nothing
   const allInvoices = invoices;
 
-  const filtered = allInvoices.filter((inv) => {
-    const invStatus = inv.status?.toUpperCase();
-    const matchStatus = statusFilter === "All" || invStatus === statusFilter;
+  // "Overdue" uses the one shared definition (unpaid, sent, past due),
+  // whatever the status string says, so it matches the Overdue tile.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const statusMatches = (inv: any, status: string) =>
+    status === "All" ||
+    (status === "OVERDUE" ? isInvoiceOverdue(inv) : inv.status?.toUpperCase() === status);
+
+  // Newest first by issue date (the date the list shows), then by number.
+  const byIssued = [...allInvoices].sort((a, b) =>
+    String(b.issue_date || b.created_at || "").localeCompare(String(a.issue_date || a.created_at || "")) ||
+    Number(b.id) - Number(a.id));
+
+  const filtered = byIssued.filter((inv) => {
+    const matchStatus = statusMatches(inv, statusFilter);
     const invNumber = inv.invoice_number || inv.invoiceNumber || "";
     const custName = inv.customer_name || inv.customerName || "";
     const matchSearch =
@@ -215,23 +249,57 @@ export default function Invoices() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Headline figures come from the stats endpoint, which covers every invoice
-  // (not just the page loaded below). Bases, from the API:
-  //   invoiced this month  total incl. VAT, by issue date since the 1st
-  //   collected this month paid amount of PAID invoices issued this month
+  // Headline figures are counted from the full invoice list with the Reports
+  // ledger rules (components/reports/data.ts), so they agree with the filter
+  // counts below and with Reports and Fast Pay. The stats endpoint is only a
+  // fallback when the list could not be loaded in full (it misses some paid
+  // invoices, e.g. INV-20260615-96400). Bases:
+  //   invoiced this month  issued invoices incl. VAT, by issue date since the 1st
+  //   collected this month paid amount of those invoices
   //   overdue              unpaid balance incl. VAT, due date passed
-  //   avg days to pay      issue date to paid date, all paid invoices
+  //   time to get paid     issue date to paid date, all paid invoices
   const now = new Date();
-  const monthName = now.toLocaleString("en-GB", { month: "long" });
+  const monthName = MONTH_NAMES[now.getMonth()];
   const byStatus = stats?.by_status ?? {};
   const draftCount: number = byStatus.DRAFT ?? 0;
-  const invoicedMtd: number = stats?.total_invoiced_mtd ?? 0;
-  const collectedMtd: number = stats?.total_collected_mtd ?? 0;
+  const truncatedList = totalInvoices > invoices.length;
+  const ymNowText = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const issuedThisMonth = invoices.filter(
+    (i) => isIssued(i as LedgerInvoice) && String(i.issue_date || "").slice(0, 7) === ymNowText,
+  );
+  const invoicedMtd: number = truncatedList
+    ? (stats?.total_invoiced_mtd ?? 0)
+    : issuedThisMonth.reduce((s, i) => s + (parseFloat(i.total_amount) || 0), 0);
+  const collectedMtd: number = truncatedList
+    ? (stats?.total_collected_mtd ?? 0)
+    : issuedThisMonth.reduce((s, i) => s + (parseFloat(i.paid_amount) || 0), 0);
+  const collectionRate = invoicedMtd > 0 ? collectedMtd / invoicedMtd : 0;
   const monthActive = invoicedMtd > 0 || collectedMtd > 0;
-  const overdueCount: number = stats?.overdue_count ?? 0;
-  const paidCount: number = byStatus.PAID ?? 0;
-  const avgDays: number | null = paidCount > 0 && stats?.avg_days_to_pay ? stats.avg_days_to_pay : null;
-  const truncated = totalInvoices > allInvoices.length;
+  // Overdue tile: when every invoice is loaded, count them with the same
+  // definition the filter uses so the two always agree. Only when the list is
+  // partial (the API pages at 20) does it fall back to the server's figure.
+  const overdueList = invoices.filter((i) => isInvoiceOverdue(i));
+  const overdueFromList = !truncatedList;
+  const overdueCount: number = overdueFromList ? overdueList.length : (stats?.overdue_count ?? 0);
+  const overdueAmount: number = overdueFromList
+    ? overdueList.reduce((sum, i) => sum + invoiceBalance(i), 0)
+    : (stats?.overdue_amount ?? 0);
+  // Time to get paid: the shared ledger definition (same count as "Paid").
+  const timing = paidInvoiceTiming(invoices);
+  const paidCount: number = truncatedList ? (byStatus.PAID ?? 0) : timing.count;
+  const avgDays: number | null = truncatedList
+    ? (paidCount > 0 && stats?.avg_days_to_pay ? stats.avg_days_to_pay : null)
+    : timing.avgDays;
+  const truncated = truncatedList;
+  // Drafts waiting to be sent: a decision (send them), counted from the list
+  // when it is complete, otherwise from the server's status counts.
+  const draftList = invoices.filter((i) => (i.status || "").toUpperCase() === "DRAFT");
+  const draftsCount: number = truncatedList ? draftCount : draftList.length;
+  // At most four tiles: the drafts tile only fills a row that has room.
+  const showDrafts = draftsCount > 0 && (monthActive ? 2 : 0) + (overdueCount > 0 ? 1 : 0) + (avgDays != null ? 1 : 0) < 4;
+  const draftAmount: number | null = truncatedList
+    ? null
+    : draftList.reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
 
   // Previous-month comparison only when every invoice is loaded; a partial
   // page would understate last month.
@@ -245,13 +313,20 @@ export default function Invoices() {
           return d >= lastMonthStart && d < monthStart;
         })
         .reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
-  const lastMonthName = lastMonthStart.toLocaleString("en-GB", { month: "long" });
+  const lastMonthName = MONTH_NAMES[lastMonthStart.getMonth()];
   const invoicedDelta = (() => {
     if (invoicedLastMonth == null) return null;
     if (invoicedLastMonth === 0) return `Nothing invoiced in ${lastMonthName}`;
     const pct = ((invoicedMtd - invoicedLastMonth) / invoicedLastMonth) * 100;
-    return `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(1)}% vs ${lastMonthName} (${formatCurrency(invoicedLastMonth)})`;
+    return `${pct >= 0 ? "+" : "−"}${formatPercent(Math.abs(pct), 0)} vs ${lastMonthName}`;
   })();
+
+  // Counts over the loaded list, with the same rules as the filter.
+  const statusOptions = STATUSES.map((st) => ({
+    value: st,
+    label: st === "All" ? "All" : formatStatus(st),
+    count: loading ? undefined : allInvoices.filter((inv) => statusMatches(inv, st)).length,
+  }));
 
   const showStatus = (s: string) => {
     setStatusFilter(s);
@@ -271,18 +346,42 @@ export default function Invoices() {
         title="Finance"
         tabs={financeTabsFor(location.pathname)}
         actions={
-          <button className="btn-action" onClick={() => navigate("/finance/invoices/new")}>
+          <button type="button" className="tw-btn tw-btn--primary" onClick={() => navigate("/finance/invoices/new")}>
             New invoice
           </button>
         }
       />
 
+      {preview && (
+        <InvoiceSendPreview
+          kind={preview.kind}
+          invoice={preview.invoice}
+          sending={preview.kind === "reminder" ? sendingReminderId === preview.invoice.id : sendingId === preview.invoice.id}
+          onCancel={() => setPreview(null)}
+          onConfirm={async () => {
+            const { kind, invoice } = preview;
+            if (kind === "reminder") await handleSendReminder(null, invoice.id);
+            else await handleSendInvoice(null, invoice.id);
+            setPreview(null);
+          }}
+        />
+      )}
+
+      {failed ? (
+        <LoadError
+          what="invoices"
+          error={invoicesQuery.error ?? invoicesQuery.failureReason}
+          busy={invoicesQuery.isFetching}
+          onRetry={() => refetchInvoices()}
+        />
+      ) : (
+      <>
       {/* Headline: tiles only where the number drives a decision */}
       {loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "20px 0", marginBottom: 24 }}>
-          <Loader size={28} />
+        <div className="tw-kpi-row fin-kpi-row" aria-busy="true" aria-label="Loading totals">
+          {[0, 1, 2].map((i) => <div key={i} className="tw-kpi fin-skel-tile" aria-hidden="true" />)}
         </div>
-      ) : !stats ? (
+      ) : !stats && truncatedList ? (
         <div className="card fin-summary">
           <div className="fin-summary__text">
             <p className="fin-summary__title">Invoice totals are unavailable</p>
@@ -295,68 +394,89 @@ export default function Invoices() {
           </div>
         </div>
       ) : (
-        <div className="fin-kpis">
-          {monthActive ? (
-            <>
-              <div className="card fin-kpi">
-                <span className="fin-kpi__label">Invoiced in {monthName}</span>
-                <span className="fin-kpi__value">{formatCurrency(invoicedMtd)}</span>
-                <span className="fin-kpi__delta">{invoicedDelta ?? "By issue date, incl. VAT"}</span>
-              </div>
-              <div className="card fin-kpi">
-                <span className="fin-kpi__label">Collected on {monthName} invoices</span>
-                <span className="fin-kpi__value">{formatCurrency(collectedMtd)}</span>
-                <span className="fin-kpi__sub">
-                  {invoicedMtd > 0
-                    ? `${Math.round((stats.collection_rate ?? 0) * 100)}% of the amount invoiced this month`
-                    : "Paid invoices issued this month"}
-                </span>
-              </div>
-            </>
-          ) : (
-            <div className="card fin-kpi fin-kpi--wide">
-              <p className="fin-summary__title">Nothing invoiced in {monthName} yet</p>
-              <p className="fin-summary__body">
-                No invoice has an issue date this month, so there is nothing collected to compare.
-                {draftCount > 0 &&
-                  ` ${draftCount} ${draftCount === 1 ? "draft is" : "drafts are"} ready to send.`}
-              </p>
-              {draftCount > 0 && (
-                <div className="fin-kpi__action">
-                  <button type="button" className="fin-link" onClick={() => showStatus("DRAFT")}>
-                    Review drafts
-                  </button>
-                </div>
-              )}
-            </div>
+        // The standard tile: only figures that drive a decision, never a dash.
+        (monthActive || overdueCount > 0 || avgDays != null || showDrafts) && (
+        <KpiRow className="fin-kpi-row">
+          {/* Separate children (not a fragment) so KpiRow counts the tiles. */}
+          {monthActive && (
+              <KpiTile
+                label={`Invoiced in ${monthName}`}
+                aside={<InfoTip>{`Invoice totals incl. VAT, by issue date since the 1st. Covers all invoices.${invoicedLastMonth == null ? "" : ` Change compares ${lastMonthName}.`}`}</InfoTip>}
+                figure={<span title={formatCurrency(invoicedMtd)}>{wholeRand(invoicedMtd)}</span>}
+                note={invoicedDelta ?? "By issue date"}
+              />
           )}
-          <div className="card fin-kpi">
-            <span className="fin-kpi__label">Overdue balance</span>
-            <span className="fin-kpi__value">{formatCurrency(stats.overdue_amount ?? 0)}</span>
-            <span className={`fin-kpi__sub ${overdueCount > 0 ? "fin-text-danger" : ""}`}>
-              {overdueCount > 0
-                ? `${overdueCount} ${overdueCount === 1 ? "invoice" : "invoices"} past the due date`
-                : "No invoice is past its due date"}
-            </span>
-            <span className="fin-kpi__sub">Unpaid amount incl. VAT</span>
-          </div>
-          <div className="card fin-kpi">
-            <span className="fin-kpi__label">Average time to get paid</span>
-            <span className="fin-kpi__value">{avgDays == null ? "—" : `${avgDays} days`}</span>
-            <span className="fin-kpi__sub">
-              {avgDays == null
-                ? "Shown once an invoice is paid"
-                : `Issue date to payment, across ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}`}
-            </span>
-          </div>
-        </div>
+          {monthActive && (
+              <KpiTile
+                label="Collected"
+                aside={<InfoTip>{`Paid amount of invoices issued in ${monthName}. Covers all invoices.`}</InfoTip>}
+                figure={<span title={formatCurrency(collectedMtd)}>{wholeRand(collectedMtd)}</span>}
+                note={invoicedMtd > 0 ? `${Math.round((truncatedList ? (stats?.collection_rate ?? 0) : collectionRate) * 100)}% of ${monthName} invoiced` : `On ${monthName} invoices`}
+              />
+          )}
+
+          {overdueCount > 0 && (
+            <KpiTile
+              label="Overdue"
+              aside={
+                <InfoTip>
+                  {overdueFromList
+                    ? "Unpaid balance incl. VAT on sent invoices past their due date, including part-paid ones. Covers all invoices. Select to show them."
+                    : "Unpaid balance incl. VAT on invoices past their due date, from the server's count of all invoices. Select to show them."}
+                </InfoTip>
+              }
+              figure={<span title={formatCurrency(overdueAmount)}>{wholeRand(overdueAmount)}</span>}
+              note={`${overdueCount} ${overdueCount === 1 ? "invoice" : "invoices"} late`}
+              tone="danger"
+              onClick={statusFilter !== "OVERDUE" ? () => showStatus("OVERDUE") : undefined}
+              aria-label={`Overdue: ${formatCurrency(overdueAmount)}, ${overdueCount} late. Show overdue invoices`}
+            />
+          )}
+          {avgDays != null && (
+            <KpiTile
+              label="Time to get paid"
+              aside={<InfoTip>Average days from issue date to the date the invoice was paid in full, across every paid invoice (the Paid filter below).</InfoTip>}
+              figure={<>{formatNumber(avgDays, { maximumFractionDigits: 1 })}<span className="fin-tile__unit">days</span></>}
+              note={`${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}`}
+            />
+          )}
+          {showDrafts && (
+            <KpiTile
+              label="Not sent yet"
+              aside={<InfoTip>Draft invoices, incl. VAT. They are not owed until you send them. Select to show them.</InfoTip>}
+              figure={draftAmount != null
+                ? <span title={formatCurrency(draftAmount)}>{wholeRand(draftAmount)}</span>
+                : <>{draftsCount}<span className="fin-tile__unit">{draftsCount === 1 ? "draft" : "drafts"}</span></>}
+              note={draftAmount != null ? `${draftsCount} ${draftsCount === 1 ? "draft" : "drafts"} to send` : "Drafts to send"}
+              onClick={statusFilter !== "DRAFT" ? () => showStatus("DRAFT") : undefined}
+              aria-label={`Not sent yet: ${draftsCount} ${draftsCount === 1 ? "draft" : "drafts"}. Show drafts`}
+            />
+          )}
+        </KpiRow>
+        )
       )}
 
-      {/* Filters */}
-      <div className="fin-toolbar">
-        <input
-          type="search"
-          className="fin-control fin-control--search"
+      {/* Filters: the shared toolbar (36px controls), as on every list. */}
+      <Toolbar
+        className="fin-toolbar"
+        aria-label="Filter invoices"
+        meta={
+          <>
+            {filtered.length} {filtered.length === 1 ? "invoice" : "invoices"}
+            {!loading && truncated && (
+              <>
+                {` · latest ${allInvoices.length} of ${totalInvoices}`}
+                <InfoTip align="end">
+                  This list holds the {allInvoices.length} most recent of {totalInvoices} invoices; search and filters apply to
+                  these. The figures above cover all {totalInvoices}.
+                </InfoTip>
+              </>
+            )}
+          </>
+        }
+      >
+        <SearchInput
+          wrapClassName="inv-search"
           placeholder="Search invoices"
           aria-label="Search invoices by number or customer"
           value={search}
@@ -365,41 +485,41 @@ export default function Invoices() {
             setPage(1);
           }}
         />
-        <div className="fin-toolbar__group" role="group" aria-label="Filter by status">
-          {STATUSES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className="fin-chip-filter"
-              aria-pressed={statusFilter === s}
-              onClick={() => {
-                setStatusFilter(s);
-                setPage(1);
-              }}>
-              {s === "All" ? "All" : formatStatus(s)}
-            </button>
-          ))}
-        </div>
-        <span className="fin-toolbar__count">
-          {filtered.length} {filtered.length === 1 ? "invoice" : "invoices"}
+        {/* Five statuses: the segmented control on wide screens, a compact
+            menu beside the search on phones (no 5-option strip). */}
+        <span className="inv-status-seg">
+          <Segmented
+            label="Filter by status"
+            className="fin-seg"
+            value={statusFilter}
+            onChange={showStatus}
+            options={statusOptions}
+          />
         </span>
-      </div>
-      {!loading && truncated && (
-        <p className="fin-coverage">
-          This list holds the {allInvoices.length} most recent of {totalInvoices} invoices; search and filters apply to
-          these. The totals above cover all {totalInvoices}.
-        </p>
-      )}
+        <span className="inv-status-menu">
+          <Select value={statusFilter} onValueChange={showStatus}>
+            <SelectTrigger aria-label="Filter by status" className="inv-status-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
+              {statusOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}{o.count != null ? ` (${o.count})` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </span>
+      </Toolbar>
 
       {/* Table: 10 per page, clickable */}
-      <div className="card fin-table-card">
+      <div className="card fin-table-card fin-table-card--fit">
         <div className="fin-table-scroll">
           <table className="fin-table fin-table--stack table-heading-roles">
             <thead>
               <tr>
+                <th className="fin-cell-fill">Customer</th>
                 <th>Issued</th>
-                <th>Invoice</th>
-                <th>Customer</th>
                 <th>Due</th>
                 <th>Status</th>
                 <th className="num">Amount incl. VAT</th>
@@ -413,17 +533,9 @@ export default function Invoices() {
             <tbody>
               {rows.length === 0 ? (
                 <tr className="is-empty">
-                  <td colSpan={7} style={{ padding: 0 }}>
+                  <td colSpan={6} style={{ padding: 0 }}>
                     {loading ? (
                       <div className="fin-empty fin-empty--compact">Loading invoices…</div>
-                    ) : isError ? (
-                      <div className="fin-empty">
-                        <p className="fin-empty__title">Couldn’t load invoices</p>
-                        <p className="fin-empty__body">Check your connection and try again.</p>
-                        <button className="btn-action" onClick={() => refetchInvoices()}>
-                          Retry loading
-                        </button>
-                      </div>
                     ) : allInvoices.length === 0 ? (
                       <div className="fin-empty">
                         <p className="fin-empty__title">No invoices yet</p>
@@ -439,15 +551,15 @@ export default function Invoices() {
                 </tr>
               ) : (
                 rows.map((inv) => {
+                  const today = todayISO();
                   const invStatus = inv.status?.toUpperCase();
                   const amount = parseFloat(inv.total_amount || inv.amount) || 0;
                   const invNumber = inv.invoice_number || inv.invoiceNumber;
                   const custName = inv.customer_name || inv.customerName;
                   const dueDate = inv.due_date || inv.dueDate;
-                  // Days relative to the due date, stated in words next to it.
-                  const ageDays = dueDate
-                    ? Math.floor((Date.now() - new Date(dueDate).getTime()) / 86400000)
-                    : 0;
+                  // Days relative to the due date, stated in words next to it:
+                  // whole SA calendar days, the Debtors report's count.
+                  const ageDays = dueDate ? daysBetween(String(dueDate), today) : 0;
                   const open = invStatus !== "PAID" && invStatus !== "DRAFT" && !!dueDate;
                   const agingLabel = !open
                     ? null
@@ -468,16 +580,17 @@ export default function Invoices() {
                     <tr
                       key={inv.id}
                       className="is-clickable"
+                      {...rowLink(() => navigate(`/finance/invoices/${inv.id}`))}
                       onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
-                      <td className="fin-date m-hide">{safeDate(inv.issue_date)}</td>
-                      <td className="m-meta">
-                        <span className="fin-id">{invNumber}</span>
-                      </td>
-                      <td className="fin-strong m-party">
-                        <div className="fin-truncate" title={custName}>
+                      <td className="fin-strong m-party m-span2 fin-cell-2 fin-cell-fill">
+                        <div className="fin-truncate fin-truncate--fill" title={custName}>
                           {custName}
                         </div>
+                        <span className="fin-cell-sub">
+                          <span className="fin-id">{invNumber}</span>
+                        </span>
                       </td>
+                      <td className="fin-date m-hide">{safeDate(inv.issue_date)}</td>
                       <td className={`fin-date m-due${agingLabel ? "" : " m-hide"}`}>
                         <span className="fin-mobile-only">Due </span>
                         {safeDate(dueDate)}
@@ -487,112 +600,63 @@ export default function Invoices() {
                       </td>
                       <td className="m-status">
                         <span className="fin-inline-list" style={{ flexWrap: "nowrap" }}>
-                          <span className={chipClass(STATUS_TONE[invStatus] ?? "neutral")}>
-                            {formatStatus(invStatus)}
-                          </span>
+                          <StatusChip status={invStatus} size="sm" />
                           {capitalEntry && tier && (
-                            <span
-                              className={chipClass(TIER_TONE[tier] ?? "neutral", true)}
-                              title="Fast Pay risk tier">
-                              {formatStatus(tier)}
-                            </span>
+                            <StatusChip
+                              tone={TIER_TONE[tier] ?? "neutral"}
+                              label={formatStatus(tier)}
+                              size="sm"
+                              title="Fast Pay risk tier"
+                            />
                           )}
                         </span>
                       </td>
-                      <td className="num m-amount">{formatCurrency(amount)}</td>
-                      <td
-                        className="actions"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape") setOpenDropdownId(null);
-                        }}>
-                        <div className="expense-row-actions">
-                          <button
-                            type="button"
-                            className="expense-menu-trigger"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenDropdownId(openDropdownId === inv.id ? null : inv.id);
-                            }}
-                            aria-label={`Invoice actions for ${invNumber}`}
-                            aria-haspopup="menu"
-                            aria-expanded={openDropdownId === inv.id}>
-                            <Ellipsis size={16} aria-hidden="true" />
-                          </button>
-
-                          {openDropdownId === inv.id && (
-                            <>
-                              {/* click-away overlay */}
-                              <div
-                                style={{ position: "fixed", inset: 0, zIndex: 99 }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenDropdownId(null);
-                                }}
-                              />
-                              <div className="expense-menu" role="menu">
-                                {invStatus === "DRAFT" && (
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="expense-menu-item"
-                                    disabled={sendingId === inv.id}
-                                    onClick={(e) => {
-                                      setOpenDropdownId(null);
-                                      handleSendInvoice(e, inv.id);
-                                    }}>
-                                    {sendingId === inv.id ? "Sending…" : "Send to customer"}
-                                  </button>
-                                )}
-                                {invStatus === "OVERDUE" && (
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="expense-menu-item"
-                                    disabled={sendingReminderId === inv.id}
-                                    onClick={(e) => {
-                                      setOpenDropdownId(null);
-                                      handleSendReminder(e, inv.id);
-                                    }}>
-                                    {sendingReminderId === inv.id ? "Sending…" : "Send reminder"}
-                                  </button>
-                                )}
-                                {invStatus !== "DRAFT" && (
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="expense-menu-item"
-                                    onClick={(e) => {
-                                      setOpenDropdownId(null);
-                                      handleDownloadPDF(e, inv.id);
-                                    }}>
-                                    Download PDF
-                                  </button>
-                                )}
-                                {capitalEntry && (
-                                  applied ? (
-                                    <div className="fin-menu-note">
-                                      <strong>Applied for Fast Pay</strong>
-                                      Your earlier application is on record.
-                                    </div>
-                                  ) : (
-                                    <button type="button" role="menuitem" className="expense-menu-item"
-                                      disabled={!CAPITAL_LAUNCHED} aria-disabled={!CAPITAL_LAUNCHED}
-                                      title={CAPITAL_LAUNCHED ? undefined : CAPITAL_COMING_SOON}>
-                                      {CAPITAL_LAUNCHED ? "Request Fast Pay" : "Request Fast Pay (coming soon)"}
-                                    </button>
-                                  )
-                                )}
-                                {ineligibleEntry && (
-                                  <div className="fin-menu-note">
-                                    <strong>Not eligible for Fast Pay</strong>
-                                    {ineligibleEntry.reason}
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </div>
+                      <td className={`num m-amount${invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005 ? " fin-cell-2" : ""}`}>
+                        {/* Lists show whole rands; cents stay on the invoice and in the title (R8). */}
+                        <span title={formatCurrency(amount)}>{wholeRand(amount)}</span>
+                        {/* Part-paid: what is still owed, under the invoice total. */}
+                        {invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005 && (
+                          <span className="fin-cell-sub" title={`${formatCurrency(invoiceBalance(inv))} due`}>{wholeRand(invoiceBalance(inv))} due</span>
+                        )}
+                      </td>
+                      <td className="actions" onClick={(e) => e.stopPropagation()}>
+                        <RowActions
+                          label={`Invoice ${invNumber}`}
+                          items={[
+                            { label: "Open invoice", onSelect: () => navigate(`/finance/invoices/${inv.id}`) },
+                            ...(invStatus === "DRAFT"
+                              ? [{
+                                  label: sendingId === inv.id ? "Sending…" : "Send to customer",
+                                  onSelect: () => setPreview({ kind: "invoice", invoice: inv }),
+                                  disabled: sendingId === inv.id,
+                                }]
+                              : []),
+                            ...(canSendReminder(inv)
+                              ? [{
+                                  label: sendingReminderId === inv.id ? "Sending…" : "Send reminder",
+                                  onSelect: () => setPreview({ kind: "reminder", invoice: inv }),
+                                  disabled: sendingReminderId === inv.id,
+                                }]
+                              : []),
+                            ...(invStatus !== "DRAFT"
+                              ? [{ label: "Download PDF", onSelect: () => handleDownloadPDF(null, inv.id) }]
+                              : []),
+                            ...(capitalEntry
+                              ? applied
+                                ? [{ label: "Applied for Fast Pay", hint: "Your earlier application is on record.", onSelect: () => {}, disabled: true }]
+                                : [{
+                                    // No handler until Fast Pay launches (unchanged behaviour).
+                                    label: CAPITAL_LAUNCHED ? "Request Fast Pay" : "Request Fast Pay (coming soon)",
+                                    hint: CAPITAL_LAUNCHED ? undefined : CAPITAL_COMING_SOON,
+                                    onSelect: () => {},
+                                    disabled: !CAPITAL_LAUNCHED,
+                                  }]
+                              : []),
+                            ...(ineligibleEntry
+                              ? [{ label: "Not eligible for Fast Pay", hint: String(ineligibleEntry.reason ?? ""), onSelect: () => {}, disabled: true }]
+                              : []),
+                          ]}
+                        />
                       </td>
                     </tr>
                   );
@@ -610,13 +674,15 @@ export default function Invoices() {
             </span>
             <div className="fin-table-foot__nav">
               <button
-                className="btn-action fin-btn-secondary"
+                type="button"
+                className="tw-btn"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}>
                 Previous
               </button>
               <button
-                className="btn-action fin-btn-secondary"
+                type="button"
+                className="tw-btn"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}>
                 Next
@@ -625,6 +691,8 @@ export default function Invoices() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

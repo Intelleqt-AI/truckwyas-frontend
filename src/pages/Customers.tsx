@@ -1,3 +1,4 @@
+import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
 import './customers-typography.css';
 import './table-heading-roles.css';
 import './bookings-section.css';
@@ -7,15 +8,24 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Building2, Plus, X } from "lucide-react";
 import SectionHeader from "@/components/layout/SectionHeader";
 import { useQuery } from "@tanstack/react-query";
+import LoadError, { loadFailed } from "@/components/data/LoadError";
+import { rowLink } from "@/lib/rowLink";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
 import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
-import { fetchData, postData, patchData, deleteData } from "../lib/Api";
+import { postData, patchData, deleteData } from "../lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader } from '@/components/Loader';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import { fetchAllPages } from '@/components/insights/findings';
+import { useLedger, isOpen, num, todayISO } from '@/components/reports/data';
+import { InfoTip } from '@/components/ui/InfoTip';
+import { formatCurrency, formatMoneyWhole } from '@/lib/formatters';
 import { useAuth } from '@/lib/AuthContext';
+import RowActions from '@/components/ui/RowActions';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
 interface Customer {
   id: number;
@@ -102,6 +112,9 @@ export default function Customers() {
   const [saving, setSaving] = useState(false);
 
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
+  // Slide-outs: focus moves in, Tab stays inside, focus returns on close.
+  useFocusTrap(latestModal, showAddForm);
+  useFocusTrap(latestModal, !!editCustomer);
   const [editForm, setEditForm] = useState<any>({});
 
   const [confirmOpts, setConfirmOpts] = useState<{
@@ -118,18 +131,79 @@ export default function Customers() {
     }
   }, [location.pathname]);
 
-  const { data, isLoading: loading, refetch } = useQuery({
+  const customersQuery = useQuery({
     queryKey: ["customers-page", debouncedSearch],
     queryFn: () => {
       const url = debouncedSearch
         ? `api/v1/customers/?search=${encodeURIComponent(debouncedSearch)}`
         : "api/v1/customers/";
-      return fetchData(url);
+      // Same list endpoint, every page followed, so the directory is complete.
+      return fetchAllPages<Customer>(url);
     },
   });
-  const customers: Customer[] = Array.isArray(data) ? data : data?.results || [];
-  // The endpoint is paginated; count is the true total, results only the first page.
-  const totalCustomers: number = Array.isArray(data) ? customers.length : (data?.count ?? customers.length);
+  const { data, refetch } = customersQuery;
+  // Failed (or failing and retrying) with nothing to show: say so, never "No customers yet".
+  const failed = loadFailed(customersQuery);
+  const loading = customersQuery.isLoading && !failed;
+  const customers: Customer[] = data?.rows ?? [];
+  // The endpoint is paginated; count is the true total (every page is followed).
+  const totalCustomers: number = data?.count ?? customers.length;
+
+  // Money owed per customer, from the same invoice ledger as Invoices and the
+  // Debtors report: issued, not paid, balance above zero (incl. VAT). Overdue
+  // is the part of that past its due date.
+  const ledger = useLedger(['invoices']);
+  const today = todayISO();
+  const owedBy = new Map<number, { owed: number; overdue: number; oldestDue?: string }>();
+  for (const inv of ledger.data?.invoices ?? []) {
+    if (inv.customer == null || !isOpen(inv)) continue;
+    const row = owedBy.get(inv.customer) ?? { owed: 0, overdue: 0 };
+    row.owed += num(inv.balance);
+    const due = inv.due_date?.slice(0, 10);
+    if (due && due < today) {
+      row.overdue += num(inv.balance);
+      if (!row.oldestDue || due < row.oldestDue) row.oldestDue = due;
+    }
+    owedBy.set(inv.customer, row);
+  }
+  // Material (R5): a customer's overdue part is at least a tenth of everything
+  // overdue and over 30 days late. Only those rows carry the small danger
+  // dot; every amount itself stays in ink, so the column never reads as an alarm.
+  const totalOverdue = [...owedBy.values()].reduce((n, r) => n + r.overdue, 0);
+  const daysLate = (iso?: string) => iso ? Math.floor((Date.parse(today) - Date.parse(iso)) / 86_400_000) : 0;
+  const isMaterial = (r?: { overdue: number; oldestDue?: string }) =>
+    !!r && r.overdue >= 0.005 && totalOverdue > 0 && r.overdue / totalOverdue >= 0.1 && daysLate(r.oldestDue) > 30;
+  // Some balance is partly late: every row then takes the two-line height.
+  const anyPartlyLate = [...owedBy.values()].some(r => r.overdue >= 0.005 && Math.abs(r.overdue - r.owed) >= 0.005);
+  // One money column: Owed, in ink. A partly late balance gets a quiet second
+  // line with the overdue part; a material overdue balance gets one small dot.
+  const owedCell = (row: { owed: number; overdue: number; oldestDue?: string } | undefined) => {
+    if (!ledger.data) return <span className="bk-muted">{ledger.error ? 'Not loaded' : '…'}</span>;
+    const owed = row?.owed ?? 0;
+    const overdue = row?.overdue ?? 0;
+    if (owed < 0.005) return <span className="bk-muted">—</span>;
+    const flag = isMaterial(row)
+      ? <span className="cu-owed__dot" title={`Overdue: ${formatCurrency(overdue)}, oldest ${daysLate(row!.oldestDue)} days late`}><span className="sr-only">Overdue, oldest {daysLate(row!.oldestDue)} days late: </span></span>
+      : null;
+    if (overdue >= 0.005 && Math.abs(overdue - owed) < 0.005) {
+      return <span title={flag ? formatCurrency(owed) : `${formatCurrency(owed)}, all overdue`}>{flag}{formatMoneyWhole(owed)}{!flag && <span className="sr-only">, all overdue</span>}</span>;
+    }
+    // Lists show whole rands (R7); the cents are in the title and on the
+    // statement.
+    return (
+      <span title={formatCurrency(owed)}>
+        {flag}{formatMoneyWhole(owed)}
+        {overdue >= 0.005 && <span className="cu-owed__sub">{formatMoneyWhole(overdue)} overdue</span>}
+      </span>
+    );
+  };
+
+  // Customer is the company; the contact name is shown only when it differs.
+  const displayName = (c: Customer) => (c.company_name || '').trim() || c.name;
+  const contactName = (c: Customer) => {
+    const n = (c.name || '').trim();
+    return n && n.toLowerCase() !== displayName(c).toLowerCase() ? n : '';
+  };
 
   useAutoRefresh(refetch);
 
@@ -142,11 +216,15 @@ export default function Customers() {
 
   const customerStatus = (c: Customer) =>
     c.is_active === false || c.status === "INACTIVE" ? "INACTIVE" : "ACTIVE";
+  // Status earns a column only when some customer is inactive.
+  const anyInactive = customers.some(c => customerStatus(c) !== 'ACTIVE');
 
   const filtered = [...customers].sort((a, b) => {
       switch (sortBy) {
-        case "name_asc":  return a.name.localeCompare(b.name);
-        case "name_desc": return b.name.localeCompare(a.name);
+        case "name_asc":  return displayName(a).localeCompare(displayName(b));
+        case "name_desc": return displayName(b).localeCompare(displayName(a));
+        case "owed":      return (owedBy.get(b.id)?.owed ?? 0) - (owedBy.get(a.id)?.owed ?? 0);
+        case "overdue":   return (owedBy.get(b.id)?.overdue ?? 0) - (owedBy.get(a.id)?.overdue ?? 0);
         case "city":      return (a.city || "").localeCompare(b.city || "");
         case "newest":    return (b.created_at || "").localeCompare(a.created_at || "");
         case "oldest":    return (a.created_at || "").localeCompare(b.created_at || "");
@@ -175,7 +253,7 @@ export default function Customers() {
   const header = (
     <SectionHeader
       title="Customers"
-      description="Everyone you quote and invoice, with their payment terms and credit limits."
+      description="Who you quote and invoice"
       actions={
         <>
           <button
@@ -197,7 +275,21 @@ export default function Customers() {
     />
   );
 
-  if (loading) return <div className="customers-typography">{header}<Loader fullScreen /></div>;
+  if (failed) {
+    return (
+      <div className="customers-typography">
+        {header}
+        <LoadError
+          what="customers"
+          error={customersQuery.error ?? customersQuery.failureReason}
+          busy={customersQuery.isFetching}
+          onRetry={() => refetch()}
+        />
+      </div>
+    );
+  }
+  // The toolbar row is reserved while loading so the table does not jump.
+  if (loading) return <div className="customers-typography">{header}<div className="tw-toolbar" aria-hidden="true" /><TableSkeleton rows={8} cols={6} label="Loading customers" /></div>;
 
   return (
     <div className="customers-typography bookings-typography">
@@ -205,8 +297,42 @@ export default function Customers() {
 
       {/* Table. No summary tiles: nothing on this directory drives a decision
           except finding the customer, so the count sits in the toolbar. */}
-      <div className="card" style={{ padding: 0, overflowX: "auto", borderRadius: "var(--radius-card, 12px)" }}>
-        {/* Sits above the toolbar so it never covers the rows being chosen. */}
+      {/* Toolbar sits above the card, as on every other list. */}
+      <Toolbar
+        className="cu-toolbar"
+        meta={data && !data.complete
+          ? `First ${customers.length} of ${totalCustomers} customers`
+          : `${totalCustomers} ${totalCustomers === 1 ? "customer" : "customers"}`}
+        end={
+          <>
+            <span id="customers-sort-label" className="cu-sort-label">Sort</span>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger aria-labelledby="customers-sort-label" style={{ width: 'auto', minWidth: 168 }}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name_asc">Name A–Z</SelectItem>
+                <SelectItem value="name_desc">Name Z–A</SelectItem>
+                <SelectItem value="owed">Most owed</SelectItem>
+                <SelectItem value="overdue">Most overdue</SelectItem>
+                <SelectItem value="city">City A–Z</SelectItem>
+                <SelectItem value="newest">Newest first</SelectItem>
+                <SelectItem value="oldest">Oldest first</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        }
+      >
+        <SearchInput
+          aria-label="Search customers"
+          placeholder="Search name, company, email, city"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </Toolbar>
+
+      <div className="card" style={{ padding: 0, overflow: "hidden", borderRadius: "var(--radius-card, 12px)" }}>
+        {/* Sits above the table so it never covers the rows being chosen. */}
         <div style={{ padding: selected.length ? "12px 16px 0" : 0 }}>
           <BulkDeleteBar
             entity="customers"
@@ -215,42 +341,11 @@ export default function Customers() {
             onDeleted={() => { setSelected([]); refetch(); }}
           />
         </div>
-
-        {/* Table toolbar */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, padding: "16px 24px", borderBottom: "1px solid var(--border-subtle)" }}>
-          <input
-            type="search"
-            className="bk-search"
-            aria-label="Search customers"
-            placeholder="Search name, company, email, city"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span className="bk-toolbar__end" style={{ marginRight: 8 }}>
-              {customers.length < totalCustomers
-                ? `Showing ${customers.length} of ${totalCustomers} customers`
-                : `${totalCustomers} ${totalCustomers === 1 ? "customer" : "customers"}`}
-            </span>
-            <span id="customers-sort-label" style={{ fontSize: 13, lineHeight: "20px", fontWeight: 500, fontFamily: "var(--font-sans)", color: "var(--text-secondary)", letterSpacing: 0 }}>Sort</span>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger aria-labelledby="customers-sort-label" style={{ minWidth: 160, minHeight: 40 }}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name_asc">Name A–Z</SelectItem>
-                <SelectItem value="name_desc">Name Z–A</SelectItem>
-                <SelectItem value="city">City A–Z</SelectItem>
-                <SelectItem value="newest">Newest first</SelectItem>
-                <SelectItem value="oldest">Oldest first</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <table className="table-heading-roles bk-table">
+        <div className="bk-table-wrap bk-table-wrap--bare">
+        <table className={`table-heading-roles bk-table bk-table--pin-actions${anyPartlyLate ? ' cu-two-line' : ''}`}>
           <thead>
             <tr>
-              <th scope="col" style={{ paddingRight: 0, width: 32 }}>
+              <th scope="col" className="bk-col-select" style={{ paddingRight: 0, width: 32 }}>
                 {filtered.length > 0 && (
                   <RowCheckbox
                     title="Select everything shown"
@@ -259,9 +354,12 @@ export default function Customers() {
                   />
                 )}
               </th>
-              {["Name", "Company", "Email", "Phone", "City", "Payment terms", "Status"].map(h => (
-                <th key={h} scope="col">{h}</th>
-              ))}
+              <th scope="col">Customer</th>
+              <th scope="col" className="bk-col-opt">Email</th>
+              <th scope="col" className="bk-col-city">City</th>
+              <th scope="col" className="bk-col-terms bk-col-narrow">Terms</th>
+              <th scope="col" className="is-num bk-col-money"><span className="cu-owed__head">Owed<InfoTip align="end">Unpaid invoice balances, incl. VAT. A red dot marks a customer whose overdue part is at least a tenth of everything overdue and over 30 days late. A second line shows the overdue part when only some is late.</InfoTip></span></th>
+              {anyInactive && <th scope="col">Status</th>}
               <th scope="col" className="is-num"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
@@ -269,7 +367,7 @@ export default function Customers() {
             {filtered.length === 0 ? (
               customers.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: 0, whiteSpace: "normal" }}>
+                  <td colSpan={anyInactive ? 8 : 7} style={{ padding: 0, whiteSpace: "normal" }}>
                     <div className="bk-empty" style={{ padding: "48px 24px" }}>
                       <div className="bk-empty__icon"><Building2 size={32} strokeWidth={1.5} aria-hidden="true" /></div>
                       <h2 className="bk-empty__title">No customers yet</h2>
@@ -297,7 +395,7 @@ export default function Customers() {
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40, fontSize: 13 }}>
+                  <td colSpan={anyInactive ? 8 : 7} style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40, fontSize: 13 }}>
                     No customers match your search.
                   </td>
                 </tr>
@@ -308,49 +406,51 @@ export default function Customers() {
                 <tr
                   key={c.id}
                   className="is-clickable"
+                  {...rowLink(() => navigate(`/customers/${c.id}`))}
                   onClick={() => navigate(`/customers/${c.id}`)}
                 >
-                  <td style={{ paddingRight: 0, width: 32 }}>
+                  <td className="bk-col-select" style={{ paddingRight: 0, width: 32 }}>
                     <RowCheckbox
                       checked={selected.includes(c.id)}
                       onChange={on => toggleOne(c.id, on)}
                     />
                   </td>
-                  <td className="is-primary is-truncate" style={{ fontWeight: 500, maxWidth: 220 }} title={c.name}>
-                    {c.name}
+                  <td className="is-primary is-truncate bk-col-customer" style={{ fontWeight: 500 }} title={[displayName(c), contactName(c)].filter(Boolean).join(', contact ')}>
+                    {(() => {
+                      // Phones: the legal suffix ("(Pty) Ltd", "Ltd") steps
+                      // aside so the name stays on one line (R7); the full
+                      // name is in the title.
+                      const n = displayName(c);
+                      const m = n.match(/^(.*?\S)(\s+(?:\(Pty\)\s*)?(?:Ltd|Inc|CC)\.?)$/i);
+                      return m ? <>{m[1]}<span className="cu-suffix">{m[2]}</span></> : n;
+                    })()}
+                    {contactName(c) && <span className="bk-muted" style={{ fontWeight: 400 }}> · {contactName(c)}</span>}
                   </td>
-                  <td className="is-truncate" style={{ maxWidth: 200 }} title={c.company_name || ""}>
-                    {c.company_name || "—"}
+                  <td className="is-truncate bk-col-opt" title={c.email}>
+                    {c.email || <span className="bk-muted">—</span>}
                   </td>
-                  <td className="is-truncate" style={{ maxWidth: 220 }} title={c.email}>
-                    {c.email}
+                  <td className="is-truncate bk-col-city">
+                    {c.city || <span className="bk-muted">—</span>}
                   </td>
-                  <td>
-                    {c.phone || "—"}
+                  <td className="bk-col-terms bk-col-narrow">
+                    {paymentTermsLabel(c.payment_terms_default).replace(/ days$/, '')}
                   </td>
-                  <td>
-                    {c.city || "—"}
-                  </td>
-                  <td>
-                    {paymentTermsLabel(c.payment_terms_default)}
-                  </td>
-                  <td>
-                    <span className={`bk-status bk-status--${status === "ACTIVE" ? "success" : "neutral"}`}>{status === "ACTIVE" ? "Active" : "Inactive"}</span>
-                  </td>
+                  <td className="is-money bk-col-money cu-owed">{owedCell(owedBy.get(c.id))}</td>
+                  {anyInactive && (
+                    <td>
+                      <StatusChip status={status === "ACTIVE" ? "ACTIVE" : "INACTIVE"} size="sm" />
+                    </td>
+                  )}
                   <td className="is-num">
-                    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-                      <button
-                        type="button"
-                        className="bk-btn bk-btn--quiet bk-btn--sm"
-                        aria-label={`Edit ${c.name}`}
-                        onClick={e => { e.stopPropagation(); openEdit(c); }}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                      >Edit</button>
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          setConfirmOpts({
+                    <RowActions
+                      label={c.name}
+                      items={[
+                        { label: "Edit", onSelect: () => openEdit(c), disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined },
+                        {
+                          label: "Delete",
+                          danger: true,
+                          disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined,
+                          onSelect: () => setConfirmOpts({
                             title: "Delete customer",
                             message: `Remove "${c.name}"? This cannot be undone.`,
                             confirmLabel: "Delete",
@@ -364,21 +464,17 @@ export default function Customers() {
                                 toast.error(err?.message || "Failed to delete");
                               }
                             },
-                          });
-                        }}
-                        type="button"
-                        className="bk-btn bk-btn--quiet-danger bk-btn--sm"
-                        aria-label={`Delete ${c.name}`}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                      >Delete</button>
-                    </div>
+                          }),
+                        },
+                      ]}
+                    />
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       <PasteImportDrawer
@@ -410,7 +506,7 @@ export default function Customers() {
               { key: "billing_address", label: "Billing address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text, var(--status-danger))", marginLeft: 2 }}>*</span>}</label>
+                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text)", marginLeft: 2 }}>*</span>}</label>
                 <input
                   className="qi-input"
                   aria-label={f.label}
@@ -511,7 +607,7 @@ export default function Customers() {
               { key: "billing_address", label: "Billing address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text, var(--status-danger))", marginLeft: 2 }}>*</span>}</label>
+                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text)", marginLeft: 2 }}>*</span>}</label>
                 <input
                   className="qi-input"
                   aria-label={f.label}

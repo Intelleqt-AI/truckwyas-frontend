@@ -1,29 +1,29 @@
 import './table-heading-roles.css';
 import './finance-brand.css';
+import SectionHeader from '@/components/layout/SectionHeader';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
-import { formatDate } from '@/lib/formatters';
+import { formatDate, formatPercent } from '@/lib/formatters';
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
-import { Loader } from '@/components/Loader';
+import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 
 // Sentence-case a single token for display: "PRIME" → "Prime".
 const cap = (s?: string) =>
   s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
 
-const TIER_TONE: Record<string, string> = {
+const TIER_TONE: Record<string, StatusTone> = {
   PRIME: 'success',
   STANDARD: 'info',
   ELEVATED: 'warning',
   HIGH: 'danger',
   INELIGIBLE: 'neutral',
 };
-const tierChip = (t?: string) => {
-  const tone = TIER_TONE[t || ''] || 'neutral';
-  return `fin-chip${tone === 'neutral' ? '' : ` fin-chip--${tone}`}`;
-};
+// Risk tiers use the shared neutral chip with a tone dot.
+const TierChip = ({ t }: { t?: string }) => <StatusChip size="sm" tone={TIER_TONE[t || ''] || 'neutral'} label={cap(t) || '—'} />;
 
 export default function RiskScoreView() {
   const navigate = useNavigate();
@@ -108,26 +108,26 @@ export default function RiskScoreView() {
 
   return (
     <div className="fin-page">
-      <header className="fin-detail-head">
-        <div style={{ minWidth: 0 }}>
-          <div className="fin-detail-head__eyebrow">Fast Pay</div>
-          <div className="fin-detail-head__title-row"><h1>Customer risk scores</h1></div>
-          <p className="fin-detail-head__sub" style={{ maxWidth: '72ch' }}>
-            How safe each customer's invoices would be to advance, scored out of 100 by the Fast Pay rules. Higher is safer.
-            {!CAPITAL_LAUNCHED && ` ${CAPITAL_COMING_SOON}`}
-          </p>
-        </div>
-      </header>
+      <SectionHeader
+        title="Customer risk scores"
+        back={{ to: '/capital', label: 'Fast Pay' }}
+        titleAdornment={!CAPITAL_LAUNCHED ? <StatusChip tone="neutral" label="Not live yet" /> : undefined}
+        description="Scored out of 100; higher is safer"
+      />
 
+      <div className="fin-stack fin-stack--16 risk-stack">
       <div className="fin-grid-2">
         <section className="card" aria-labelledby="tiers-title">
           <div className="fin-panel-head">
             <div className="fin-panel-head__text">
-              <h2 id="tiers-title" className="fin-panel-title">How are your customers spread across risk tiers?</h2>
+              <h2 id="tiers-title" className="fin-panel-title fin-panel-title--tip">
+                Customers by risk tier
+                <InfoTip align="end">Each customer's highest stored score is shown. An expired score is out of date until the customer is scored again.</InfoTip>
+              </h2>
               <p className="fin-panel-desc">
-                {customerScores.length > 0
-                  ? `${customerScores.length} customers scored, average ${avgScore} out of 100. Each customer's highest stored score is shown.${expiredCount > 0 ? ` ${expiredCount === customerScores.length ? 'All' : expiredCount} of these scores ${expiredCount === 1 ? 'has' : 'have'} expired, so treat them as out of date.` : ''}`
-                  : 'Customers appear here once their invoices are scored.'}
+                {isLoading ? 'Loading scores…' : customerScores.length > 0
+                  ? `${customerScores.length} scored, average ${avgScore} of 100${expiredCount > 0 ? ` · ${expiredCount === customerScores.length ? 'all' : expiredCount} expired` : ''}`
+                  : 'Scored once they have invoices'}
               </p>
             </div>
           </div>
@@ -140,7 +140,7 @@ export default function RiskScoreView() {
             </div>
             {tiers.map(t => (
               <div key={t} className={`fin-rank__row${(tierCounts[t] || 0) === 0 ? ' is-thin' : ''}`} role="row">
-                <span className="fin-rank__label" role="cell"><span className={tierChip(t)}>{cap(t)}</span></span>
+                <span className="fin-rank__label" role="cell"><TierChip t={t} /></span>
                 <span className="fin-rank__track" aria-hidden="true">
                   <span className="fin-rank__bar" style={{ display: 'block', width: `${maxTier > 0 ? ((tierCounts[t] || 0) / maxTier) * 100 : 0}%` }} />
                 </span>
@@ -156,11 +156,14 @@ export default function RiskScoreView() {
         <section className="card" aria-labelledby="factors-title">
           <div className="fin-panel-head">
             <div className="fin-panel-head__text">
-              <h2 id="factors-title" className="fin-panel-title">What goes into a score?</h2>
-              <p className="fin-panel-desc">{pillars.length > 0 ? `The ${pillars.length} areas the model scores, and how much each counts towards 100.` : 'The areas the model scores.'}</p>
+              <h2 id="factors-title" className="fin-panel-title">What goes into a score</h2>
+              <p className="fin-panel-desc">{pillars.length > 0 ? `${pillars.length} areas, points out of 100` : 'The areas the model scores'}</p>
             </div>
           </div>
-          {pillars.length === 0 ? (
+          {pillars.length === 0 && isLoading ? (
+            // Seven areas, as the loaded list: nothing below moves when it lands.
+            <span className="fin-skel" style={{ height: 315, borderRadius: 8 }} aria-hidden="true" />
+          ) : pillars.length === 0 ? (
             <div className="fin-empty fin-empty--compact">The breakdown appears once a customer is scored.</div>
           ) : (
             <dl className="fin-dl">
@@ -178,12 +181,15 @@ export default function RiskScoreView() {
       <section className="card fin-table-card" aria-labelledby="scores-title">
         <div className="fin-panel-head">
           <div className="fin-panel-head__text">
-            <h2 id="scores-title" className="fin-panel-title">Which customers are safest to advance against?</h2>
-            <p className="fin-panel-desc">Highest score first. Eligibility follows the Fast Pay rules at the time of scoring.</p>
+            <h2 id="scores-title" className="fin-panel-title fin-panel-title--tip">
+              Safest customers first
+              <InfoTip align="end">Highest score first. Whether a customer meets the rules follows the Fast Pay rules at the time of scoring.</InfoTip>
+            </h2>
+            <p className="fin-panel-desc">By score, highest first</p>
           </div>
         </div>
         {isLoading ? (
-          <div style={{ padding: '40px 20px', display: 'flex', justifyContent: 'center' }}><Loader size={28} label="Loading scores…" /></div>
+          <div style={{ padding: 20 }} aria-busy="true" aria-label="Loading scores"><span className="fin-skel" style={{ height: 240, borderRadius: 8 }} aria-hidden="true" /></div>
         ) : customerScores.length === 0 ? (
           <div className="fin-empty">
             <p className="fin-empty__title">No risk scores yet</p>
@@ -216,14 +222,14 @@ export default function RiskScoreView() {
                           </div>
                         </div>
                       </td>
-                      <td><span className={tierChip(cs.tier)}>{cap(cs.tier)}</span></td>
+                      <td><TierChip t={cs.tier} /></td>
                       <td className="fin-date">
                         {scoredOn(cs)}
                         {expired && <span className="fin-text-muted"> · expired</span>}
                       </td>
                       <td>{cs.is_eligible ? 'Yes' : <span className="fin-text-muted">No</span>}</td>
                       {CAPITAL_LAUNCHED && (
-                        <td className="num">{cs.is_eligible && cs.fee_percent != null ? `${parseFloat(cs.fee_percent).toFixed(1)}%` : '—'}</td>
+                        <td className="num">{cs.is_eligible && cs.fee_percent != null ? formatPercent(parseFloat(cs.fee_percent), 1) : '—'}</td>
                       )}
                     </tr>
                   );
@@ -233,6 +239,7 @@ export default function RiskScoreView() {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchData } from "@/lib/Api";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatNumber, formatPercent } from "@/lib/formatters";
 import "./finance-brand.css";
-import { Loader } from "@/components/Loader";
 import { ChevronLeft } from "lucide-react";
 import SectionHeader from "@/components/layout/SectionHeader";
 
@@ -69,8 +68,17 @@ export default function AdvanceDetail() {
     if (id) loadAdvance();
   }, [id]);
 
+  // The head renders at once; only the content waits, as a skeleton.
   if (loading) {
-    return <Loader fullScreen />;
+    return (
+      <div className="fin-page">
+        <SectionHeader eyebrow="Fast Pay" title={`Advance #${id ?? ''}`} />
+        <div aria-busy="true" aria-label="Loading" style={{ display: 'grid', gap: 'var(--card-gap, 16px)' }}>
+          <div style={{ height: 160, borderRadius: 'var(--radius-card)', background: 'var(--bg-surface-hover)' }} />
+          <div style={{ height: 240, borderRadius: 'var(--radius-card)', background: 'var(--bg-surface-hover)' }} />
+        </div>
+      </div>
+    );
   }
 
   if (error || !advance) {
@@ -130,7 +138,7 @@ export default function AdvanceDetail() {
         eyebrow="Fast Pay"
         title={`Advance #${advance.id}`}
         titleAdornment={<span className={chip(STATUS_TONE[status])} style={{ borderRadius: 'var(--radius-chip)' }}>{formatStatus(status)}</span>}
-        description={<>Requested {safeDateTime(createdAt)}. Invoice <span className="fin-id">{invoiceNumber}</span>, {customerName}.</>}
+        description={<>Requested {safeDateTime(createdAt)}. Invoice <span style={{ fontVariantNumeric: 'tabular-nums' }}>{invoiceNumber}</span>, {customerName}.</>}
       />
 
       <div className="fin-grid-2" style={{ alignItems: 'start' }}>
@@ -147,7 +155,7 @@ export default function AdvanceDetail() {
                 <dd style={{ margin: 0, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>{formatCurrency(grossAmount)}</dd>
               </div>
               <div style={rowStyle}>
-                <dt style={{ color: 'var(--text-secondary)' }}>Fee ({feePercent.toFixed(1)}%)</dt>
+                <dt style={{ color: 'var(--text-secondary)' }}>Fee ({formatPercent(feePercent)})</dt>
                 <dd style={{ margin: 0, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>−{formatCurrency(feeAmount)}</dd>
               </div>
               <div style={{ ...rowStyle, paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
@@ -172,7 +180,7 @@ export default function AdvanceDetail() {
             <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, margin: 0 }}>
               <div>
                 <dt style={labelStyle}>Invoice number</dt>
-                <dd style={{ margin: '4px 0 0' }}><span className="fin-id">{invoiceNumber}</span></dd>
+                <dd style={{ margin: '4px 0 0' }}><span style={{ fontVariantNumeric: 'tabular-nums' }}>{invoiceNumber}</span></dd>
               </div>
               <div>
                 <dt style={labelStyle}>Customer</dt>
@@ -269,7 +277,7 @@ export default function AdvanceDetail() {
             <dl style={{ display: 'grid', gap: 8, margin: 0, fontSize: 14, lineHeight: '20px' }}>
               <div style={rowStyle}>
                 <dt style={{ color: 'var(--text-secondary)' }}>Fee rate</dt>
-                <dd style={{ margin: 0, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>{feePercent.toFixed(1)}%</dd>
+                <dd style={{ margin: 0, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>{formatPercent(feePercent)}</dd>
               </div>
               <div style={{ ...rowStyle, paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
                 <dt style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Total fee</dt>
@@ -302,7 +310,7 @@ export default function AdvanceDetail() {
                       .map(([key, val]) => (
                         <div key={key} style={{ ...rowStyle, fontSize: 13, lineHeight: '20px' }}>
                           <dt style={{ color: 'var(--text-secondary)' }}>{formatStatus(key)}</dt>
-                          <dd style={{ margin: 0, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{(val as number).toFixed(1)}</dd>
+                          <dd style={{ margin: 0, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatNumber(val as number, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</dd>
                         </div>
                       ))}
                   </dl>

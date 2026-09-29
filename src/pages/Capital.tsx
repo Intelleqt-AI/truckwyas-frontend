@@ -8,7 +8,6 @@ import { useQuery } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/formatters";
 import { fetchData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { Loader } from "@/components/Loader";
 import SectionHeader from "@/components/layout/SectionHeader";
 import CapitalPrelaunch from "@/components/capital/CapitalPrelaunch";
 
@@ -96,8 +95,20 @@ function CapitalLaunched() {
 
   useAutoRefresh(refetch);
 
+  // The head renders at once; only the content waits, as a skeleton.
   if (loading) {
-    return <Loader fullScreen />;
+    return (
+      <div className="capital-typography fin-page">
+        <SectionHeader
+          title="Fast Pay"
+          description="Get paid early on eligible invoices. Each advance is repaid when your customer pays."
+        />
+        <div aria-busy="true" aria-label="Loading" style={{ display: 'grid', gap: 'var(--card-gap, 16px)' }}>
+          <div style={{ height: 160, borderRadius: 'var(--radius-card)', background: 'var(--bg-surface-hover)' }} />
+          <div style={{ height: 240, borderRadius: 'var(--radius-card)', background: 'var(--bg-surface-hover)' }} />
+        </div>
+      </div>
+    );
   }
 
   const utilTone = utilization > 90 ? "danger" : utilization > 75 ? "warning" : "";
@@ -231,7 +242,7 @@ function CapitalLaunched() {
                   return (
                     <tr key={inv.id}>
                       <td>
-                        <span className="fin-id">{inv.invoice_number || inv.invoiceNumber}</span>
+                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>{inv.invoice_number || inv.invoiceNumber}</span>
                       </td>
                       <td className="fin-strong">
                         {inv.customer || inv.customer_name || inv.customerName}
@@ -310,7 +321,7 @@ function CapitalLaunched() {
                   {ineligibleInvoices.map((inv) => (
                     <tr key={inv.id}>
                       <td>
-                        <span className="fin-id">{inv.invoice_number}</span>
+                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>{inv.invoice_number}</span>
                       </td>
                       <td className="fin-strong">{inv.customer}</td>
                       <td className="num capital-amount">{formatCurrency(inv.amount)}</td>

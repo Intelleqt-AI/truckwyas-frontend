@@ -61,7 +61,7 @@ export function PaymentDotPlot({ rows, maxRows = 10 }: { rows: PayRow[]; maxRows
           {ticks.map((t) => (
             <g key={t}>
               <line x1={x(t)} x2={x(t)} y1={axisH - 6} y2={H} className="viz-gridline" />
-              <text x={t === 0 ? x(t) - 4 : x(t)} y={12} textAnchor={t === 0 ? 'start' : t === ticks[ticks.length - 1] ? 'end' : 'middle'}>{t === 0 ? 'Issued' : `${t}d`}</text>
+              <text x={t === 0 ? x(t) - 4 : x(t)} y={12} textAnchor={t === 0 ? 'start' : t === ticks[ticks.length - 1] ? 'end' : 'middle'}>{t === 0 ? 'Issued' : t === ticks[ticks.length - 1] ? `${t} days` : String(t)}</text>
             </g>
           ))}
           {visible.map((r, ri) => {
@@ -78,7 +78,8 @@ export function PaymentDotPlot({ rows, maxRows = 10 }: { rows: PayRow[]; maxRows
                 )}
                 {r.terms != null && (
                   <>
-                    <rect x={x(0)} y={cy - 7} width={Math.max(0, x(r.terms) - x(0))} height={14} rx={3} fill="var(--viz-track)" />
+                    {/* Context band (issue to terms); the terms tick carries the value at 3:1+. */}
+                    <rect className="viz-context-band" x={x(0)} y={cy - 7} width={Math.max(0, x(r.terms) - x(0))} height={14} rx={3} fill="var(--viz-track)" />
                     <line x1={x(r.terms)} x2={x(r.terms)} y1={cy - 9} y2={cy + 9} stroke="var(--text-secondary)" strokeWidth={2} />
                   </>
                 )}
@@ -88,37 +89,39 @@ export function PaymentDotPlot({ rows, maxRows = 10 }: { rows: PayRow[]; maxRows
                 ))}
                 {r.marks.map((m) => {
                   const mx = x(m.days);
-                  const dim = activeMark != null && activeMark !== m.id;
                   return (
-                    <g key={m.id} opacity={dim ? 0.5 : 1}>
+                    <g key={m.id}>
+                      {activeMark === m.id && <circle cx={mx} cy={cy} r={9} fill="none" stroke="var(--text-primary)" strokeWidth={1.5} />}
                       {m.open
                         ? <circle cx={mx} cy={cy} r={5} fill="var(--viz-surface)" stroke={VIZ.neutralStrong} strokeWidth={2} />
                         : <circle cx={mx} cy={cy} r={5} fill={VIZ.accent} stroke="var(--viz-surface)" strokeWidth={2} />}
-                      <circle className="viz-hit" cx={mx} cy={cy} r={12} tabIndex={0}
-                        aria-label={`${r.label}, ${m.ref}: ${m.open ? `unpaid for ${plural(m.days, 'day')}` : `paid after ${plural(m.days, 'day')}`}${r.terms != null ? `, terms ${r.terms} days` : ''}`}
-                        onPointerEnter={() => open(r, m, mx, cy + (figRef.current && ref.current ? ref.current.getBoundingClientRect().top - figRef.current.getBoundingClientRect().top : 0))}
-                        onFocus={() => open(r, m, mx, cy + (figRef.current && ref.current ? ref.current.getBoundingClientRect().top - figRef.current.getBoundingClientRect().top : 0))}
-                        onBlur={close} />
+                      {/* Pointer only: the SVG is one labelled image; the table twin is the keyboard route to every invoice. */}
+                      <circle className="viz-hit" cx={mx} cy={cy} r={12} aria-hidden="true"
+                        onPointerEnter={() => open(r, m, mx, cy + (figRef.current && ref.current ? ref.current.getBoundingClientRect().top - figRef.current.getBoundingClientRect().top : 0))} />
                     </g>
                   );
                 })}
-                {!stacked && r.terms != null && worst > r.terms && (
-                  <text x={Math.min(x(worst) + 10, W - padR)} y={cy} dy="0.32em" textAnchor={x(worst) + 60 > W ? 'end' : 'start'} className="viz-muted" style={{ display: x(worst) + 60 > W ? 'none' : undefined }}>
-                    +{worst - r.terms}d
-                  </text>
-                )}
+                {!stacked && r.terms != null && worst > r.terms && (() => {
+                  // Words, not "+150d" (R7). Shown only where it fits right of the mark.
+                  const late = `${plural(worst - r.terms, 'day')} late`;
+                  const fits = x(worst) + 10 + late.length * 6.6 <= W;
+                  return fits ? (
+                    <text x={x(worst) + 10} y={cy} dy="0.32em" textAnchor="start" className="viz-muted">{late}</text>
+                  ) : null;
+                })()}
               </g>
             );
           })}
         </svg>
       </div>
       <Tip tip={tip} width={W} />
-      {rows.length > maxRows && (
-        <button type="button" className="viz-table-toggle" onClick={() => setShowAll((s) => !s)}>
-          {showAll ? `Show the first ${maxRows}` : `Show all ${rows.length} customers`}
-        </button>
-      )}
+      {/* One foot row (R7): the quiet "Show all" on the left, the table link on the right. */}
       <TableTwin
+        note={rows.length > maxRows ? (
+          <button type="button" className="viz-table-toggle viz-table-toggle--quiet" aria-expanded={showAll} onClick={() => setShowAll((s) => !s)}>
+            {showAll ? `Show the first ${maxRows}` : `Show all ${rows.length} customers`}
+          </button>
+        ) : undefined}
         table={{
           caption: 'Days to pay per invoice, against payment terms',
           columns: [{ label: 'Customer' }, { label: 'Invoice' }, { label: 'Status' }, { label: 'Days', numeric: true }, { label: 'Terms', numeric: true }, { label: 'Amount', numeric: true }],

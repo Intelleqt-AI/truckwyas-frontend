@@ -4,16 +4,16 @@
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card, 12px);
-  padding: 24px;
+  padding: var(--card-pad, 20px);
   box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 .ic-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; min-width: 0; }
-.ic-card__heading { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.ic-card__title { margin: 0; font: 600 16px/24px var(--font-sans); letter-spacing: normal; color: var(--text-primary); }
-.ic-card__desc { margin: 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); max-width: 90ch; }
+.ic-card__heading { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ic-card__title { margin: 0; font: 600 var(--text-subhead, 15px)/22px var(--font-sans); letter-spacing: var(--tracking-title, -0.01em); color: var(--text-primary); }
+.ic-card__desc { margin: 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); max-width: 90ch; }
 .ic-card__action { flex-shrink: 0; }
 .ic-card__body { min-width: 0; }
 .ic-card__body--flush { margin: 0 -8px; }
@@ -58,7 +58,7 @@ a.ic-row:hover { background: var(--bg-surface-hover); }
 a.ic-row:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
 .ic-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ic-row__title { font: 500 14px/20px var(--font-sans); color: var(--text-primary); }
-.ic-row__title--mono { font: 400 13px/20px var(--font-mono); }
+.ic-row__title--mono { font: 400 14px/20px var(--font-sans); font-variant-numeric: tabular-nums; }
 .ic-row__meta { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
 .ic-row__value { flex-shrink: 0; text-align: right; font: 500 14px/20px var(--font-sans); font-variant-numeric: tabular-nums; }
 
@@ -76,7 +76,7 @@ a.ic-row:focus-visible { outline: 2px solid var(--accent-primary); outline-offse
 
 .ic-text-button {
   display: inline-flex; align-items: center; min-height: 40px; padding: 0; border: 0; background: none; cursor: pointer;
-  font: 500 14px/20px var(--font-sans); color: var(--accent-primary); text-decoration: none;
+  font: 500 14px/20px var(--font-sans); color: var(--link, var(--accent-primary)); text-decoration: none;
 }
 .ic-text-button:hover { text-decoration: underline; }
 .ic-text-button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; border-radius: 4px; }
@@ -87,7 +87,7 @@ a.ic-row:focus-visible { outline: 2px solid var(--accent-primary); outline-offse
   .ic-kpis--4 { --ic-cols: 2; }
 }
 @media (max-width: 767px) {
-  .ic-card { padding: 16px; }
+  .ic-card { padding: var(--card-pad, 16px); }
 }
 @media (max-width: 640px) {
   .ic-kpis { --ic-cols: 2; }
@@ -102,4 +102,10 @@ a.ic-row:focus-visible { outline: 2px solid var(--accent-primary); outline-offse
 }
 @media (max-width: 400px) {
   .ic-kpis, .ic-kpis--2 { --ic-cols: 1; }
+}
+
+/* R7: 44px touch target for text buttons ("Open the P&L"), drawn size unchanged. */
+@media (pointer: coarse) {
+  .ic-text-button { position: relative; }
+  .ic-text-button::after { content: ''; position: absolute; inset: min(0px, calc(50% - 22px)); }
 }

@@ -5,22 +5,8 @@
   letter-spacing: normal;
   min-width: 0;
 }
-.fp-page { --text-tertiary: #8E959D; }
-[data-theme="light"] .fp-page { --text-tertiary: #6B7280; }
 
-.fp-page .fp-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-chip);
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  font: 500 13px/20px var(--font-sans);
-  white-space: nowrap;
-}
-
-.fp-stack { display: flex; flex-direction: column; gap: 16px; }
+.fp-stack { display: flex; flex-direction: column; gap: var(--card-gap, 16px); }
 
 /* ---- Card ---- */
 .fp-card {
@@ -28,16 +14,25 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
   box-shadow: none;
-  padding: 24px;
+  padding: var(--card-pad, 20px);
   min-width: 0;
 }
-.fp-card__head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+/* Loading placeholders hold about the cards' height so the page does not move when data lands. */
+.fp-card--placeholder { border-style: solid; }
+.fp-card--ph-lg { min-height: 640px; }
+.fp-card--ph-sm { min-height: 200px; }
+.fp-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; margin-bottom: 16px; }
+.fp-card__titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fp-card__aside { display: flex; align-items: center; gap: 4px 16px; flex-wrap: wrap; }
+.fp-card__aside .fp-btn--quiet { min-height: 32px; padding: 4px 12px; }
 .fp-page .fp-card__title {
   margin: 0;
-  font: 600 16px/24px var(--font-sans);
+  display: flex; align-items: center; gap: 6px;
+  font: 600 var(--text-subhead, 15px)/22px var(--font-sans);
+  letter-spacing: var(--tracking-title, -0.01em);
   color: var(--text-primary);
 }
-.fp-card__desc { margin: 0; font-size: 13px; line-height: 20px; color: var(--text-secondary); max-width: 80ch; }
+.fp-card__desc { margin: 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
 .fp-card__foot {
   display: flex;
   align-items: center;
@@ -51,38 +46,38 @@
 .fp-muted { color: var(--text-secondary); margin: 0; font-size: 13px; line-height: 20px; }
 .fp-subhead { margin: 0 0 4px; font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }
 
-/* ---- Outcome ---- */
-.fp-outcome {
+/* ---- Outcome: a stats row, the lateness strip, then customers, all full width ---- */
+.fp-outcome { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.fp-summary {
+  margin: 0;
   display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  gap: 40px;
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
+  gap: 16px 32px;
   align-items: start;
 }
+.fp-summary > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fp-summary > div + div { padding-left: 32px; border-left: 1px solid var(--border-row); }
+.fp-summary dt { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fp-summary dd { margin: 0; }
+.fp-summary__value { font: 600 20px/28px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.fp-summary__note { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fp-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .fp-hero {
   font: 600 32px/40px var(--font-sans);
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }
-.fp-hero__sub { margin: 4px 0 0; font-size: 14px; line-height: 20px; color: var(--text-secondary); }
-.fp-facts { margin: 24px 0 0; display: grid; gap: 16px; }
-.fp-facts > div { display: grid; gap: 2px; }
-.fp-facts dt { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }
-.fp-facts dd {
-  margin: 0;
-  font: 600 16px/24px var(--font-sans);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
-}
-.fp-facts dd .fp-muted { display: inline; font-weight: 400; font-size: 14px; }
-.fp-facts dd.fp-dd-text { font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
-.fp-note { display: block; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fp-page .fp-hero__sub { margin: 4px 0 0; font-size: 14px; line-height: 20px; color: var(--text-secondary); }
+.fp-page .fp-basis { margin: 4px 0 0; max-width: 56ch; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+/* The lateness strip is context for the hero figure, not the headline: a thin band. */
+.fp-outcome__breakdown .viz-strip { height: 6px; }
 
 /* ---- Ranked / distribution list: label, bar, value, meta share one grid ---- */
 .fp-rank { list-style: none; margin: 0; padding: 0; }
 .fp-rank__row {
   display: grid;
-  grid-template-columns: minmax(150px, 1.3fr) minmax(80px, 2fr) minmax(120px, auto) 132px;
+  grid-template-columns: minmax(160px, 240px) minmax(80px, 1fr) minmax(120px, auto) 132px;
   align-items: center;
   column-gap: 16px;
   min-height: 44px;
@@ -94,11 +89,11 @@
   display: block;
   height: 6px;
   border-radius: 3px;
-  background: var(--border-row);
+  background: var(--bg-raised);
   overflow: hidden;
 }
-[data-theme="light"] .fp-rank__bar { background: #EEF0F3; }
-.fp-rank__bar > span { display: block; height: 100%; border-radius: 3px; background: var(--accent-primary); }
+/* Value held back by a check is not money in: neutral, per the chart grammar (viz.css). */
+.fp-rank__bar > span { display: block; height: 100%; border-radius: 3px; background: var(--chart-muted); }
 .fp-rank__value {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -118,32 +113,40 @@
 .fp-rank__row.is-empty .fp-rank__bar { background: transparent; border-top: 1px dashed var(--border-subtle); height: 0; border-radius: 0; }
 
 /* Outcome breakdown sits in a narrower column: drop the meta column width. */
-.fp-outcome .fp-rank__row { grid-template-columns: minmax(130px, 1.2fr) minmax(60px, 1.4fr) minmax(112px, auto) 116px; }
+.fp-outcome .fp-rank__row { grid-template-columns: minmax(160px, 240px) minmax(60px, 1fr) minmax(112px, auto) 116px; }
 
 /* Customers under the outcome: full width, bars are balance shaded by lateness. */
 .fp-outcome__customers { grid-column: 1 / -1; }
 .fp-rank__aged { display: block; min-width: 0; }
 
+/* ---- Checks ---- */
+.fp-checked-note { margin: 0 0 12px; }
+.fp-allfail__lead { margin: 0; color: var(--text-primary); }
+.fp-allfail { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.fp-allfail__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.fp-allfail__list li { padding: 2px 10px; border: 1px solid var(--border-subtle); border-radius: var(--radius-chip, 6px); font: 500 13px/20px var(--font-sans); color: var(--text-primary); background: var(--bg-raised); }
+
 /* ---- Table (disclosure) ---- */
-.fp-table-wrap { overflow-x: auto; margin: 8px -24px -24px; border-top: 1px solid var(--border-row); }
+.fp-table-wrap { overflow-x: auto; margin: 16px calc(-1 * var(--card-pad, 20px)) calc(-1 * var(--card-pad, 20px)); border-top: 1px solid var(--border-row); }
 .fp-table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 20px; }
 .fp-table th {
   text-align: left;
   font: 500 13px/20px var(--font-sans);
   color: var(--text-secondary);
-  padding: 12px 24px;
+  padding: 12px var(--card-pad, 20px);
   border-bottom: 1px solid var(--border-row);
   white-space: nowrap;
 }
-.fp-table td { padding: 12px 24px; border-bottom: 1px solid var(--border-row); vertical-align: middle; }
+.fp-table td { padding: 12px var(--card-pad, 20px); border-bottom: 1px solid var(--border-row); vertical-align: middle; }
 .fp-table tr:last-child td { border-bottom: 0; }
 .fp-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fp-table td.fp-muted { font-size: 13px; }
 .fp-id {
-  font: 400 13px/20px var(--font-mono);
+  font: 400 14px/20px var(--font-sans);
+  font-variant-numeric: tabular-nums;
   color: var(--text-primary);
   text-decoration: underline;
-  text-decoration-color: var(--border-active);
+  text-decoration-color: var(--border-strong, var(--border-active));
   text-underline-offset: 3px;
 }
 .fp-id:hover { text-decoration-color: currentColor; }
@@ -187,17 +190,31 @@
   background: none;
   color: var(--text-primary);
 }
-.fp-btn--primary { background: var(--accent-primary); color: var(--btn-action-color); }
+.fp-btn--primary { background: var(--btn-primary-bg); color: var(--btn-primary-fg); }
+.fp-btn--primary:hover:not(:disabled) { background: var(--btn-primary-hover, var(--btn-primary-bg)); }
+.fp-btn--primary:active:not(:disabled) { background: var(--btn-primary-pressed, var(--btn-primary-bg)); }
 .fp-btn--primary:disabled {
-  background: var(--bg-surface-hover);
-  border-color: var(--border-subtle);
-  color: var(--text-tertiary);
+  background: var(--btn-disabled-bg, var(--bg-raised));
+  border-color: transparent;
+  color: var(--btn-disabled-fg, var(--text-tertiary));
   cursor: not-allowed;
 }
-.fp-btn--secondary { border-color: var(--border-subtle); }
+.fp-btn--secondary { border-color: var(--border-default, var(--border-subtle)); }
 .fp-btn--secondary:hover, .fp-btn--quiet:hover { background: var(--bg-surface-hover); }
 .fp-btn--quiet { padding: 8px 12px; margin-right: -12px; color: var(--text-primary); }
-.fp-btn:focus-visible, .fp-id:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+/* A quiet button under a list starts on the list's text edge, not 12px in. */
+.fp-btn--quiet.fp-btn--flush { margin: 8px 0 0 -12px; }
+.fp-btn:focus-visible, .fp-id:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 3px; }
+
+/* Text links: the product link colour, like "Show as table" (viz.css) and Reports links. */
+.fp-link {
+  position: relative; display: inline-flex; align-items: center; min-height: 0; padding: 0; border: 0; background: none; cursor: pointer;
+  font: 500 14px/20px var(--font-sans); color: var(--link, var(--accent-primary)); white-space: nowrap;
+}
+.fp-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.fp-link:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
+.fp-link--below { margin-top: 12px; }
+@media (pointer: coarse) { .fp-link::after { content: ''; position: absolute; inset: -12px -8px; } }
 
 /* ---- States ---- */
 .fp-state { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
@@ -207,13 +224,13 @@
 
 /* ---- Narrow ---- */
 @media (max-width: 900px) {
-  .fp-outcome { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .fp-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fp-summary__lead { grid-column: 1 / -1; }
+  .fp-summary > div + div { padding-left: 0; border-left: 0; }
+  .fp-summary > div + div + div { padding-left: 24px; border-left: 1px solid var(--border-row); }
   .fp-steps { grid-template-columns: minmax(0, 1fr); gap: 20px; }
 }
 @media (max-width: 640px) {
-  .fp-card { padding: 16px; }
-  .fp-table-wrap { margin: 8px -16px -16px; }
-  .fp-table th, .fp-table td { padding: 12px 16px; }
   .fp-hero { font-size: 28px; line-height: 36px; }
   .fp-rank__row,
   .fp-outcome .fp-rank__row {
@@ -238,5 +255,7 @@
   .fp-btn--quiet { margin: 0 0 0 -12px; }
 }
 @media (max-width: 640px) {
-  .fp-rank__aged { grid-area: bar; }
+  /* Phone: customer rows are two lines: name and amount, then a short bar and the share. */
+  .fp-outcome .fp-rank__row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label value" "bar meta"; row-gap: 4px; padding: 10px 0; column-gap: 12px; }
+  .fp-outcome .fp-rank__meta { text-align: right; font-size: 12px; }
 }

@@ -1,17 +1,27 @@
 import './bookings-typography.css';
 import './table-heading-roles.css';
 import './bookings-section.css';
+import './ops-tiles.css';
+import { InfoTip } from '@/components/ui/InfoTip';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Package, Plus } from 'lucide-react';
 import SectionHeader, { type SectionTab } from '@/components/layout/SectionHeader';
 import { useQuery } from '@tanstack/react-query';
-import { fetchData, postData } from '@/lib/Api';
-import { formatCurrency } from '@/lib/formatters';
+import { postData } from '@/lib/Api';
+import { fetchAllPages } from '@/components/insights/findings';
+import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
+import { formatCurrency, formatDate, formatMoneyWhole } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
-import { QuotesList } from './QuotesList';
+import { QuotesList, StatusFilter, RecordNo } from './QuotesList';
+import RowActions from '@/components/ui/RowActions';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { rowLink } from '@/lib/rowLink';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
-import { Loader } from '@/components/Loader';
+import { SkeletonRows, TilesSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import { staleWork, staleLabel, staleAction } from './bookings-stale';
 
 interface Load {
   id: number;
@@ -25,22 +35,66 @@ interface Load {
   pickup_date?: string;
   customer_name?: string;
   quote_number?: string;
+  pickup_city?: string;
+  delivery_city?: string;
+  vehicle?: number | null;
+  driver?: number | null;
+  delivery_date?: string;
+  actual_delivered_at?: string | null;
+  created_at?: string;
 }
-
-// Status chip tone; each tone uses the tested -text role on a tinted surface.
-const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
-  PENDING: 'neutral',
-  ASSIGNED: 'warning',
-  IN_TRANSIT: 'info',
-  LOADING: 'warning',
-  DELIVERED: 'success',
-  INVOICED: 'info',
-  CANCELLED: 'danger',
-};
 
 // Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
 const formatStatus = (s?: string) =>
   s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+
+// "MAN TGL 8.180 - MP 123 FGH" → "MP 123 FGH": the plate identifies the truck;
+// the full make and model stays in the cell's title.
+const plateOf = (info?: string) => {
+  if (!info) return '';
+  const parts = info.split(' - ');
+  return (parts.length > 1 ? parts[parts.length - 1] : info).trim();
+};
+// One column for who and what is on the job, so the table keeps Status and
+// Amount in view at laptop widths.
+// Loading or in transit with no vehicle is not a normal state: it is flagged
+// calmly as a short line under the status (the status itself is not repeated).
+const ON_THE_MOVE = ['LOADING', 'IN_TRANSIT'];
+const missingVehicle = (l: { vehicle_info?: string; vehicle?: number | null; status: string }) =>
+  !plateOf(l.vehicle_info) && l.vehicle == null && ON_THE_MOVE.includes(l.status);
+// On the move with no vehicle reads "No vehicle" here, in neutral text: the
+// row's one amber mark is the stale dot under Status (R6).
+const assignedLabel = (l: { driver_name?: string; vehicle_info?: string; vehicle?: number | null; status: string }) => {
+  const bits = [l.driver_name, plateOf(l.vehicle_info)].filter(Boolean);
+  // One wording for a missing vehicle on Orders (R8): "No vehicle".
+  if (missingVehicle(l) || (!plateOf(l.vehicle_info) && l.vehicle == null)) return <span className="bk-muted">{bits.length ? `${bits.join(' · ')} · no vehicle` : 'No vehicle'}</span>;
+  return bits.join(' · ');
+};
+
+// No vehicle on an order that is still open, in any status (R5: the tile
+// counts the same rows the table marks "No vehicle").
+const hasNoVehicle = (l: { vehicle_info?: string; vehicle?: number | null }) =>
+  !plateOf(l.vehicle_info) && l.vehicle == null;
+
+// Stale work (R5): an order still Assigned, Loading or In transit past its
+// delivery date, or older than 30 days, is not current work. The row says
+// so in one quiet line; the full sentence sits in the title.
+// Phones: the same words without this year's year ("since 20 Jun (101 days)"),
+// so the stale line stays on one line under the chip.
+const shortStale = (since: string, days: string) => {
+  const y = String(new Date().getFullYear());
+  return since.endsWith(` ${y}`) ? `since ${since.slice(0, -(y.length + 1))} (${days})` : null;
+};
+// The step the booking page offers for a stale load (Loading can go on to
+// In transit, not straight to Delivered).
+const staleStep = (l: Load) => (l.status === 'LOADING' ? 'Mark it in transit or cancel it' : staleAction(l));
+
+// Newest first: delivered date, else due date, else pickup.
+const whenOf = (l: Load) => Date.parse(l.actual_delivered_at || l.delivery_date || l.pickup_date || l.created_at || '') || 0;
+
+// Cities read as a route; the full addresses stay in the tooltip.
+const placeOf = (loc?: string, city?: string) => String(loc || '').split(',')[0].trim() || (city || '').trim() || '—';
+const routeText = (l: Load) => `${placeOf(l.pickup_location, l.pickup_city)} → ${placeOf(l.delivery_location, l.delivery_city)}`;
 
 type BookingTab = 'quotes' | 'orders' | 'history';
 
@@ -56,7 +110,7 @@ export const BOOKINGS_TABS: SectionTab[] = [
 
 const TAB_TITLES: Record<BookingTab, string> = {
   quotes: 'Quotes',
-  orders: 'Active orders',
+  orders: 'Open orders',
   history: 'Order history',
 };
 
@@ -67,9 +121,11 @@ const TAB_DESCRIPTIONS: Record<BookingTab, string> = {
 };
 
 export default function LoadsList() {
-  const { data, isLoading: loading, isError, isFetching, refetch } = useQuery({
+  const loadsQuery = useQuery({
     queryKey: ["loads-list"],
-    queryFn: () => fetchData('/api/v1/loads/'),
+    // Every page (the endpoint returns 20 at a time), so the tiles and the
+    // History list count every load, not the latest 20.
+    queryFn: () => fetchAllPages<Load>('api/v1/loads/').then(r => r.rows),
     // Give the backend enough time to wake from a cold start (Render free tier ~20-30s).
     // Retry up to 4 times with increasing delays: 3s, 6s, 9s, 12s.
     retry: (failureCount, error: any) => {
@@ -78,16 +134,23 @@ export default function LoadsList() {
     },
     retryDelay: (attempt) => Math.min(3000 * (attempt + 1), 12000),
   });
-  const loads = (data?.results || data || []) as Load[];
-  const error = isError ? 'Failed to load bookings' : null;
+  const { data, isFetching, refetch } = loadsQuery;
+  // Failed (or failing and retrying) with nothing to show: say so straight away.
+  const failed = loadFailed(loadsQuery);
+  const loading = loadsQuery.isLoading && !failed;
+  const loads: Load[] = data ?? [];
+  const error = failed ? 'Failed to load bookings' : null;
   const [convertingIds, setConvertingIds] = useState<Set<number>>(new Set());
   const [orderFilter, setOrderFilter] = useState('All');
   const [historyFilter, setHistoryFilter] = useState('All');
   const [historySearch, setHistorySearch] = useState('');
+  const [orderSearch, setOrderSearch] = useState('');
   // Owned here (not inside QuotesList) so the search box + Board/List toggle
   // can render inline with the Quotes/Orders/History tabs.
   const [quoteSearch, setQuoteSearch] = useState('');
-  const [quoteView, setQuoteView] = useState<'board' | 'list'>('board');
+  // Phones open on the List: a sideways kanban shows two cards per column.
+  const [quoteView, setQuoteView] = useState<'board' | 'list'>(() =>
+    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches ? 'list' : 'board');
   const navigate = useNavigate();
   const location = useLocation();
   const urlSegment = location.pathname.split('/').pop();
@@ -95,8 +158,8 @@ export default function LoadsList() {
     ? (urlSegment as BookingTab)
     : 'orders';
 
-  const handleConvertToInvoice = async (load: Load, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleConvertToInvoice = async (load: Load, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setConvertingIds(prev => new Set(prev).add(load.id));
 
     try {
@@ -123,9 +186,15 @@ export default function LoadsList() {
   useAutoRefresh(refetch);
 
   const activeLoads = loads.filter(l => ACTIVE_STATUSES.includes(l.status));
-  const historyLoads = loads.filter(l => HISTORY_STATUSES.includes(l.status));
+  const historyLoads = loads.filter(l => HISTORY_STATUSES.includes(l.status)).sort((a, b) => whenOf(b) - whenOf(a) || b.id - a.id);
 
-  const filteredOrders = activeLoads.filter(l => orderFilter === 'All' || l.status === orderFilter);
+  const matchesText = (l: Load, q: string) => {
+    if (!q) return true;
+    const t = q.toLowerCase();
+    return [l.customer_name, l.load_number, l.pickup_location, l.delivery_location, l.pickup_city, l.delivery_city, l.driver_name, l.vehicle_info]
+      .some(v => (v || '').toLowerCase().includes(t));
+  };
+  const filteredOrders = activeLoads.filter(l => (orderFilter === 'All' || l.status === orderFilter) && matchesText(l, orderSearch));
   const filteredHistory = historyLoads.filter(l => {
     const matchStatus = historyFilter === 'All' || l.status === historyFilter;
     const matchSearch = !historySearch || 
@@ -136,57 +205,113 @@ export default function LoadsList() {
     return matchStatus && matchSearch;
   });
 
-  const renderTable = (data: Load[], showInvoiceAction: boolean, emptyText: string) => (
-    <div className="bk-table-wrap">
-      <table className="table-heading-roles bk-table">
+  const renderTable = (data: Load[], showInvoiceAction: boolean, emptyText: string) => loading ? (
+    // Loading: the real table head with placeholder rows at the final row
+    // height, so nothing moves when the orders arrive.
+    <div className="bk-table-wrap" aria-busy="true" aria-label="Loading orders">
+      <table className={`table-heading-roles bk-table bk-table--loads${showInvoiceAction ? ' bk-table--history' : ''}`}>
         <thead>
           <tr>
-            <th scope="col">Load #</th>
-            <th scope="col">Customer</th>
-            <th scope="col">Route</th>
-            <th scope="col">Driver</th>
-            <th scope="col">Vehicle</th>
+            <th scope="col" className="bk-col-load">Load</th>
+            <th scope="col" className="bk-col-customer-head">Customer</th>
+            <th scope="col" className="bk-col-route">Route</th>
+            <th scope="col" className="bk-col-opt">Driver and vehicle</th>
+            {showInvoiceAction && <th scope="col" className="bk-col-date" title="Delivered date, or the due date when no delivery was recorded. Newest first.">Date</th>}
             <th scope="col">Status</th>
             <th scope="col" className="is-num">Amount</th>
-            {showInvoiceAction && <th scope="col" className="is-num"><span className="sr-only">Action</span></th>}
+            {showInvoiceAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Actions</span></th>}
+          </tr>
+        </thead>
+        <tbody><SkeletonRows rows={8} cols={showInvoiceAction ? 8 : 6} /></tbody>
+      </table>
+    </div>
+  ) : (
+    <div className="bk-table-wrap">
+      <table className={`table-heading-roles bk-table bk-table--loads${showInvoiceAction ? ' bk-table--history' : ''}`}>
+        <thead>
+          <tr>
+            <th scope="col" className="bk-col-load">Load</th>
+            <th scope="col" className="bk-col-customer-head">Customer</th>
+            <th scope="col" className="bk-col-route">Route</th>
+            <th scope="col" className="bk-col-opt">Driver and vehicle</th>
+            {showInvoiceAction && <th scope="col" className="bk-col-date" title="Delivered date, or the due date when no delivery was recorded. Newest first.">Date</th>}
+            <th scope="col">Status</th>
+            <th scope="col" className="is-num">Amount</th>
+            {showInvoiceAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Actions</span></th>}
           </tr>
         </thead>
         <tbody>
-          {data.map((load) => (
+          {data.map((load) => {
+            // Stale work (R6, shared rule): "since <date> (N days)" with one
+            // amber dot; the action sits in the title and for screen readers.
+            // Phones (R8) show it under the customer, as History does, so the
+            // Status column is the chip only and the customer is not squeezed.
+            const staleFlag = (where: 'status' | 'customer') => {
+              const st = showInvoiceAction ? null : staleWork(load);
+              if (!st) return null;
+              const words = staleLabel(st);
+              const full = `Still ${formatStatus(load.status).toLowerCase()}${st.overdue ? ', past its delivery date' : ''} ${words.text}. Open it to ${staleStep(load).charAt(0).toLowerCase()}${staleStep(load).slice(1)}.`;
+              return <span className={`bk-status-flag bk-status-flag--stale bk-stale-in-${where}`} title={full}><span className="sr-only">{full}</span><span aria-hidden="true" className="bk-stale-long">{words.text}</span><span aria-hidden="true" className="bk-stale-short">{shortStale(st.since, words.days) ?? words.text}</span></span>;
+            };
+            return (
             <tr
               key={load.id}
               className="is-clickable"
+              {...rowLink(() => navigate(`/bookings/${load.id}`))}
               onClick={() => navigate(`/bookings/${load.id}`)}
             >
-              <td className="is-id">{load.load_number}</td>
-              <td className="is-primary is-truncate" style={{ maxWidth: 180 }} title={load.customer_name || ''}>{load.customer_name || '—'}</td>
-              <td className="is-truncate" style={{ maxWidth: 220 }} title={`${load.pickup_location} → ${load.delivery_location}`}>
-                {load.pickup_location} → {load.delivery_location}
+              <td className="is-id bk-col-load">{load.load_number}</td>
+              <td className="is-primary is-truncate bk-col-customer" title={load.customer_name || ''}>
+                {load.customer_name || '—'}
+                {/* Phones: the load number rides under the customer (its column folds away). */}
+                <RecordNo value={load.load_number} />
+                {staleFlag('customer')}
               </td>
-              <td className="is-truncate" style={{ maxWidth: 160 }} title={load.driver_name || ''}>{load.driver_name || '—'}</td>
-              <td className="is-truncate" style={{ maxWidth: 140 }} title={load.vehicle_info || ''}>{load.vehicle_info || '—'}</td>
-              <td>
-                <span className={`bk-status bk-status--${STATUS_TONE[load.status] || 'neutral'}`}>
-                  {formatStatus(load.status)}
-                </span>
+              <td className={`bk-col-route${showInvoiceAction ? ' is-truncate' : ' bk-route-cell'}`} title={`${load.pickup_location} to ${load.delivery_location}`}>
+                {showInvoiceAction ? routeText(load) : (
+                  // Orders rows are two lines (status and its stale line), so
+                  // the route stacks too instead of truncating (R6).
+                  <>
+                    <span className="bk-route-cell__from">{placeOf(load.pickup_location, load.pickup_city)}</span>
+                    <span className="bk-route-cell__to"><span aria-hidden="true">→ </span><span className="sr-only">to </span>{placeOf(load.delivery_location, load.delivery_city)}</span>
+                  </>
+                )}
               </td>
-              <td className="is-money">
-                {formatCurrency(parseFloat(load.total_amount || '0'))}
+              <td className={`bk-col-opt bk-col-assign${showInvoiceAction ? ' is-truncate' : ' bk-assign-cell'}`} title={[load.driver_name, load.vehicle_info].filter(Boolean).join(', ')}>
+                {showInvoiceAction || !(load.driver_name && plateOf(load.vehicle_info)) ? assignedLabel(load) : (
+                  // Two lines like the rest of the row: driver, then the plate (never cut).
+                  <><span className="bk-assign-cell__driver">{load.driver_name}</span><span className="bk-assign-cell__plate">{plateOf(load.vehicle_info)}</span></>
+                )}
               </td>
-              {showInvoiceAction && <td className="is-num" onClick={(e) => e.stopPropagation()}>
+              {showInvoiceAction && <td className="is-date is-nowrap bk-col-date">{load.actual_delivered_at || load.delivery_date ? formatDate(load.actual_delivered_at || load.delivery_date!) : '—'}</td>}
+              <td className="bk-col-status">
+                <StatusChip status={load.status} size="sm" />
+                {staleFlag('status')}
+              </td>
+              <td className="is-money" title={formatCurrency(parseFloat(load.total_amount || '0'))}>
+                {/* Lists show whole rands at every width; cents stay on the invoice (R7). */}
+                {formatMoneyWhole(parseFloat(load.total_amount || '0'))}
+              </td>
+              {showInvoiceAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
+                {/* One quiet row menu (R4): no column of blue "Create invoice" links. */}
                 {load.status === 'DELIVERED' && (
-                  <button
-                    type="button"
-                    className="bk-btn bk-btn--secondary bk-btn--sm"
-                    onClick={(e) => handleConvertToInvoice(load, e)}
-                    disabled={convertingIds.has(load.id)}
-                  >
-                    {convertingIds.has(load.id) ? 'Creating…' : 'Create invoice'}
-                  </button>
+                  <RowActions
+                    label={load.load_number}
+                    items={[
+                      {
+                        label: convertingIds.has(load.id) ? 'Creating invoice…' : 'Create invoice',
+                        hint: 'Opens the new invoice',
+                        onSelect: () => handleConvertToInvoice(load),
+                        disabled: convertingIds.has(load.id),
+                      },
+                      { label: 'Open load', onSelect: () => navigate(`/bookings/${load.id}`) },
+                    ]}
+                  />
                 )}
               </td>}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
       {data.length === 0 && (
@@ -208,21 +333,29 @@ export default function LoadsList() {
     </div>
   );
 
-  // One quiet summary strip: only the numbers that tell you what to do next,
-  // each with its basis in plain words underneath.
-  const summary = (items: { label: string; value: React.ReactNode; note: string; attention?: boolean }[]) => (
-    <section className="bk-summary" aria-label="Summary">
+  // Summary tiles: only the numbers that tell you what to do next. Each is
+  // its own card (label, figure, one short line); method sits in an InfoTip.
+  const summary = (items: { label: string; value: React.ReactNode; title?: string; note: string; tip?: string; attention?: boolean }[]) => (
+    <KpiRow className="bk-kpis">
       {items.map(m => (
-        <div key={m.label} className="bk-summary__cell">
-          <div className="bk-summary__label">{m.label}</div>
-          <div className={`bk-summary__value${m.attention ? ' is-attention' : ''}`}>{m.value}</div>
-          <div className="bk-summary__note">{m.note}</div>
-        </div>
+        <KpiTile
+          key={m.label}
+          aria-label={m.label}
+          label={m.label}
+          aside={m.tip ? <InfoTip>{m.tip}</InfoTip> : undefined}
+          figure={<span title={m.title}>{m.value}</span>}
+          note={m.note}
+          // Counts carry the attention; the note stays neutral text (no amber links).
+          tone="neutral"
+        />
       ))}
-    </section>
+    </KpiRow>
   );
+  const wholeRand = (n: number) => formatMoneyWhole(n);
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-  const pendingCount = activeLoads.filter(l => l.status === 'PENDING').length;
+  const needVehicle = activeLoads.filter(l => hasNoVehicle(l) && !ON_THE_MOVE.includes(l.status));
+  const needVehicleStale = needVehicle.filter(l => staleWork(l)?.overdue).length;
+  const movingNoVehicle = activeLoads.filter(l => hasNoVehicle(l) && ON_THE_MOVE.includes(l.status)).length;
   const deliveredNotInvoiced = historyLoads.filter(l => l.status === 'DELIVERED').length;
   const completedLoads = historyLoads.filter(l => l.status !== 'CANCELLED');
 
@@ -231,31 +364,19 @@ export default function LoadsList() {
   let body: React.ReactNode;
   if (activeTab === 'quotes') {
     body = null; // Quotes manage their own loading per column.
-  } else if (loading) {
-    body = <Loader fullScreen />;
   } else if (error) {
     body = (
-      <div className="card" role="alert" style={{ padding: 24 }}>
-        <h2 className="bk-empty__title" style={{ textAlign: 'left' }}>Unable to load bookings</h2>
-        <p className="bk-empty__text" style={{ marginBottom: 16 }}>
-          The server may be starting up. This usually resolves in 20 to 30 seconds.
-        </p>
-        <div>
-          <button
-            type="button"
-            className="bk-btn bk-btn--primary"
-            disabled={isFetching}
-            onClick={() => refetch()}
-          >
-            {isFetching ? 'Retrying…' : 'Retry loading'}
-          </button>
-        </div>
-      </div>
+      <LoadError
+        what={activeTab === 'history' ? 'past loads' : 'orders'}
+        error={loadsQuery.error ?? loadsQuery.failureReason}
+        busy={isFetching}
+        onRetry={() => refetch()}
+      />
     );
   }
 
   return (
-    <div className="bookings-typography" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className={`bookings-typography${activeTab === 'quotes' && quoteView === 'list' ? ' bk-qlist-page' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ flexShrink: 0 }}>
         <SectionHeader
           eyebrow="Bookings"
@@ -273,7 +394,7 @@ export default function LoadsList() {
 
       {/* QUOTES TAB — fills remaining viewport height; QuotesList scrolls its own areas internally */}
       {activeTab === 'quotes' && (
-        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div className="bk-qlist-fill" style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <QuotesList embedded={true} search={quoteSearch} onSearchChange={setQuoteSearch} view={quoteView} onViewChange={setQuoteView} />
         </div>
       )}
@@ -283,49 +404,76 @@ export default function LoadsList() {
       {/* ORDERS TAB */}
       {activeTab === 'orders' && !body && (
         <div>
-          {activeLoads.length > 0 ? summary([
+          {loading ? <TilesSkeleton count={3} /> : activeLoads.length > 0 ? summary([
             {
-              label: 'Waiting for a vehicle',
-              value: pendingCount,
-              note: pendingCount > 0 ? 'Pending orders. Assign a vehicle to move them forward.' : 'Every active order has a vehicle.',
-              attention: pendingCount > 0,
+              // Only orders that can still get a vehicle (Pending, Assigned).
+              // One already loading or in transit can't, so it is named in
+              // the note, not counted (R7).
+              label: 'Need a vehicle',
+              value: needVehicle.length,
+              note: needVehicle.length === 0 ? 'All have a vehicle'
+                : needVehicleStale === needVehicle.length ? 'All past delivery date'
+                : needVehicleStale > 0 ? `${needVehicleStale} past delivery date` : 'Assign a vehicle',
+              tip: `Pending or Assigned orders with no vehicle.${movingNoVehicle > 0 ? ` Not counted: ${movingNoVehicle === 1 ? '1 order already loading or in transit without one; it' : `${movingNoVehicle} orders already loading or in transit without one; they`} can no longer be given a vehicle, only closed or cancelled.` : ''}`,
+              attention: needVehicle.length > 0,
             },
-            {
-              label: 'On the road',
-              value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length,
-              note: `In transit. ${plural(activeLoads.filter(l => l.status === 'LOADING').length, 'order', 'orders')} loading, ${activeLoads.filter(l => l.status === 'ASSIGNED').length} assigned.`,
-            },
-            {
-              label: 'Value of active orders',
-              value: formatCurrency(activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)),
-              note: `Order totals across ${plural(activeLoads.length, 'active order', 'active orders')}.`,
-            },
+            (() => {
+              // The note describes these same loads (R7), never the other
+              // statuses, so it can't read as a breakdown of the figure.
+              const inTransit = activeLoads.filter(l => l.status === 'IN_TRANSIT');
+              const late = inTransit.filter(l => staleWork(l)?.overdue).length;
+              return {
+                label: 'In transit',
+                value: inTransit.length,
+                note: inTransit.length === 0 ? 'None on the road'
+                  : late === inTransit.length ? (inTransit.length === 1 ? 'Past its delivery date' : 'All past delivery date')
+                  : late > 0 ? `${late} past delivery date` : 'All on schedule',
+                tip: 'Orders with status In transit. Loads past their delivery date are flagged in the table: close them via the order.',
+              };
+            })(),
+            (() => {
+              // "Active" means current work (R7): orders left open past their
+              // dates are counted as left open, never as active.
+              const total = activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0);
+              const leftOpen = activeLoads.filter(l => staleWork(l)).length;
+              const current = activeLoads.length - leftOpen;
+              return {
+                label: 'Open order value',
+                value: wholeRand(total),
+                title: formatCurrency(total),
+                note: leftOpen === 0 ? plural(current, 'active order', 'active orders')
+                  : current === 0 ? `${plural(leftOpen, 'order', 'orders')}, all left open`
+                  : `${current} active · ${leftOpen} left open`,
+                tip: 'Sum of order totals across orders not yet delivered or cancelled. "Left open" means past the delivery date, or open for more than 30 days.',
+              };
+            })(),
           ]) : (
             <div className="bk-notice">
               <div>
                 <p className="bk-notice__text">No orders are in progress.</p>
-                <p className="bk-notice__sub">A quote becomes an order when you convert it to a booking.</p>
               </div>
               <button type="button" className="bk-btn bk-btn--secondary" onClick={() => navigate('/bookings/quotes')}>View quotes</button>
             </div>
           )}
 
-          <div className="bk-toolbar">
-            <div className="bk-filters" role="group" aria-label="Filter orders by status">
-              {['All', 'PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'].map(status => (
-                <button
-                  key={status}
-                  type="button"
-                  aria-pressed={orderFilter === status}
-                  className={`bk-chip${orderFilter === status ? ' is-active' : ''}`}
-                  onClick={() => setOrderFilter(status)}
-                >
-                  {status === 'All' ? 'All' : formatStatus(status)}
-                </button>
-              ))}
-            </div>
-            <span className="bk-toolbar__end">{filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}</span>
-          </div>
+          <Toolbar
+            meta={`${filteredOrders.length} ${filteredOrders.length === 1 ? 'order' : 'orders'}`}
+            end={
+              <StatusFilter
+                label="Filter orders by status"
+                value={orderFilter}
+                onChange={setOrderFilter}
+                options={['All', 'PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'].map(status => ({ value: status, label: status === 'All' ? 'All' : formatStatus(status) }))}
+              />
+            }
+          >
+            <SearchInput
+              aria-label="Search orders"
+              placeholder="Search customer, load or route"
+              value={orderSearch}
+              onChange={e => setOrderSearch(e.target.value)}
+            />
+          </Toolbar>
 
           {renderTable(filteredOrders, false, activeLoads.length === 0 ? 'Nothing in progress right now.' : 'No orders match this filter.')}
         </div>
@@ -334,49 +482,53 @@ export default function LoadsList() {
       {/* HISTORY TAB */}
       {activeTab === 'history' && !body && (
         <div>
-          {historyLoads.length > 0 && summary([
+          {loading ? <TilesSkeleton count={3} /> : historyLoads.length > 0 && summary([
             {
               label: 'Delivered, not invoiced',
               value: deliveredNotInvoiced,
-              note: deliveredNotInvoiced > 0 ? 'Create the invoice so you can get paid.' : 'Every delivered load has been invoiced.',
+              note: deliveredNotInvoiced > 0 ? 'Invoice to get paid' : 'All invoiced',
               attention: deliveredNotInvoiced > 0,
             },
             {
               label: 'Invoiced',
               value: historyLoads.filter(l => l.status === 'INVOICED').length,
-              note: `${plural(historyLoads.filter(l => l.status === 'CANCELLED').length, 'load', 'loads')} cancelled.`,
+              // Only facts about invoiced loads (R5): their value, not cancellations.
+              note: `${wholeRand(historyLoads.filter(l => l.status === 'INVOICED').reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0))} billed`,
             },
-            {
-              label: 'Revenue from completed loads',
-              value: formatCurrency(completedLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)),
-              note: `Order totals across ${plural(completedLoads.length, 'delivered or invoiced load', 'delivered or invoiced loads')}.`,
-            },
+            (() => {
+              const total = completedLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0);
+              return {
+                label: 'Delivered revenue',
+                value: wholeRand(total),
+                title: formatCurrency(total),
+                note: plural(completedLoads.length, 'load', 'loads'),
+                tip: 'Sum of order totals across delivered and invoiced loads.',
+              };
+            })(),
           ])}
 
-          <div className="bk-toolbar">
-            <input
-              type="search"
-              className="bk-search"
+          <Toolbar
+            className="bk-hist-toolbar"
+            meta={`${filteredHistory.length} ${filteredHistory.length === 1 ? 'record' : 'records'}`}
+            end={
+              // Phones: the count and a status select share one row under
+              // the search, like Orders (two rows, not three; R7).
+              <StatusFilter
+                compactOnPhone
+                label="Filter history by status"
+                value={historyFilter}
+                onChange={setHistoryFilter}
+                options={['All', 'DELIVERED', 'INVOICED', 'CANCELLED'].map(status => ({ value: status, label: status === 'All' ? 'All' : formatStatus(status) }))}
+              />
+            }
+          >
+            <SearchInput
               aria-label="Search history"
               placeholder="Search customer, load or route"
               value={historySearch}
               onChange={e => setHistorySearch(e.target.value)}
             />
-            <div className="bk-filters" role="group" aria-label="Filter history by status">
-              {['All', 'DELIVERED', 'INVOICED', 'CANCELLED'].map(status => (
-                <button
-                  key={status}
-                  type="button"
-                  aria-pressed={historyFilter === status}
-                  className={`bk-chip${historyFilter === status ? ' is-active' : ''}`}
-                  onClick={() => setHistoryFilter(status)}
-                >
-                  {status === 'All' ? 'All' : formatStatus(status)}
-                </button>
-              ))}
-            </div>
-            <span className="bk-toolbar__end">{filteredHistory.length} {filteredHistory.length === 1 ? 'record' : 'records'}</span>
-          </div>
+          </Toolbar>
 
           {renderTable(filteredHistory, true, historyLoads.length === 0 ? 'No delivered, invoiced or cancelled loads yet.' : 'No loads match your search or filter.')}
         </div>

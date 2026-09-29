@@ -33,11 +33,11 @@
 .fin-btn-secondary.btn-action,
 .fin-btn-secondary {
   background: transparent;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default, var(--border-subtle));
   color: var(--text-primary);
   box-shadow: none;
 }
-.fin-btn-secondary:hover { background: var(--bg-surface-hover); opacity: 1; }
+.fin-btn-secondary:hover { background: var(--bg-surface-hover); border-color: var(--border-strong, var(--border-subtle)); opacity: 1; }
 .fin-page .btn-action:focus-visible,
 .fin-btn-secondary:focus-visible {
   outline: 2px solid var(--accent-primary);
@@ -132,9 +132,9 @@ select.fin-control { cursor: pointer; padding-right: 8px; }
 }
 .fin-chip-filter:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
 .fin-chip-filter[aria-pressed="true"] {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: var(--btn-action-color);
+  background: var(--bg-raised);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
   font-weight: 500;
 }
 .fin-chip-filter:focus-visible {
@@ -162,7 +162,7 @@ select.fin-control { cursor: pointer; padding-right: 8px; }
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 20px 24px 12px;
+  padding: var(--card-pad, 20px) var(--card-pad, 20px) 12px;
 }
 .fin-table-scroll { min-width: 0; position: relative; }
 @media (max-width: 900px) { .fin-table-scroll { overflow-x: auto; } }
@@ -199,9 +199,9 @@ table.fin-table td {
   font-weight: 400;
 }
 table.fin-table th:first-child,
-table.fin-table td:first-child { padding-left: 24px; }
+table.fin-table td:first-child { padding-left: var(--card-pad, 20px); }
 table.fin-table th:last-child,
-table.fin-table td:last-child { padding-right: 24px; }
+table.fin-table td:last-child { padding-right: var(--card-pad, 20px); }
 table.fin-table tbody tr:last-child td { border-bottom: none; }
 table.fin-table tbody tr.is-clickable { cursor: pointer; }
 table.fin-table tbody tr:hover td { background: var(--bg-surface-hover); }
@@ -217,7 +217,9 @@ table.fin-table td.num { color: var(--text-primary); }
 table.fin-table th.actions,
 table.fin-table td.actions { text-align: right; width: 1%; white-space: nowrap; }
 .fin-id {
-  font-family: var(--font-mono);
+  /* IDs in the tabular sans, like every other figure (v3 decision). */
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
   font-size: 13px;
   line-height: 20px;
   font-weight: 400;
@@ -237,7 +239,7 @@ table.fin-table td.actions { text-align: right; width: 1%; white-space: nowrap; 
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 12px 24px;
+  padding: 12px var(--card-pad, 20px);
   border-top: 1px solid var(--border-subtle);
   font-size: 13px;
   line-height: 20px;
@@ -280,23 +282,20 @@ table.fin-table td.actions { text-align: right; width: 1%; white-space: nowrap; 
   background: var(--status-neutral-bg);
   color: var(--text-secondary);
 }
-.fin-chip--success { background: rgba(34, 197, 94, 0.12); color: var(--status-success-text, #86EFAC); }
-.fin-chip--warning { background: rgba(245, 158, 11, 0.12); color: var(--status-warning-text, #FCD34D); }
-.fin-chip--danger  { background: rgba(239, 68, 68, 0.12); color: var(--status-danger-text, #FCA5A5); }
-.fin-chip--info    { background: rgba(77, 158, 255, 0.12); color: var(--status-info-text, #93C5FD); }
+/* Legacy tinted chip, still used by the Capital pages. Finance pages use the
+   shared <StatusChip>. Tokens only, so both themes come from theme.css. */
+.fin-chip--success { background: var(--status-success-bg); color: var(--status-success-text); }
+.fin-chip--warning { background: var(--status-warning-bg); color: var(--status-warning-text); }
+.fin-chip--danger  { background: var(--status-danger-bg); color: var(--status-danger-text); }
+.fin-chip--info    { background: var(--status-info-bg); color: var(--status-info-text); }
 .fin-chip--outline { background: transparent; border-color: currentColor; }
-[data-theme="light"] .fin-chip--success { background: #DCFCE7; }
-[data-theme="light"] .fin-chip--warning { background: #FEF3C7; }
-[data-theme="light"] .fin-chip--danger  { background: #FEE2E2; }
-[data-theme="light"] .fin-chip--info    { background: #DBEAFE; }
-[data-theme="light"] .fin-chip--outline { background: transparent; }
 button.fin-chip { cursor: pointer; }
 button.fin-chip:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 
 /* Semantic text colours (AA in both themes). */
-.fin-text-success { color: var(--status-success-text, #86EFAC); }
-.fin-text-warning { color: var(--status-warning-text, #FCD34D); }
-.fin-text-danger  { color: var(--status-danger-text, #FCA5A5); }
+.fin-text-success { color: var(--status-success-text); }
+.fin-text-warning { color: var(--status-warning-text); }
+.fin-text-danger  { color: var(--status-danger-text); }
 .fin-text-muted   { color: var(--text-tertiary); }
 
 /* ---- Row menu (shared with expense-row-actions.css trigger/menu) ---- */
@@ -309,7 +308,7 @@ button.fin-chip:focus-visible { outline: 2px solid var(--accent-primary); outlin
   color: var(--text-tertiary);
   white-space: normal;
 }
-.fin-menu-note strong { display: block; font-weight: 500; color: var(--status-danger-text, #FCA5A5); }
+.fin-menu-note strong { display: block; font-weight: 500; color: var(--status-danger-text); }
 a.expense-menu-item { text-decoration: none; box-sizing: border-box; }
 
 /* ---- Cards / sections ---- */
@@ -426,7 +425,7 @@ a.expense-menu-item { text-decoration: none; box-sizing: border-box; }
   font-weight: 500;
   box-shadow: none;
 }
-.fin-toast--error { color: var(--status-danger-text, #FCA5A5); }
+.fin-toast--error { color: var(--status-danger-text); }
 
 /* ---- Horizontal bar chart (expenses trend) ---- */
 .fin-bars {
@@ -448,7 +447,7 @@ a.expense-menu-item { text-decoration: none; box-sizing: border-box; }
 .fin-legend__amt { color: var(--text-primary); font-variant-numeric: tabular-nums; text-align: right; }
 .fin-legend__pct { color: var(--text-tertiary); font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; }
 .fin-meter { height: 8px; background: var(--bg-surface-hover); border-radius: 4px; overflow: hidden; }
-[data-theme="light"] .fin-meter { background: #E5E7EB; }
+[data-theme="light"] .fin-meter { background: var(--border-subtle); }
 .fin-meter__fill { height: 100%; border-radius: 4px; }
 
 /* ---- Phone ---- */
@@ -475,15 +474,14 @@ a.expense-menu-item { text-decoration: none; box-sizing: border-box; }
 .fin-subnav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 24px; }
 .fin-subnav__meta { margin-left: auto; font-size: 13px; line-height: 20px; color: var(--text-tertiary); }
 @media (max-width: 767px) { .fin-subnav__meta { margin-left: 0; width: 100%; } }
-.fin-create-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; }
-@media (max-width: 900px) { .fin-create-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 767px) { .fin-page .btn-action { min-height: 48px; } }
 
 /* ==== Design principles v2 (docs/brand/DESIGN-PRINCIPLES.md) ==== */
-/* Cards: 1px border, no shadow, 12px radius, 24px padding. Hover never swaps
-   the border or adds a shadow; interactive rows tint instead. */
+/* Cards: 1px border, no shadow, 12px radius, the one card padding
+   (--card-pad: 20 desktop, 16 phone). Hover never swaps the border or adds a
+   shadow; interactive rows tint instead. */
 .fin-page .card {
-  padding: 24px;
+  padding: var(--card-pad, 20px);
   border-radius: var(--radius-card, 12px);
   box-shadow: none;
 }
@@ -532,7 +530,7 @@ table.fin-table tfoot tr.fin-total-row td { color: var(--text-primary); font-wei
   margin: 4px 0 0;
   max-width: 72ch;
 }
-.fin-table-card > .fin-panel-head { padding: 24px 24px 0; }
+.fin-table-card > .fin-panel-head { padding: var(--card-pad, 20px) var(--card-pad, 20px) 0; }
 @media (max-width: 767px) { .fin-table-card > .fin-panel-head { padding: 16px 16px 0; } }
 .fin-stack { display: flex; flex-direction: column; gap: 24px; }
 .fin-stack--16 { gap: 16px; }
@@ -553,14 +551,13 @@ table.fin-table tfoot tr.fin-total-row td { color: var(--text-primary); font-wei
   font-size: 13px;
   line-height: 20px;
   font-weight: 500;
-  color: var(--accent-primary);
+  color: var(--link, var(--accent-primary));
   cursor: pointer;
   text-decoration: none;
   min-height: 24px;
 }
 .fin-link:hover { text-decoration: underline; }
 .fin-link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
-[data-theme="light"] .fin-link { color: var(--status-info-text, #1D4ED8); }
 
 /* Summary line: replaces a row of zero tiles with one sentence and an action. */
 .fin-summary.card {
@@ -595,7 +592,7 @@ table.fin-table tfoot tr.fin-total-row td { color: var(--text-primary); font-wei
 .fin-rank__label { min-width: 0; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fin-rank__label small { display: block; font-size: 13px; line-height: 20px; color: var(--text-tertiary); }
 .fin-rank__track { height: 6px; border-radius: 3px; background: var(--status-neutral-bg); overflow: hidden; }
-[data-theme="light"] .fin-rank__track { background: #E5E7EB; }
+[data-theme="light"] .fin-rank__track { background: var(--border-subtle); }
 .fin-rank__bar { height: 100%; border-radius: 3px; background: var(--text-tertiary); }
 .fin-rank__bar--accent { background: var(--accent-primary); }
 .fin-rank__bar--danger { background: var(--status-danger); }
@@ -676,7 +673,7 @@ table.fin-table tfoot tr.fin-total-row td { color: var(--text-primary); font-wei
 }
 .fin-detail-head__eyebrow { font-size: 13px; line-height: 20px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
 .fin-detail-head__title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.fin-detail-head h1 { font-size: 22px; line-height: 28px; font-weight: 600; margin: 0; color: var(--text-primary); overflow-wrap: anywhere; }
+.fin-detail-head h1 { font-size: var(--text-display, 28px); line-height: 34px; font-weight: 600; letter-spacing: var(--tracking-display, -0.025em); margin: 0; color: var(--text-primary); overflow-wrap: anywhere; }
 .fin-detail-head__sub { font-size: 14px; line-height: 20px; color: var(--text-secondary); margin: 4px 0 0; }
 .fin-detail-head__actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .fin-hero-amount { font-size: 28px; line-height: 36px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); overflow-wrap: anywhere; margin: 0; }
@@ -684,7 +681,7 @@ table.fin-table tfoot tr.fin-total-row td { color: var(--text-primary); font-wei
 .fin-facts dt { font-size: 13px; line-height: 20px; color: var(--text-secondary); margin: 0 0 2px; }
 .fin-facts dd { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--text-primary); margin: 0; font-variant-numeric: tabular-nums; }
 .fin-progress { height: 6px; border-radius: 3px; background: var(--status-neutral-bg); overflow: hidden; margin-top: 12px; }
-[data-theme="light"] .fin-progress { background: #E5E7EB; }
+[data-theme="light"] .fin-progress { background: var(--border-subtle); }
 .fin-progress__fill { height: 100%; background: var(--accent-primary); border-radius: 3px; }
 .fin-note { font-size: 13px; line-height: 20px; color: var(--text-secondary); margin: 0; }
 .fin-note strong { display: block; font-weight: 500; color: var(--text-primary); margin-bottom: 2px; }
@@ -701,7 +698,7 @@ table.fin-table .fin-chip { padding-top: 0; padding-bottom: 0; }
 .fin-rank__row--compact { grid-template-columns: minmax(96px, 1.2fr) minmax(48px, 1fr) 112px 40px; }
 @media (max-width: 560px) { .fin-rank__row--compact { grid-template-columns: minmax(0, 1fr) auto 40px; } }
 .fin-rank__row.is-thin .fin-rank__bar { opacity: 0.5; }
-table.fin-table td.fin-text-danger, table.fin-table td .fin-text-danger { color: var(--status-danger-text, #FCA5A5); }
+table.fin-table td.fin-text-danger, table.fin-table td .fin-text-danger { color: var(--status-danger-text); }
 table.fin-table td.fin-text-muted { color: var(--text-tertiary); }
 
 /* Phone: invoice/expense rows become a two-line list so the amount stays
@@ -742,3 +739,421 @@ table.fin-table td.fin-text-muted { color: var(--text-tertiary); }
   table.fin-table--stack .m-hide-inline { display: none; }
   table.fin-table--stack td.m-party .fin-truncate { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 }
+
+/* ==== v3 list pages (Invoices, Expenses, invoice detail, new invoice) ==== */
+/* Figure tiles: one figure per card, like the Today tiles (owner review
+   28 Sep 2026). At most four per row; two, then one, on narrow screens. */
+.fin-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--card-gap, 16px);
+  margin-bottom: 24px;
+}
+@media (min-width: 1101px) { .fin-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } .fin-tiles:has(> :nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); } .fin-tiles:has(> :nth-child(2):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .fin-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 767px) { .fin-tiles { gap: 12px; } }
+@media (max-width: 340px) { .fin-tiles { grid-template-columns: minmax(0, 1fr); } }
+.fin-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 132px;
+  padding: 18px 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card, 16px);
+  box-shadow: none;
+}
+.fin-page .fin-tile__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  margin: 0;
+  font: 500 13px/20px var(--font-sans);
+  letter-spacing: normal;
+  color: var(--text-secondary);
+}
+.fin-tile__value {
+  margin-top: 12px;
+  font: 600 var(--text-figure, 32px)/38px var(--font-sans);
+  letter-spacing: var(--tracking-figure, -0.03em);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.fin-tile__value--sm { font-size: 22px; line-height: 38px; letter-spacing: -0.02em; }
+.fin-tile__foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 10px;
+  min-height: 26px;
+}
+.fin-tile__sub { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; min-width: 0; }
+.fin-tile__sub.fin-text-danger { color: var(--status-danger-text); }
+.fin-tile .fin-tile__action { font-size: 12px; line-height: 16px; min-height: 16px; }
+@media (max-width: 767px) {
+  .fin-tile { min-height: 112px; padding: 14px; }
+  .fin-tile__value { font-size: 22px; line-height: 30px; margin-top: 6px; letter-spacing: -0.02em; }
+  .fin-tile__value--sm { font-size: 17px; }
+  .fin-tile .fin-tile__label { font-size: 12px; line-height: 16px; }
+}
+
+/* Tables scroll inside their own card, never the page (§10.7). Columns are
+   trimmed first so the lists fit at 1280 and wider without scrolling. */
+.fin-table-card .fin-table-scroll { overflow-x: auto; }
+table.fin-table td.actions { width: 48px; padding-left: 8px; }
+table.fin-table td.actions .tw-rowact { vertical-align: middle; }
+table.fin-table .fin-cell-sub { display: block; font-size: 12px; line-height: 16px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+table.fin-table .fin-cell-sub .fin-id { font-size: 12px; line-height: 16px; color: var(--text-tertiary); }
+table.fin-table td.fin-cell-2 { padding-top: 6px; padding-bottom: 6px; }
+/* Low-value columns step out as the card narrows (container width, so the
+   sidebar state is accounted for). */
+.fin-table-card--fit { container-type: inline-size; container-name: fin-table; }
+@container fin-table (max-width: 1040px) { table.fin-table .fin-col-wide { display: none; } }
+@container fin-table (max-width: 900px) { table.fin-table .fin-col-mid { display: none; } }
+/* Columns size to their content; only the free-text column (.fin-cell-fill)
+   takes the slack and truncates, with the full text in its title. */
+table.fin-table th.fin-cell-fill, table.fin-table td.fin-cell-fill { width: 100%; }
+table.fin-table td.fin-cell-fill { max-width: 0; }
+.fin-truncate.fin-truncate--fill { max-width: none; }
+table.fin-table td.fin-nowrap { white-space: nowrap; }
+@container fin-table (max-width: 1040px) {
+  table.fin-table th, table.fin-table td { padding-left: 12px; padding-right: 12px; }
+  table.fin-table th:first-child, table.fin-table td:first-child { padding-left: 20px; }
+  table.fin-table th:last-child, table.fin-table td:last-child { padding-right: 16px; }
+}
+.fin-grid-2--even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .fin-grid-2--even { grid-template-columns: minmax(0, 1fr); } }
+.fin-panel-title--tip { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 640px) {
+  table.fin-table--stack td.m-party.m-span2 { grid-row: 1 / span 2; align-self: center; }
+  table.fin-table--stack td.m-party .fin-cell-sub { font-weight: 400; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* Detail / create head: one primary action, the rest behind one menu. */
+.fin-detail-head__actions .tw-rowact { height: 40px; min-width: 40px; border: 1px solid var(--border-subtle); border-radius: var(--radius-control, 10px); }
+@media (max-width: 767px) { .fin-detail-head__actions .tw-rowact { height: 48px; min-width: 48px; } }
+.fin-btn-ghost.btn-action { border-color: transparent; color: var(--text-secondary); }
+.fin-btn-ghost.btn-action:hover { color: var(--text-primary); }
+.fin-tile__unit { margin-left: 6px; font-size: 0.56em; font-weight: 600; letter-spacing: -0.01em; color: var(--text-tertiary); }
+
+/* ==== v3 final: standard tiles, segmented filters, 32px toolbar ==== */
+.fin-page .fin-kpi-row { margin-bottom: var(--section-gap, 24px); }
+.fin-page .fin-kpi-row .tw-kpi__head .tw-info { flex: none; }
+@media (min-width: 768px) {
+  /* The row sizes to its count (shared .tw-kpi-row): two or three tiles
+     fill the row instead of leaving it half empty. */
+  .fin-toolbar { gap: 8px 12px; }
+  .fin-page .fin-toolbar .fin-control { min-height: var(--control-h, 36px); height: var(--control-h, 36px); font-size: 13px; }
+  .fin-page .fin-toolbar .fin-control--search { width: 240px; }
+}
+.fin-toolbar .fin-seg { flex: none; }
+/* The segmented control sizes itself (28px, 40px on touch). */
+.fin-page .fin-toolbar .fin-seg .tw-seg__opt { min-height: 0; }
+@media (max-width: 767px) {
+  .fin-toolbar .fin-seg { width: 100%; }
+  table.fin-table--stack td.fin-cell-fill { max-width: none; width: auto; }
+}
+/* Peers align at the top; the shorter chart card does not stretch. */
+.fin-grid-2--even { align-items: start; }
+
+/* ---- Detail and create pages: main column + sticky 320px rail ---- */
+.fin-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.fin-detail-grid,
+.fin-create-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--card-gap, 16px);
+  align-items: start;
+}
+.fin-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  position: sticky;
+  top: 24px;
+}
+@media (max-width: 1100px) {
+  .fin-detail-grid, .fin-create-grid { grid-template-columns: minmax(0, 1fr); }
+  .fin-rail { position: static; }
+}
+
+/* Invoice document: facts, lines and totals in one card. */
+.fin-page .card.fin-doc { padding: 0; overflow: hidden; }
+.fin-doc__facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px 24px;
+  margin: 0;
+  padding: var(--card-pad, 20px);
+  border-bottom: 1px solid var(--border-row);
+}
+@media (max-width: 767px) { .fin-doc__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Charges without lines: the amounts as a second row of facts. */
+.fin-doc__facts--money { border-bottom: 0; }
+.fin-doc__facts--money > .is-total dd { font: 600 16px/20px var(--font-sans); }
+.fin-doc__facts > div { min-width: 0; }
+.fin-doc__facts dt { margin: 0 0 2px; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fin-doc__facts dd { margin: 0; font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-doc__late { display: block; font: 500 12px/16px var(--font-sans); }
+.fin-doc__head { padding: var(--card-pad, 20px) var(--card-pad, 20px) 8px; }
+.fin-doc__lines--padded { padding: 0 var(--card-pad, 20px) 8px; }
+.fin-doc__lines--padded .fin-doc__head { padding-left: 0; padding-right: 0; }
+table.fin-table tfoot tr.fin-doc__rule td { border-top: 1px solid var(--border-subtle); }
+table.fin-table tfoot tr.fin-doc__grand td { font-size: 16px; line-height: 24px; font-weight: 600; color: var(--text-primary); }
+.fin-doc__note { padding: 0 var(--card-pad, 20px) var(--card-pad, 20px); }
+.fin-dl__row.is-total:last-child dd { font-size: 16px; }
+
+/* Payments in the rail: date + method over the amount, compact. */
+.fin-paylist { list-style: none; margin: 0; padding: 0 0 4px; }
+.fin-paylist__row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 44px; padding: 8px var(--card-pad, 20px); border-top: 1px solid var(--border-row);
+  font-size: 14px; line-height: 20px; color: var(--text-primary);
+}
+.fin-paylist__main { display: flex; flex-direction: column; min-width: 0; }
+.fin-paylist__sub { font-size: 12px; line-height: 16px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-paylist__sub .fin-id { font-size: 12px; line-height: 16px; color: var(--text-tertiary); }
+.fin-paylist__amt { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fin-paylist__row--total { font-weight: 600; border-top-color: var(--border-subtle); }
+.fin-table-card > .fin-panel-head + .fin-paylist { margin-top: -4px; }
+@media (max-width: 767px) {
+  .fin-doc__facts, .fin-doc__head { padding-left: 16px; padding-right: 16px; }
+  .fin-doc__lines--padded { padding: 0 16px 8px; }
+  .fin-doc__note { padding: 0 16px 16px; }
+  .fin-paylist__row { padding-left: 16px; padding-right: 16px; }
+}
+
+/* New invoice summary in the rail. */
+.fin-summary-card__label { display: inline-flex; align-items: center; gap: 4px; margin: 0; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fin-summary-card__figure { margin: 4px 0 0; font: 600 28px/34px var(--font-sans); letter-spacing: var(--tracking-figure, -0.03em); font-variant-numeric: tabular-nums; color: var(--text-primary); overflow-wrap: anywhere; }
+.fin-summary-card__split { margin: 12px 0 0; }
+.fin-summary-card__split .fin-dl__row { min-height: 36px; padding: 8px 0; }
+.fin-summary-card__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.fin-label__hint { font-weight: 400; color: var(--text-tertiary); }
+/* A unit inside a tile figure ("31.9 days") must not grow the line box. */
+.tw-kpi__figure .fin-tile__unit { line-height: 1; }
+.fin-kpi-row .tw-kpi__head .tw-info { height: 16px; }
+/* 96px tile: label 16 + figure 34 + note 16 fill the 68px inner height
+   exactly, so no extra flex gap (it squeezed the figure and note). */
+
+/* Loading: tile-shaped placeholders, so the head and filters render at once
+   and nothing jumps when the figures arrive. */
+.fin-skel-tile { background: var(--bg-raised); border-color: transparent; animation: fin-pulse 1.4s ease-in-out infinite; }
+@keyframes fin-pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .fin-skel-tile { animation: none; } }
+@media (max-width: 767px) { .fin-detail-head h1 { font-size: 24px; line-height: 30px; } }
+.fin-skel { display: block; background: var(--bg-raised); border-radius: var(--radius-card); animation: fin-pulse 1.4s ease-in-out infinite; }
+.fin-skel--line { height: 34px; width: 220px; border-radius: 6px; }
+.fin-skel--card { height: 320px; margin-top: var(--section-gap, 24px); }
+@media (prefers-reduced-motion: reduce) { .fin-skel { animation: none; } }
+
+/* ==== Expenses overview (round 3): a summary card (three figures,
+   stacked) beside where the money goes and when. One row, equal heights,
+   fixed so the loading placeholders take exactly the same space. ==== */
+.exp-overview {
+  display: grid; gap: var(--card-gap, 16px); margin-bottom: var(--section-gap, 24px);
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.4fr) minmax(0, 1.4fr);
+  grid-auto-rows: 292px;
+}
+.exp-overview > * { margin: 0; min-width: 0; box-sizing: border-box; height: 100%; overflow: hidden; }
+.exp-overview > .card { display: flex; flex-direction: column; }
+.exp-overview .fin-panel-head { margin-bottom: 8px; }
+.exp-overview .fin-rank { gap: 4px; }
+.exp-overview .exp-cat .fin-rank__row { min-height: 28px; padding-top: 4px; padding-bottom: 4px; }
+/* Wide screens: the label column is as wide as the longest category, so
+   the bar gets the rest of the card instead of a 90px stub. */
+@media (min-width: 561px) {
+  .exp-overview .exp-cat .fin-rank__row--compact { grid-template-columns: 96px minmax(48px, 1fr) 84px 36px; column-gap: 12px; }
+}
+.exp-overview .fin-months { flex: 1; height: auto; min-height: 0; }
+/* Summary: the shared stats line, stacked in one column. */
+.exp-overview .exp-summary .tw-kpi-stats__list { flex-direction: column; flex-wrap: nowrap; height: 100%; row-gap: 0; }
+.exp-overview .exp-summary .tw-kpi-stats__item { flex: 1 1 0; justify-content: center; padding: 0; border-left: 0; border-top: 1px solid var(--border-subtle); min-width: 0; }
+.exp-overview .exp-summary .tw-kpi-stats__item:first-child { border-top: 0; justify-content: flex-start; }
+.exp-overview .exp-summary .tw-kpi-stats__item:last-child { justify-content: flex-end; }
+.exp-summary .tw-kpi-stats__label .tw-info { margin-left: auto; }
+.exp-summary .tw-kpi-stats__label { width: 100%; }
+/* The one link style: accent text, underline on hover only. */
+.exp-stat-link {
+  padding: 0; border: 0; background: none; font: inherit; font-weight: 500; color: var(--link, var(--accent-primary)); cursor: pointer;
+  text-decoration: none; text-underline-offset: 3px;
+}
+.exp-stat-link:hover { text-decoration: underline; }
+.exp-stat-link:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
+/* Month labels: "Apr" with the year under the first month and each January. */
+.fin-months__lab { display: flex; flex-direction: column; align-items: center; }
+.fin-months__year { font-size: 11px; line-height: 14px; color: var(--text-tertiary); }
+.exp-table-skel { height: 560px; margin-top: 0; }
+@media (max-width: 1279px) {
+  .exp-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; }
+  .exp-overview > .exp-summary { grid-column: 1 / -1; height: 106px; }
+  .exp-overview > .exp-cat, .exp-overview > .exp-month { height: 292px; }
+  .exp-overview .exp-summary .tw-kpi-stats__list { flex-direction: row; }
+  .exp-overview .exp-summary .tw-kpi-stats__item { justify-content: flex-start !important; padding: 0 var(--card-pad); border-top: 0; border-left: 1px solid var(--border-subtle); }
+  .exp-overview .exp-summary .tw-kpi-stats__item:first-child { padding-left: 0; border-left: 0; }
+}
+/* Phone: summary, filters and the register first; the analytics follow. */
+@media (max-width: 767px) {
+  .exp-page { display: flex; flex-direction: column; }
+  .exp-page > * { min-width: 0; }
+  .exp-overview { display: contents; }
+  .exp-overview > .exp-summary { order: 1; height: auto; margin-bottom: var(--card-gap, 16px); }
+  .exp-overview > .exp-summary.fin-skel-tile { height: 190px; }
+  .exp-overview .exp-summary .tw-kpi-stats__list { flex-wrap: wrap; row-gap: 16px; }
+  .exp-overview .exp-summary .tw-kpi-stats__item { flex: 1 1 calc(50% - 1px); padding: 0 0 0 var(--card-pad); }
+  .exp-overview .exp-summary .tw-kpi-stats__item:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .exp-overview .exp-summary .tw-kpi-stats__item:nth-child(3) { flex-basis: 100%; border-top: 1px solid var(--border-subtle); padding-top: 16px; }
+  .exp-overview > .card.exp-cat { order: 20; height: auto; margin-bottom: var(--card-gap, 16px); }
+  .exp-overview > .card.exp-month { order: 21; height: 292px; }
+  .exp-page > .exp-toolbar { order: 2; }
+  .exp-page > .fin-table-card, .exp-page > .exp-table-skel { order: 3; margin-bottom: var(--section-gap, 24px); }
+}
+@media (min-width: 768px) { .exp-toolbar .exp-search { flex: 0 1 240px; } }
+
+/* Toolbar filters on the shared select: 32px beside the search and seg. */
+.exp-filters { display: flex; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+.fin-page .fin-toolbar .fin-filter.tw-select-trigger { width: auto; min-height: var(--control-h, 36px); height: var(--control-h, 36px); padding: 0 10px 0 12px; font-size: 13px; max-width: 220px; }
+.fin-filter > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
+.fin-filter__short { display: none; }
+@media (max-width: 767px) {
+  .exp-filters { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .fin-page .fin-toolbar .fin-filter.tw-select-trigger { width: 100% !important; max-width: none; min-height: 44px !important; height: 44px !important; }
+  .fin-filter__long { display: none; }
+  .fin-filter__short { display: inline; }
+}
+/* Overview cards stay compact: one line per category (the count is in the
+   row's accessible name), and the filters keep the 32px toolbar height. */
+.exp-overview .exp-cat .fin-rank__label small { display: none; }
+.exp-overview .exp-cat .fin-rank__row { min-height: 28px; padding-top: 4px; padding-bottom: 4px; }
+.exp-overview .fin-panel-head { margin-bottom: 8px; }
+.expenses-type-roles .expenses-filter-bar .fin-filter.tw-select-trigger { min-height: var(--control-h, 36px); }
+@media (max-width: 767px), (pointer: coarse) {
+  .expenses-type-roles .expenses-filter-bar .fin-filter.tw-select-trigger { min-height: 44px; }
+}
+.section-header__description .fin-id { color: inherit; font-size: inherit; }
+.fin-page .tw-toolbar .tw-search-wrap > .tw-search { width: 100%; }
+@media (min-width: 768px) { .fin-page .tw-toolbar .inv-search { flex: 0 1 320px; } }
+/* A page rule gives inputs position: relative; keep the magnifier on top. */
+.fin-page .tw-search-wrap > svg { z-index: 1; }
+/* Phone: the status filter fits the width without a clipped last option. */
+@media (max-width: 767px) {
+  .fin-page .tw-toolbar .fin-seg { width: 100%; }
+  .fin-page .tw-toolbar .fin-seg .tw-seg__opt { flex: 1 1 auto; padding-left: 6px; padding-right: 6px; }
+}
+/* Meta count sits at the right end of the toolbar, as on other lists. */
+.fin-page .tw-toolbar.fin-toolbar > .tw-toolbar__meta { margin-left: auto; }
+@media (max-width: 767px) { .fin-page .tw-toolbar.fin-toolbar > .tw-toolbar__meta { margin-left: 0; } }
+/* Risk pages: sibling cards 16 apart (the stack's gap), no extra margins. */
+.risk-stack > .fin-section, .risk-stack > .fin-kpi-row, .risk-stack > .fin-grid-2 { margin: 0; }
+@media (min-width: 1101px) { .risk-desc-2 { min-height: 40px; } }
+@media (max-width: 640px) { .risk-desc-2 { min-height: 80px; } }
+/* Form fields are --field-h (40; 44 on touch and phones), buttons in a form
+   rail match them. The shared date picker input included. */
+.fin-page .fin-form input.fin-control { min-height: var(--field-h, 40px); height: var(--field-h, 40px); box-sizing: border-box; }
+/* The date input itself is --field-h (the wrapper's 1px border was taking
+   2px off it): the border is drawn as an inset ring instead. */
+.fin-page .fin-form .fin-date-field .tw-date-field { height: var(--field-h, 40px); box-sizing: border-box; border: 0 !important; box-shadow: inset 0 0 0 1px var(--border-control); }
+.fin-page .fin-form .fin-date-field .tw-date-field:focus-within { box-shadow: inset 0 0 0 1px var(--accent-primary); }
+.fin-page .fin-form .fin-date-field .tw-date-field > input { height: var(--field-h, 40px); min-height: 0; box-sizing: border-box; }
+.fin-page .fin-form .fin-date-field .tw-date-field > button { align-self: stretch; margin: 1px 1px 1px 0; }
+.fin-page .fin-rail .fin-rail-btn { height: var(--field-h, 40px); font-size: 14px; }
+
+/* ==== Round 4: invoice document ====
+   Every invoice has a charges table (itemised lines, or its load as one
+   line) and a right-aligned totals block whose figures share the Total
+   column's right edge. Phones: quantity and unit price move under the
+   description, so the table never scrolls sideways. */
+.fin-doc__desc { white-space: normal; overflow-wrap: break-word; }
+.fin-doc__totals {
+  display: flex; flex-direction: column;
+  width: min(100%, 360px); margin: 0 0 0 auto; box-sizing: border-box;
+  padding: 8px var(--card-pad, 20px) var(--card-pad, 20px);
+  border-top: 1px solid var(--border-row);
+}
+.fin-doc__totals > div { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; font: 400 14px/20px var(--font-sans); }
+.fin-doc__totals dt { color: var(--text-secondary); }
+.fin-doc__totals dd { margin: 0; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fin-doc__totals > .is-rule { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
+.fin-doc__totals > .is-total dt, .fin-doc__totals > .is-total dd { font: 600 16px/24px var(--font-sans); color: var(--text-primary); }
+table.fin-table.fin-doc__table .fin-mobile-only { display: none; }
+@media (max-width: 640px) {
+  table.fin-table.fin-doc__table .m-hide { display: none; }
+  table.fin-table.fin-doc__table .fin-mobile-only { display: block; }
+}
+@media (max-width: 767px) { .fin-doc__totals { padding-left: 16px; padding-right: 16px; width: 100%; } }
+
+/* Invoices status filter: five options are a seg on wide screens and a
+   compact menu beside the search on phones. */
+.inv-status-seg { display: contents; }
+.inv-status-menu { display: none; }
+@media (max-width: 767px) {
+  .inv-status-seg { display: none; }
+  .inv-status-menu { display: block; flex: 0 0 136px; min-width: 0; }
+  .fin-page .tw-toolbar.fin-toolbar:has(.inv-status-menu) > .tw-toolbar__meta { flex: 1 1 100%; }
+  .fin-page .tw-toolbar.fin-toolbar > .inv-search { flex: 1 1 0; min-width: 0; }
+  .inv-status-menu .inv-status-select.tw-select-trigger { width: 100%; height: var(--control-h, 44px); min-height: var(--control-h, 44px); padding: 0 10px 0 12px; font-size: 14px; }
+}
+
+/* ==== Round 5: invoice heads on phones ====
+   The invoice number is an ID: it never breaks. On phones it is set at 22px
+   (a step below the SectionHeader long-ID size) and the status chip moves to the line
+   under it, so the one primary action ("Send to customer", "Send reminder",
+   "Record payment") stays on the title row beside "⋯" with a short label;
+   its full label stays its accessible name and its "⋯" menu label. */
+.fin-head-chip--sub { display: none; }
+@media (max-width: 768px) {
+  .fin-page--invoice .section-header__title { font-size: 22px; letter-spacing: -0.02em; white-space: nowrap; overflow-wrap: normal; word-break: keep-all; }
+  .fin-page--invoice .section-header__title-row > .fin-head-chip { display: none; }
+  .fin-page--invoice .fin-head-chip--sub { display: inline-flex; align-items: center; height: 20px; vertical-align: top; }
+  .fin-page--invoice .fin-hide-phone { display: none; }
+  .fin-act .fin-act__long { display: none; }
+  .fin-act::before { content: attr(data-short); }
+  .fin-act[data-sh-icon]::before { content: none; }
+}
+.fin-act:not([data-sh-icon]) > svg { display: none; }
+@media (min-width: 769px) {
+  .fin-phone-only { display: none !important; }
+  .section-header__actions:has(> .fin-phone-only:only-child) { display: none; }
+}
+/* Expenses "Spend by month" on phones: value labels only on the highest
+   and the latest month, so neighbouring figures never touch. */
+@media (max-width: 640px) {
+  .fin-months__col:not(.is-labelled) > .fin-months__val { visibility: hidden; }
+}
+
+/* ==== Round 6: invoice detail balance, not-found, new invoice ====
+   The document's facts block (bill to, dates, terms, and a draft's passed
+   due date) opens the document, or becomes the rail's first card when that
+   brings the two columns within 48px (useBalancedColumns). */
+.fin-main-col { display: flex; flex-direction: column; gap: var(--card-gap, 16px); min-width: 0; }
+.fin-docfacts { border-bottom: 1px solid var(--border-row); }
+.fin-docfacts > .fin-doc__facts { border-bottom: 0; }
+.fin-docfacts__note { margin: -4px var(--card-pad, 20px) 0; padding: 0 0 var(--card-pad, 20px); font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fin-page .card.fin-facts-card { padding: 0; }
+.fin-facts-card .fin-docfacts { border-bottom: 0; }
+.fin-facts-card .fin-doc__facts { grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 12px; }
+.fin-facts-card .fin-doc__facts dd { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 767px) { .fin-docfacts__note { margin-left: 16px; margin-right: 16px; padding-bottom: 16px; } }
+/* Not found: the message and "All invoices" share one row, the button
+   centred on the text (the load-error layout, with a neutral icon). */
+.fin-missing .load-error__icon { color: var(--text-tertiary); }
+/* New invoice: a three-field row when the details card is wide enough. */
+.fin-create-grid > .card { container-type: inline-size; }
+.fin-form__row--3 { row-gap: 16px; }
+@container (min-width: 600px) {
+  .fin-form__row--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .fin-form__row--3 > .fin-form__wide { grid-column: 1 / -1; }
+}
+@media (max-width: 768px) { .fin-hide-phone-create { display: none !important; } }
+/* The calendar button fills the field's height (it was 2px short: 38/42). */
+.fin-page .fin-form .fin-date-field .tw-date-field > button { margin: 0; height: var(--field-h, 40px); min-width: var(--field-h, 40px); justify-content: center; }

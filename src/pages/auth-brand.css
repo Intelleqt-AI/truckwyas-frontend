@@ -27,3 +27,73 @@
     min-height: 48px !important;
   }
 }
+
+/* Touch (R7): the "Forgot password?" link sits on the label row right above
+   the password field; its 44px target (global ::after) stays above the field. */
+@media (pointer: coarse) {
+  a.tw-auth-control { z-index: 1; }
+  /* 10px (not 6) between that row and the field, so the link's target and
+     the show-password button's target (inside the field) don't overlap. */
+  .tw-auth-labelrow { margin-bottom: 10px !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   Desktop split (Login, Signup), R7. Two halves:
+     brand  its own surface (white in light, the card surface in dark), a
+            hairline edge, content left-aligned in a 440px column;
+     form   the page background with the form card.
+   Both halves start at the same top (--auth-top), so the logo line and the
+   card's top edge are level; on a tall screen the pair sits near the middle.
+   --------------------------------------------------------------------------- */
+.tw-auth-split {
+  --auth-top: max(48px, calc(50vh - 240px));
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  background: var(--bg-deep);
+  font-family: var(--font-sans);
+}
+.tw-auth-split__brand,
+.tw-auth-split__form {
+  flex: 1 1 50%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: var(--auth-top) 48px 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.tw-auth-split__brand {
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+}
+.tw-auth-split__form { align-items: center; }
+.tw-auth-split__inner { width: 100%; max-width: 440px; margin: 0 auto; }
+.tw-auth-split .tw-auth-logo { margin: 0 0 48px; }
+.tw-auth-eyebrow { font: 500 13px/20px var(--font-sans); color: var(--text-tertiary); margin: 0 0 8px; }
+.tw-auth-headline {
+  margin: 0 0 12px;
+  font: 600 32px/40px var(--font-sans);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+.tw-auth-headline > span { color: var(--text-tertiary); }
+.tw-auth-lede { margin: 0 0 32px; font: 400 15px/24px var(--font-sans); color: var(--text-secondary); }
+.tw-auth-proof { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.tw-auth-proof li {
+  display: flex; align-items: center; gap: 12px;
+  font: 500 15px/24px var(--font-sans); color: var(--text-primary);
+  white-space: nowrap;
+}
+.tw-auth-proof svg {
+  flex: none; box-sizing: content-box; width: 14px; height: 14px; padding: 4px;
+  border-radius: 50%; background: var(--bg-raised); color: var(--text-primary);
+}
+.tw-auth-foot {
+  margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border-subtle);
+  font: 400 13px/20px var(--font-sans); color: var(--text-tertiary);
+}
+/* The phone layout (MobileAuthLayout) shows the same list in its footer. */
+.mobile-auth-layout .tw-auth-proof li { font-size: 14px; line-height: 20px; white-space: normal; }
+.mobile-auth-layout .tw-auth-foot { margin-top: 20px; border-top: 0; padding-top: 0; }
+.tw-auth-split--tall { --auth-top: 80px; }

@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import './confirm-dialog-brand.css';
 
 interface Props {
@@ -20,6 +21,8 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, true);
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
@@ -38,6 +41,7 @@ export function ConfirmModal({
       onClick={onCancel}
     >
       <div
+        ref={dialogRef}
         className="dashboard-confirm-dialog"
         role="alertdialog"
         aria-modal="true"
@@ -66,7 +70,7 @@ export function ConfirmModal({
             onClick={onCancel}
             style={{
               padding: '8px 16px',
-              minHeight: 40,
+              minHeight: 'var(--confirm-btn-h, 40px)',
               background: 'transparent',
               border: '1px solid var(--border-subtle)',
               color: 'var(--text-primary)',
@@ -86,7 +90,7 @@ export function ConfirmModal({
             onClick={() => { onConfirm(); onCancel(); }}
             style={{
               padding: '8px 16px',
-              minHeight: 40,
+              minHeight: 'var(--confirm-btn-h, 40px)',
               background: danger ? 'var(--confirm-danger-surface)' : 'var(--accent-primary)',
               border: danger ? '1px solid var(--confirm-danger-text)' : '1px solid transparent',
               color: danger ? 'var(--confirm-danger-text)' : 'var(--btn-action-color, #fff)',

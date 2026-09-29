@@ -1,4 +1,5 @@
 import '@/pages/table-heading-roles.css';
+import { formatDate, formatMoney, formatMoneyWhole, formatPercent } from '@/lib/formatters';
 import '@/pages/settings/settings-brand.css';
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -7,6 +8,7 @@ import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { useAuth } from "@/lib/AuthContext";
 import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
+import { StatusChip } from '@/components/ui/StatusChip';
 
 const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle = settingsCardHeaderStyle;
@@ -94,18 +96,22 @@ interface BillingTransaction {
 // Pricing is server-driven (billing/status/ returns flat_plan) — only the
 // feature list lives here.
 const PLAN_FEATURES = [
-  'Unlimited loads & invoices',
-  'AI-powered quote optimisation',
-  'Fast Pay capital access (not live yet)',
-  'Advanced analytics & reporting',
-  'Fleet intelligence dashboard',
+  'Unlimited loads and invoices',
+  'Quotes priced from your own costs',
+  'Reports and insights',
+  'Fleet and driver records',
   'Multi-user access',
-  'API & integrations',
+  'API and integrations',
   'Priority support',
 ];
 
-const formatRand = (amount?: string | number | null) =>
-  `R${Number(amount ?? 0).toLocaleString('en-ZA')}`;
+/** Server take rate ("0.25") in the house format ("0,25%"). */
+const formatRate = (pct?: string | number | null) => formatPercent(pct, 2);
+
+const formatRand = (amount?: string | number | null) => {
+  const n = Number(amount ?? 0);
+  return Number.isInteger(n) ? formatMoneyWhole(n) : formatMoney(n);
+};
 
 // Live-ticking countdown to next_billing_at. Under 48h out it ticks every
 // second (HH:MM:SS, or MM:SS once under an hour) so a fast test cycle is
@@ -144,10 +150,10 @@ function NextPaymentCountdown({ nextBillingAt, mode = 'charge' }: { nextBillingA
 
   return (
     <div style={{
-      fontSize: 13, lineHeight: '20px', color: mode === 'cancel' ? 'var(--status-warning-text, var(--status-warning))' : 'var(--accent-primary)', marginTop: 2,
+      fontSize: 13, lineHeight: '20px', color: mode === 'cancel' ? 'var(--status-warning-text)' : 'var(--accent-primary)', marginTop: 2,
       fontVariantNumeric: 'tabular-nums' as const,
     }}>
-      {label} · {new Date(nextBillingAt).toLocaleDateString('en-ZA')}
+      {label} · {formatDate(nextBillingAt)}
       {mode === 'cancel' && '. You won\'t be charged again.'}
     </div>
   );
@@ -382,11 +388,11 @@ export function BillingSettings() {
   const showLoading = loading || confirming;
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
       <SettingsPageHeader title="Billing" description="Manage your subscription and payment history" />
 
       {confirming && (
-        <div style={{ ...sectionStyle, padding: '16px 24px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ ...sectionStyle, padding: '16px var(--card-pad, 20px)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 16, height: 16, border: '2px solid var(--accent-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Activating your subscription…</span>
         </div>
@@ -394,7 +400,7 @@ export function BillingSettings() {
 
       {showLoading && !confirming && (
         <div style={sectionStyle}>
-          <div style={{ padding: 24 }}>
+          <div style={{ padding: 'var(--card-pad, 20px)' }}>
             <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', marginBottom: 12, width: '60%' }} />
             <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', width: '40%' }} />
           </div>
@@ -404,7 +410,7 @@ export function BillingSettings() {
       {!showLoading && (
         <div style={sectionStyle}>
           <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Plan</h2></div>
-          <div style={{ padding: 24 }}>
+          <div style={{ padding: 'var(--card-pad, 20px)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -412,22 +418,13 @@ export function BillingSettings() {
                     {isPaid ? (billingStatus?.item_name || 'TruckWys Fleet') : 'Free plan'}
                   </span>
                   {isPaid && !billingStatus?.cancel_at_period_end && (
-                    <span style={{
-                      ...planBadgeStyle,
-                      background: 'var(--status-success-bg)', color: 'var(--accent-primary)',
-                    }}>Active</span>
+                    <StatusChip status="ACTIVE" />
                   )}
                   {isPaid && billingStatus?.cancel_at_period_end && (
-                    <span style={{
-                      ...planBadgeStyle,
-                      background: 'var(--status-warning-bg)', color: 'var(--status-warning-text, var(--status-warning))',
-                    }}>Cancelling</span>
+                    <StatusChip tone="warning" label="Cancelling" />
                   )}
                   {subStatus === 'cancelled' && (
-                    <span style={{
-                      ...planBadgeStyle,
-                      background: 'var(--status-danger-bg)', color: 'var(--status-danger-text, var(--status-danger))',
-                    }}>Cancelled</span>
+                    <StatusChip tone="danger" label="Cancelled" />
                   )}
                 </div>
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
@@ -467,7 +464,7 @@ export function BillingSettings() {
                     disabled={cancelling || isDemo}
                     title={isDemo ? 'Fixed in demo mode' : undefined}
                     className="btn-action settings-control"
-                    style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                    style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
                   >
                     {cancelling ? 'Restoring…' : 'Keep subscription'}
                   </button>
@@ -492,12 +489,13 @@ export function BillingSettings() {
                       disabled={subscribing || isDemo}
                       title={isDemo ? 'Fixed in demo mode' : undefined}
                       className="btn-action settings-control"
-                      style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                      style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
                     >
                       {subscribing ? 'Redirecting…' : isSuspended ? `Reactivate for ${formatRand(subscribeAmount)}/month` : `Subscribe for ${formatRand(subscribeAmount)}/month`}
                     </button>
+                    {/* The fee is stated once, here, beside the price it adds to. */}
                     <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' as const }}>
-                      + {flatPlan?.take_rate_pct}% of every delivered load
+                      + {formatRate(flatPlan?.take_rate_pct)} of each delivered load's value
                     </span>
                   </div>
                 )}
@@ -508,9 +506,9 @@ export function BillingSettings() {
               <div style={{
                 marginBottom: 16, padding: 16,
                 background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)',
-                borderRadius: 'var(--radius-nested)', fontSize: 14, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))',
+                borderRadius: 'var(--radius-nested)', fontSize: 14, lineHeight: '20px', color: 'var(--status-danger-text)',
               }}>
-                <strong>Your account is suspended.</strong> You can still view existing data and manage
+                <span style={{ fontWeight: 600 }}>Your account is suspended.</span> You can still view existing data and manage
                 drivers/vehicles, but can't create quotes or invoices until you update your payment method.
               </div>
             )}
@@ -524,7 +522,7 @@ export function BillingSettings() {
                 <div style={{ fontWeight: 600, marginBottom: 6 }}>
                   We couldn't charge your card
                 </div>
-                <div style={{ color: 'var(--status-warning-text, var(--status-warning))', fontWeight: 500 }}>
+                <div style={{ color: 'var(--status-warning-text)', fontWeight: 500 }}>
                   {grace.days_remaining > 0
                     ? `${grace.days_remaining} day${grace.days_remaining === 1 ? '' : 's'} left to resolve this before your account is suspended.`
                     : 'Grace period has ended. A successful charge is needed to avoid suspension.'}
@@ -552,10 +550,10 @@ export function BillingSettings() {
                     <div>
                       <div style={{ color: 'var(--text-primary)' }}>{item.label}</div>
                       <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 1 }}>
-                        Failed {new Date(item.failed_at).toLocaleDateString('en-ZA')}
+                        Failed {formatDate(item.failed_at)}
                       </div>
                     </div>
-                    <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--status-warning-text, var(--status-warning))' }}>{formatRand(item.amount)}</span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--status-warning-text)' }}>{formatRand(item.amount)}</span>
                   </div>
                 ))}
                 <div style={{
@@ -581,25 +579,11 @@ export function BillingSettings() {
 
             {isPaid && (
               <div style={{ marginTop: 16, fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                Every delivered load is also charged {billingStatus?.flat_plan?.take_rate_pct}% of its invoice value
+                Every delivered load is also charged {formatRate(billingStatus?.flat_plan?.take_rate_pct)} of its invoice value
                 automatically to this card, on top of the monthly fee. See Billing history below for every charge taken.
               </div>
             )}
 
-            {!isPaid && subStatus !== 'cancelled' && !isSuspended && (
-              <div style={{
-                marginTop: 16, padding: 16,
-                background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
-              }}>
-                <strong style={{ color: 'var(--accent-primary)' }}>Unlock the full platform</strong>
-                <br />
-                Subscribe to TruckWys for AI-powered insights, Fast Pay capital access, and unlimited loads:
-                one flat fee of {formatRand(flatPlan?.amount)}/month, whatever your fleet size,{' '}
-                <strong>plus {flatPlan?.take_rate_pct}% of every delivered load's value</strong>, charged
-                automatically to the same card the moment each load is delivered.
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -641,16 +625,13 @@ export function BillingSettings() {
                       {tx.reference || '—'}
                     </td>
                     <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                      {new Date(tx.created_at).toLocaleDateString('en-ZA')}
+                      {formatDate(tx.created_at)}
                     </td>
                     <td className="num" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                       {formatRand(tx.amount)}
                     </td>
                     <td>
-                      <span style={{
-                        fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-                        color: tx.status === 'complete' ? 'var(--status-success-text, var(--accent-primary))' : tx.status === 'pending' ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))',
-                      }}>{statusDisplay(tx.status)}</span>
+                      <StatusChip tone={tx.status === 'complete' ? 'success' : tx.status === 'pending' ? 'warning' : 'danger'} label={statusDisplay(tx.status)} size="sm" />
                     </td>
                   </tr>
                 ))}

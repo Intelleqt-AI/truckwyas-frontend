@@ -9,13 +9,12 @@ import { MobileAuthLayout } from '@/components/MobileAuthLayout';
 // Same list Signup.tsx / Login.tsx / BillingSettings.tsx show — kept
 // identical everywhere the plan is mentioned.
 const PLAN_FEATURES = [
-  "Unlimited loads & invoices",
-  "AI-powered quote optimisation",
-  "Fast Pay capital access (not live yet)",
-  "Advanced analytics & reporting",
-  "Fleet intelligence dashboard",
+  "Unlimited loads and invoices",
+  "Quotes priced from your own costs",
+  "Reports and insights",
+  "Fleet and driver records",
   "Multi-user access",
-  "API & integrations",
+  "API and integrations",
   "Priority support",
 ];
 
@@ -160,7 +159,7 @@ export default function PasswordReset() {
             </div>
 
             {error && (
-              <div role="alert" style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
+              <div role="alert" style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>
                 {error}
               </div>
             )}
@@ -184,7 +183,7 @@ export default function PasswordReset() {
                     {countdown > 0 ? `Resend in ${formatCountdown(countdown)}` : 'Didn\'t receive the code?'}
                   </span>
                   <button type="button" onClick={handleResend} disabled={countdown > 0}
-                    style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', background: 'none', border: 'none', cursor: countdown > 0 ? 'default' : 'pointer', color: countdown > 0 ? 'var(--text-tertiary)' : 'var(--accent-primary)', padding: 0 }}>
+                    style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', background: 'none', border: 'none', cursor: countdown > 0 ? 'default' : 'pointer', color: countdown > 0 ? 'var(--text-tertiary)' : 'var(--link)', padding: 0 }}>
                     Resend
                   </button>
                 </div>
@@ -254,20 +253,12 @@ export default function PasswordReset() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px 16px' }}>
         {PLAN_FEATURES.map(f => (
           <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-            <Check size={16} aria-hidden="true" style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: 2 }} />
+            <Check size={16} aria-hidden="true" style={{ color: 'var(--text-primary)', flexShrink: 0, marginTop: 2 }} />
             {f}
           </div>
         ))}
       </div>
 
-      <div style={{
-        marginTop: 20, padding: '12px 16px', border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--radius-nested)', background: 'var(--bg-surface-hover)',
-        fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
-      }}>
-        Reminder: every completed load also carries a <strong style={{ color: 'var(--text-primary)' }}>0.25% platform fee</strong>,
-        charged automatically to the card on file on top of the monthly plan.
-      </div>
 
       <div style={{ marginTop: 16, fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)' }}>
         Built for South African road freight
@@ -279,7 +270,7 @@ export default function PasswordReset() {
     return (
       <MobileAuthLayout
         eyebrow="Account recovery"
-        title={<>Let's get you <span style={{ color: 'var(--accent-primary)' }}>back in</span>.</>}
+        title={<>Let's get you <span style={{ color: 'var(--text-tertiary)' }}>back in</span>.</>}
         subtitle="Loads, quotes, invoices, and fleet intelligence, all in one dashboard, waiting right where you left them."
         footer={extraContent}
       >
@@ -317,17 +308,17 @@ export default function PasswordReset() {
       {/* Content side — same "welcome back" framing as Login, not a sales pitch */}
       <div className="pwreset-split__content" style={{
         position: 'relative', overflow: 'hidden',
-        background: 'var(--bg-surface)',
+        background: 'var(--bg-deep)',
         borderRight: '1px solid var(--border-subtle)',
       }}>
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
           <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
 
-          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-info-text, var(--accent-primary))', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)', marginBottom: 10 }}>
             Account recovery
           </div>
           <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '34px', marginBottom: 16 }}>
-            Let's get you <span style={{ color: 'var(--accent-primary)' }}>back in</span>.
+            Let's get you <span style={{ color: 'var(--text-tertiary)' }}>back in</span>.
           </div>
           <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: '22px', marginBottom: 32 }}>
             Loads, quotes, invoices, and fleet intelligence, all in one dashboard, waiting right where you left them.

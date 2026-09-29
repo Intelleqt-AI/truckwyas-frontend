@@ -1,17 +1,23 @@
+import { fetchAllPages } from '@/components/insights/findings';
 import '@/pages/table-heading-roles.css';
+import '@/pages/ops-tiles.css';
 import '@/pages/settings/settings-brand.css';
+import '@/pages/bookings-section.css';
 import { useState, useEffect } from "react";
 import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/AuthContext';
-import { formatDateTime } from '@/lib/formatters';
+import { formatDate, formatDateTime } from '@/lib/formatters';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsSecondaryButtonStyle, settingsDangerButtonStyle, SettingsPageHeader } from './settingsUi';
+import RowActions from '@/components/ui/RowActions';
+import { StatusChip } from '@/components/ui/StatusChip';
 
 // Presentation only: the API sends a raw ISO timestamp; show it in the app's
 // date format, and anything unparseable verbatim.
 const displayLastActive = (v?: string) => {
-  if (!v) return '—';
+  if (!v) return 'Never';
   const d = new Date(v);
   return isNaN(d.getTime()) ? v : formatDateTime(d);
 };
@@ -20,24 +26,15 @@ const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle: React.CSSProperties = { ...settingsCardHeaderStyle, justifyContent: 'space-between' };
 const sectionTitleStyle = settingsCardTitleStyle;
 const fieldLabelStyle = settingsLabelStyle;
-const rowActionStyle = settingsSecondaryButtonStyle;
 
 const roleBadgeStyle: React.CSSProperties = {
   fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
   padding: '2px 8px', borderRadius: 'var(--radius-chip)', display: 'inline-block', whiteSpace: 'nowrap',
 };
 
-/* Badge text colours use the tested text roles — raw palette swatches
-   (#3B82F6, #9CA3AF) measure under 4.5:1 on the light surface. */
-const ROLE_COLORS: Record<string, string> = {
-  admin: 'var(--status-danger-text, var(--status-danger))',
-  manager: 'var(--status-warning-text, var(--status-warning))',
-  operator: 'var(--status-info-text, #3B82F6)',
-  dispatcher: 'var(--status-info-text, #8B5CF6)',
-  viewer: 'var(--text-tertiary)',
-  driver: 'var(--status-success-text, var(--status-success))',
-  customer: 'var(--text-tertiary)',
-};
+/* Roles are not states: every role badge is the same neutral outline, so
+   colour stays reserved for status (DESIGN-PRINCIPLES §4). */
+const ROLE_COLORS: Record<string, string> = {};
 
 // Presentation-only labels for known payload values — unknown strings render
 // verbatim (own-property lookup; never restyles user data).
@@ -90,6 +87,9 @@ export function UsersPermissions() {
   const [inviteRole, setInviteRole] = useState('operator');
   const [inviting, setInviting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  // Role is plain text in the table; "Change role" in the row menu opens this.
+  const [roleEdit, setRoleEdit] = useState<{ user: User; role: string } | null>(null);
+  useFocusTrap(latestModal, !!roleEdit);
 
   useEffect(() => {
     loadUsers();
@@ -109,6 +109,20 @@ export function UsersPermissions() {
       .finally(() => setLoading(false));
   };
 
+  // Which users are also drivers (by email), so a driver holding the Admin
+  // role is visible. Roles are shown exactly as the API returns them; this
+  // page never changes a role except through "Change role".
+  const [driverEmails, setDriverEmails] = useState<Set<string>>(new Set());
+  // The table waits for the drivers too (R5): the Admin-driver note and the
+  // "Also a driver" lines then arrive with the rows, so nothing shifts later.
+  const [driversReady, setDriversReady] = useState(false);
+  useEffect(() => {
+    fetchAllPages<any>('api/v1/drivers/')
+      .then(r => setDriverEmails(new Set(r.rows.map((d: any) => String(d.user_details?.email || d.email || '').toLowerCase()).filter(Boolean))))
+      .catch(() => setDriverEmails(new Set()))
+      .finally(() => setDriversReady(true));
+  }, []);
+
   const loadPendingInvites = () => {
     fetchData('api/v1/auth/invite/')
       .then((d: any) => {
@@ -123,6 +137,8 @@ export function UsersPermissions() {
   };
 
   const isAdmin = currentUser?.role?.toLowerCase() === 'admin';
+  const isDriver = (u: User) => !!u.email && driverEmails.has(u.email.toLowerCase());
+  const adminDrivers = users.filter(u => u.role?.toLowerCase() === 'admin' && isDriver(u)).length;
 
   const filtered = users.filter(u =>
     u.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -223,20 +239,20 @@ export function UsersPermissions() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <SettingsPageHeader title="Users & permissions" description="Manage team access and roles" />
+    <div style={{ maxWidth: 'var(--form-max, 720px)', minWidth: 0 }}>
+      <SettingsPageHeader title="Users and permissions" description="Manage team access and roles" />
 
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <h2 style={sectionTitleStyle}>Team members</h2>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <input
-              className="settings-control"
+              className="settings-control st-search"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search users…"
               aria-label="Search users"
-              style={{ ...settingsInputStyle, width: 180, maxWidth: '100%' }}
+              style={{ ...settingsInputStyle, height: 'var(--control-h, 36px)', minHeight: 'var(--control-h, 36px)', paddingTop: 0, paddingBottom: 0, width: 220, maxWidth: '100%' }}
             />
             {isAdmin && (
               <button
@@ -244,7 +260,7 @@ export function UsersPermissions() {
                 onClick={() => setShowInvite(!showInvite)}
                 disabled={isDemo}
                 title={isDemo ? 'Fixed in demo mode' : undefined}
-                style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
               >Invite user</button>
             )}
           </div>
@@ -253,7 +269,7 @@ export function UsersPermissions() {
         {/* Invite form */}
         {showInvite && (
           <div style={{
-            padding: '16px 24px',
+            padding: '16px var(--card-pad, 20px)',
             borderBottom: '1px solid var(--border-subtle)',
             background: 'var(--bg-surface-hover)',
             display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap',
@@ -291,27 +307,46 @@ export function UsersPermissions() {
               onClick={handleInvite}
               disabled={inviting || isDemo}
               title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+              style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
             >
               {inviting ? 'Sending…' : 'Send invite'}
             </button>
           </div>
         )}
 
+        {/* A driver with full admin rights is worth knowing about; say it once, calmly. */}
+        {!loading && driversReady && adminDrivers > 0 && (
+          <p className="st-note">
+            <span className="bk-dot bk-dot--warning" aria-hidden="true" />
+            {adminDrivers} {adminDrivers === 1 ? 'driver has' : 'drivers have'} the Admin role, with billing and user access.
+          </p>
+        )}
+
         {/* Table */}
-        {loading ? (
-          <div style={{ padding: 24 }}>
-            <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', marginBottom: 12, width: '60%' }} />
-            <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', marginBottom: 12, width: '40%' }} />
-            <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', width: '40%' }} />
-          </div>
+        {loading || !driversReady ? (
+          // Real head plus placeholder rows at the final row height (65px, avatar
+          // and two lines), so the cards below do not move when users arrive.
+          <table className="table-heading-roles settings-table" aria-busy="true" aria-label="Loading team members">
+            <thead><tr>{['User', 'Role', 'Status', 'Last active', ''].map(h => <th key={h || 'a'} scope="col" className={h === 'Role' || h === 'Last active' || h === 'Status' ? 'st-col-phone' : undefined}>{h}</th>)}</tr></thead>
+            <tbody>
+              {Array.from({ length: 12 }, (_, i) => (
+                <tr key={i} aria-hidden="true" style={{ borderBottom: '1px solid var(--border-row)', height: 65 }}>
+                  <td><span className="ops-skel" style={{ width: 180, height: 12 }} /></td>
+                  <td className="st-col-phone"><span className="ops-skel" style={{ width: 60 }} /></td>
+                  <td><span className="ops-skel" style={{ width: 56 }} /></td>
+                  <td className="st-col-phone"><span className="ops-skel" style={{ width: 100 }} /></td>
+                  <td />
+                </tr>
+              ))}
+            </tbody>
+          </table>
         ) : (
           <div className="settings-scroll-region" role="region" aria-label="Team members" tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles settings-table">
+          <table className="table-heading-roles settings-table settings-table--pin-actions">
             <thead>
               <tr>
                 {['User', 'Role', 'Status', 'Last active', ''].map(h => (
-                  <th key={h || 'actions'} scope="col" style={{ textAlign: (h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
+                  <th key={h || 'actions'} scope="col" className={h === 'Role' || h === 'Last active' || h === 'Status' ? 'st-col-phone' : undefined} style={{ textAlign: (h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
@@ -329,70 +364,53 @@ export function UsersPermissions() {
                         style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
                       />
                     ) : (
-                      <div style={{
-                        width: 30, height: 30, borderRadius: '50%',
-                        background: 'var(--accent-dim)', display: 'flex', alignItems: 'center',
+                      <div aria-hidden="true" style={{
+                        width: 30, height: 30, borderRadius: '50%', boxSizing: 'border-box',
+                        background: 'var(--bg-surface-hover)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center',
                         justifyContent: 'center', fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500,
-                        color: 'var(--avatar-on-dim, var(--accent-primary))', flexShrink: 0,
+                        color: 'var(--text-secondary)', flexShrink: 0,
                       }}>
                         {u.name?.charAt(0).toUpperCase() || '?'}
                       </div>
                     )}
-                    <div>
-                      <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{u.name}</div>
-                      <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{u.email}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
+                        {u.name}
+                        {/* Phones (R7): Role and Status fold away, so the role (and any
+                            status other than Active) rides beside the name and the
+                            email keeps a whole line. */}
+                        <span className="st-phone-inline"> · {[roleDisplay(u.role), String(u.status).toUpperCase() === 'ACTIVE' ? '' : statusDisplay(u.status)].filter(Boolean).join(' · ')}</span>
+                      </div>
+                      <div className="st-email" title={u.email} style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{u.email}</div>
                     </div>
                   </div>
                 </td>
-                <td>
-                  {isAdmin && u.id !== currentUser?.id ? (
-                    <Select value={u.role?.toLowerCase()} onValueChange={val => handleRoleChange(u.id, val)} disabled={isDemo}>
-                      <SelectTrigger
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="operator">Operator</SelectItem>
-                        <SelectItem value="dispatcher">Dispatcher</SelectItem>
-                        <SelectItem value="viewer">Viewer</SelectItem>
-                        <SelectItem value="driver">Driver</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <span style={{
-                      ...roleBadgeStyle,
-                      border: `1px solid ${roleColor(u.role)}`,
-                      color: roleColor(u.role),
-                    }}>{roleDisplay(u.role)}</span>
+                <td className="st-col-phone">
+                  <span className="st-role" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{roleDisplay(u.role)}</span>
+                  {isDriver(u) && u.role?.toLowerCase() !== 'driver' && (
+                    <span style={{ display: 'block', fontSize: 12, lineHeight: '16px', color: 'var(--text-tertiary)' }}>Also a driver</span>
                   )}
                 </td>
-                <td>
-                  <span style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-                    color: u.status?.toLowerCase() === 'active' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                  }}>{statusDisplay(u.status)}</span>
+                <td className="st-col-phone">
+                  <StatusChip status={u.status} label={statusDisplay(u.status)} size="sm" />
                 </td>
-                <td style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
+                <td className="st-col-phone" style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
                   {displayLastActive(u.last_active)}
                 </td>
                 <td style={{ textAlign: 'right' as const }}>
                   {isAdmin && (
-                    <button
-                      className="settings-control"
-                      onClick={() => setDeleteConfirm(u.id)}
-                      disabled={isDemo}
-                      title={isDemo ? 'Fixed in demo mode' : undefined}
-                      style={{
-                        /* Neutral in the row; the danger colour belongs to the
-                           confirmation step, so a list of users is not a wall of red. */
-                        ...rowActionStyle, color: 'var(--text-secondary)',
-                        cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                      }}
-                    >Remove</button>
+                    <RowActions
+                      label={u.email || `User ${u.id}`}
+                      items={[
+                        ...(u.id !== currentUser?.id ? [{
+                          label: 'Change role',
+                          onSelect: () => setRoleEdit({ user: u, role: u.role?.toLowerCase() || 'operator' }),
+                          disabled: isDemo,
+                          title: isDemo ? 'Fixed in demo mode' : undefined,
+                        }] : []),
+                        { label: 'Remove', danger: true, onSelect: () => setDeleteConfirm(u.id), disabled: isDemo },
+                      ]}
+                    />
                   )}
                 </td>
               </tr>
@@ -410,7 +428,7 @@ export function UsersPermissions() {
             <h2 style={sectionTitleStyle}>Pending invites</h2>
           </div>
           <div className="settings-scroll-region" role="region" aria-label="Pending invites" tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles settings-table">
+          <table className="table-heading-roles settings-table settings-table--pin-actions">
             <thead>
               <tr>
                 {['Email', 'Role', 'Invited', 'Expires', ''].map(h => (
@@ -423,45 +441,22 @@ export function UsersPermissions() {
                 <tr key={inv.id} style={{ borderBottom: i < pendingInvites.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
                   <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{inv.email}</td>
                   <td>
-                    <span style={{
-                      ...roleBadgeStyle,
-                      border: `1px solid ${roleColor(inv.role)}`,
-                      color: roleColor(inv.role),
-                    }}>{roleDisplay(inv.role)}</span>
+                    <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{roleDisplay(inv.role)}</span>
                   </td>
                   <td style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                    {new Date(inv.invited_at).toLocaleDateString()}
+                    {formatDate(inv.invited_at)}
                   </td>
                   <td style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                    {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : '—'}
+                    {inv.expires_at ? formatDate(inv.expires_at) : 'No expiry'}
                   </td>
                   <td style={{ textAlign: 'right' as const }}>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <button
-                        className="settings-control"
-                        onClick={() => handleResendInvite(inv.token)}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{
-                          ...rowActionStyle,
-                          cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                        }}
-                      >Resend</button>
-                      {isAdmin && (
-                        <button
-                          className="settings-control"
-                          onClick={() => handleRevokeInvite(inv.token)}
-                          disabled={isDemo}
-                          title={isDemo ? 'Fixed in demo mode' : undefined}
-                          style={{
-                            /* Neutral in the row; the danger colour belongs to the
-                           confirmation step, so a list of users is not a wall of red. */
-                        ...rowActionStyle, color: 'var(--text-secondary)',
-                            cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                          }}
-                        >Revoke</button>
-                      )}
-                    </div>
+                    <RowActions
+                      label={inv.email}
+                      items={[
+                        { label: 'Resend', onSelect: () => handleResendInvite(inv.token), disabled: isDemo },
+                        ...(isAdmin ? [{ label: 'Revoke', danger: true, onSelect: () => handleRevokeInvite(inv.token), disabled: isDemo }] : []),
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
@@ -486,19 +481,51 @@ export function UsersPermissions() {
           ].map((r, i, arr) => (
             <div key={r.role} style={{
               display: 'flex', alignItems: 'center', gap: 16,
-              padding: '12px 24px',
+              padding: '12px var(--card-pad, 20px)',
               borderBottom: i < arr.length - 1 ? '1px solid var(--border-row)' : 'none',
             }}>
-              <span style={{
-                ...roleBadgeStyle,
-                border: `1px solid ${r.color}`, color: r.color,
-                width: 80, textAlign: 'center' as const,
-              }}>{r.role}</span>
+              <span style={{ width: 96, flexShrink: 0, fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>{r.role}</span>
               <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{r.desc}</span>
             </div>
           ))}
         </div>
       </div>
+
+      {/* Change role: same PATCH as before, now behind one row action. */}
+      {roleEdit && (
+        <div className="bk-dialog-backdrop" onClick={() => setRoleEdit(null)}>
+          <div className="bk-dialog" role="dialog" aria-modal="true" aria-labelledby="role-edit-title" onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === 'Escape') setRoleEdit(null); }}>
+            <h2 className="bk-dialog__title" id="role-edit-title">Change role</h2>
+            <p className="bk-dialog__body">{roleEdit.user.name || roleEdit.user.email} is now {roleDisplay(roleEdit.user.role).toLowerCase()}.</p>
+            <span style={fieldLabelStyle} id="role-edit-label">New role</span>
+            <Select value={roleEdit.role} onValueChange={(val) => setRoleEdit({ ...roleEdit, role: val })}>
+              <SelectTrigger aria-labelledby="role-edit-label" data-autofocus>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="operator">Operator</SelectItem>
+                <SelectItem value="dispatcher">Dispatcher</SelectItem>
+                <SelectItem value="viewer">Viewer</SelectItem>
+                <SelectItem value="driver">Driver</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="bk-dialog__footer">
+              <button type="button" className="bk-btn bk-btn--secondary" onClick={() => setRoleEdit(null)}>Cancel</button>
+              <button
+                type="button"
+                className="bk-btn bk-btn--primary"
+                disabled={isDemo || roleEdit.role === roleEdit.user.role?.toLowerCase()}
+                onClick={() => { const { user, role } = roleEdit; setRoleEdit(null); handleRoleChange(user.id, role); }}
+              >
+                Save role
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
@@ -511,7 +538,7 @@ export function UsersPermissions() {
             background: 'var(--bg-surface)',
             border: '1px solid var(--border-subtle)',
             borderRadius: 'var(--radius-dialog)',
-            padding: 24,
+            padding: 'var(--card-pad, 20px)',
             maxWidth: 420,
             width: '100%',
             boxSizing: 'border-box',

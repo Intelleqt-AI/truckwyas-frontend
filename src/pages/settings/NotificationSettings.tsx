@@ -3,7 +3,7 @@ import { toast } from "react-toastify";
 import { fetchData, patchData } from "@/lib/Api";
 import { enablePush, disablePush, pushSupported, PushStatus } from "@/lib/push";
 import { useAuth } from "@/lib/AuthContext";
-import { SettingsToggleRow, settingsBadgeStyle, settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle } from "./settingsUi";
+import { SettingsToggleRow, settingsBadgeStyle, settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, SettingsPageHeader } from "./settingsUi";
 
 const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle = settingsCardHeaderStyle;
@@ -100,16 +100,12 @@ export function NotificationSettings() {
     : undefined;
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
-          Notifications
-        </h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-          Choose what you get notified about and how
-        </div>
+    // Settings forms cap at 720px so each toggle sits near its label.
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
+      <SettingsPageHeader title="Notifications" description="Choose what you get notified about and how" />
+      <div>
         {loadFailed && (
-          <div style={{ marginTop: 8, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
+          <div style={{ marginTop: 8, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>
             Settings failed to load.{' '}
             <button type="button" className="settings-control" onClick={load} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: '20px', textDecoration: 'underline' }}>
               Retry
@@ -143,7 +139,7 @@ export function NotificationSettings() {
           <ToggleRow label="Maintenance due" checked={settings.push.maintenance_due} onChange={v => setChannel('push', 'maintenance_due', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           <ToggleRow label="Driver status updates" checked={settings.push.driver_updates} onChange={v => setChannel('push', 'driver_updates', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           {pushHint && (
-            <div style={{ padding: '12px 24px', borderTop: '1px solid var(--border-row)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{pushHint}</div>
+            <div style={{ padding: '12px var(--card-pad, 20px)', borderTop: '1px solid var(--border-row)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{pushHint}</div>
           )}
         </div>
       </div>
@@ -160,7 +156,10 @@ export function NotificationSettings() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      {/* One save pattern across Settings (R9): the sticky save bar, as on
+          Company details. It saves every card on this page. */}
+      <div className="cs-savebar">
+        <span className="cs-savebar__note">{saved ? 'Saved.' : 'Applies to the alerts you receive.'}</span>
         <button
           className="btn-action settings-control"
           onClick={handleSave}

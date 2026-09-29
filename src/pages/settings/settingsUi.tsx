@@ -1,4 +1,7 @@
 import '@/pages/settings/settings-brand.css';
+import { createPortal } from 'react-dom';
+import { useSettingsShell } from './SettingsShell';
+import '@/components/layout/section-header.css';
 
 // Shared presentation roles for every settings section (see
 // docs/brand/BRAND-GUIDELINES.md). Each section used to carry its own copy of
@@ -15,7 +18,7 @@ export const settingsCardStyle: React.CSSProperties = {
 };
 
 export const settingsCardHeaderStyle: React.CSSProperties = {
-  padding: '20px 24px 16px',
+  padding: '16px var(--card-pad, 20px)',
   borderBottom: '1px solid var(--border-subtle)',
   display: 'flex',
   alignItems: 'center',
@@ -35,7 +38,7 @@ export const settingsCardTitleStyle: React.CSSProperties = {
   margin: 0,
 };
 
-export const settingsCardBodyStyle: React.CSSProperties = { padding: 24 };
+export const settingsCardBodyStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
 
 export const settingsLabelStyle: React.CSSProperties = {
   display: 'block',
@@ -59,7 +62,7 @@ export const settingsInputStyle: React.CSSProperties = {
   background: 'var(--input-bg)',
   border: '1px solid var(--border-subtle)',
   borderRadius: 'var(--radius-control)',
-  minHeight: 40,
+  minHeight: 'var(--field-h, 40px)',
   minWidth: 0,
   padding: '8px 12px',
   color: 'var(--text-primary)',
@@ -79,7 +82,7 @@ export const settingsHelpStyle: React.CSSProperties = {
 
 export const settingsErrorStyle: React.CSSProperties = {
   ...settingsHelpStyle,
-  color: 'var(--status-danger-text, var(--status-danger))',
+  color: 'var(--status-danger-text)',
 };
 
 /** Right-aligned action row that closes a card (Save changes etc.). */
@@ -106,7 +109,9 @@ export function SettingsSwitch({ checked, onChange, label, disabled, title }: Se
   return (
     <button
       type="button"
-      className="settings-control settings-switch"
+      // Not a .settings-control: the coarse-pointer 44px floor must not
+      // resize the switch; its hit area grows via ::after instead.
+      className="settings-switch"
       role="switch"
       aria-checked={checked}
       aria-label={label}
@@ -130,7 +135,7 @@ export function SettingsToggleRow({ label, description, checked, onChange, disab
   return (
     <div className="settings-toggle-row" style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-      padding: '12px 24px',
+      padding: '12px var(--card-pad, 20px)',
       minHeight: 48,
       opacity: disabled ? 0.6 : 1,
     }}>
@@ -171,8 +176,8 @@ export const settingsSecondaryButtonStyle: React.CSSProperties = {
   background: 'transparent',
   border: '1px solid var(--border-subtle)',
   color: 'var(--text-primary)',
-  padding: '8px 16px',
-  minHeight: 40,
+  padding: '0 14px',
+  minHeight: 'var(--control-h, 36px)',
   borderRadius: 'var(--radius-control)',
   fontFamily: 'var(--font-sans)',
   fontSize: 14,
@@ -187,18 +192,30 @@ export const settingsSecondaryButtonStyle: React.CSSProperties = {
 export const settingsDangerButtonStyle: React.CSSProperties = {
   ...settingsSecondaryButtonStyle,
   border: '1px solid var(--status-danger)',
-  color: 'var(--status-danger-text, var(--status-danger))',
+  color: 'var(--status-danger-text)',
 };
 
-/** Standard settings section title block (one h1 + supporting line). */
+/** Standard settings section title block (one h1 + supporting line). Same
+ * geometry and type as the shared SectionHeader (28/34 title, one grey line,
+ * actions on the title row), so every page head in the product matches. */
 export function SettingsPageHeader({ title, description, actions }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode }) {
-  return (
-    <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-      <div style={{ minWidth: 0 }}>
-        <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: description ? 4 : 0 }}>{title}</h1>
-        {description && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{description}</div>}
+  // Inside the settings shell the head is portalled into the shell's head
+  // slot, above the sub-nav, so the H1 sits where it does on every page.
+  const shell = useSettingsShell();
+  const head = (
+    <header className="section-header settings-page-head">
+      <div className="section-header__top">
+        <div className="section-header__titles">
+          <div className="section-header__title-row">
+            <h1 className="section-header__title">{title}</h1>
+          </div>
+          <p className="section-header__description">{description}</p>
+        </div>
+        {actions ? <div className="section-header__actions">{actions}</div> : null}
       </div>
-      {actions && <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', flexShrink: 0 }}>{actions}</div>}
-    </div>
+    </header>
   );
+  if (!shell) return head;
+  if (!shell.slot) return null;
+  return createPortal(<>{head}{shell.phoneNav}</>, shell.slot);
 }

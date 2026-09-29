@@ -1,3 +1,4 @@
+import { formatDateShort } from '@/lib/formatters';
 import { useRef, useState } from 'react';
 import { TableTwin, Tip, TipRow, VIZ, plural, useTip, useWidth } from './core';
 
@@ -47,19 +48,18 @@ export function ActivityStrip({ rows, dayLabels, maxRows = 12 }: { rows: Activit
           {[0, 7, 14, 21].filter((d) => d < n && x(d) + 48 < labelW + gridW - 40).map((d) => (
             <text key={d} x={x(d)} y={12}>{dayLabels[d]}</text>
           ))}
-          <text x={labelW + gridW} y={12} textAnchor="end" className="viz-strong">Today</text>
+          <text x={labelW + gridW} y={12} textAnchor="end" className="viz-strong">{formatDateShort(new Date())}</text>
           {visible.map((r, ri) => {
             const cy = headH + ri * rowH + (rowH - cell) / 2;
             const worked = r.days.filter((v) => v > 0).length;
             return (
               <g key={r.id}>
-                <text x={0} y={cy + cell / 2} dy="0.32em" style={{ fill: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                <text x={0} y={cy + cell / 2} dy="0.32em" style={{ fill: 'var(--text-primary)', fontSize: 12 }}>
                   {r.label.length > 14 ? r.label.slice(0, 13) + '…' : r.label}
                 </text>
                 {r.days.map((v, d) => (
                   <rect key={d} x={x(d)} y={cy} width={cell} height={cell} rx={Math.min(3, cell / 4)}
                     fill={v > 0 ? VIZ.accent : 'var(--viz-track)'}
-                    opacity={active && active !== `${r.id}:${d}` && active.startsWith(`${r.id}:`) ? 0.7 : 1}
                     stroke={active === `${r.id}:${d}` ? 'var(--text-primary)' : 'none'} strokeWidth={1.5}
                     onPointerEnter={() => open(r, d, x(d) + cell / 2, cy + off())} />
                 ))}

@@ -27,9 +27,9 @@ const toastVariants = cva(
   {
     variants: {
       variant: {
-        default: "border-[color:var(--border-subtle)] bg-[var(--bg-surface)] text-[color:var(--text-primary)]",
+        default: "border-[color:var(--border-overlay)] bg-[var(--bg-overlay)] text-[color:var(--text-primary)]",
         destructive:
-          "destructive group border-[color:var(--border-subtle)] bg-[var(--bg-surface)] text-[color:var(--status-danger-text,var(--status-danger))]",
+          "destructive group border-[color:var(--border-overlay)] bg-[var(--bg-overlay)] text-[color:var(--status-danger-text)]",
       },
     },
     defaultVariants: {
@@ -60,7 +60,7 @@ const ToastAction = React.forwardRef<
   <ToastPrimitives.Action
     ref={ref}
     className={cn(
-      "inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-[color:var(--border-subtle)] bg-transparent px-4 text-sm font-medium transition-colors hover:bg-[var(--surface-tint-hover)] focus-visible:[outline:2px_solid_var(--accent-primary)] focus-visible:[outline-offset:3px] disabled:pointer-events-none disabled:opacity-50",
+      "inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-[color:var(--border-subtle)] bg-transparent px-4 text-sm font-medium transition-colors hover:bg-[var(--surface-tint-hover)] focus-visible:[outline:2px_solid_var(--accent-primary)] focus-visible:[outline-offset:3px] disabled:pointer-events-none disabled:text-[color:var(--text-disabled)]",
       className
     )}
     {...props}

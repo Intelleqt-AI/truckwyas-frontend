@@ -6,11 +6,17 @@ import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
 import { formatRelativeTime } from "@/lib/formatters";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/AuthContext";
+import RowActions from "@/components/ui/RowActions";
 import { SettingsToggleRow, settingsBadgeStyle, settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsDangerButtonStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
+import { StatusChip } from '@/components/ui/StatusChip';
 
 const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle = settingsCardHeaderStyle;
 const sectionTitleStyle = settingsCardTitleStyle;
+// Three rows each keeps the whole page near one screen; the rest is one click away.
+const LIST_CAP = 3;
+const countStyle: React.CSSProperties = { fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' };
+const showAllRowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'center', padding: '8px 24px', borderTop: '1px solid var(--border-row)' };
 const labelStyle = settingsLabelStyle;
 const inputStyle = settingsInputStyle;
 
@@ -20,9 +26,9 @@ const dangerBtnStyle = settingsDangerButtonStyle;
 const ACTIVITY_META: Record<string, { label: string; color: string }> = {
   login: { label: 'Signed in', color: 'var(--status-success)' },
   logout: { label: 'Signed out', color: 'var(--text-tertiary)' },
-  revoked: { label: 'Session revoked', color: 'var(--status-danger-text, var(--status-danger))' },
-  revoked_others: { label: 'Other sessions revoked', color: 'var(--status-danger-text, var(--status-danger))' },
-  revoked_all: { label: 'All sessions revoked', color: 'var(--status-danger-text, var(--status-danger))' },
+  revoked: { label: 'Session revoked', color: 'var(--status-danger-text)' },
+  revoked_others: { label: 'Other sessions revoked', color: 'var(--status-danger-text)' },
+  revoked_all: { label: 'All sessions revoked', color: 'var(--status-danger-text)' },
 };
 
 function ToggleRow({ badge, ...props }: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void; badge?: string; disabled?: boolean }) {
@@ -31,7 +37,7 @@ function ToggleRow({ badge, ...props }: { label: string; description?: string; c
       {...props}
       disabledTitle="Fixed in demo mode"
       badge={badge ? (
-        <span style={{ ...settingsBadgeStyle, color: 'var(--status-info-text, var(--accent-primary))', borderColor: 'currentColor' }}>{badge}</span>
+        <StatusChip tone="info" label={badge} size="sm" />
       ) : undefined}
     />
   );
@@ -53,6 +59,11 @@ export function SecuritySettings() {
   const [activity, setActivity] = useState<any[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(true);
   const [bulkBusy, setBulkBusy] = useState(false);
+  // Presentation only: long lists show the first few rows with "Show all".
+  const [showAllSessions, setShowAllSessions] = useState(false);
+  const [showAllActivity, setShowAllActivity] = useState(false);
+  // The password fields open on request, so the page leads with its options.
+  const [pwOpen, setPwOpen] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -132,6 +143,10 @@ export function SecuritySettings() {
   };
 
   const otherCount = sessions.filter(s => !s.current).length;
+  // This device first, then the rest in the order the API returns them.
+  const orderedSessions = [...sessions.filter(s => s.current), ...sessions.filter(s => !s.current)];
+  const visibleSessions = showAllSessions ? orderedSessions : orderedSessions.slice(0, LIST_CAP);
+  const visibleActivity = showAllActivity ? activity : activity.slice(0, LIST_CAP);
   const hasOthers = otherCount > 0;
 
   const handleBulkLogout = async () => {
@@ -180,6 +195,7 @@ export function SecuritySettings() {
         data: { current_password: pwForm.current, new_password: pwForm.new1 },
       });
       setPwForm({ current: '', new1: '', new2: '' });
+      setPwOpen(false);
       alert('Password updated successfully');
     } catch (err) {
       console.error('Password change failed:', err);
@@ -218,100 +234,97 @@ export function SecuritySettings() {
     }
   };
 
+  const rowBorder = '1px solid var(--border-row)';
+  const emptyStyle: React.CSSProperties = { padding: '12px var(--card-pad, 20px)', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' };
+  const metaStyle: React.CSSProperties = { fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' };
+  const subheadStyle: React.CSSProperties = { margin: 0, padding: '12px var(--card-pad, 20px) 4px', borderTop: '1px solid var(--border-subtle)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)' };
+
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <SettingsPageHeader title="Security settings" description="Manage your account security and authentication methods" />
+    <div className="sec-page" style={{ maxWidth: 'var(--form-max, 720px)' }}>
+      <SettingsPageHeader title="Security" description="Password, sign-in options and where you are signed in" />
 
-      {/* Change Password */}
-      <div style={sectionStyle}>
+      {/* Sign-in: password (fields open on request) and the three options, one card. */}
+      <section style={sectionStyle} aria-labelledby="sec-signin">
         <div style={sectionHeaderStyle}>
-          <h2 style={sectionTitleStyle}>Change password</h2>
+          <h2 id="sec-signin" style={sectionTitleStyle}>Sign-in</h2>
         </div>
-        <div style={{ padding: 24 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 16 }}>
-            <div>
-              <label htmlFor="pw-current" style={labelStyle}>Current password</label>
-              <input id="pw-current" className="settings-control" style={inputStyle} type="password" value={pwForm.current} onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))} disabled={isDemo} />
-            </div>
-            <div>
-              <label htmlFor="pw-new" style={labelStyle}>New password</label>
-              <input id="pw-new" className="settings-control" style={inputStyle} type="password" value={pwForm.new1} onChange={e => setPwForm(p => ({ ...p, new1: e.target.value }))} disabled={isDemo} />
-            </div>
-            <div>
-              <label htmlFor="pw-confirm" style={labelStyle}>Confirm password</label>
-              <input id="pw-confirm" className="settings-control" style={inputStyle} type="password" value={pwForm.new2} onChange={e => setPwForm(p => ({ ...p, new2: e.target.value }))} disabled={isDemo} />
-            </div>
+        <div className="sec-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px var(--card-pad, 20px)', minHeight: 48 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>Password</div>
+            <div style={metaStyle}>Used with your email to sign in</div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          {!pwOpen && (
             <button
-              className="btn-action settings-control"
-              onClick={handleChangePassword}
-              disabled={saving || isDemo}
+              type="button"
+              className="settings-control"
+              onClick={() => setPwOpen(true)}
+              disabled={isDemo}
               title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              aria-expanded={false}
+              aria-controls="sec-pw-form"
+              style={{ ...settingsSecondaryButtonStyle, flexShrink: 0, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
             >
-              {saving ? 'Updating…' : 'Update password'}
+              Change password
             </button>
+          )}
+        </div>
+        {pwOpen && (
+          <div id="sec-pw-form" style={{ padding: '4px var(--card-pad, 20px) var(--card-pad, 20px)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 16 }}>
+              <div>
+                <label htmlFor="pw-current" style={labelStyle}>Current password</label>
+                <input id="pw-current" className="settings-control" style={inputStyle} type="password" autoFocus value={pwForm.current} onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))} disabled={isDemo} />
+              </div>
+              <div>
+                <label htmlFor="pw-new" style={labelStyle}>New password</label>
+                <input id="pw-new" className="settings-control" style={inputStyle} type="password" value={pwForm.new1} onChange={e => setPwForm(p => ({ ...p, new1: e.target.value }))} disabled={isDemo} />
+              </div>
+              <div>
+                <label htmlFor="pw-confirm" style={labelStyle}>Confirm password</label>
+                <input id="pw-confirm" className="settings-control" style={inputStyle} type="password" value={pwForm.new2} onChange={e => setPwForm(p => ({ ...p, new2: e.target.value }))} disabled={isDemo} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="settings-control"
+                onClick={() => { setPwOpen(false); setPwForm({ current: '', new1: '', new2: '' }); }}
+                disabled={saving}
+                style={settingsSecondaryButtonStyle}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-action settings-control"
+                onClick={handleChangePassword}
+                disabled={saving || isDemo}
+                title={isDemo ? 'Fixed in demo mode' : undefined}
+                style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              >
+                {saving ? 'Updating…' : 'Update password'}
+              </button>
+            </div>
           </div>
+        )}
+        <div style={{ borderTop: rowBorder }}>
+          <ToggleRow label="Two-factor authentication" description="Ask for a one-time code after the password" checked={twoFactor} onChange={(v) => updateSecuritySetting('two_factor', v, setTwoFactor)} badge="Recommended" disabled={isDemo} />
         </div>
-      </div>
-
-      {/* Security Options */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
-          <h2 style={sectionTitleStyle}>Security options</h2>
+        <div style={{ borderTop: rowBorder }}>
+          <ToggleRow label="Session timeout" description="Sign out after 30 minutes of inactivity" checked={sessionTimeout} onChange={(v) => updateSecuritySetting('session_timeout', v, setSessionTimeout)} disabled={isDemo} />
         </div>
-        <div>
-          <ToggleRow label="Two-factor authentication" description="Require OTP on login in addition to password" checked={twoFactor} onChange={(v) => updateSecuritySetting('two_factor', v, setTwoFactor)} badge="Recommended" disabled={isDemo} />
-          <ToggleRow label="Session timeout" description="Auto sign out after 30 minutes of inactivity" checked={sessionTimeout} onChange={(v) => updateSecuritySetting('session_timeout', v, setSessionTimeout)} disabled={isDemo} />
+        <div style={{ borderTop: rowBorder }}>
           <ToggleRow label="Login alerts" description="Email me when a new device signs in" checked={loginAlerts} onChange={(v) => updateSecuritySetting('login_alerts', v, setLoginAlerts)} disabled={isDemo} />
         </div>
-      </div>
+      </section>
 
-      {/* Active Sessions */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
-          <h2 style={sectionTitleStyle}>Active sessions</h2>
-        </div>
-        {loadingSessions ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading sessions…</div>
-        ) : sessions.length === 0 ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No active sessions</div>
-        ) : (
-          <div>
-          {sessions.map((s, i) => (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '12px 24px', gap: 16, borderBottom: i < sessions.length - 1 ? '1px solid var(--border-row)' : 'none',
-            }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                  <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{s.device}</span>
-                  {s.current && (
-                    <span style={{ ...settingsBadgeStyle, color: 'var(--status-info-text, var(--accent-primary))', borderColor: 'currentColor' }}>Current</span>
-                  )}
-                </div>
-                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{s.location} · {formatRelativeTime(s.time)}</div>
-              </div>
-              {!s.current && (
-                <button
-                  className="settings-control"
-                  onClick={() => handleRevokeSession(s.id)}
-                  disabled={revokingId === s.id || isDemo}
-                  title={isDemo ? 'Fixed in demo mode' : undefined}
-                  style={{
-                    ...dangerBtnStyle,
-                    cursor: isDemo ? 'not-allowed' : revokingId === s.id ? 'default' : 'pointer',
-                    opacity: (revokingId === s.id || isDemo) ? 0.5 : 1,
-                  }}
-                >{revokingId === s.id ? 'Revoking…' : 'Revoke'}</button>
-              )}
-            </div>
-          ))}
-          <div style={{
-            display: 'flex', justifyContent: 'flex-end',
-            padding: '12px 24px', borderTop: '1px solid var(--border-row)',
-          }}>
+      {/* Where you are signed in, then recent sign-ins: one card, three rows each. */}
+      <section style={sectionStyle} aria-labelledby="sec-sessions">
+        <div style={{ ...sectionHeaderStyle, justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+            <h2 id="sec-sessions" style={sectionTitleStyle}>Signed in</h2>
+            {!loadingSessions && sessions.length > 0 && <span style={countStyle}>{sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}</span>}
+          </div>
+          {!loadingSessions && sessions.length > 0 && (
             <button
               className="settings-control"
               onClick={handleBulkLogout}
@@ -323,61 +336,90 @@ export function SecuritySettings() {
                 opacity: (bulkBusy || isDemo) ? 0.5 : 1,
               }}
             >{bulkBusy ? 'Working…' : hasOthers ? 'Log out other sessions' : 'Log out all sessions'}</button>
-          </div>
-          </div>
-        )}
-      </div>
-
-      {/* Login Activity */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
-          <h2 style={sectionTitleStyle}>Login activity</h2>
+          )}
         </div>
-        {loadingActivity ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading activity…</div>
-        ) : activity.length === 0 ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No recent activity</div>
+        {loadingSessions ? (
+          <div style={{ ...emptyStyle, minHeight: 3 * 64 }}>Loading sessions…</div>
+        ) : sessions.length === 0 ? (
+          <div style={emptyStyle}>No active sessions</div>
         ) : (
           <div>
-          {activity.map((a, i) => {
+          {visibleSessions.map((s, i) => (
+            <div key={s.id ?? i} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px var(--card-pad, 20px)', gap: 16, borderTop: i > 0 ? rowBorder : 'none', minHeight: 44,
+            }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{s.device}</span>
+                  {s.current && (
+                    <StatusChip tone="success" label="This device" size="sm" />
+                  )}
+                </div>
+                <div style={metaStyle}>{s.location} · {formatRelativeTime(s.time)}</div>
+              </div>
+              {!s.current && (
+                <RowActions
+                  label={`${s.device || 'Session'} ${s.location || ''}`.trim()}
+                  items={[{
+                    label: revokingId === s.id ? 'Revoking…' : 'Revoke',
+                    danger: true,
+                    onSelect: () => handleRevokeSession(s.id),
+                    disabled: revokingId === s.id || isDemo,
+                  }]}
+                />
+              )}
+            </div>
+          ))}
+          {orderedSessions.length > LIST_CAP && (
+            <div style={showAllRowStyle}>
+              <button type="button" className="settings-control tw-btn tw-btn--ghost" onClick={() => setShowAllSessions(v => !v)}>
+                {showAllSessions ? 'Show fewer' : `Show all ${orderedSessions.length}`}
+              </button>
+            </div>
+          )}
+          </div>
+        )}
+
+        <h3 style={subheadStyle}>Recent sign-ins</h3>
+        {loadingActivity ? (
+          <div style={{ ...emptyStyle, minHeight: 3 * 44 }}>Loading activity…</div>
+        ) : activity.length === 0 ? (
+          <div style={emptyStyle}>No recent activity</div>
+        ) : (
+          <div>
+          {visibleActivity.map((a, i) => {
             const meta = ACTIVITY_META[a.event]
               || (a.action === 'LOGIN' ? ACTIVITY_META.login : ACTIVITY_META.logout);
             return (
-              <div key={a.id} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '12px 24px', borderBottom: i < activity.length - 1 ? '1px solid var(--border-row)' : 'none',
-              }}>
-                <span style={{
-                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                  background: meta.color,
-                }} />
-                <div>
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', marginBottom: 2 }}>{meta.label}</div>
-                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                    {a.device} · {a.ip} · {formatRelativeTime(a.time)}
-                  </div>
-                </div>
+              <div key={a.id} className="sec-activity" style={{ borderTop: i > 0 ? rowBorder : 'none' }}>
+                <span className="sec-activity__dot" aria-hidden="true" style={{ background: meta.color }} />
+                <span className="sec-activity__label">{meta.label}</span>
+                <span className="sec-activity__meta">{a.device} · {a.ip}</span>
+                <span className="sec-activity__time">{formatRelativeTime(a.time)}</span>
               </div>
             );
           })}
+          {activity.length > LIST_CAP && (
+            <div style={showAllRowStyle}>
+              <button type="button" className="settings-control tw-btn tw-btn--ghost" onClick={() => setShowAllActivity(v => !v)}>
+                {showAllActivity ? 'Show fewer' : `Show all ${activity.length}`}
+              </button>
+            </div>
+          )}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Danger Zone */}
-      <div style={{ ...sectionStyle, borderColor: 'var(--status-danger)' }}>
-        <div style={sectionHeaderStyle}>
-          <h2 style={{ ...sectionTitleStyle, color: 'var(--status-danger-text, var(--status-danger))' }}>Danger zone</h2>
-        </div>
+      {/* Danger zone: one row, no header, so the card is not half empty. */}
+      <section aria-labelledby="sec-danger" style={{ ...sectionStyle, borderColor: 'var(--status-danger)' }}>
         <div style={{
-          padding: 24, display: 'flex', alignItems: 'center',
+          padding: '16px var(--card-pad, 20px)', display: 'flex', alignItems: 'center',
           justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
         }}>
-          <div>
-            <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', marginBottom: 2 }}>Delete my account</div>
-            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-              Deactivates your account and signs you out on every device immediately.
-            </div>
+          <div style={{ minWidth: 0, flex: '1 1 260px' }}>
+            <h2 id="sec-danger" style={{ ...sectionTitleStyle, fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--status-danger-text)' }}>Delete my account</h2>
+            <div style={metaStyle}>Deactivates your account and signs you out on every device.</div>
           </div>
           <button
             className="settings-control"
@@ -390,10 +432,10 @@ export function SecuritySettings() {
               opacity: isDemo ? 0.5 : 1,
             }}
           >
-            Delete my account
+            Delete account
           </button>
         </div>
-      </div>
+      </section>
 
       {/* Delete Account confirmation modal */}
       {showDeleteModal && (
@@ -402,7 +444,7 @@ export function SecuritySettings() {
             position: 'fixed', inset: 0, zIndex: 2000,
             background: 'var(--modal-backdrop, rgba(0,0,0,0.65))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 24,
+            padding: 'var(--card-pad, 20px)',
           }}
           onClick={closeDeleteModal}
         >
@@ -414,7 +456,7 @@ export function SecuritySettings() {
               background: 'var(--bg-surface)',
               border: '1px solid var(--border-subtle)',
               borderRadius: 'var(--radius-dialog)',
-              padding: 24,
+              padding: 'var(--card-pad, 20px)',
               maxWidth: 440,
               width: '100%',
               boxSizing: 'border-box',
@@ -441,7 +483,7 @@ export function SecuritySettings() {
               placeholder="Your current password"
             />
             {deleteError && (
-              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 12 }}>{deleteError}</div>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)', marginBottom: 12 }}>{deleteError}</div>
             )}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: deleteError ? 4 : 20 }}>
               <button
@@ -462,7 +504,7 @@ export function SecuritySettings() {
                 style={{
                   padding: '8px 12px', minHeight: 40,
                   background: 'var(--status-danger-bg)',
-                  border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-control)',
+                  border: '1px solid var(--status-danger)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-control)',
                   fontSize: 14, lineHeight: '20px', fontWeight: 500,
                   fontFamily: 'var(--font-sans)',
                   cursor: (!deletePassword || deleting) ? 'default' : 'pointer',

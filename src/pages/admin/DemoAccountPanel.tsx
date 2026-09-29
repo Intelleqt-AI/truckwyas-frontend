@@ -1,20 +1,20 @@
 import '@/pages/admin/admin-brand.css';
+import { formatDateTime } from '@/lib/formatters';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { InfoTip } from '@/components/ui/InfoTip';
+import { StatusChip } from '@/components/ui/StatusChip';
 
-const cardStyle: React.CSSProperties = { padding: 24 };
+const cardStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16,
 };
-const metricLabelStyle: React.CSSProperties = {
-  fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 4,
-};
 
 const fmt = (dateStr?: string | null) =>
-  dateStr ? new Date(dateStr).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  dateStr ? formatDateTime(dateStr) : 'Never';
 
 export default function DemoAccountPanel() {
   const qc = useQueryClient();
@@ -49,11 +49,11 @@ export default function DemoAccountPanel() {
           first tick. */}
       {demoStatus && !demoStatus.exists && (
         <div className="card" style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 0 }}>
               <h2 style={{ ...sectionTitleStyle, marginBottom: 4 }}>Demo account</h2>
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                No demo company exists yet. It normally self-creates on the scheduler's first run, or you can create it now.
+                No demo company yet. The scheduler creates it on its first run.
               </div>
             </div>
             <button className="btn-action admin-control" style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }} disabled={resetting} onClick={doReset}>
@@ -64,8 +64,8 @@ export default function DemoAccountPanel() {
       )}
 
       {demoStatus?.exists && (
-        <div className="card" style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <section aria-label="Demo account">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
             <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Demo account</h2>
             <button
               className="btn-action admin-control"
@@ -75,24 +75,32 @@ export default function DemoAccountPanel() {
               Force reset now
             </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          {/* Facts about the demo, not KPIs: one card, label over value. */}
+          <dl className="card admin-facts">
             <div>
-              <div style={metricLabelStyle}>Quotes since last reset</div>
-              <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{demoStatus.demo_quota_used}</div>
-              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>Each visitor's own session gets 1, independent of this total</div>
+              <dt>
+                Quotes since reset
+                <InfoTip>Total across all visitors. Each visitor's own session gets 1 quote, independent of this total.</InfoTip>
+              </dt>
+              <dd className="admin-facts__figure">{demoStatus.demo_quota_used}</dd>
             </div>
             <div>
-              <div style={metricLabelStyle}>Last reset</div>
-              <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{fmt(demoStatus.demo_last_reset_at)}</div>
+              <dt>Last reset</dt>
+              <dd title={fmt(demoStatus.demo_last_reset_at)}>{fmt(demoStatus.demo_last_reset_at)}</dd>
             </div>
             <div>
-              <div style={metricLabelStyle}>Idle-eligible for auto-reset</div>
-              <div style={{ fontSize: 14, lineHeight: '20px', color: demoStatus.idle_eligible_for_auto_reset ? 'var(--status-warning-text, var(--status-warning))' : 'var(--text-primary)' }}>
-                {demoStatus.idle_eligible_for_auto_reset ? 'Yes. The next 15-min check will reset it' : 'No'}
-              </div>
+              <dt>
+                Auto-reset
+                <InfoTip>An idle demo company is reset by the next 15-minute check.</InfoTip>
+              </dt>
+              <dd>
+                {demoStatus.idle_eligible_for_auto_reset
+                  ? <StatusChip tone="warning" label="Due at the next check" />
+                  : <StatusChip tone="neutral" label="Not idle" />}
+              </dd>
             </div>
-          </div>
-        </div>
+          </dl>
+        </section>
       )}
 
       {confirmReset && (

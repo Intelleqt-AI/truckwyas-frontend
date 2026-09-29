@@ -1,10 +1,13 @@
 import '@/pages/admin/admin-brand.css';
+import { formatMoney } from '@/lib/formatters';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData, deleteData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import RowActions from '@/components/ui/RowActions';
+import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 
 // Platform-wide cross-border pricing reference data — feeds the "Border
 // fees", "Weighbridge" and "Non-SA tolls" line items on every cross-tenant
@@ -15,7 +18,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 // Zimborders bridge toll). An edit here applies to every company's quotes
 // immediately, same reasoning as the Truck Types page.
 
-const cardStyle: React.CSSProperties = { padding: 24, marginBottom: 16 };
+const cardStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)', marginBottom: 16 };
 const sectionTitleStyle: React.CSSProperties = { fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 };
 const thStyle: React.CSSProperties = {
   textAlign: 'left', padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
@@ -25,12 +28,10 @@ const thStyle: React.CSSProperties = {
 const tdStyle: React.CSSProperties = {
   padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
-const secondaryBtnStyle: React.CSSProperties = {
-  padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer',
-};
 // Cells holding 40px controls trim their vertical padding so the row stays 48px.
 const controlTdStyle: React.CSSProperties = { ...tdStyle, paddingTop: 4, paddingBottom: 4 };
+// The one row action (RowActions) stays pinned right, so wide tables never hide it.
+const actionTdStyle: React.CSSProperties = { ...controlTdStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' };
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500,
   fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', marginBottom: 6,
@@ -53,7 +54,7 @@ interface TransitRate {
 const feeForm0 = { from_country: '', to_country: '', fee_zar: '', notes: '', is_active: true };
 const rateForm0 = { country_code: '', country_name: '', weighbridge_fee_zar: '', toll_rate_per_km: '', sa_border_distance_km: '', is_active: true };
 
-const fmtRand = (v: any) => (v || v === 0) ? `R${parseFloat(v).toFixed(2)}` : '—';
+const fmtRand = (v: any) => (v || v === 0) ? formatMoney(parseFloat(v)) : 'Not set';
 
 export default function CrossBorderRatesPanel() {
   const qc = useQueryClient();
@@ -254,7 +255,7 @@ export default function CrossBorderRatesPanel() {
 
         {showAddFee && (
           <div style={{ padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-            {feeErr && <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px' }}>{feeErr}</div>}
+            {feeErr && <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px' }}>{feeErr}</div>}
             <div><label style={labelStyle}>From country</label><input style={inputStyle} value={feeForm.from_country} onChange={e => setFeeForm(p => ({ ...p, from_country: e.target.value.toUpperCase() }))} placeholder="SA" /></div>
             <div><label style={labelStyle}>To country</label><input style={inputStyle} value={feeForm.to_country} onChange={e => setFeeForm(p => ({ ...p, to_country: e.target.value.toUpperCase() }))} placeholder="ZW" /></div>
             <div><label style={labelStyle}>Fee (R)</label><input type="number" style={inputStyle} value={feeForm.fee_zar} onChange={e => setFeeForm(p => ({ ...p, fee_zar: e.target.value }))} /></div>
@@ -266,7 +267,7 @@ export default function CrossBorderRatesPanel() {
         {feesLoading ? <Loader size={24} /> : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={thStyle}>From</th><th style={thStyle}>To</th><th className="num" style={thStyle}>Fee</th><th style={thStyle}>Notes</th><th style={thStyle}>Status</th><th style={{ ...thStyle, textAlign: 'right' }}>Actions</th></tr></thead>
+              <thead><tr><th style={thStyle}>From</th><th style={thStyle}>To</th><th className="num" style={thStyle}>Fee</th><th style={thStyle}>Notes</th><th style={thStyle}>Status</th><th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>
                 {fees.map(f => (
                   <tr key={f.id} style={{ opacity: f.is_active ? 1 : 0.55 }}>
@@ -274,13 +275,16 @@ export default function CrossBorderRatesPanel() {
                     <td style={tdStyle}>{f.to_country}</td>
                     <td className="num" style={tdStyle}>{fmtRand(f.fee_zar)}</td>
                     <td style={{ ...tdStyle, fontSize: 13, color: 'var(--text-tertiary)', maxWidth: 320 }}>{f.notes || '—'}</td>
-                    <td style={tdStyle}><span className={`status-badge ${f.is_active ? 'active' : 'delayed'}`}>{f.is_active ? 'Active' : 'Inactive'}</span></td>
-                    <td style={controlTdStyle}>
-                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                        <button className="admin-control" style={secondaryBtnStyle} disabled={feePending === f.id} onClick={() => openEditFee(f)}>Edit</button>
-                        <button className="admin-control" style={secondaryBtnStyle} disabled={feePending === f.id} onClick={() => toggleFeeActive(f)}>{f.is_active ? 'Deactivate' : 'Activate'}</button>
-                        <button className="admin-control" style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }} disabled={feePending === f.id} onClick={() => setDeleteFee(f)}>Delete</button>
-                      </div>
+                    <td style={tdStyle}><StatusChip status={f.is_active ? 'ACTIVE' : 'INACTIVE'} size="sm" /></td>
+                    <td style={actionTdStyle}>
+                      <RowActions
+                        label={`${f.from_country} to ${f.to_country}`}
+                        items={[
+                          { label: 'Edit', onSelect: () => openEditFee(f), disabled: feePending === f.id },
+                          { label: f.is_active ? 'Deactivate' : 'Activate', onSelect: () => toggleFeeActive(f), disabled: feePending === f.id },
+                          { label: 'Delete', danger: true, onSelect: () => setDeleteFee(f), disabled: feePending === f.id },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -304,7 +308,7 @@ export default function CrossBorderRatesPanel() {
 
         {showAddRate && (
           <div style={{ padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-            {rateErr && <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px' }}>{rateErr}</div>}
+            {rateErr && <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px' }}>{rateErr}</div>}
             <div><label style={labelStyle}>Country code</label><input style={inputStyle} value={rateForm.country_code} onChange={e => setRateForm(p => ({ ...p, country_code: e.target.value.toUpperCase() }))} placeholder="ZW" /></div>
             <div><label style={labelStyle}>Country name</label><input style={inputStyle} value={rateForm.country_name} onChange={e => setRateForm(p => ({ ...p, country_name: e.target.value }))} placeholder="Zimbabwe" /></div>
             <div><label style={labelStyle}>Weighbridge (R)</label><input type="number" style={inputStyle} value={rateForm.weighbridge_fee_zar} onChange={e => setRateForm(p => ({ ...p, weighbridge_fee_zar: e.target.value }))} /></div>
@@ -317,21 +321,24 @@ export default function CrossBorderRatesPanel() {
         {ratesLoading ? <Loader size={24} /> : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={thStyle}>Country</th><th className="num" style={thStyle}>Weighbridge</th><th className="num" style={thStyle}>Toll/km</th><th className="num" style={thStyle}>Border distance</th><th style={thStyle}>Status</th><th style={{ ...thStyle, textAlign: 'right' }}>Actions</th></tr></thead>
+              <thead><tr><th style={thStyle}>Country</th><th className="num" style={thStyle}>Weighbridge</th><th className="num" style={thStyle}>Toll/km</th><th className="num" style={thStyle}>Border distance</th><th style={thStyle}>Status</th><th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>
                 {rates.map(r => (
                   <tr key={r.id} style={{ opacity: r.is_active ? 1 : 0.55 }}>
-                    <td style={tdStyle}>{r.country_name} <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>({r.country_code})</span></td>
+                    <td style={tdStyle}>{r.country_name} <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>({r.country_code})</span></td>
                     <td className="num" style={tdStyle}>{fmtRand(r.weighbridge_fee_zar)}</td>
                     <td className="num" style={tdStyle}>{fmtRand(r.toll_rate_per_km)}/km</td>
                     <td className="num" style={tdStyle}>{r.sa_border_distance_km}km</td>
-                    <td style={tdStyle}><span className={`status-badge ${r.is_active ? 'active' : 'delayed'}`}>{r.is_active ? 'Active' : 'Inactive'}</span></td>
-                    <td style={controlTdStyle}>
-                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                        <button className="admin-control" style={secondaryBtnStyle} disabled={ratePending === r.id} onClick={() => openEditRate(r)}>Edit</button>
-                        <button className="admin-control" style={secondaryBtnStyle} disabled={ratePending === r.id} onClick={() => toggleRateActive(r)}>{r.is_active ? 'Deactivate' : 'Activate'}</button>
-                        <button className="admin-control" style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }} disabled={ratePending === r.id} onClick={() => setDeleteRate(r)}>Delete</button>
-                      </div>
+                    <td style={tdStyle}><StatusChip status={r.is_active ? 'ACTIVE' : 'INACTIVE'} size="sm" /></td>
+                    <td style={actionTdStyle}>
+                      <RowActions
+                        label={r.country_name}
+                        items={[
+                          { label: 'Edit', onSelect: () => openEditRate(r), disabled: ratePending === r.id },
+                          { label: r.is_active ? 'Deactivate' : 'Activate', onSelect: () => toggleRateActive(r), disabled: ratePending === r.id },
+                          { label: 'Delete', danger: true, onSelect: () => setDeleteRate(r), disabled: ratePending === r.id },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -350,11 +357,11 @@ export default function CrossBorderRatesPanel() {
               <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit {editFee.from_country} → {editFee.to_country} fee</h2>
               <button className="admin-control admin-tint-hover" aria-label="Close" onClick={() => setEditFee(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, width: 40, height: 40, borderRadius: 'var(--radius-control)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
-            {feeErr && <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>{feeErr}</div>}
+            {feeErr && <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>{feeErr}</div>}
             <div style={{ marginBottom: 16 }}><label style={labelStyle}>Fee (R)</label><input type="number" style={inputStyle} value={editFeeForm.fee_zar} onChange={e => setEditFeeForm(p => ({ ...p, fee_zar: e.target.value }))} /></div>
             <div style={{ marginBottom: 16 }}><label style={labelStyle}>Notes</label><input style={inputStyle} value={editFeeForm.notes} onChange={e => setEditFeeForm(p => ({ ...p, notes: e.target.value }))} /></div>
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button className="admin-control" disabled={feeSaving} onClick={handleEditFeeSave} style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control)', cursor: feeSaving ? 'wait' : 'pointer', fontWeight: 500 }}>{feeSaving ? 'Saving…' : 'Save changes'}</button>
+              <button className="admin-control" disabled={feeSaving} onClick={handleEditFeeSave} style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: 'var(--radius-control)', cursor: feeSaving ? 'wait' : 'pointer', fontWeight: 500 }}>{feeSaving ? 'Saving…' : 'Save changes'}</button>
               <button className="admin-control" onClick={() => setEditFee(null)} style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-control)', cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>
@@ -369,13 +376,13 @@ export default function CrossBorderRatesPanel() {
               <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit {editRate.country_name}</h2>
               <button className="admin-control admin-tint-hover" aria-label="Close" onClick={() => setEditRate(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, width: 40, height: 40, borderRadius: 'var(--radius-control)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
-            {rateErr && <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>{rateErr}</div>}
+            {rateErr && <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>{rateErr}</div>}
             <div style={{ marginBottom: 16 }}><label style={labelStyle}>Country name</label><input style={inputStyle} value={editRateForm.country_name} onChange={e => setEditRateForm(p => ({ ...p, country_name: e.target.value }))} /></div>
             <div style={{ marginBottom: 16 }}><label style={labelStyle}>Weighbridge (R)</label><input type="number" style={inputStyle} value={editRateForm.weighbridge_fee_zar} onChange={e => setEditRateForm(p => ({ ...p, weighbridge_fee_zar: e.target.value }))} /></div>
             <div style={{ marginBottom: 16 }}><label style={labelStyle}>Toll rate (R/km)</label><input type="number" style={inputStyle} value={editRateForm.toll_rate_per_km} onChange={e => setEditRateForm(p => ({ ...p, toll_rate_per_km: e.target.value }))} /></div>
             <div style={{ marginBottom: 16 }}><label style={labelStyle}>Border distance (km)</label><input type="number" style={inputStyle} value={editRateForm.sa_border_distance_km} onChange={e => setEditRateForm(p => ({ ...p, sa_border_distance_km: e.target.value }))} /></div>
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button className="admin-control" disabled={rateSaving} onClick={handleEditRateSave} style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control)', cursor: rateSaving ? 'wait' : 'pointer', fontWeight: 500 }}>{rateSaving ? 'Saving…' : 'Save changes'}</button>
+              <button className="admin-control" disabled={rateSaving} onClick={handleEditRateSave} style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: 'var(--radius-control)', cursor: rateSaving ? 'wait' : 'pointer', fontWeight: 500 }}>{rateSaving ? 'Saving…' : 'Save changes'}</button>
               <button className="admin-control" onClick={() => setEditRate(null)} style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-control)', cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>

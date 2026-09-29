@@ -1,4 +1,5 @@
 import '@/pages/admin/admin-brand.css';
+import { formatDateTime } from '@/lib/formatters';
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, deleteData } from '@/lib/Api';
@@ -6,6 +7,7 @@ import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import PaginationControls from '@/pages/admin/PaginationControls';
+import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 
 // Per-user drawer opened from UsersTable — merges three separate data
 // sources (UserActivityLog, AuditLog auth rows, UserSession) into one place
@@ -54,12 +56,12 @@ const tdStyle: React.CSSProperties = {
   padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 const secondaryBtnStyle: React.CSSProperties = {
-  padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--status-danger-text, var(--status-danger))',
+  padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--status-danger-text)',
   borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer',
 };
 
 const fmt = (dateStr?: string | null) =>
-  dateStr ? new Date(dateStr).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  dateStr ? formatDateTime(dateStr) : 'Never';
 
 interface ActivityRow {
   id: number; method: string; path: string; status_code: number; duration_ms: number;
@@ -170,7 +172,7 @@ export default function UserActivityDrawer({
                           <td style={tdStyle}>{r.method}</td>
                           <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 13 }}>{r.path}</td>
                           <td style={tdStyle}>
-                            <span style={{ color: r.status_code >= 400 ? 'var(--status-danger-text, var(--status-danger))' : 'var(--text-secondary)' }}>
+                            <span style={{ color: r.status_code >= 400 ? 'var(--status-danger-text)' : 'var(--text-secondary)' }}>
                               {r.status_code}
                             </span>
                           </td>
@@ -248,7 +250,7 @@ export default function UserActivityDrawer({
                         <tr key={r.id}>
                           <td style={tdStyle}>{fmt(r.created_at)}</td>
                           <td style={tdStyle}>
-                            <span className={`status-badge ${r.action === 'LOGIN' ? 'active' : 'delayed'}`}>{r.event}</span>
+                            <StatusChip tone={r.action === 'LOGIN' ? 'success' : /FAIL/i.test(String(r.action)) ? 'danger' : 'neutral'} label={r.event} size="sm" />
                           </td>
                           <td style={tdStyle}>{r.device}</td>
                           <td style={tdStyle}>{r.ip}</td>

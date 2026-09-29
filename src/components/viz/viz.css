@@ -1,60 +1,49 @@
-/* TruckWys chart system (src/components/viz). One set of roles, selected per
-   mode and validated with the dataviz six-checks validator against the card
-   surfaces (#FFFFFF light, #101215 dark). Dark is the app default; light is
-   stamped with [data-theme="light"]. Marks wear these roles; text never does.
+/* TruckWys chart colour grammar: one rule for every chart in the product.
 
-   Categorical (2 slots, adjacent + all pairs PASS both modes):
-     accent  light #2563EB  dark #3B82F6   the series the panel is about / money in / above zero
-     warm    light #C2410C  dark #D4541A   the opposite pole / money out / below zero
-   De-emphasis (comparison series, not a hue):  light #9CA3AF  dark #5B626B
-   Ordinal ramp for lateness (validated --ordinal, later = stronger):
-     light #7DB3F8 #4F8FF4 #2563EB #1E40AF #172554
-     dark  #1E40AF #2563EB #3B82F6 #60A5FA #93C5FD */
+     money in / revenue / a profit     accent   --chart-series-1 (solid)
+     costs, comparison, context        neutral  --chart-muted, hatched with --chart-hatch
+     a loss (negative result only)     red      --status-danger
+     lateness / age                    neutral ramp; only the oldest band is accent
+
+   Orange is not a chart colour. Red never means "a cost" or "below average".
+   Every mark is >= 3:1 on the card in both themes; text never wears a chart colour.
+   Roles are read from the theme tokens (src/styles/theme.css), so light and dark
+   are designed there once; the same roles mean the same thing in both themes. */
 
 .viz {
-  --viz-accent: #3B82F6;
-  --viz-warm: #D4541A;
-  --viz-neutral: #5B626B;
-  --viz-neutral-strong: #8A8F98;
-  --viz-grid: #1E2126;
-  --viz-axis: #3A3F46;
-  --viz-zero: #9AA1A9;
-  --viz-track: #1E2227;
-  --viz-surface: var(--bg-surface, #101215);
-  --viz-wash-warm: rgba(212, 84, 26, 0.14);
-  --viz-wash-accent: rgba(59, 130, 246, 0.12);
-  --viz-ord-1: #1E40AF;
-  --viz-ord-2: #2563EB;
-  --viz-ord-3: #3B82F6;
-  --viz-ord-4: #60A5FA;
-  --viz-ord-5: #93C5FD;
-  --viz-ink-on-ord-low: #FFFFFF;
-  --viz-ink-on-ord-high: #0B1220;
+  --viz-accent: var(--chart-series-1, var(--accent-primary));
+  --viz-loss: var(--status-danger);
+  --viz-warm: var(--viz-loss);
+  --viz-neutral: var(--chart-muted);
+  --viz-neutral-strong: var(--text-tertiary);
+  --viz-hatch: var(--chart-hatch);
+  --viz-hatch-fill: var(--chart-bar);
+  --viz-hover-band: var(--chart-hover-band);
+  --viz-grid: var(--chart-grid);
+  --viz-axis: var(--chart-axis);
+  --viz-zero: var(--text-tertiary);
+  --viz-track: var(--bg-raised);
+  --viz-surface: var(--bg-surface);
+  --viz-wash-warm: color-mix(in srgb, var(--status-danger) 10%, transparent);
+  --viz-wash-accent: var(--accent-dim);
+  /* Lateness ramp (R5, calmer): every band but the oldest is a neutral grey,
+     stepping from the muted chart grey to the stronger tertiary grey as it ages;
+     only the oldest band wears the accent. No blue-on-blue two-tone. Both ends
+     are >= 3:1 on the card in both themes, so every step between is too. */
+  --viz-ord-1: var(--chart-muted);
+  --viz-ord-2: color-mix(in srgb, var(--viz-neutral-strong) 33%, var(--chart-muted));
+  --viz-ord-3: color-mix(in srgb, var(--viz-neutral-strong) 66%, var(--chart-muted));
+  --viz-ord-4: var(--viz-neutral-strong);
+  --viz-ord-5: var(--viz-accent);
+  /* Calm lateness strip (R7, Fast Pay): two neutral steps of clearly different
+     lightness (the chart grey, then the ink), both >= 3:1 on the card. */
+  --viz-calm-light: var(--chart-muted);
+  --viz-calm-dark: var(--text-primary);
 
   position: relative;
   min-width: 0;
   font: 400 13px/20px var(--font-sans);
   color: var(--text-secondary);
-}
-[data-theme="light"] .viz {
-  --viz-accent: #2563EB;
-  --viz-warm: #C2410C;
-  --viz-neutral: #9CA3AF;
-  --viz-neutral-strong: #6B7280;
-  --viz-grid: #EEF0F3;
-  --viz-axis: #D1D5DB;
-  --viz-zero: #6B7280;
-  --viz-track: #EEF0F3;
-  --viz-surface: var(--bg-surface, #FFFFFF);
-  --viz-wash-warm: rgba(194, 65, 12, 0.08);
-  --viz-wash-accent: rgba(37, 99, 235, 0.08);
-  --viz-ord-1: #7DB3F8;
-  --viz-ord-2: #4F8FF4;
-  --viz-ord-3: #2563EB;
-  --viz-ord-4: #1E40AF;
-  --viz-ord-5: #172554;
-  --viz-ink-on-ord-low: #0B1220;
-  --viz-ink-on-ord-high: #FFFFFF;
 }
 
 .viz svg { display: block; overflow: visible; }
@@ -66,6 +55,9 @@
 .viz .viz-zero { stroke: var(--viz-zero); stroke-width: 1.5; shape-rendering: crispEdges; }
 .viz .viz-hit { fill: transparent; cursor: default; outline: none; }
 .viz .viz-hit:focus-visible { stroke: var(--accent-primary); stroke-width: 2; }
+.viz .viz-connector { stroke: var(--viz-axis); stroke-width: 1; shape-rendering: crispEdges; }
+.viz .viz-hover-band { fill: var(--viz-hover-band); pointer-events: none; }
+.viz text.viz-on-mark { fill: var(--on-accent); font-weight: 600; }
 .viz .viz-cross { stroke: var(--text-tertiary); stroke-width: 1; shape-rendering: crispEdges; pointer-events: none; }
 
 /* Legend: mirrors the mark (rect for bars, line for lines, ring for hollow). */
@@ -76,6 +68,7 @@
 .viz-key--line { width: 14px; height: 2px; border-radius: 1px; }
 .viz-key--dot { width: 8px; height: 8px; border-radius: 50%; }
 .viz-key--ring { width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid var(--viz-neutral-strong); }
+.viz-key--hatch { width: 12px; height: 12px; border-radius: 2px; background: repeating-linear-gradient(45deg, var(--viz-hatch) 0 1.5px, var(--viz-hatch-fill) 1.5px 4px); box-shadow: inset 0 0 0 1px var(--viz-hatch); }
 .viz-key--wash { width: 12px; height: 12px; border-radius: 2px; background: var(--viz-wash-warm); }
 
 /* Tooltip: value leads, label follows. Never the only route to a value. */
@@ -83,8 +76,8 @@
   position: absolute; z-index: 5; pointer-events: none;
   min-width: 140px; max-width: 260px;
   padding: 8px 12px; border-radius: 8px;
-  background: var(--bg-surface); border: 1px solid var(--border-subtle);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  background: var(--bg-overlay, var(--bg-surface)); border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-pop);
   font: 400 13px/20px var(--font-sans); color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
@@ -98,11 +91,19 @@
 .viz-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; flex-wrap: wrap; }
 .viz-foot__note { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
 .viz-table-toggle {
-  min-height: 32px; padding: 0; border: 0; background: none; cursor: pointer;
-  font: 500 13px/20px var(--font-sans); color: var(--accent-primary);
+  position: relative; min-height: 0; padding: 0; border: 0; background: none; cursor: pointer;
+  font: 500 13px/20px var(--font-sans); color: var(--link, var(--accent-primary));
 }
 .viz-table-toggle:hover { text-decoration: underline; }
-.viz-table-toggle:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
+/* A secondary foot action sits in quiet ink, so a chart foot has one blue link. */
+.viz-table-toggle--quiet { color: var(--text-secondary); }
+.viz-table-toggle--quiet:hover { color: var(--text-primary); }
+/* The ring hugs the text (about 90x24); the touch target comes from ::after, not the box. */
+.viz-table-toggle:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 6px; }
+@media (pointer: coarse) {
+  .viz .viz-table-toggle, .viz-foot .viz-table-toggle { min-height: 0 !important; min-width: 0 !important; }
+  .viz-table-toggle::after { content: ''; position: absolute; inset: -12px -8px; }
+}
 .viz-table-wrap { margin-top: 8px; overflow-x: auto; }
 .viz-table { width: 100%; border-collapse: collapse; font: 400 13px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); }
 .viz-table caption { text-align: left; color: var(--text-secondary); padding-bottom: 4px; }
@@ -119,14 +120,24 @@
 .viz-spark__axis { display: flex; justify-content: space-between; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); margin-top: 4px; }
 
 /* ---- Ageing strip ---- */
-.viz-strip { display: flex; gap: 2px; height: 28px; border-radius: 6px; overflow: hidden; }
+/* Thin (8px): a part-to-whole bar is context, never the loudest mark on a page. */
+.viz-strip { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; }
 .viz-strip--thin { height: 8px; border-radius: 4px; }
+/* Calm strip (R6, Fast Pay): 6px, neutral ramp only, so it never becomes a
+   coloured slab; the accent is only a small tick where the oldest band starts. */
+.viz-strip--calm { height: 6px; border-radius: 3px; overflow: visible; }
+.viz-strip--calm .viz-strip__seg:first-child { border-radius: 3px 0 0 3px; }
+.viz-strip--calm .viz-strip__seg:last-child { border-radius: 0 3px 3px 0; }
+.viz-strip--calm .viz-strip__seg:only-child { border-radius: 3px; }
+/* The oldest band: a small accent tick where it starts (not a fill), and its
+   label name in the primary ink. */
+.viz-strip__seg.is-marked::before { content: ''; position: absolute; left: -2px; top: -3px; bottom: -3px; width: 2px; border-radius: 1px; background: var(--viz-accent); }
+.viz-strip-label.is-marked .viz-strip-label__name { color: var(--text-primary); font-weight: 500; }
 .viz-strip__seg { position: relative; min-width: 2px; display: flex; align-items: center; justify-content: center; font: 600 12px/16px var(--font-sans); font-variant-numeric: tabular-nums; outline: none; }
-.viz-strip__seg:focus-visible { box-shadow: inset 0 0 0 2px var(--text-primary); }
-.viz-strip__seg:hover { filter: brightness(1.12); }
+.viz-strip__seg:hover { box-shadow: inset 0 0 0 2px var(--viz-surface); }
 .viz-strip-labels { display: grid; gap: 8px 16px; margin-top: 12px; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
 .viz-strip-label { display: flex; flex-direction: column; min-width: 0; }
-.viz-strip-label__name { display: flex; align-items: baseline; gap: 6px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.viz-strip-label__name { display: flex; align-items: baseline; gap: 6px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); white-space: nowrap; }
 .viz-strip-label__name .viz-key { transform: translateY(1px); }
 .viz-strip-label__value { font: 600 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .viz-strip-label__meta { font: 400 12px/16px var(--font-sans); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
@@ -139,7 +150,11 @@
 .viz-funnel__sub { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-secondary); }
 .viz-funnel__track { position: relative; height: 24px; display: flex; align-items: center; outline: none; }
 .viz-funnel__track:focus-visible { box-shadow: 0 0 0 2px var(--accent-primary); border-radius: 4px; }
-.viz-funnel__bar { position: absolute; top: 6px; bottom: 6px; left: 0; border-radius: 0 4px 4px 0; background: var(--viz-accent); min-width: 2px; }
+.viz-funnel__bar { position: absolute; top: 6px; bottom: 6px; left: 0; border-radius: 0 4px 4px 0; background: var(--viz-neutral); min-width: 2px; }
+/* One emphasis per funnel: the outcome stage wears the accent, the stages before it are neutral. */
+.viz-funnel__bar.is-emphasis { background: var(--viz-accent); }
+/* Drop-off: the part of the stage before that did not reach this one, as a dashed ghost. */
+.viz-funnel__lost { position: absolute; top: 6px; bottom: 6px; box-sizing: border-box; border: 1px dashed var(--viz-neutral-strong); border-left: 0; border-radius: 0 4px 4px 0; }
 .viz-funnel__bar.is-zero { background: transparent; border-left: 2px solid var(--viz-axis); border-radius: 0; }
 .viz-funnel__value { text-align: right; font: 600 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .viz-funnel__rate { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-secondary); }
@@ -159,3 +174,11 @@
 }
 /* Label halo: a surface-coloured stroke behind text that crosses marks or rules. */
 .viz text.viz-halo { paint-order: stroke; stroke: var(--viz-surface); stroke-width: 4px; stroke-linejoin: round; }
+/* A chart that takes focus as one stop (arrow keys walk its points) shows the standard ring. */
+.viz svg.viz-focusable { outline: none; border-radius: 4px; }
+.viz svg.viz-focusable:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 4px; }
+
+/* Lane scatter on phones: numbered points keyed to full lane names. */
+.viz-lane-key { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.viz-lane-key li { display: flex; gap: 8px; min-width: 0; }
+.viz-lane-key__n { flex: none; min-width: 12px; font-weight: 600; color: var(--text-primary); }

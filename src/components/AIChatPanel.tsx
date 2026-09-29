@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { MessageCircle, X, Mic, Square, Send } from "lucide-react";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import "./ai-chat-panel.css";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -17,6 +19,12 @@ interface AIChatPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSend: (text: string, detectedLanguage?: string | null) => void;
+  /**
+   * Position only. When passed (even as null while the host's slot mounts),
+   * the launcher renders inside that element as an ordinary icon button
+   * instead of floating bottom-right. Omit it to keep the floating launcher.
+   */
+  launcherSlot?: HTMLElement | null;
 }
 
 /**
@@ -27,7 +35,8 @@ interface AIChatPanelProps {
  */
 const TRANSITION_MS = 180;
 
-export function AIChatPanel({ messages, busy, open, onOpenChange, onSend }: AIChatPanelProps) {
+export function AIChatPanel({ messages, busy, open, onOpenChange, onSend, launcherSlot }: AIChatPanelProps) {
+  const inlineLauncher = launcherSlot !== undefined;
   const [text, setText] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const hasUnread = !open && messages.length > 0 && messages[messages.length - 1].role === "assistant";
@@ -62,12 +71,39 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend }: AICh
     setText("");
   };
 
+  const launcher = (
+    <button
+      type="button"
+      onClick={() => onOpenChange(!open)}
+      title="AI assistant"
+      aria-label="AI assistant"
+      aria-expanded={open}
+      className={inlineLauncher ? "ai-launcher ai-launcher--inline" : "ai-launcher"}
+    >
+      <span style={{ position: "relative", width: 20, height: 20, display: "inline-block" }}>
+        <MessageCircle size={20} style={{
+          position: "absolute", inset: 0,
+          opacity: open ? 0 : 1, transform: open ? "rotate(-45deg) scale(0.6)" : "rotate(0deg) scale(1)",
+          transition: `opacity ${TRANSITION_MS}ms ease, transform ${TRANSITION_MS}ms ease`,
+        }} />
+        <X size={20} style={{
+          position: "absolute", inset: 0,
+          opacity: open ? 1 : 0, transform: open ? "rotate(0deg) scale(1)" : "rotate(45deg) scale(0.6)",
+          transition: `opacity ${TRANSITION_MS}ms ease, transform ${TRANSITION_MS}ms ease`,
+        }} />
+      </span>
+      {hasUnread && (
+        <span style={{ position: "absolute", top: 4, right: 4, width: 10, height: 10, borderRadius: "50%", background: "var(--status-danger)", border: "2px solid var(--bg-surface)" }} />
+      )}
+    </button>
+  );
+
   return (
     <>
       {mounted && (
         <div
+          className="ai-chat-panel"
           style={{
-            position: "fixed", bottom: 92, right: 24, width: 360, maxHeight: "70vh", zIndex: 60,
             display: "flex", flexDirection: "column",
             background: "var(--bg-surface)", border: "1px solid var(--border-subtle)",
             borderRadius: "var(--radius-card)", overflow: "hidden",
@@ -160,35 +196,7 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend }: AICh
         </div>
       )}
 
-      <button
-        onClick={() => onOpenChange(!open)}
-        title="AI assistant"
-        aria-label="AI assistant"
-        style={{
-          position: "fixed", bottom: 24, right: 24, width: 52, height: 52, borderRadius: "50%",
-          border: "none", background: "var(--accent-primary)", color: "var(--btn-action-color)",
-          display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-          boxShadow: "var(--shadow-card-hover, var(--shadow-card))", zIndex: 60,
-          transition: `transform ${TRANSITION_MS}ms ease`,
-          transform: open ? "scale(1.05)" : "scale(1)",
-        }}
-      >
-        <span style={{ position: "relative", width: 22, height: 22, display: "inline-block" }}>
-          <MessageCircle size={22} style={{
-            position: "absolute", inset: 0,
-            opacity: open ? 0 : 1, transform: open ? "rotate(-45deg) scale(0.6)" : "rotate(0deg) scale(1)",
-            transition: `opacity ${TRANSITION_MS}ms ease, transform ${TRANSITION_MS}ms ease`,
-          }} />
-          <X size={22} style={{
-            position: "absolute", inset: 0,
-            opacity: open ? 1 : 0, transform: open ? "rotate(0deg) scale(1)" : "rotate(45deg) scale(0.6)",
-            transition: `opacity ${TRANSITION_MS}ms ease, transform ${TRANSITION_MS}ms ease`,
-          }} />
-        </span>
-        {hasUnread && (
-          <span style={{ position: "absolute", top: 4, right: 4, width: 10, height: 10, borderRadius: "50%", background: "var(--status-danger)", border: "2px solid var(--bg-surface)" }} />
-        )}
-      </button>
+      {!inlineLauncher ? launcher : launcherSlot ? createPortal(launcher, launcherSlot) : null}
     </>
   );
 }

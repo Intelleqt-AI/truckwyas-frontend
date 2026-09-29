@@ -8,17 +8,20 @@ import {
   ResponsiveContainer, Cell, ReferenceLine,
 } from "recharts";
 import { fetchData } from "@/lib/Api";
-import { formatCurrency, formatDate } from "@/lib/formatters";
-import { Loader } from "@/components/Loader";
+import { formatCurrency, formatDate, formatDays, formatPercent } from "@/lib/formatters";
+import LoadError, { loadFailed } from "@/components/data/LoadError";
+import { KpiRow, KpiStats, KpiTile } from "@/components/ui/KpiTile";
+import { InfoTip } from "@/components/ui/InfoTip";
+import SectionHeader from "@/components/layout/SectionHeader";
+import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
 
-const BAND_TONE: Record<string, string> = {
+const BAND_TONE: Record<string, StatusTone> = {
   LOW: "success",
   MEDIUM: "warning",
   HIGH: "danger",
   CRITICAL: "danger",
   NEW: "neutral",
 };
-const chip = (tone?: string) => `fin-chip${tone && tone !== "neutral" ? ` fin-chip--${tone}` : ""}`;
 const fmtStatus = (s?: string) =>
   s ? s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()) : "—";
 const safeDate = (d?: string | null) => {
@@ -53,27 +56,46 @@ interface RiskRow {
 
 export default function CustomerRisk() {
   const { id } = useParams();
+  const backTo = id ? `/customers/${id}` : "/customers";
   const navigate = useNavigate();
 
-  const { data, isLoading, error } = useQuery({
+  const riskQuery = useQuery({
     queryKey: ["customer-risk", id],
     queryFn: () => fetchData(`api/v1/customers/${id}/risk-profile/`),
     retry: 1,
   });
+  const { data, isLoading, error } = riskQuery;
+  const riskFailed = loadFailed(riskQuery);
+  const riskError = (riskQuery.error ?? riskQuery.failureReason) as { status?: number } | null;
 
   useEffect(() => {
     document.title = "Payment risk profile - TruckWys";
   }, []);
 
-  if (isLoading) {
-    return <Loader fullScreen />;
+  // A failed request is not a missing profile: only a 404 says "not found".
+  if (riskFailed && riskError?.status !== 404) {
+    return (
+      <div className="fin-page">
+        <LoadError what="this risk profile" error={riskError} busy={riskQuery.isFetching} onRetry={() => riskQuery.refetch()} />
+      </div>
+    );
+  }
+
+  // Loading: back link and head placeholder at once; only the content waits.
+  if (isLoading && !riskFailed) {
+    return (
+      <div className="fin-page" aria-busy="true" aria-label="Loading risk profile">
+        <SectionHeader title="Payment risk profile" back={{ to: backTo, label: 'Customer' }} />
+        <div key="skel" className="fin-skel fin-skel--card" aria-hidden="true" style={{ marginTop: 0 }} />
+      </div>
+    );
   }
 
   if (error || !data) {
     return (
       <div className="fin-page">
         <div className="card fin-empty">
-          <h1 className="fin-empty__title" style={{ fontSize: 22, lineHeight: "28px" }}>Risk profile not found</h1>
+          <h1 className="fin-empty__title">Risk profile not found</h1>
           <p className="fin-empty__body">We couldn’t load this customer’s risk profile.</p>
           <button className="btn-action" onClick={() => navigate("/capital")}>Back to Capital</button>
         </div>
@@ -105,30 +127,37 @@ export default function CustomerRisk() {
   const lateCount: number = stats.late_count ?? beyond30;
   const name = data.customer_name;
 
-  const kpis = [
+  // Standard tiles; a tile with nothing to show is left out, never a dash.
+  const kpis: { label: string; value: string; sub: string; show: boolean }[] = [
     {
       label: "Late-payment risk",
-      value: `${data.risk_pct}%`,
+      value: formatPercent(data.risk_pct, Number.isInteger(Number(data.risk_pct)) ? 0 : 1),
       sub: data.insufficient_history
         ? `Fewer than 3 invoices, so this is a starting estimate`
         : `${lateCount} of ${invoiceCount} invoices more than 30 days late`,
+      show: true,
     },
     {
       label: "Average time to pay",
-      value: stats.avg_days_to_pay != null ? `${stats.avg_days_to_pay} days` : "—",
+      value: stats.avg_days_to_pay != null ? formatDays(stats.avg_days_to_pay) : "—",
       sub: paidCount > 0 ? `Issue to payment, across ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}` : "No paid invoices yet",
+      show: stats.avg_days_to_pay != null,
     },
     {
       label: "Paid by the due date",
-      value: stats.on_time_pct != null ? `${stats.on_time_pct}%` : "—",
+      value: stats.on_time_pct != null ? formatPercent(stats.on_time_pct, Number.isInteger(Number(stats.on_time_pct)) ? 0 : 1) : "—",
       sub: paidCount > 0 ? `Of ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}` : "No paid invoices yet",
+      show: stats.on_time_pct != null,
     },
     {
       label: "Owed more than 30 days late",
       value: (stats.overdue_30_total || 0) > 0 ? formatCurrency(stats.overdue_30_total) : "Nothing",
       sub: stats.outstanding_total != null ? `Of ${formatCurrency(stats.outstanding_total)} unpaid, incl. VAT` : "Unpaid balance, incl. VAT",
+      show: (stats.overdue_30_total || 0) > 0,
     },
   ];
+
+  const shownKpis = kpis.filter((k) => k.show);
 
   const legend = [
     { label: "Paid or open, up to 30 days late (normal)", color: "var(--text-tertiary)" },
@@ -137,36 +166,38 @@ export default function CustomerRisk() {
 
   return (
     <div className="fin-page">
-      <button type="button" onClick={() => navigate(-1)} className="fin-back">
-        <span aria-hidden="true">←</span> Back
-      </button>
-      <header className="fin-detail-head">
-        <div style={{ minWidth: 0 }}>
-          <div className="fin-detail-head__eyebrow">Payment risk profile</div>
-          <div className="fin-detail-head__title-row">
-            <h1>{name}</h1>
-            <span
-              className={chip(bandTone)}
-              title={data.insufficient_history ? "Fewer than 3 invoices: not enough history" : `Risk band: ${fmtStatus(data.band)}`}>
-              {bandLabel}
-            </span>
-          </div>
-          <p className="fin-detail-head__sub" style={{ maxWidth: "72ch" }}>
-            Scored only from how this customer pays: up to 30 days late is treated as normal; later payments and money still owed beyond 30 days raise the risk.
-            {data.blocked && " At this level their invoices can't be advanced."}
-          </p>
-        </div>
-      </header>
+      <SectionHeader
+        title={name}
+        titleAdornment={
+          <StatusChip
+            tone={bandTone}
+            label={bandLabel}
+            title={data.insufficient_history ? "Fewer than 3 invoices: not enough history" : `Risk band: ${fmtStatus(data.band)}`}
+          />
+        }
+        back={{ to: backTo, label: "Customer" }}
+        description={<>Payment risk profile{data.blocked && ", invoices can't be advanced"}</>}
+      />
 
-      <div className="fin-kpis">
-        {kpis.map((k) => (
-          <div key={k.label} className="card fin-kpi">
-            <span className="fin-kpi__label">{k.label}</span>
-            <span className="fin-kpi__value">{k.value}</span>
-            <span className="fin-kpi__sub">{k.sub}</span>
-          </div>
-        ))}
-      </div>
+      <div key="stack" className="fin-stack fin-stack--16 risk-stack">
+      {/* One or two figures: a stats line in one card; three or four: tiles. */}
+      {shownKpis.length <= 2 ? (
+        <KpiStats
+          aria-label="Risk figures"
+          items={shownKpis.map((k, i) => ({
+            label: k.label,
+            aside: i === 0 ? <InfoTip>{"Scored only from how this customer pays: up to 30 days late is treated as normal; later payments and money still owed beyond 30 days raise the risk."}</InfoTip> : undefined,
+            figure: k.value,
+            note: <span title={k.sub}>{k.sub}</span>,
+          }))}
+        />
+      ) : (
+        <KpiRow className="fin-kpi-row">
+          {shownKpis.map((k, i) => (
+            <KpiTile key={k.label} label={k.label} aside={i === 0 ? <InfoTip>{"Scored only from how this customer pays: up to 30 days late is treated as normal; later payments and money still owed beyond 30 days raise the risk."}</InfoTip> : undefined} figure={k.value} note={<span title={k.sub}>{k.sub}</span>} />
+          ))}
+        </KpiRow>
+      )}
 
       {data.ai_summary && (
         <section className="card fin-section" aria-labelledby="summary-title">
@@ -185,10 +216,11 @@ export default function CustomerRisk() {
       <section className="card fin-section" aria-labelledby="lateness-title">
         <div className="fin-panel-head">
           <div className="fin-panel-head__text">
-            <h2 id="lateness-title" className="fin-panel-title">How late does {name} pay?</h2>
-            <p className="fin-panel-desc">
-              Days past the due date for each invoice, oldest first by issue date. Settled invoices show when they were paid; open ones show days late so far.
-            </p>
+            <h2 id="lateness-title" className="fin-panel-title fin-panel-title--tip">
+              How late they pay
+              <InfoTip align="end">Days past the due date for each invoice, oldest first by issue date. Settled invoices show when they were paid; open ones show days late so far.</InfoTip>
+            </h2>
+            <p className="fin-panel-desc">Days past due, per invoice</p>
           </div>
         </div>
         <div className="fin-legend-inline" style={{ marginBottom: 12 }}>
@@ -250,9 +282,12 @@ export default function CustomerRisk() {
       <section className="card fin-table-card" aria-labelledby="behaviour-title">
         <div className="fin-panel-head">
           <div className="fin-panel-head__text">
-            <h2 id="behaviour-title" className="fin-panel-title">Which invoices drive the score?</h2>
+            <h2 id="behaviour-title" className="fin-panel-title fin-panel-title--tip">
+              Invoices behind the score
+              <InfoTip align="end">Drafts and cancelled invoices are left out.</InfoTip>
+            </h2>
             <p className="fin-panel-desc">
-              {rows.length} {rows.length === 1 ? "invoice" : "invoices"} considered, newest first. Drafts and cancelled invoices are left out.
+              {rows.length} {rows.length === 1 ? "invoice" : "invoices"}, newest first
             </p>
           </div>
         </div>
@@ -285,9 +320,7 @@ export default function CustomerRisk() {
                       {r.days_late === null ? "—" : r.days_late > 0 ? `+${r.days_late}` : r.days_late}
                     </td>
                     <td>
-                      <span className={chip(r.status === "PAID" ? "success" : r.days_late !== null && r.days_late > 30 ? "danger" : "neutral")}>
-                        {fmtStatus(r.status)}
-                      </span>
+                      <StatusChip size="sm" tone={r.status === "PAID" ? "success" : r.days_late !== null && r.days_late > 30 ? "danger" : "neutral"} label={fmtStatus(r.status)} />
                     </td>
                     <td className="num">{formatCurrency(r.amount)}</td>
                   </tr>
@@ -297,6 +330,7 @@ export default function CustomerRisk() {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

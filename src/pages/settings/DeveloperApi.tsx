@@ -1,4 +1,7 @@
+import { InfoTip } from '@/components/ui/InfoTip';
 import '@/pages/table-heading-roles.css';
+import { formatDateTime, formatMoneyWhole, formatNumber } from '@/lib/formatters';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import '@/pages/settings/settings-brand.css';
 import { useState, useEffect } from 'react';
 import { fetchData, postData, patchData, deleteData } from '@/lib/Api';
@@ -6,6 +9,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { Loader } from '@/components/Loader';
 import { useAuth } from '@/lib/AuthContext';
 import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsInputStyle, settingsLabelStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from './settingsUi';
+import RowActions from '@/components/ui/RowActions';
 
 interface ApiKey {
   id: number;
@@ -37,7 +41,6 @@ const sectionHeader: React.CSSProperties = { ...settingsCardHeaderStyle, justify
 const sectionTitle = settingsCardTitleStyle;
 const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px' };
 
-const rowActionStyle = settingsSecondaryButtonStyle;
 
 /* Compact inline chips beside the key string — deliberate legacy-size
    exception (a 40px control inline with a mono key string breaks the row);
@@ -78,15 +81,15 @@ const SCHEMA_FIELDS = [
 ];
 
 const TIER_COLOR: Record<string, string> = {
-  A: 'var(--status-success-text, var(--status-success))',
+  A: 'var(--status-success-text)',
   B: 'var(--accent-primary)',
-  C: 'var(--status-warning-text, #f59e0b)',
-  D: 'var(--status-danger-text, var(--status-danger))',
+  C: 'var(--status-warning-text)',
+  D: 'var(--status-danger-text)',
 };
 
 function fmtDate(s?: string | null) {
   if (!s) return '—';
-  return new Date(s).toLocaleString('en-ZA', { dateStyle: 'short', timeStyle: 'short' });
+  return formatDateTime(s);
 }
 
 export function DeveloperApi() {
@@ -250,18 +253,18 @@ export function DeveloperApi() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div className="settings-wide" style={{ minWidth: 0 }}>
       <SettingsPageHeader
-        title="Risk-scoring API"
-        description="Score any invoice with the same 7-pillar underwriting engine your Capital product uses. Partners authenticate with an API key and are metered per call."
+        title="Payment risk API"
+        description={<>Check how likely an invoice is to be paid, from your own systems<InfoTip label="How the payment risk API works">Scores any invoice with the same 7-pillar underwriting engine Fast Pay uses. Partners authenticate with an API key and are metered per call.</InfoTip></>}
       />
 
       {/* ── Endpoint reference ── */}
       <div style={sectionStyle}>
         <div style={sectionHeader}><h2 style={sectionTitle}>Endpoint</h2></div>
-        <div style={{ padding: 24 }}>
+        <div style={{ padding: 'var(--card-pad, 20px)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <span style={{ ...mono, fontWeight: 700, color: 'var(--accent-primary)', padding: '2px 8px', border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-chip)' }}>POST</span>
+            <span style={{ ...mono, fontWeight: 600, color: 'var(--accent-primary)', padding: '2px 8px', border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-chip)' }}>POST</span>
             <span style={{ ...mono, color: 'var(--text-primary)' }}>/api/v1/risk/underwrite/</span>
           </div>
           <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 4 }}>
@@ -298,7 +301,7 @@ export function DeveloperApi() {
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{f.field}</td>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)' }}>{f.type}</td>
                   <td>
-                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, padding: '2px 8px', borderRadius: 'var(--radius-chip)', background: f.required ? 'rgba(239,68,68,0.12)' : 'var(--bg-deep)', color: f.required ? 'var(--status-danger-text, var(--status-danger))' : 'var(--text-tertiary)' }}>
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, padding: '2px 8px', borderRadius: 'var(--radius-chip)', background: f.required ? 'rgba(239,68,68,0.12)' : 'var(--bg-deep)', color: f.required ? 'var(--status-danger-text)' : 'var(--text-tertiary)' }}>
                       {f.required ? 'Yes' : 'No'}
                     </span>
                   </td>
@@ -315,7 +318,7 @@ export function DeveloperApi() {
         <div style={sectionHeader}><h2 style={sectionTitle}>API keys</h2></div>
 
         {/* Create row */}
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-subtle)' }}>
+        <div style={{ padding: '16px var(--card-pad, 20px)', borderBottom: '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: showAdvCreate ? 16 : 0 }}>
             <div style={{ flex: 2 }}>
               <label style={labelStyle}>Key name</label>
@@ -330,7 +333,7 @@ export function DeveloperApi() {
               className="settings-control"
               aria-expanded={showAdvCreate}
               style={{
-                background: showAdvCreate ? 'rgba(var(--accent-primary-rgb,37,99,235),0.08)' : 'var(--bg-deep)',
+                background: showAdvCreate ? 'var(--accent-dim)' : 'var(--bg-deep)',
                 border: '1px solid var(--border-subtle)',
                 color: showAdvCreate ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
@@ -376,7 +379,7 @@ export function DeveloperApi() {
           return (
             <div key={k.id} style={{ borderBottom: i < keys.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
               {/* Key row */}
-              <div style={{ padding: '16px 24px' }}>
+              <div style={{ padding: '16px var(--card-pad, 20px)' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{k.name}</div>
@@ -398,7 +401,7 @@ export function DeveloperApi() {
                           ...keyChipStyle,
                           background: copied === k.id ? 'rgba(34,197,94,0.12)' : 'var(--bg-deep)',
                           border: `1px solid ${copied === k.id ? 'var(--status-success)' : 'var(--border-subtle)'}`,
-                          color: copied === k.id ? 'var(--status-success-text, var(--status-success))' : 'var(--text-secondary)',
+                          color: copied === k.id ? 'var(--status-success-text)' : 'var(--text-secondary)',
                           transition: 'all 0.2s',
                         }}
                       >
@@ -406,7 +409,7 @@ export function DeveloperApi() {
                       </button>
                     </div>
                     <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{(k.usage_count || 0).toLocaleString()} total calls</span>
+                      <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{formatNumber(k.usage_count || 0)} total calls</span>
                       <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>Last used: {fmtDate(k.last_used_at)}</span>
                       {k.monthly_quota ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -422,31 +425,22 @@ export function DeveloperApi() {
                       {k.webhook_url && <span style={{ ...mono, color: 'var(--text-tertiary)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>webhook: {k.webhook_url}</span>}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
-                    <button className="settings-control" onClick={() => toggleLogs(k)} style={{ ...rowActionStyle, cursor: 'pointer' }}>
-                      {logsOpen ? 'Hide logs' : 'Logs'}
-                    </button>
-                    <button
-                      onClick={() => openEdit(k)}
-                      disabled={isDemo}
-                      title={isDemo ? 'Fixed in demo mode' : undefined}
-                      className="settings-control"
-                      style={{ ...rowActionStyle, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
-                    >Edit</button>
-                    <button
-                      onClick={() => setRevokeTarget(k)}
-                      disabled={isDemo}
-                      title={isDemo ? 'Fixed in demo mode' : undefined}
-                      className="settings-control"
-                      style={{ ...rowActionStyle, border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
-                    >Revoke</button>
+                  <div style={{ display: 'flex', flexShrink: 0, alignItems: 'center' }}>
+                    <RowActions
+                      label={k.name}
+                      items={[
+                        { label: logsOpen ? 'Hide logs' : 'Logs', onSelect: () => toggleLogs(k) },
+                        { label: 'Edit', onSelect: () => openEdit(k), disabled: isDemo },
+                        { label: 'Revoke', danger: true, onSelect: () => setRevokeTarget(k), disabled: isDemo },
+                      ]}
+                    />
                   </div>
                 </div>
               </div>
 
               {/* Call history panel */}
               {logsOpen && (
-                <div style={{ background: 'var(--bg-deep)', borderTop: '1px solid var(--border-subtle)', padding: '16px 24px' }}>
+                <div style={{ background: 'var(--bg-deep)', borderTop: '1px solid var(--border-subtle)', padding: '16px var(--card-pad, 20px)' }}>
                   <h4 style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', margin: 0, marginBottom: 8 }}>Call history (last 100)</h4>
                   {logsLoading[k.id] ? (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0' }}><Loader size={16} /></div>
@@ -467,7 +461,7 @@ export function DeveloperApi() {
                           <tr key={log.id} style={{ borderBottom: '1px solid var(--border-row)' }}>
                             <td style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmtDate(log.scored_at)}</td>
                             <td className="num" style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                              {log.invoice_amount ? `R${parseFloat(log.invoice_amount).toLocaleString('en-ZA', { maximumFractionDigits: 0 })}` : '—'}
+                              {log.invoice_amount ? formatMoneyWhole(parseFloat(log.invoice_amount)) : '—'}
                             </td>
                             <td>
                               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: TIER_COLOR[log.risk_tier] || 'var(--text-secondary)' }}>
@@ -478,8 +472,8 @@ export function DeveloperApi() {
                             <td>
                               {log.eligible === null ? <span style={{ color: 'var(--text-tertiary)' }}>—</span>
                                 : log.eligible
-                                  ? <span style={{ color: 'var(--status-success-text, var(--status-success))', fontSize: 13, fontWeight: 500 }}>Yes</span>
-                                  : <span style={{ color: 'var(--status-danger-text, var(--status-danger))', fontSize: 13, fontWeight: 500 }}>No</span>}
+                                  ? <span style={{ color: 'var(--status-success-text)', fontSize: 13, fontWeight: 500 }}>Yes</span>
+                                  : <span style={{ color: 'var(--status-danger-text)', fontSize: 13, fontWeight: 500 }}>No</span>}
                             </td>
                             <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{log.caller_ip || '—'}</td>
                           </tr>
@@ -502,20 +496,20 @@ export function DeveloperApi() {
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
               <label style={{ ...labelStyle, marginBottom: 0, marginRight: 6, display: 'inline' }}>Auth as</label>
-              <select
-                className="settings-control"
-                value={tryKeyId}
-                onChange={e => setTryKeyId(e.target.value === '' ? '' : Number(e.target.value))}
-                style={{ ...inputStyle, width: 'auto' }}
-              >
-                <option value="">Bearer (in-app / internal)</option>
-                {keys.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
-              </select>
+              <Select value={tryKeyId === '' ? 'bearer' : String(tryKeyId)} onValueChange={v => setTryKeyId(v === 'bearer' ? '' : Number(v))}>
+                <SelectTrigger aria-label="Auth as" style={{ width: 'auto', minWidth: 220, minHeight: 40, display: 'inline-flex' }}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bearer">Bearer (in-app, internal)</SelectItem>
+                  {keys.map(k => <SelectItem key={k.id} value={String(k.id)}>{k.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <button className="btn-action settings-control" style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }} onClick={runTry} disabled={running}>{running ? 'Scoring…' : 'Run'}</button>
           </div>
         </div>
-        <div style={{ padding: 24, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+        <div style={{ padding: 'var(--card-pad, 20px)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           <div>
             <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>Request body</div>
             <textarea value={body} onChange={e => setBody(e.target.value)} spellCheck={false}
@@ -525,15 +519,15 @@ export function DeveloperApi() {
           <div>
             <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>Response</div>
             {tryErr ? (
-              <div style={{ color: 'var(--status-danger-text, var(--status-danger))', fontSize: 13, lineHeight: '20px' }}>{tryErr}</div>
+              <div style={{ color: 'var(--status-danger-text)', fontSize: 13, lineHeight: '20px' }}>{tryErr}</div>
             ) : result ? (
               <div>
                 <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
-                  <Stat label="Tier" value={result.risk_tier || '—'} color={result.eligible ? (TIER_COLOR[result.risk_tier] || 'var(--accent-primary)') : 'var(--status-danger-text, var(--status-danger))'} />
+                  <Stat label="Tier" value={result.risk_tier || '—'} color={result.eligible ? (TIER_COLOR[result.risk_tier] || 'var(--accent-primary)') : 'var(--status-danger-text)'} />
                   <Stat label="Score" value={String(result.score ?? '—')} />
                   <Stat label="Fee" value={result.fee_percent != null ? `${result.fee_percent}%` : '—'} />
                   <Stat label="Advance" value={result.max_advance_percent != null ? `${result.max_advance_percent}%` : '—'} />
-                  <Stat label="Net" value={result.net_advance != null ? `R${Math.round(result.net_advance).toLocaleString()}` : '—'} color="var(--status-success)" />
+                  <Stat label="Net" value={result.net_advance != null ? formatMoneyWhole(result.net_advance) : '—'} color="var(--status-success)" />
                 </div>
                 {result._meta && (
                   <div style={{ ...mono, color: 'var(--text-tertiary)', marginBottom: 12, padding: '8px 12px', background: 'var(--bg-deep)', borderRadius: 'var(--radius-nested)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -558,7 +552,7 @@ export function DeveloperApi() {
       {/* ── Edit key drawer ── */}
       {editKey && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }} onClick={() => setEditKey(null)}>
-          <div style={{ width: 440, maxWidth: '100%', boxSizing: 'border-box', background: 'var(--bg-surface)', borderLeft: '1px solid var(--border-subtle)', height: '100%', overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }} onClick={e => e.stopPropagation()}>
+          <div style={{ width: 440, maxWidth: '100%', boxSizing: 'border-box', background: 'var(--bg-surface)', borderLeft: '1px solid var(--border-subtle)', height: '100%', overflowY: 'auto', padding: 'var(--card-pad, 20px)', display: 'flex', flexDirection: 'column', gap: 16 }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit API key</h2>
               <button className="settings-control" aria-label="Close" onClick={() => setEditKey(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 20, cursor: 'pointer', lineHeight: 1, minWidth: 44, minHeight: 44, borderRadius: 'var(--radius-control)' }}>×</button>
@@ -586,7 +580,7 @@ export function DeveloperApi() {
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>TruckWys will POST the full scoring result here after every call.</div>
             </div>
 
-            {editErr && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))', padding: '8px 12px', background: 'var(--status-danger-bg)', borderRadius: 'var(--radius-nested)' }}>{editErr}</div>}
+            {editErr && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)', padding: '8px 12px', background: 'var(--status-danger-bg)', borderRadius: 'var(--radius-nested)' }}>{editErr}</div>}
 
             <div style={{ display: 'flex', gap: 12, marginTop: 'auto', paddingTop: 8 }}>
               <button

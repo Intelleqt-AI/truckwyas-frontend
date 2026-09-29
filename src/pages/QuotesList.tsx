@@ -1,14 +1,18 @@
 import './bookings-typography.css';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import './table-heading-roles.css';
 import './bookings-section.css';
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { fetchData, patchData, postData } from "@/lib/Api";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateShort, formatMoneyWhole } from "@/lib/formatters";
 import { Loader } from "@/components/Loader";
 import { toast } from "@/lib/toast";
-import { Fuel } from "lucide-react";
+import { Fuel, Columns3, List as ListIcon } from "lucide-react";
+import { boardStage } from "@/components/overview/today";
+import { useAllQuotes } from "@/components/overview/ledger";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { ConvertToBookingModal } from "@/components/ConvertToBookingModal";
 import { useAuth } from "@/lib/AuthContext";
@@ -30,6 +34,12 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import QuoteSendPreview from '@/components/QuoteSendPreview';
+import { rowLink } from '@/lib/rowLink';
+import { StatusChip, statusTone } from '@/components/ui/StatusChip';
+import { Segmented } from '@/components/ui/Segmented';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 // Pipeline stage -> dot/chip tone. Colour only ever sits next to its text label.
@@ -61,11 +71,16 @@ const sentenceCase = (s?: string) =>
 // used to double as quote-pipeline columns too, which let a quote be
 // dragged straight to "Completed" with no Order behind it at all.
 const COLUMNS = ['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED'];
+// The board shows one more column, Expired: derived from the date rule, not
+// a status, so nothing can be dropped on it.
+const BOARD_COLUMNS = [...COLUMNS, 'EXPIRED'];
 const COLUMN_LABELS: Record<string, string> = {
   DRAFT: 'Draft',
   SENT: 'Sent',
   ACCEPTED: 'Accepted',
   DECLINED: 'Declined',
+  // Draft or Sent past its valid-until date (boardStage, R8): not live work.
+  EXPIRED: 'Expired',
   // Not board columns — kept only so a quote from before this change still
   // renders a readable label in the list view instead of the raw code.
   IT: 'In transit',
@@ -89,17 +104,24 @@ function QuoteCardBody({ quote }: { quote: any }) {
         <span className="bk-qcard__id">{quote.quote_number}</span>
         <span className="bk-qcard__flags">
           {quote.fuel_alert && (
-            <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', color: 'var(--status-warning-text, var(--status-warning))' }}><Fuel size={16} aria-hidden="true" /></span>
+            <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', color: 'var(--status-warning-text)' }}><Fuel size={16} aria-hidden="true" /></span>
           )}
-          {quote.outcome === 'accepted' && <span className="bk-status bk-status--success">Won</span>}
-          {quote.outcome === 'rejected' && <span className="bk-status bk-status--danger">Lost</span>}
+          {/* The recorded answer, when the column does not already say it.
+              Neutral text: the column is the status. */}
+          {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && <span className="bk-qcard__meta">Marked won</span>}
+          {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <span className="bk-qcard__meta">Marked lost</span>}
         </span>
       </div>
       <div className="bk-qcard__customer" title={quote.customer_name || ''}>{quote.customer_name || '—'}</div>
       <div className="bk-qcard__route" title={routeOf(quote)}>{routeOf(quote)}</div>
       <div className="bk-qcard__foot">
-        <span className="bk-qcard__amount">{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
-        {quote.confidence && <span className="bk-qcard__meta">{sentenceCase(quote.confidence)} confidence</span>}
+        <span className="bk-qcard__amount" title={formatCurrency(parseFloat(quote.total_amount || '0'))}>{formatMoneyWhole(parseFloat(quote.total_amount || '0'))}</span>
+        {/* Only a low price confidence is worth a word on the card; otherwise the date it was made. */}
+        {boardStage(quote) === 'EXPIRED' && quote.valid_until
+          ? <span className="bk-qcard__meta" title={`${String(quote.status).toUpperCase() === 'SENT' ? 'Sent' : 'Draft'}, valid until ${formatDate(quote.valid_until)}`}>Expired {formatDateShort(quote.valid_until)}</span>
+          : String(quote.confidence).toUpperCase() === 'LOW'
+          ? <span className="bk-qcard__meta">Low confidence</span>
+          : quote.created_at ? <span className="bk-qcard__meta">{formatDateShort(quote.created_at)}</span> : null}
       </div>
     </>
   );
@@ -133,7 +155,9 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
       onClick={onClick}
     >
       <QuoteCardBody quote={quote} />
-      {quote.status === 'ACCEPTED' && convertedLoad && (
+      {/* Any quote with a linked booking offers it, whatever its own status
+          (legacy In-transit quotes sit in the Accepted column too). */}
+      {convertedLoad && (
         <button
           type="button"
           className="bk-btn bk-btn--secondary bk-btn--block bk-qcard__action"
@@ -153,6 +177,24 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
           Convert to booking
         </button>
       )}
+    </div>
+  );
+}
+
+// An expired quote's card: opens the quote (where "Edit quote" is the next
+// step); it is not dragged, since its column is a date rule, not a status.
+function StaticQuoteCard({ quote, onClick }: { quote: any; onClick: () => void }) {
+  return (
+    <div
+      className="bk-qcard"
+      role="button"
+      tabIndex={0}
+      aria-label={`Quote ${quote.quote_number}, expired`}
+      style={{ cursor: 'pointer' }}
+      onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
+    >
+      <QuoteCardBody quote={quote} />
     </div>
   );
 }
@@ -181,6 +223,26 @@ function DroppableColumn({ columnId, items, children, isOver }: { columnId: stri
       </SortableContext>
     </div>
   );
+}
+
+// The loads list behind "View booking". Quote detail reads the same cached
+// query, so the board card and the detail page always agree.
+export const loadsQuery = {
+  queryKey: ['loads'],
+  queryFn: () => fetchData('api/v1/loads/'),
+  retry: 1,
+};
+
+// A quote converts to at most one load (convert_to_load blocks a second
+// conversion) — map quote id -> its load so the "Convert to booking"
+// button can be swapped for a "View booking" link once that's happened.
+export function mapLoadsByQuoteId(loadsData: any): Map<string, any> {
+  const loads: any[] = loadsData?.results || loadsData || [];
+  const byQuote = new Map<string, any>();
+  loads.forEach(l => {
+    if (l.quote != null) byQuote.set(String(l.quote), l);
+  });
+  return byQuote;
 }
 
 const QUOTE_PAGE_SIZE = 10;
@@ -244,13 +306,48 @@ interface QuotesListProps {
   onViewChange?: (value: 'board' | 'list') => void;
 }
 
+/**
+ * A status filter: the segmented control on wider screens; on phones, when
+ * there are more than four options, a compact select (R4 phone rule). Both
+ * stay mounted and CSS picks one, so nothing shifts when the width changes.
+ */
+export { idTail, RecordNo, RecordId } from './recordNo';
+import { RecordNo } from './recordNo';
+
+export function StatusFilter<V extends string>({ label, value, onChange, options, className, compactOnPhone }: {
+  label: string; value: V; onChange: (v: V) => void;
+  options: { value: V; label: string; count?: number }[]; className?: string;
+  /** Use the phone select even with four options, so the count fits beside it. */
+  compactOnPhone?: boolean;
+}) {
+  const compact = compactOnPhone || options.length > 4;
+  const current = options.find(o => o.value === value) ?? options[0];
+  const text = (o: { label: string; count?: number }) => (o.count != null ? `${o.label} (${o.count})` : o.label);
+  return (
+    <div className={`bk-filter${compact ? ' bk-filter--compact' : ''}${className ? ` ${className}` : ''}`}>
+      <Segmented<V> label={label} value={value} onChange={onChange} options={options} className="bk-filter__seg" />
+      {compact && (
+        <Select value={value} onValueChange={v => onChange(v as V)}>
+          <SelectTrigger aria-label={label} className="bk-filter__select">
+            <SelectValue>{current ? text(current) : ''}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {options.map(o => <SelectItem key={o.value} value={o.value}>{text(o)}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      )}
+    </div>
+  );
+}
+
 export function QuotesList({ embedded = false, search: searchProp, onSearchChange, view: viewProp, onViewChange }: QuotesListProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
   const [internalSearch, setInternalSearch] = useState('');
-  const [internalView, setInternalView] = useState<'board' | 'list'>('board');
+  const [internalView, setInternalView] = useState<'board' | 'list'>(() =>
+    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches ? 'list' : 'board');
   const search = searchProp ?? internalSearch;
   const setSearch = onSearchChange ?? setInternalSearch;
   const view = viewProp ?? internalView;
@@ -263,6 +360,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [confirmOpts, setConfirmOpts] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void } | null>(null);
   const [pendingConvertQuote, setPendingConvertQuote] = useState<any>(null);
+  // Dragging a card into Sent emails the customer (the server sends on the
+  // status change), so it is previewed and confirmed first.
+  const [pendingSend, setPendingSend] = useState<{ quote: any; oldColumn: string } | null>(null);
 
   // Search is sent to the backend (it searches across every quote, not just
   // whatever's already loaded on screen) — debounced so typing doesn't fire
@@ -281,20 +381,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     })
   );
 
-  const { data: loadsData } = useQuery({
-    queryKey: ['loads'],
-    queryFn: () => fetchData('api/v1/loads/'),
-    retry: 1,
-  });
-  const loads: any[] = loadsData?.results || loadsData || [];
-
-  // A quote converts to at most one load (convert_to_load blocks a second
-  // conversion) — map quote id -> its load so the "Convert to booking"
-  // button can be swapped for a "View booking" link once that's happened.
-  const loadByQuoteId = new Map<string, any>();
-  loads.forEach(l => {
-    if (l.quote != null) loadByQuoteId.set(String(l.quote), l);
-  });
+  const { data: loadsData } = useQuery(loadsQuery);
+  const loadByQuoteId = mapLoadsByQuoteId(loadsData);
 
   // Each pipeline column is its own backend-paginated query (10 at a time,
   // "load more" — see useQuoteColumn) rather than one big "fetch every
@@ -312,7 +400,65 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     () => ({ DRAFT: draftQ, SENT: sentQ, ACCEPTED: acceptedQ, DECLINED: declinedQ }),
     [draftQ, sentQ, acceptedQ, declinedQ]
   );
-  const totalQuotesCount = COLUMNS.reduce((sum, col) => sum + flattenColumn(columnQueries[col]).count, 0);
+  const totalQuotesCountRaw = COLUMNS.reduce((sum, col) => sum + flattenColumn(columnQueries[col]).count, 0);
+  // A sent quote whose answer was recorded as lost belongs with the declined
+  // ones: the board shows it there (with "Marked lost"), and both column
+  // counts and totals move with it, so the board never says "Declined 0"
+  // while a lost quote sits under Sent. Only loaded cards can move.
+  // One stage definition everywhere (R5): the board's, shared with Home.
+  const isMarkedLost = (q: any) => String(q.status).toUpperCase() === 'SENT' && boardStage(q) === 'DECLINED';
+  const movedLost = flattenColumn(sentQ).items.filter(isMarkedLost);
+  const amountOf = (q: any) => parseFloat(q.total_amount || '0') || 0;
+  const movedLostTotal = movedLost.reduce((n: number, q: any) => n + amountOf(q), 0);
+  // R8: a Draft or Sent quote past its valid-until date is Expired (the same
+  // boardStage rule as Home's pipeline). Without a search the exact set comes
+  // from the full quotes list Home already fetches (same cache); with a search
+  // only the loaded cards can be placed.
+  const allQuotesQ = useAllQuotes();
+  const allRows: any[] | null = !debouncedSearch && allQuotesQ.data?.complete ? allQuotesQ.data.rows : null;
+  // Until that list arrives, Draft, Sent and Expired wait together, so cards
+  // don't jump between columns as it lands.
+  const expiryPending = !debouncedSearch && allQuotesQ.isLoading;
+  const isExpired = (q: any) => boardStage(q) === 'EXPIRED';
+  const expiredRows: any[] = allRows
+    ? allRows.filter(isExpired)
+    : [...flattenColumn(draftQ).items, ...flattenColumn(sentQ).items].filter(isExpired);
+  const expiredIn = (st: string) => expiredRows.filter((q: any) => String(q.status).toUpperCase() === st);
+  // Quotes whose backend status is already EXPIRED are on no status query.
+  const extraExpired = expiredIn('EXPIRED').length;
+  const boardColumn = (col: string) => {
+    if (col === 'EXPIRED') {
+      const failed = loadFailed(draftQ) || loadFailed(sentQ);
+      return {
+        items: expiredRows, count: expiredRows.length,
+        totalAmount: expiredRows.reduce((n: number, q: any) => n + amountOf(q), 0),
+        hasNextPage: false, isLoading: (expiryPending || (!allRows && (draftQ.isLoading || sentQ.isLoading))) && !failed,
+        isFetchingNextPage: false, fetchNextPage: () => undefined,
+      };
+    }
+    const f = flattenColumn(columnQueries[col as keyof typeof columnQueries]);
+    const lapsed = col === 'DRAFT' || col === 'SENT' ? expiredIn(col) : [];
+    const lapsedTotal = lapsed.reduce((n: number, q: any) => n + amountOf(q), 0);
+    const live = (items: any[]) => items.filter((q: any) => !isExpired(q) && !(col === 'SENT' && isMarkedLost(q)));
+    if (col === 'DRAFT' || col === 'SENT') {
+      const lost = col === 'SENT' ? movedLost : [];
+      const items = live(f.items);
+      const count = Math.max(0, f.count - lapsed.length - lost.length);
+      return {
+        ...f, items, count, isLoading: f.isLoading || expiryPending,
+        totalAmount: f.totalAmount - lapsedTotal - (col === 'SENT' ? movedLostTotal : 0),
+        // Every live card may already be loaded even though the backend has
+        // more rows in this status (the rest are expired).
+        hasNextPage: f.hasNextPage && items.length < count,
+      };
+    }
+    if (col === 'DECLINED' && movedLost.length) return { ...f, items: [...f.items, ...movedLost], count: f.count + movedLost.length, totalAmount: f.totalAmount + movedLostTotal };
+    return f;
+  };
+  // A failed column must never read as "No quotes" (and its 0 must not be counted).
+  const failedColumns = COLUMNS.filter(col => loadFailed(columnQueries[col]));
+  const totalQuotesCount = totalQuotesCountRaw + extraExpired;
+  const retryFailedColumns = () => failedColumns.forEach(col => columnQueries[col].refetch());
 
   // Live update: refetch every column when the backend pushes any quote
   // event over WebSocket — prefix match invalidates all of them (and the
@@ -322,6 +468,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       const { detail } = (e as CustomEvent);
       if (typeof detail?.event === 'string' && detail.event.startsWith('quote.')) {
         queryClient.invalidateQueries({ queryKey: ['quotes-column'] });
+        queryClient.invalidateQueries({ queryKey: ['insights-source', 'quotes'] });
       }
     };
     window.addEventListener('tw:live-event', handler);
@@ -370,7 +517,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   // that card's column, not just a bare column id.
   const columnOfQuoteId: Record<string, string> = {};
   COLUMNS.forEach(col => {
-    flattenColumn(columnQueries[col]).items.forEach((q: any) => { columnOfQuoteId[String(q.id)] = col; });
+    boardColumn(col).items.forEach((q: any) => { columnOfQuoteId[String(q.id)] = col; });
   });
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -411,12 +558,22 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     // new column (and disappears from the old) once these refetch, which
     // the live WebSocket event above also triggers the moment the backend
     // confirms the change.
+    if (newStatus === 'SENT') {
+      const quote = allLoadedBoardItems.find((q: any) => String(q.id) === quoteId);
+      if (quote) { setPendingSend({ quote, oldColumn }); return; }
+    }
+    moveQuote(quoteId, oldColumn, newStatus);
+  };
+
+  const moveQuote = (quoteId: string, oldColumn: string, newStatus: string, onDone?: () => void) => {
     statusMutation.mutate({ id: quoteId, status: newStatus }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['quotes-column', oldColumn] });
         queryClient.invalidateQueries({ queryKey: ['quotes-column', newStatus] });
         queryClient.invalidateQueries({ queryKey: ['quotes-column', null] });
+        queryClient.invalidateQueries({ queryKey: ['insights-source', 'quotes'] });
       },
+      onSettled: () => onDone?.(),
     });
   };
 
@@ -425,14 +582,29 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
 
   // List view reuses a board column's query directly for a specific status,
   // or the separate "All" query (no status filter) for the All tab.
-  const activeListQuery = statusFilter === 'ALL' ? allQ : columnQueries[statusFilter];
+  const activeListQuery = statusFilter === 'ALL' ? allQ : statusFilter === 'EXPIRED' ? draftQ : columnQueries[statusFilter as keyof typeof columnQueries];
   const {
-    items: listItems, hasNextPage: listHasNextPage, isLoading: listIsLoading,
+    hasNextPage: listHasNextPage, isLoading: listIsLoading,
     isFetchingNextPage: listIsFetchingNextPage, fetchNextPage: listFetchNextPage,
-  } = flattenColumn(activeListQuery);
+  } = statusFilter === 'ALL' ? flattenColumn(allQ) : boardColumn(statusFilter);
+  // The list's per-status rows and counts are the board's columns, so a
+  // quote marked lost is under Declined in both views (R5: "Sent 2" twice).
+  const listItems = statusFilter === 'ALL' ? flattenColumn(allQ).items : boardColumn(statusFilter).items;
+  const statusOptions = ['ALL', ...BOARD_COLUMNS].map(status => ({
+    value: status,
+    label: status === 'ALL' ? 'All' : COLUMN_LABELS[status],
+    count: (status === 'ALL' ? failedColumns.length === 0 : status === 'EXPIRED' ? !failedColumns.includes('DRAFT') && !failedColumns.includes('SENT') : !failedColumns.includes(status))
+      ? (status === 'ALL' ? totalQuotesCount : boardColumn(status).count)
+      : undefined,
+  }));
+  // Phones: one toolbar row (search, status select, view toggle) so the
+  // first quote starts high on the screen.
+  const isPhone = useIsMobile(767);
+  const statusText = (o: { label: string; count?: number }) => (o.count != null ? `${o.label} (${o.count})` : o.label);
+  const currentStatus = statusOptions.find(o => o.value === statusFilter) ?? statusOptions[0];
 
   return (
-    <div className="bookings-typography" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+    <div className="bookings-typography bk-qlist-fill" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* Header — hidden when embedded in Bookings tabs */}
       {!embedded && (
         <div style={{ marginBottom: 24, flexShrink: 0 }}>
@@ -458,24 +630,54 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           type="search"
           className="bk-search"
           aria-label="Search quotes"
-          placeholder="Search quotes, customers, routes"
+          placeholder={isPhone ? 'Search quotes' : 'Search quotes, customers, routes'}
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <div className="bk-filters" role="group" aria-label="Quote view">
-          {(['board', 'list'] as const).map(v => (
+        {isPhone ? (
+          <>
+            {view === 'list' && (
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger aria-label="Filter quotes by status" className="bk-toolbar__status">
+                  <SelectValue>{statusText(currentStatus)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{statusText(o)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
             <button
-              key={v}
               type="button"
-              aria-pressed={view === v}
-              className={`bk-chip${view === v ? ' is-active' : ''}`}
-              onClick={() => setView(v)}
-            >{v === 'board' ? 'Board' : 'List'}</button>
-          ))}
-        </div>
+              className="bk-view-toggle"
+              aria-label={view === 'list' ? 'Show as board' : 'Show as list'}
+              title={view === 'list' ? 'Show as board' : 'Show as list'}
+              onClick={() => setView(view === 'list' ? 'board' : 'list')}
+            >
+              {view === 'list' ? <Columns3 size={18} aria-hidden="true" /> : <ListIcon size={18} aria-hidden="true" />}
+            </button>
+          </>
+        ) : (
+          <Segmented
+            label="Quote view"
+            value={view}
+            onChange={setView}
+            options={[{ value: 'board', label: 'Board' }, { value: 'list', label: 'List' }]}
+          />
+        )}
         <span className="bk-toolbar__end">
-          {view === 'board' && !billingBlocked ? 'Drag a card to change its status · ' : ''}{totalQuotesCount} {totalQuotesCount === 1 ? 'quote' : 'quotes'}
+          {view === 'board' && !billingBlocked ? 'Drag a card to change its status' : ''}
+          {failedColumns.length === 0 && <>{view === 'board' && !billingBlocked ? ' · ' : ''}{totalQuotesCount} {totalQuotesCount === 1 ? 'quote' : 'quotes'}</>}
         </span>
+        {/* List view (R6): the status filter shares the search row, as on
+            Orders and History, so the table starts at the same height. */}
+        {!isPhone && view === 'list' && (
+          <StatusFilter
+            label="Filter quotes by status"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={statusOptions}
+          />
+        )}
       </div>
 
       {billingBlocked && (
@@ -491,7 +693,14 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       )}
 
       {/* Tabs */}
-      {view === 'board' ? (
+      {view === 'board' && failedColumns.length === COLUMNS.length ? (
+        <LoadError
+          what="quotes"
+          error={columnQueries.DRAFT.error ?? columnQueries.DRAFT.failureReason}
+          busy={COLUMNS.some(col => columnQueries[col].isFetching)}
+          onRetry={retryFailedColumns}
+        />
+      ) : view === 'board' ? (
         <DndContext
           sensors={sensors}
           onDragStart={handleDragStart}
@@ -502,21 +711,40 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
               column scrolls its own card list instead of the whole page growing. */}
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
             <div className="bk-kanban">
-              {COLUMNS.map(col => {
-                const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading, isFetchingNextPage, fetchNextPage } = flattenColumn(columnQueries[col]);
+              {BOARD_COLUMNS.map(col => {
+                const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading: colLoading, isFetchingNextPage, fetchNextPage } = boardColumn(col);
+                const isExpiredCol = col === 'EXPIRED';
+                const colFailed = isExpiredCol ? failedColumns.includes('DRAFT') && failedColumns.includes('SENT') : failedColumns.includes(col);
+                const isLoading = colLoading && !colFailed;
+                const colQuery = isExpiredCol ? draftQ : columnQueries[col as keyof typeof columnQueries];
                 return (
                 <section key={col} className="bk-col" aria-label={`${COLUMN_LABELS[col]} quotes`}>
                   <div className="bk-col__head">
                     <span className="bk-col__title">
-                      <span className={`bk-dot bk-dot--${COLUMN_TONE[col]}`} aria-hidden="true" />
+                      <span className={`bk-dot bk-dot--${statusTone(col)}`} aria-hidden="true" />
                       {COLUMN_LABELS[col]}
-                      <span className="bk-col__count">{colCount}</span>
+                      {!colFailed && <span className="bk-col__count">{colCount}</span>}
                     </span>
-                    {colTotal > 0 && <span className="bk-col__total">{formatCurrency(colTotal)}</span>}
+                    {colTotal > 0 && <span className="bk-col__total" title={formatCurrency(colTotal)}>{formatMoneyWhole(colTotal)}</span>}
                   </div>
                   <div className="kanban-col-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
-                    {isLoading ? (
-                      <div style={{ padding: '28px 0', display: 'flex', justifyContent: 'center' }}><Loader size={22} /></div>
+                    {colFailed ? (
+                      <LoadError
+                        compact
+                        what={`${COLUMN_LABELS[col].toLowerCase()} quotes`}
+                        error={colQuery.error ?? colQuery.failureReason}
+                        busy={colQuery.isFetching}
+                        onRetry={() => colQuery.refetch()}
+                      />
+                    ) : isLoading ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{[0, 1, 2].map(i => <div key={i} className="ops-skel" style={{ height: 84, borderRadius: 8 }} />)}</div>
+                    ) : isExpiredCol ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 2 }}>
+                        {colItems.map((q: any) => (
+                          <StaticQuoteCard key={q.id} quote={q} onClick={() => navigate(`/bookings/quotes/${q.id}`)} />
+                        ))}
+                        {colItems.length === 0 && <div className="bk-col__empty">No expired quotes</div>}
+                      </div>
                     ) : (
                       <DroppableColumn columnId={col} items={colItems} isOver={overColumnId === col}>
                         {colItems.map((q: any) => (
@@ -565,35 +793,33 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
         /* List view — quotes table, backed by the same per-status paginated
            queries as the board (plus a 5th "All" query with no status
            filter) — switching tabs reuses whatever's already loaded. */
-        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          {/* Status filters */}
-          <div className="bk-filters" role="group" aria-label="Filter quotes by status" style={{ marginBottom: 16, flexShrink: 0 }}>
-            {['ALL', ...COLUMNS].map(status => (
-              <button
-                key={status}
-                type="button"
-                aria-pressed={statusFilter === status}
-                className={`bk-chip${statusFilter === status ? ' is-active' : ''}`}
-                onClick={() => setStatusFilter(status)}
-              >
-                {status === 'ALL' ? 'All' : COLUMN_LABELS[status]}
-                <span className="bk-chip__count">{status === 'ALL' ? totalQuotesCount : flattenColumn(columnQueries[status]).count}</span>
-              </button>
-            ))}
-          </div>
+        <div className="bk-qlist-fill" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-          <div className="bk-table-wrap" style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+          {loadFailed(activeListQuery) ? (
+            <LoadError
+              what="quotes"
+              error={activeListQuery.error ?? activeListQuery.failureReason}
+              busy={activeListQuery.isFetching}
+              onRetry={() => activeListQuery.refetch()}
+            />
+          ) : (
+          (() => {
+          // Columns with nothing in them on any row step aside (R9).
+          const anyOutcome = listItems.some((q: any) => q.outcome === 'accepted' || q.outcome === 'rejected');
+          const anyAction = listItems.some((q: any) => q.status === 'ACCEPTED' || loadByQuoteId.has(String(q.id)));
+          return (
+          <div className="bk-table-wrap bk-qlist-fill" style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
             <table className="table-heading-roles bk-table">
               <thead>
                 <tr style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                  <th scope="col">Quote #</th>
+                  <th scope="col" className="bk-col-load">Quote #</th>
                   <th scope="col">Customer</th>
-                  <th scope="col">Route</th>
+                  <th scope="col" className="bk-col-route">Route</th>
                   <th scope="col">Status</th>
-                  <th scope="col">Outcome</th>
-                  <th scope="col">Created</th>
+                  {anyOutcome && <th scope="col" className="bk-col-phone">Outcome</th>}
+                  <th scope="col" className="bk-col-phone">Created</th>
                   <th scope="col" className="is-num">Amount</th>
-                  <th scope="col" className="is-num"><span className="sr-only">Action</span></th>
+                  {anyAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Action</span></th>}
                 </tr>
               </thead>
               <tbody>
@@ -601,34 +827,44 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                   <tr
                     key={quote.id}
                     className="is-clickable"
+                    {...rowLink(() => navigate(`/bookings/quotes/${quote.id}`))}
                     onClick={() => navigate(`/bookings/quotes/${quote.id}`)}
                   >
-                    <td className="is-id">
+                    <td className="is-id bk-col-load">
                       {quote.quote_number}
                       {quote.fuel_alert && (
-                        <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: 6, color: 'var(--status-warning-text, var(--status-warning))' }}><Fuel size={16} aria-hidden="true" /></span>
+                        <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: 6, color: 'var(--status-warning-text)' }}><Fuel size={16} aria-hidden="true" /></span>
                       )}
                     </td>
-                    <td className="is-primary">{quote.customer_name || '—'}</td>
-                    <td className="is-truncate" title={routeOf(quote)}>{routeOf(quote)}</td>
-                    <td>
-                      <span className={`bk-status bk-status--${QUOTE_TONE[quote.status] || 'neutral'}`}>
-                        {COLUMN_LABELS[quote.status] || sentenceCase(quote.status)}
-                      </span>
+                    <td className="is-primary bk-col-customer" title={quote.customer_name || ''}>
+                      {quote.customer_name || '—'}
+                      {/* Phones: the quote number rides under the customer (its column folds away). */}
+                      <RecordNo value={quote.quote_number} />
                     </td>
+                    <td className="is-truncate bk-col-route" title={routeOf(quote)}>{routeOf(quote)}</td>
                     <td>
-                      {quote.outcome === 'accepted' && <span className="bk-status bk-status--success">Won</span>}
-                      {quote.outcome === 'rejected' && <span className="bk-status bk-status--danger">Lost</span>}
+                      {/* The board's stage: a sent quote marked lost reads Declined here too. */}
+                      {(() => {
+                        const stage = boardStage(quote);
+                        return stage
+                          ? <StatusChip status={stage} label={COLUMN_LABELS[stage]} size="sm" />
+                          : <StatusChip status={quote.status === 'IT' ? 'IN_TRANSIT' : quote.status} label={COLUMN_LABELS[quote.status]} size="sm" />;
+                      })()}
+                    </td>
+                    {anyOutcome && <td className="bk-col-phone">
+                      {quote.outcome === 'accepted' && <StatusChip status="WON" size="sm" />}
+                      {quote.outcome === 'rejected' && <StatusChip status="LOST" size="sm" />}
                       {(!quote.outcome || quote.outcome === 'pending') && <span>—</span>}
-                    </td>
-                    <td className="is-date">
+                    </td>}
+                    <td className="is-date bk-col-phone">
                       {quote.created_at ? formatDate(quote.created_at) : '—'}
                     </td>
-                    <td className="is-money">
-                      {formatCurrency(parseFloat(quote.total_amount || '0'))}
+                    <td className="is-money" title={formatCurrency(parseFloat(quote.total_amount || '0'))}>
+                      {/* Lists show whole rands; the quote itself carries the cents (R7). */}
+                      {formatMoneyWhole(parseFloat(quote.total_amount || '0'))}
                     </td>
-                    <td className="is-num" onClick={(e) => e.stopPropagation()}>
-                      {quote.status === 'ACCEPTED' && loadByQuoteId.has(String(quote.id)) && (
+                    {anyAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
+                      {loadByQuoteId.has(String(quote.id)) && (
                         <button
                           type="button"
                           className="bk-btn bk-btn--secondary bk-btn--sm"
@@ -646,16 +882,16 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                           Convert to booking
                         </button>
                       )}
-                    </td>
+                    </td>}
                   </tr>
                 ))}
               </tbody>
             </table>
-            {listIsLoading && (
-              <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={24} /></div>
+            {listIsLoading && !loadFailed(activeListQuery) && (
+              <TableSkeleton rows={6} cols={5} label="Loading quotes" />
             )}
             {!listIsLoading && listItems.length === 0 && (
-              <div className="bk-empty"><p className="bk-empty__text">{search ? 'No quotes match your search.' : 'No quotes yet.'}</p></div>
+              <div className="bk-empty"><p className="bk-empty__text">{search ? 'No quotes match your search.' : statusFilter === 'ALL' ? 'No quotes yet.' : `No ${COLUMN_LABELS[statusFilter].toLowerCase()} quotes.`}</p></div>
             )}
             {listHasNextPage && (
               <div style={{ padding: 12, display: 'flex', justifyContent: 'center' }}>
@@ -670,7 +906,22 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
               </div>
             )}
           </div>
+          );
+          })()
+          )}
         </div>
+      )}
+
+      {pendingSend && (
+        <QuoteSendPreview
+          quote={pendingSend.quote}
+          sending={statusMutation.isPending}
+          onCancel={() => setPendingSend(null)}
+          onConfirm={() => {
+            const { quote, oldColumn } = pendingSend;
+            moveQuote(String(quote.id), oldColumn, 'SENT', () => setPendingSend(null));
+          }}
+        />
       )}
 
       {confirmOpts && (

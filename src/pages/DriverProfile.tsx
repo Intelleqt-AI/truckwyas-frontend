@@ -1,64 +1,78 @@
-import './table-heading-roles.css';
 import './fleet-detail.css';
-import { useState } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useCallback, useState } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
-import { formatCurrency } from "@/lib/formatters";
-import { Loader } from "@/components/Loader";
-import SectionHeader from "@/components/layout/SectionHeader";
+import {
+  DetailSkeleton, RecordState, randCents, Panel, RecordHeader, StatusChip, StatusControl, dateText, formatStatus, isNotFound, kmText, plural,
+} from '@/components/fleet-detail/parts';
+import {
+  ComplianceCard, FactsCard, LinkCard, LoadLink, NowLine, PerformanceCard,
+  dateToDo, daysSince, fleetPerKm, isDelivered, isOpenLoad, latest, perfFigures, perfLine, performance, staleWork, staleSentence, StaleOrderButton, type ToDo,
+} from '@/components/fleet-detail/record';
+import { useBalancedColumns } from '@/components/fleet-detail/useBalancedColumns';
+import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
+import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
+import { useLedger } from '@/components/reports/data';
+import { loadFailed } from '@/components/data/LoadError';
 
 const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] as const;
 
-/** Label/value row used by every detail card. `mono` only for identifiers. */
-const DetailRow = ({ label, value, mono, alert }: { label: string; value: any; mono?: boolean; alert?: boolean }) => (
-  <div className="fd-row">
-    <span className="fd-row__label">{label}</span>
-    <span className={`fd-row__value${mono ? ' fd-id' : ''}`} style={alert ? { color: 'var(--status-danger-text, var(--status-danger))' } : undefined}>{value == null || value === '' ? '—' : value}</span>
-  </div>
-);
+/** Licence renewal reminder window, in days. */
+const LICENCE_SOON_DAYS = 60;
 
-const formatZAR = (v: number) =>
-  'R ' + (v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-
-const STATUS_TONE: Record<string, 'success' | 'warning' | 'neutral'> = {
-  ACTIVE: 'success',
-  INACTIVE: 'neutral',
-  ON_LEAVE: 'warning',
-};
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-// Sentence-case a status token for display: "ON_LEAVE" → "On leave".
-const formatStatus = (s?: string) =>
-  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
-
+/* One page per driver, mirroring the vehicle page (round 4): initials and
+   name, what they are doing now, what they have driven (Performance, then
+   their loads with money), and in the rail what the owner acts on
+   (licence and medical countdowns), their truck, contact and record.
+   /fleet/drivers/:driverId and /:driverId/financial both land here. Figures
+   come from this driver's loads only (not the driver stats job). */
 export default function DriverProfile() {
   const { driverId } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const queryClient = useQueryClient();
-  const isFinancial = location.pathname.endsWith('/financial');
   const [updating, setUpdating] = useState(false);
+  const railRef = useStickyRail<HTMLElement>();
 
-  const { data: driver, isLoading } = useQuery({
+  const driverQuery = useQuery({
     queryKey: ['driver', driverId],
     queryFn: () => fetchData(`api/v1/drivers/${driverId}/`),
     enabled: !!driverId,
+    // A missing record is final; only retry transient failures.
+    retry: (count: number, err: unknown) => !isNotFound(err) && count < 2,
   });
+  const { data: driver, isLoading, error: queryError, refetch } = driverQuery;
+  const loadError = queryError ?? driverQuery.failureReason;
+  // Failing (even while retrying) with nothing to show: say so straight away.
+  const isError = loadFailed(driverQuery);
 
-  const { data: loadsData } = useQuery({
+  const { data: loadsData, isLoading: loadsLoading } = useQuery({
     queryKey: ['driver-loads', driverId],
     queryFn: () => fetchData(`api/v1/loads/?driver=${driverId}&page_size=50`),
     enabled: !!driverId,
   });
 
-  if (isLoading) return <Loader fullScreen />;
-  if (!driver) return (
-    <div className="fleet-detail">
-      <SectionHeader eyebrow="Fleet" title="Driver not found" description="This driver may have been removed, or the link is out of date." />
-      <button className="btn-action" onClick={() => navigate('/fleet/drivers')}>Back to drivers</button>
-    </div>
+  // The truck assigned to this driver (vehicle.driver), from the shared vehicles
+  // list; every load, for the fleet's revenue per km (the comparison).
+  const ledger = useLedger(['vehicles', 'loads']);
+
+  // The contact and licence cards may drop into the main column, and the
+  // truck card may fold into the licence card as a row (R8), when
+  // the rail would otherwise run far past it (R5 column balance).
+  const bal = useBalancedColumns({ toMain: ['truck', 'contact', 'facts'] }, `${driverId}-${isLoading}-${loadsLoading}-${ledger.loading}`);
+  const sideRef = useCallback((n: HTMLElement | null) => { railRef(n); bal.sideRef.current = n; }, [railRef, bal.sideRef]);
+
+  // Error states keep the head ("Driver") and the breadcrumb (R7): a 404 says
+  // the driver is not there; anything else is a load error with Retry.
+  const stateProps = { type: 'Driver', crumb: 'Drivers', crumbTo: '/fleet/drivers', what: 'this driver',
+    missingTitle: 'There is no driver at this link', missingHint: 'It may have been deleted, or the link is wrong.', backLabel: 'All drivers' };
+  if (isError && !isNotFound(loadError)) return (
+    <RecordState kind="error" {...stateProps} error={loadError} busy={driverQuery.isFetching} onRetry={() => refetch()} />
   );
+  // Wait for the loads and the truck list too: they decide the cards, so
+  // drawing before they land would make the page jump.
+  if ((isLoading || loadsLoading || ledger.loading) && !isError) return <DetailSkeleton crumb="Drivers" crumbTo="/fleet/drivers" />;
+  if (!driver) return <RecordState kind="missing" {...stateProps} />;
 
   const ud = driver.user_details || {};
   const firstName = driver.first_name || ud.first_name || '';
@@ -68,267 +82,209 @@ export default function DriverProfile() {
   const name = (firstName && lastName)
     ? `${firstName} ${lastName}`
     : firstName || driver.name || ud.name || ud.username || `Driver ${driver.id}`;
+  const did = Number(driverId);
+  const status = String(driver.status || '').toUpperCase();
+  const edit = () => navigate(`/fleet/drivers?edit=${did}`);
 
-  const loads = Array.isArray(loadsData) ? loadsData : (loadsData?.results || []);
-  const completedLoads = loads.filter((l: any) => l.status === 'DELIVERED' || l.status === 'INVOICED');
-  const totalRevenue = completedLoads.reduce((s: number, l: any) => s + parseFloat(l.total_amount || '0'), 0);
-  const totalTrips = loads.length;
-  const completedTrips = completedLoads.length;
-  const avgRevPerTrip = completedTrips > 0 ? totalRevenue / completedTrips : 0;
-  const totalDistance = completedLoads.reduce((s: number, l: any) => s + parseFloat(l.distance || '0'), 0);
+  const loads: any[] = Array.isArray(loadsData) ? loadsData : (loadsData?.results || []);
+  const loadsTotal: number = loadsData?.count ?? loads.length;
+  const partial = loadsTotal > loads.length;
+  const perf = performance(loads, null);
+  const deliveredCount = perf.delivered.length;
+  const thin = deliveredCount > 0 && deliveredCount < 3;
 
-  // Financial metrics
-  const totalDistanceKm = loads.reduce((s: number, l: any) => s + parseFloat(l.distance || '0'), 0);
-  const revPerKm = totalDistanceKm > 0 ? totalRevenue / totalDistanceKm : 0;
-  const bestTripAmount = loads.length > 0 ? Math.max(...loads.map((l: any) => parseFloat(l.total_amount || '0'))) : 0;
+  // On time, only where it can be measured: an actual delivery time against the planned date.
+  const timed = perf.delivered.filter((l: any) => l.actual_delivered_at && l.delivery_date);
+  const onTime = timed.filter((l: any) => new Date(l.actual_delivered_at).getTime() <= new Date(l.delivery_date).setHours(23, 59, 59, 999)).length;
 
-  // The driver stats job fills revenue_generated / avg_revenue_per_trip; until
-  // it has run the API sends 0.00, so fall back to the loads on this page
-  // rather than show a false R 0.
-  const recordedRevenue = Number(driver.revenue_generated) > 0 ? Number(driver.revenue_generated) : totalRevenue;
-  const recordedAvg = Number(driver.avg_revenue_per_trip) > 0 ? Number(driver.avg_revenue_per_trip) : avgRevPerTrip;
-  const licenceT = driver.license_expiry ? new Date(driver.license_expiry).getTime() : null;
-  const licenceExpired = licenceT !== null && licenceT < Date.now();
-  const licenceDays = licenceT !== null ? Math.ceil((licenceT - Date.now()) / DAY_MS) : null;
-  const loadsBasis = loadsData?.count && loadsData.count > loads.length ? `the latest ${loads.length} of ${loadsData.count} loads` : `${totalTrips} assigned ${totalTrips === 1 ? 'load' : 'loads'}`;
+  // ---- Truck: assigned on the vehicle record, else the one on their open load.
+  const vehicles: any[] = (ledger.data?.vehicles as any[] | undefined) ?? [];
+  const truck = vehicles.find((v: any) => v.driver === did);
+  const openLoad = loads.filter(isOpenLoad).sort((a, b) => String(b.pickup_date || '').localeCompare(String(a.pickup_date || '')))[0];
+  const plateOf = (l: any) => (String(l?.vehicle_info || '').split(' - ').pop() || '').trim() || null;
+
+  // ---- Now
+  const lastDelivered = latest(loads.filter(isDelivered));
+  const lastWhen = lastDelivered ? dateText(lastDelivered.delivery_date || lastDelivered.pickup_date) : null;
+  const openOrders = <button type="button" className="fd-ghost" onClick={() => navigate('/bookings/orders')}>Open orders</button>;
+  const verb: Record<string, string> = { IN_TRANSIT: 'Driving', LOADING: 'Loading', ASSIGNED: 'Assigned to' };
+  let now: JSX.Element;
+  const stale = staleWork(openLoad);
+  if (openLoad && stale) {
+    // Stale work (R6/R7): one short fact line and one action. The head chip
+    // says the driver's status, the Loads card the load number and the Truck
+    // card the plate, so none of them repeats here.
+    now = (
+      <NowLine dot action={<StaleOrderButton load={openLoad} />}>
+        {staleSentence(openLoad, stale)}
+      </NowLine>
+    );
+  } else if (openLoad) {
+    const to = openLoad.delivery_city || openLoad.delivery_location;
+    const plate = plateOf(openLoad);
+    now = (
+      <NowLine flag={status !== 'ACTIVE' ? `Marked ${formatStatus(status).toLowerCase()}` : undefined} action={undefined}>
+        <strong>{verb[String(openLoad.status).toUpperCase()] ?? 'On'}</strong>
+        {plate ? <> {openLoad.vehicle ? <Link className="fd-inline-link" to={`/fleet/vehicles/${openLoad.vehicle}`}>{plate}</Link> : plate}</> : null}
+        {to ? <> to {to}</> : null}
+        {openLoad.customer_name ? <> for {openLoad.customer_name}</> : null}
+        {' · '}<LoadLink load={openLoad} />
+      </NowLine>
+    );
+  } else if (status === 'ON_LEAVE') {
+    now = <NowLine>On leave{lastWhen ? `, last delivery ${lastWhen}` : ''}</NowLine>;
+  } else if (status === 'INACTIVE') {
+    now = <NowLine>Inactive{lastWhen ? `, last delivery ${lastWhen}` : ''}</NowLine>;
+  } else if (lastDelivered) {
+    const idle = daysSince(lastDelivered.delivery_date || lastDelivered.pickup_date);
+    now = (
+      <NowLine action={openOrders}>
+        <strong>Free{idle !== null && idle > 0 ? ` for ${plural(idle, 'day')}` : ''}</strong>, last delivery <span className="fd-nowrap">{lastWhen}</span>
+        {lastDelivered.delivery_city ? <> in <span className="fd-nowrap">{lastDelivered.delivery_city}</span></> : null}
+      </NowLine>
+    );
+  } else {
+    now = <NowLine action={openOrders}>Free, no loads yet</NowLine>;
+  }
+
+  // ---- Compliance
+  const todos = [
+    dateToDo('licence', 'Licence', driver.license_expiry, LICENCE_SOON_DAYS, { label: 'Add', onClick: edit, aria: 'Add licence expiry' }),
+    dateToDo('medical', 'Medical card', driver.medical_card_expiry, 30, { label: 'Add', onClick: edit, aria: 'Add medical card expiry' }),
+  ].filter(Boolean) as ToDo[];
+
+  // ---- Performance
+  const fleetKm = fleetPerKm(ledger.data?.loads);
+  const figures = perfFigures(perf, { revenueLabel: 'Revenue driven', thin, fleetKm });
+  if (timed.length > 0) figures.push({ label: 'On time', value: `${Math.round((onTime / timed.length) * 100)}%`, note: `${onTime} of ${timed.length} timed` });
+  const basis = <>
+    Delivered and invoiced loads this driver drove, counted in the month of delivery, over the last 12 months (the Reports definition).
+    {' '}Revenue per km uses loads with a distance{perf.km > 0 ? ` (${kmText(perf.km)} here)` : ''}; the fleet figure{fleetKm ? ` (${randCents(fleetKm.perKm)} per km)` : ''} is every delivered load with a distance over the same 12 months, the basis Insights uses. Days on a job count calendar days from pickup to delivery.
+    {' '}On time needs an actual delivery time{timed.length === 0 ? ', and none is recorded yet, so it is not shown' : ''}.
+    {partial ? ` Based on the latest ${loads.length} of ${loadsTotal} loads.` : ''}
+    {perf.older > 0 ? ` ${plural(perf.older, 'older delivered load')} fall outside the 12 months.` : ''}
+  </>;
+
+  const setStatus = async (s: string) => {
+    setUpdating(true);
+    try {
+      await patchData({ url: `api/v1/drivers/${driverId}/`, data: { status: s } });
+      queryClient.invalidateQueries({ queryKey: ['driver', driverId] });
+    } catch (e) { console.error(e); }
+    setUpdating(false);
+  };
+
+  // Years of service are said once, here (R5: a fact appears once per page).
+  const meta = driver.hire_date && dateText(driver.hire_date) ? `Driving for you since ${dateText(driver.hire_date)}` : '';
+
+  // The truck on the vehicle record, else the truck on their open order
+  // (the one the Now line names, said the same way: "On LOAD-… with CA 789
+  // TUV"), else none. Only a truck on the vehicle record is "theirs".
+  const openPlate = openLoad ? plateOf(openLoad) : null;
+  // The truck: a small card in the rail; where the columns need it out of
+  // the rail it folds into the licence card as a row (R8), never a one-line
+  // card stretched across the main column.
+  const truckFolded = bal.inMain('truck');
+  const makeModel = truck ? [truck.make, truck.model].filter(Boolean).join(' ') : '';
+  const truckParts: { primary: JSX.Element; secondary?: string; action?: JSX.Element } = truck ? {
+    primary: <Link className="fd-inline-link" to={`/fleet/vehicles/${truck.id}`}>{truck.plate || `Vehicle ${truck.id}`}</Link>,
+    secondary: makeModel || (truckFolded ? undefined : 'Assigned to this driver'),
+  } : openLoad && openPlate ? {
+    primary: openLoad.vehicle ? <Link className="fd-inline-link" to={`/fleet/vehicles/${openLoad.vehicle}`}>{openPlate}</Link> : <>{openPlate}</>,
+    secondary: 'On the open order · no regular truck',
+  } : {
+    primary: <span className="fd-muted">{truckFolded ? 'None assigned' : 'No truck assigned'}</span>,
+    action: <button type="button" className={truckFolded ? 'fd-ghost fd-ghost--row' : 'fd-ghost'} onClick={edit} aria-label="Assign a truck">Assign</button>,
+  };
+  const truckCard = truckFolded ? null : (
+    <LinkCard title="Truck" className="fd-o-driver" primary={truckParts.primary} secondary={truckParts.secondary} action={truckParts.action} />
+  );
+  // Folded: the card's first line, across the full card width.
+  const truckLead = truckFolded ? (
+    <div className="fd-factlead">
+      <span className="fd-factlead__label">Truck</span>
+      <span className="fd-linkfact">
+        <span className="fd-linkfact__main">{truckParts.primary}{truckParts.action}</span>
+        {truckParts.secondary ? <span className="fd-linkfact__note">{truckParts.secondary}</span> : null}
+      </span>
+    </div>
+  ) : null;
+
+  const contactCard = (
+    <FactsCard className="fd-o-contact" wide={bal.inMain('contact')} title="Contact" facts={[
+      { label: 'Phone', value: phone ? <a className="fd-inline-link" href={`tel:${phone.replace(/\s+/g, '')}`}>{phone}</a> : null, add: edit },
+      { label: 'Email', value: email ? <a className="fd-inline-link fd-break" href={`mailto:${email}`}>{email}</a> : null, add: edit },
+      { label: 'Address', value: ud.address || null },
+      { label: 'Emergency contact', value: [driver.emergency_contact, driver.emergency_phone].filter(Boolean).join(' · ') || null, add: edit },
+    ]} />
+  );
+  const factsCard = (
+    <FactsCard className="fd-o-facts" wide={bal.inMain('facts')} title={truckFolded ? 'Truck and licence' : 'Licence and record'} lead={truckLead} facts={[
+      { label: 'Licence number', value: driver.license_number, mono: true, add: edit },
+      { label: 'Province', value: driver.license_state },
+      { label: 'Violations', value: String(driver.violation_count ?? 0) },
+      { label: 'Accidents', value: String(driver.accident_history ?? 0) },
+    ]} />
+  );
 
   return (
     <div className="fleet-detail">
-      <button className="fd-back" onClick={() => navigate('/fleet/drivers')}>← Back to drivers</button>
-
-      <SectionHeader
-        eyebrow="Driver"
+      <RecordHeader
+        crumb="Drivers"
+        crumbTo="/fleet/drivers"
         title={name}
-        titleAdornment={<span className={`fd-chip fd-chip--${STATUS_TONE[driver.status] || 'neutral'}`}>{formatStatus(driver.status)}</span>}
-        description={phone ? (
-          driver.license_number
-            ? <><span className="fd-id">{driver.license_number}</span> · {phone}</>
-            : phone
-        ) : undefined}
-        tabs={[
-          { label: 'Overview', to: `/fleet/drivers/${driverId}`, end: true },
-          { label: 'Financial profile', to: `/fleet/drivers/${driverId}/financial` },
-        ]}
-        actions={
-          <div className="fd-status-group" role="group" aria-label="Set driver status">
-            {DRIVER_STATUSES.map(s => {
-              const isCurrentStatus = driver.status === s;
-              return (
-                <button
-                  key={s}
-                  className="fd-button fd-status"
-                  aria-pressed={isCurrentStatus}
-                  disabled={isCurrentStatus || updating}
-                  onClick={async () => {
-                    setUpdating(true);
-                    try {
-                      await patchData({ url: `api/v1/drivers/${driverId}/`, data: { status: s } });
-                      queryClient.invalidateQueries({ queryKey: ['driver', driverId] });
-                    } catch (e) { console.error(e); }
-                    setUpdating(false);
-                  }}
-                  style={isCurrentStatus ? undefined : { opacity: updating ? 0.5 : 1 }}
-                >
-                  {formatStatus(s)}
-                </button>
-              );
-            })}
-          </div>
-        }
+        chip={<StatusChip status={driver.status} />}
+        meta={meta || undefined}
+        actions={<>
+          <button type="button" className="fd-button fd-head-secondary" onClick={edit}>Edit driver</button>
+          <StatusControl label="Set driver status" subject={name} options={DRIVER_STATUSES} current={driver.status} busy={updating} onPick={setStatus} />
+        </>}
       />
 
-      {/* ── Overview tab ── */}
-      {!isFinancial && (
-        <>
-          {/* Key figure first: what this driver has delivered, then compliance. */}
-          <section className="card fd-kpis" aria-label="Driver summary">
-            <div className="fd-kpi fd-kpi--lead">
-              <div className="fd-kpi__label">Revenue from completed loads</div>
-              <div className="fd-kpi__value">{completedTrips > 0 ? formatZAR(totalRevenue) : '—'}</div>
-              <div className="fd-kpi__note">{completedTrips > 0 ? `${formatZAR(avgRevPerTrip)} per load on average.` : 'No completed loads yet.'}</div>
-            </div>
-            <div className="fd-kpi">
-              <div className="fd-kpi__label">Completed loads</div>
-              <div className="fd-kpi__value">{completedTrips}<span className="fd-kpi__of">of {totalTrips}</span></div>
-              <div className="fd-kpi__note">Delivered or invoiced, from {loadsBasis}.</div>
-            </div>
-            <div className="fd-kpi">
-              <div className="fd-kpi__label">Licence valid until</div>
-              <div className={`fd-kpi__value${licenceExpired ? ' is-danger' : ''}`}>{driver.license_expiry ? new Date(driver.license_expiry).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</div>
-              <div className="fd-kpi__note">
-                {licenceDays === null ? 'No expiry date recorded.' : licenceExpired ? 'Expired. Renew before assigning loads.' : `${licenceDays} days from today.`}
-              </div>
-            </div>
-          </section>
+      {now}
 
-          <div className="fd-grid">
-            <section className="card fd-card">
-              <h2 className="fd-card__title">Details</h2>
-              <DetailRow label="Licence number" value={driver.license_number} mono />
-              <DetailRow label="Licence province" value={driver.license_state} />
-              <DetailRow label="Phone" value={phone || undefined} />
-              <DetailRow label="Email" value={email || undefined} />
-              <DetailRow label="Address" value={ud.address} />
-              <DetailRow label="Hire date" value={driver.hire_date?.slice(0, 10)} />
-              <DetailRow label="Emergency contact" value={driver.emergency_contact || driver.emergency_phone} />
-              <DetailRow label="Vehicle" value={driver.assigned_vehicle} mono />
-            </section>
+      <div className="fd-record">
+        <div className="fd-main" ref={bal.mainRef}>
+          {/* With loads but none delivered in the window, Performance has one
+              sentence: it becomes the Loads card's sub line (R6: no card
+              holding a single line). */}
+          {(deliveredCount > 0 || loads.length === 0) && (
+            <PerformanceCard
+              className="fd-o-perf"
+              perf={perf}
+              figures={figures}
+              basis={basis}
+              thinLine={perfLine(perf)}
+              empty={deliveredCount === 0 ? {
+                text: <>No loads yet. Assign {firstName || name} to a load to track their work.</>,
+                action: <button type="button" className="fd-ghost" onClick={() => navigate('/bookings/orders')}>Open orders</button>,
+              } : undefined}
+            />
+          )}
 
-            <section className="card fd-card">
-              <h2 className="fd-card__title">Performance</h2>
-              <DetailRow label="Efficiency score" value={driver.efficiency_score || '—'} />
-              <DetailRow label="On-time rate" value={Number(driver.on_time_rate) ? `${Number(driver.on_time_rate).toFixed(0)}%` : '—'} />
-              <DetailRow label="Average rating" value={Number(driver.avg_rating) ? `${driver.avg_rating}` : '—'} />
-              <DetailRow label="Trips this month" value={driver.trips_this_month ?? 0} />
-              <DetailRow label="Total trips" value={driver.total_trips ?? totalTrips} />
-              <DetailRow label="Total distance" value={Number(driver.total_distance) ? `${parseFloat(driver.total_distance).toLocaleString('en-ZA')} km` : totalDistance > 0 ? `${Math.round(totalDistance).toLocaleString('en-ZA')} km` : '—'} />
-              
-            </section>
-          </div>
+          {loads.length > 0 && (
+            <Panel
+              title="Loads"
+              sub={deliveredCount > 0
+                ? (loadsTotal > 1 ? plural(loadsTotal, 'load') : undefined)
+                : `${plural(loadsTotal, 'load')} · none delivered in the last 12 months${perf.older > 0 ? ` (${perf.older} earlier)` : ''}`}
+              flush
+              className="fd-o-loads"
+            >
+              <LoadsTable loads={loads} />
+            </Panel>
+          )}
+          {bal.inMain('contact') && contactCard}
+          {bal.inMain('facts') && factsCard}
+        </div>
 
-          <section className="card fd-card fd-table-card" style={{ marginTop: 24 }}>
-            <h2 className="fd-card__title">Recent loads ({loads.length})</h2>
-            {loads.length === 0 ? (
-              <div className="fd-empty">No loads recorded</div>
-            ) : (
-              <div className="fd-table-scroll" role="region" aria-label="Recent loads" tabIndex={0}>
-                <table className="table-heading-roles fd-table">
-                  <thead>
-                    <tr>
-                      {['Load', 'Route', 'Distance', 'Revenue', 'Status', 'Date'].map(h => (
-                        <th key={h} className={h === 'Distance' || h === 'Revenue' ? 'is-numeric' : undefined}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loads.slice(0, 10).map((load: any) => (
-                      <tr
-                        key={load.id}
-                        onClick={() => navigate(`/bookings/${load.id}`)}
-                      >
-                        <td><span className="fd-id" style={{ color: 'var(--text-primary)' }}>{load.load_number}</span></td>
-                        <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${load.pickup_city || '—'} → ${load.delivery_city || '—'}`}>
-                          {load.pickup_city || '—'} → {load.delivery_city || '—'}
-                        </td>
-                        <td className="is-numeric">{load.distance ? `${parseFloat(load.distance).toFixed(0)} km` : '—'}</td>
-                        <td className="is-numeric" style={{ color: 'var(--text-primary)' }}>{load.total_amount ? formatZAR(parseFloat(load.total_amount)) : '—'}</td>
-                        <td>{formatStatus(load.status)}</td>
-                        <td>{load.created_at ? new Date(load.created_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        </>
-      )}
-
-      {/* ── Financial profile tab ── */}
-      {isFinancial && (
-        <>
-          <section className="card fd-kpis" aria-label="Earnings summary">
-            <div className="fd-kpi fd-kpi--lead">
-              <div className="fd-kpi__label">Revenue generated</div>
-              <div className="fd-kpi__value">{recordedRevenue > 0 ? formatCurrency(recordedRevenue) : '—'}</div>
-              <div className="fd-kpi__note">{driver.total_trips ?? totalTrips} completed loads.</div>
-            </div>
-            <div className="fd-kpi">
-              <div className="fd-kpi__label">Revenue per load</div>
-              <div className="fd-kpi__value">{recordedAvg > 0 ? formatCurrency(recordedAvg) : '—'}</div>
-              <div className="fd-kpi__note">Average across completed loads.</div>
-            </div>
-            <div className="fd-kpi">
-              <div className="fd-kpi__label">Revenue per km</div>
-              <div className="fd-kpi__value">{revPerKm > 0 ? `R ${revPerKm.toFixed(2)}` : '—'}</div>
-              <div className="fd-kpi__note">{totalDistanceKm > 0 ? `Over ${Math.round(totalDistanceKm).toLocaleString('en-ZA')} km across all assigned loads.` : 'No distance recorded on these loads.'}</div>
-            </div>
-          </section>
-
-          <div className="fd-grid">
-            <section className="card fd-card">
-              {/* Recorded facts only. The old safety, experience and compliance
-                  "scores" were invented formulas over these same fields. */}
-              <h2 className="fd-card__title">What is on their record?</h2>
-              <DetailRow label="On-time rate" value={Number(driver.on_time_rate) ? `${Number(driver.on_time_rate).toFixed(0)}%` : '—'} />
-              <DetailRow label="Violations" value={(driver.violation_count ?? 0).toString()} />
-              <DetailRow label="Accidents" value={(driver.accident_history ?? 0).toString()} />
-              <DetailRow label="Experience" value={driver.experience_years ? `${driver.experience_years} years` : '—'} />
-              <DetailRow label="Hire date" value={driver.hire_date?.slice(0, 10) || '—'} />
-              <DetailRow label="Licence expiry" value={driver.license_expiry?.slice(0, 10) || '—'} alert={licenceExpired} />
-            </section>
-
-            <section className="card fd-card">
-              <h2 className="fd-card__title">Earnings breakdown</h2>
-              <DetailRow label="Total revenue" value={recordedRevenue > 0 ? formatCurrency(recordedRevenue) : '—'} />
-              <DetailRow label="Completed loads" value={(driver.total_trips ?? totalTrips).toString()} />
-              <DetailRow label="Average per load" value={recordedAvg > 0 ? formatCurrency(recordedAvg) : '—'} />
-              <DetailRow label="Highest load value" value={bestTripAmount > 0 ? formatCurrency(bestTripAmount) : '—'} />
-              <DetailRow label="Total distance" value={totalDistanceKm > 0 ? `${Math.round(totalDistanceKm).toLocaleString('en-ZA')} km` : '—'} />
-            </section>
-
-            <section className="card fd-card">
-              <h2 className="fd-card__title">How much did they carry each month?</h2>
-              <p className="fd-card__desc">Load totals by month the load was created, last six months with loads.</p>
-              {(() => {
-                const monthMap: Record<string, number> = {};
-                loads.forEach((l: any) => {
-                  if (!l.created_at) return;
-                  const d = new Date(l.created_at);
-                  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-                  monthMap[key] = (monthMap[key] || 0) + parseFloat(l.total_amount || '0');
-                });
-                const months = Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0])).slice(-6);
-                const maxVal = Math.max(...months.map(([, v]) => v), 1);
-                if (months.length === 0) return (
-                  <div className="fd-empty">No loads assigned yet.</div>
-                );
-                return months.map(([key, val]) => {
-                  const [yr, mo] = key.split('-');
-                  const label = new Date(parseInt(yr), parseInt(mo) - 1).toLocaleString('en-ZA', { month: 'short', year: 'numeric' });
-                  const pct = (val / maxVal) * 100;
-                  return (
-                    <div key={key} className="fd-score">
-                      <div className="fd-score__row">
-                        <span className="fd-row__label">{label}</span>
-                        <span className="fd-row__value">R {val.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                      </div>
-                      <div className="fd-score__track" aria-hidden="true">
-                        <div style={{ height: 6, width: `${pct}%`, background: 'var(--accent-primary)', borderRadius: 3 }} />
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </section>
-
-            <section className="card fd-card">
-              <h2 className="fd-card__title">Recent loads ({loads.length})</h2>
-              {loads.length === 0 ? (
-                <div className="fd-empty">No loads recorded</div>
-              ) : loads.slice(0, 8).map((load: any) => (
-                <div
-                  key={load.id}
-                  className="fd-row fd-row--link"
-                  role="link"
-                  tabIndex={0}
-                  onClick={() => navigate(`/bookings/${load.id}`)}
-                  onKeyDown={e => { if (e.key === 'Enter') navigate(`/bookings/${load.id}`); }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div className="fd-id" style={{ color: 'var(--text-primary)' }}>{load.load_number}</div>
-                    <div className="fd-row__label">{load.pickup_city || '—'} → {load.delivery_city || '—'}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div className="fd-row__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</div>
-                    <div className="fd-row__label">{formatStatus(load.status)}</div>
-                  </div>
-                </div>
-              ))}
-            </section>
-          </div>
-        </>
-      )}
+        <aside ref={sideRef} className="fd-side">
+          <ComplianceCard className="fd-o-todo" items={todos} />
+          {truckCard}
+          {!bal.inMain('contact') && contactCard}
+          {!bal.inMain('facts') && factsCard}
+        </aside>
+      </div>
     </div>
   );
 }

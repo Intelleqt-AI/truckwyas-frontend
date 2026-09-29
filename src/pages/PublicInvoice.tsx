@@ -1,18 +1,20 @@
 import './public-document.css';
+import { usePublicTheme } from './usePublicTheme';
+import { StatusChip } from '@/components/ui/StatusChip';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Loader } from '@/components/Loader';
+import { formatDate, formatMoney } from '@/lib/formatters';
 
 const BASE_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/').replace(/\/$/, '');
 
+// House formats: "R 20 505,65" and "5 Apr 2026".
 function fmt(n: string | number) {
-  return new Intl.NumberFormat('en-ZA', {
-    style: 'currency', currency: 'ZAR', minimumFractionDigits: 2,
-  }).format(Number(n));
+  return formatMoney(Number(n) || 0);
 }
 
 function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
+  return formatDate(d.length > 10 ? d : d.slice(0, 10));
 }
 
 // Status presentation only; the API enum is unchanged.
@@ -66,6 +68,7 @@ function HowToPay({ details, invoiceNumber }: { details: PaymentDetails; invoice
 }
 
 export default function PublicInvoice() {
+  usePublicTheme();
   const { id, token } = useParams<{ id: string; token: string }>();
 
   const { data, isLoading, isError } = useQuery({
@@ -87,8 +90,10 @@ export default function PublicInvoice() {
   return (
     <div className="pd">
       <main className="pd-page">
-        {/* Sender identity on the page ground; the document itself below. */}
-        <header className="pd-brand">
+        {/* Sender identity on the page ground; the document itself below.
+            An invalid link has no sender to show: its centred message card is
+            the whole page, so no left-aligned "Invoice" head sits beside it. */}
+        {!isError && <header className="pd-brand">
           <div style={{ minWidth: 0 }}>
             {data?.company_logo_url
               ? <><img className="pd-brand__logo" src={data.company_logo_url} alt={data.company_name || 'Company logo'} /><h1 className="sr-only">{data.company_name}</h1></>
@@ -100,7 +105,7 @@ export default function PublicInvoice() {
               <div className="pd-brand__number">{data.invoice_number}</div>
             </div>
           )}
-        </header>
+        </header>}
 
         {isLoading && (
           <div className="pd-doc"><div className="pd-center"><Loader size={36} label="Loading invoice" /></div></div>
@@ -130,7 +135,7 @@ export default function PublicInvoice() {
                     : data.due_date ? `Due ${fmtDate(data.due_date)}` : 'Payment terms as agreed'}
                 </div>
               </div>
-              <span className={`pd-chip${status.tone ? ` pd-chip--${status.tone}` : ''}`}>{status.label}</span>
+              <StatusChip tone={status.tone || 'neutral'} label={status.label} />
             </section>
 
             <section className="pd-section">
@@ -148,11 +153,11 @@ export default function PublicInvoice() {
                 </div>
                 <div className="pd-field">
                   <div className="pd-label">Issue date</div>
-                  <div className="pd-value">{data.issue_date ? fmtDate(data.issue_date) : '—'}</div>
+                  <div className="pd-value">{data.issue_date ? fmtDate(data.issue_date) : 'Not set'}</div>
                 </div>
                 <div className="pd-field">
                   <div className="pd-label">Due date</div>
-                  <div className="pd-value">{data.due_date ? fmtDate(data.due_date) : '—'}</div>
+                  <div className="pd-value">{data.due_date ? fmtDate(data.due_date) : 'Not set'}</div>
                 </div>
               </div>
             </section>

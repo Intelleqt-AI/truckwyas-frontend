@@ -404,3 +404,27 @@
   .fleet-page .fleet-months__money { display: none; }
   .fleet-page .fleet-route__figures { gap: 8px; }
 }
+
+/* ---- Round 4: calmer Vehicles ---- */
+/* Status/order mismatches read as neutral words in the rows; amber is kept
+   for the one review line above the table and for rows while reviewing. */
+.fleet-page .fleet-doing--mismatch { color: var(--text-secondary); }
+.fleet-page .fleet-review { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.fleet-page .fleet-review__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--status-warning-dot); flex-shrink: 0; }
+.fleet-page .fleet-review__text { font: 500 13px/20px var(--font-sans); color: var(--text-primary); white-space: nowrap; }
+.fleet-page .fleet-review__btn {
+  position: relative; height: 32px; padding: 0 12px; flex-shrink: 0;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-control, 8px);
+  background: none; color: var(--text-primary); font: 500 13px/20px var(--font-sans); cursor: pointer;
+}
+.fleet-page .fleet-review__btn::after { content: ''; position: absolute; inset: -6px -2px; }
+.fleet-page .fleet-review__btn:hover { background: var(--bg-surface-hover); }
+.fleet-page .fleet-review__btn[aria-pressed="true"] { border-color: var(--text-primary); }
+.fleet-page .fleet-review__btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.fleet-page .fleet-health__low { color: var(--text-secondary); font-weight: 400; }
+.fleet-page .fleet-health__low.is-action { color: var(--status-danger-text); font-weight: 500; }
+.fleet-page .fleet-health__fill.is-low { background: var(--status-danger-dot); }
+/* Pickups by month: no empty track behind each bar, just a shared baseline. */
+.fleet-page .fleet-months__track { background: none; border-bottom: 1px solid var(--border-subtle); border-radius: 0; }
+/* The count row is as tall as the Review button from the first paint, so the flag never moves the table. */
+.fleet-page .fleet-toolbar__count { min-height: 32px; }

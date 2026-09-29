@@ -24,11 +24,13 @@
 /* R3: one money column. The overdue part is a quiet second line only when it says something. */
 .customers-typography .cu-owed__sub { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; }
 .customers-typography .cu-owed { vertical-align: middle; }
+.customers-typography .cu-owed__late { color: var(--status-danger-text); }
+.customers-typography .cu-owed__head { display: inline-flex; align-items: center; gap: 4px; }
+/* Even rows: every row takes the two-line height, so a partly overdue
+   balance never makes its row taller than the rest. */
+.customers-typography .bk-table.cu-two-line tbody td { height: 52px; }
 .customers-typography .cu-sort-label { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); letter-spacing: 0; }
 /* With Overdue folded into Owed, names get the room back. */
 .customers-typography .bk-table .bk-col-customer { max-width: 34ch; }
-@container (max-width: 520px) { .customers-typography .bk-table .bk-col-customer { max-width: 24ch; } }
-/* Phone: one primary in the head; the Excel import is a desktop task. */
-@media (max-width: 720px) {
-  .customers-typography .section-header__actions .bk-btn--secondary { display: none; }
-}
+@container (max-width: 520px) { .customers-typography .bk-table .bk-col-customer { max-width: 20ch; } }
+/* Phone: Add customer stays on the title row; Import moves into the head's "⋯" menu (SectionHeader). */

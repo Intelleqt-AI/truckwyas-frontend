@@ -970,6 +970,11 @@ table.fin-table tfoot tr.fin-doc__grand td { font-size: 16px; line-height: 24px;
 .exp-overview .fin-panel-head { margin-bottom: 8px; }
 .exp-overview .fin-rank { gap: 4px; }
 .exp-overview .exp-cat .fin-rank__row { min-height: 28px; padding-top: 4px; padding-bottom: 4px; }
+/* Wide screens: the label column is as wide as the longest category, so
+   the bar gets the rest of the card instead of a 90px stub. */
+@media (min-width: 561px) {
+  .exp-overview .exp-cat .fin-rank__row--compact { grid-template-columns: 96px minmax(48px, 1fr) 84px 36px; column-gap: 12px; }
+}
 .exp-overview .fin-months { flex: 1; height: auto; min-height: 0; }
 /* Summary: the shared stats line, stacked in one column. */
 .exp-overview .exp-summary .tw-kpi-stats__list { flex-direction: column; flex-wrap: nowrap; height: 100%; row-gap: 0; }
@@ -978,11 +983,12 @@ table.fin-table tfoot tr.fin-doc__grand td { font-size: 16px; line-height: 24px;
 .exp-overview .exp-summary .tw-kpi-stats__item:last-child { justify-content: flex-end; }
 .exp-summary .tw-kpi-stats__label .tw-info { margin-left: auto; }
 .exp-summary .tw-kpi-stats__label { width: 100%; }
+/* The one link style: accent text, underline on hover only. */
 .exp-stat-link {
-  padding: 0; border: 0; background: none; font: inherit; color: var(--text-link, var(--accent-primary)); cursor: pointer;
-  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  padding: 0; border: 0; background: none; font: inherit; font-weight: 500; color: var(--link, var(--accent-primary)); cursor: pointer;
+  text-decoration: none; text-underline-offset: 3px;
 }
-.exp-stat-link:hover { text-decoration-color: currentColor; }
+.exp-stat-link:hover { text-decoration: underline; }
 .exp-stat-link:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
 /* Month labels: "Apr" with the year under the first month and each January. */
 .fin-months__lab { display: flex; flex-direction: column; align-items: center; }
@@ -1057,3 +1063,39 @@ table.fin-table tfoot tr.fin-doc__grand td { font-size: 16px; line-height: 24px;
 .fin-page .fin-form .fin-date-field .tw-date-field { height: var(--field-h, 40px); box-sizing: border-box; }
 .fin-page .fin-form .fin-date-field .tw-date-field > input { height: 100%; min-height: 0; }
 .fin-page .fin-rail .fin-rail-btn { height: var(--field-h, 40px); font-size: 14px; }
+
+/* ==== Round 4: invoice document ====
+   Every invoice has a charges table (itemised lines, or its load as one
+   line) and a right-aligned totals block whose figures share the Total
+   column's right edge. Phones: quantity and unit price move under the
+   description, so the table never scrolls sideways. */
+.fin-doc__desc { white-space: normal; overflow-wrap: break-word; }
+.fin-doc__totals {
+  display: flex; flex-direction: column;
+  width: min(100%, 360px); margin: 0 0 0 auto; box-sizing: border-box;
+  padding: 8px var(--card-pad, 20px) var(--card-pad, 20px);
+  border-top: 1px solid var(--border-row);
+}
+.fin-doc__totals > div { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; font: 400 14px/20px var(--font-sans); }
+.fin-doc__totals dt { color: var(--text-secondary); }
+.fin-doc__totals dd { margin: 0; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fin-doc__totals > .is-rule { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
+.fin-doc__totals > .is-total dt, .fin-doc__totals > .is-total dd { font: 600 16px/24px var(--font-sans); color: var(--text-primary); }
+table.fin-table.fin-doc__table .fin-mobile-only { display: none; }
+@media (max-width: 640px) {
+  table.fin-table.fin-doc__table .m-hide { display: none; }
+  table.fin-table.fin-doc__table .fin-mobile-only { display: block; }
+}
+@media (max-width: 767px) { .fin-doc__totals { padding-left: 16px; padding-right: 16px; width: 100%; } }
+
+/* Invoices status filter: five options are a seg on wide screens and a
+   compact menu beside the search on phones. */
+.inv-status-seg { display: contents; }
+.inv-status-menu { display: none; }
+@media (max-width: 767px) {
+  .inv-status-seg { display: none; }
+  .inv-status-menu { display: block; flex: 0 0 136px; min-width: 0; }
+  .fin-page .tw-toolbar.fin-toolbar:has(.inv-status-menu) > .tw-toolbar__meta { flex: 1 1 100%; }
+  .fin-page .tw-toolbar.fin-toolbar > .inv-search { flex: 1 1 0; min-width: 0; }
+  .inv-status-menu .inv-status-select.tw-select-trigger { width: 100%; height: var(--control-h, 44px); min-height: var(--control-h, 44px); padding: 0 10px 0 12px; font-size: 14px; }
+}

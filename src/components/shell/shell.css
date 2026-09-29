@@ -278,8 +278,10 @@
 .tw-top .dashboard-notification-trigger { width: 36px !important; height: 36px !important; min-width: 36px !important; min-height: 36px !important; border-radius: var(--radius-control) !important; }
 .tw-top .dashboard-notification-trigger:hover { background: var(--nav-hover-bg); color: var(--text-primary) !important; }
 .tw-top .dashboard-notification-icon { width: 18px !important; height: 18px !important; }
-/* Unread count: a small neutral ink badge, not an alarm. */
-.tw-top .dashboard-notification-count { background: var(--text-primary) !important; color: var(--bg-surface) !important; top: 3px !important; right: 3px !important; min-width: 16px !important; height: 16px !important; padding: 0 4px !important; font-size: 10px !important; font-weight: 600 !important; box-shadow: 0 0 0 2px var(--bg-deep); }
+/* Unread count: a small neutral ink badge, not an alarm. It sits off the
+   glyph's top-right corner (anchored from the centre so a wider "9+" grows
+   outward, away from the bell) and never covers the bell itself. */
+.tw-top .dashboard-notification-count { background: var(--text-primary) !important; color: var(--bg-surface) !important; top: 2px !important; right: auto !important; left: calc(50% + 5px) !important; min-width: 14px !important; height: 14px !important; padding: 0 3px !important; font-size: 9px !important; line-height: 14px !important; font-weight: 600 !important; letter-spacing: 0; box-shadow: 0 0 0 1.5px var(--bg-deep); }
 
 .tw-pill {
   display: inline-flex; align-items: center; gap: 6px;
@@ -342,6 +344,11 @@
 .os-app-shell .tw-menu__item--danger,
 .os-app-shell .tw-menu__item--danger svg { color: var(--status-danger-text); }
 .os-app-shell .tw-menu__item--danger:hover { color: var(--status-danger-text); }
+.os-app-shell .tw-menu__item.is-danger,
+.os-app-shell .tw-menu__item.is-danger .tw-menu-icon { color: var(--status-danger-text); }
+.os-app-shell .tw-menu__item .tw-menu-icon { display: inline-flex; color: var(--text-tertiary); }
+.os-app-shell .tw-menu__item .tw-rowact-menu__label { flex: 1 1 auto; }
+.tw-menu [role="separator"] { height: 1px; margin: 6px 4px; background: var(--border-subtle); }
 
 /* ------------------------------------------------------------------- main */
 .os-app-shell.tw-shell > .tw-main {
@@ -439,3 +446,6 @@
 /* One content width (DESIGN-PRINCIPLES §11.8): pages fill main up to 1600px,
    left-aligned with the top bar. Page-specific caps and centring go away. */
 .os-app-shell.tw-shell > .tw-main > * { max-width: var(--content-max, 1600px); }
+
+/* Two-state item in the phone "More" sheet (Dark theme: On/Off). */
+.tw-nav__state { margin-left: auto; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }

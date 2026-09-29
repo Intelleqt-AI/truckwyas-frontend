@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { prefetchProps } from './routePrefetch';
-import { Ellipsis, Settings, MessageSquareText, Sun, Moon, LogOut, X } from 'lucide-react';
+import { Ellipsis, Settings, Search, Moon, LogOut, X } from 'lucide-react';
 import { NAV_GROUPS, PHONE_PRIMARY, isItemActive, underPrefix, type NavItem } from './nav';
 
 interface PhoneBarProps {
@@ -111,7 +111,7 @@ export function PhoneBar({ allowed, canAccessSettings, canAsk, open, setOpen, th
               <div className="tw-nav__group-label">Account</div>
               {canAsk && (
                 <Link to="/copilot" className={`tw-nav__item${underPrefix(pathname, '/copilot') ? ' is-active' : ''}`}>
-                  <MessageSquareText className="tw-nav__icon" aria-hidden="true" strokeWidth={1.75} />
+                  <Search className="tw-nav__icon" aria-hidden="true" strokeWidth={1.75} />
                   <span className="tw-nav__label">Ask Copilot</span>
                 </Link>
               )}
@@ -121,11 +121,11 @@ export function PhoneBar({ allowed, canAccessSettings, canAsk, open, setOpen, th
                   <span className="tw-nav__label">Settings</span>
                 </Link>
               )}
-              <button type="button" className="tw-nav__item" onClick={onToggleTheme}>
-                {theme === 'dark'
-                  ? <Sun className="tw-nav__icon" aria-hidden="true" strokeWidth={1.75} />
-                  : <Moon className="tw-nav__icon" aria-hidden="true" strokeWidth={1.75} />}
-                <span className="tw-nav__label">{theme === 'dark' ? 'Light theme' : 'Dark theme'}</span>
+              {/* Same item as the account menu: "Dark theme", with its state shown. */}
+              <button type="button" className="tw-nav__item" role="switch" aria-checked={theme === 'dark'} onClick={onToggleTheme}>
+                <Moon className="tw-nav__icon" aria-hidden="true" strokeWidth={1.75} />
+                <span className="tw-nav__label">Dark theme</span>
+                <span className="tw-nav__state">{theme === 'dark' ? 'On' : 'Off'}</span>
               </button>
               <button type="button" className="tw-nav__item is-danger" onClick={onSignOut}>
                 <LogOut className="tw-nav__icon" aria-hidden="true" strokeWidth={1.75} />

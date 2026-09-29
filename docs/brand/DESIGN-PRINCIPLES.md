@@ -88,7 +88,7 @@ All values live in `src/styles/theme.css`, in the `:root, [data-theme="dark"]` b
   - Link text is `--link` (`#1D4ED8` / `#7DB2FF`).
   - A selected tint is `--accent-dim` (`#EFF5FF` / 10% blue, never a solid navy).
 - **One emphasis tile per page**, reading only the `--emphasis-*` tokens:
-  - **Light** (R3) is calm, like dark: a raised, faintly blue surface `#F4F7FE` with a `#D3E0FB` border, the figure in accent ink `#1D4ED8`, muted text `#434A55`, and a `#2563EB` fill on a 14% blue track. Never a saturated blue slab.
+  - **Light** (R4) is the plain card: the normal card surface (`--bg-surface`, white) and border (`--border-subtle`), with only the figure in accent ink `#1D4ED8`. Muted text is `#434A55`, and a meter inside it is a `#2563EB` fill on a 14% blue track. No tinted fill, never a saturated blue slab.
   - **Dark** is a raised, faintly blue surface: `#16233A` with a `#25406B` border, `#EDEFF2` text, `#A9B9D3` muted text, and a `#6AA6FF` fill. Never a glowing blue block.
   - **Focus** inside the tile uses `--emphasis-focus` (`#1D4ED8` light, white dark).
 - **Active navigation** is a filled pill.
@@ -273,9 +273,10 @@ The shell (`src/components/shell/`) and the primitives at the end of `src/styles
 9. **One page head.** Same coordinates on every page, set by tokens in `theme.css` and applied by `SectionHeader` / `.tw-page-head` and the shell's `<main>`:
    - H1 box top at `--page-head-top` (24px desktop, 16px phone) below the top bar; 28/34 600.
    - The head block is `--page-head-h` (58px: title 34 + 4 + one subtitle line 20); the subtitle line is reserved even when empty, so tabs never move.
-   - Tabs row (40px) at `--head-to-tabs` (16px) below the head; content at `--tabs-to-content` (24px) below the tabs, or `--head-to-content` (24px) below the head when there are no tabs.
+   - Tabs row (40px, 44px on phones) at `--head-to-tabs` (16px) below the head; content at `--tabs-to-content` (24px) below the tabs, or `--head-to-content` (24px) below the head when there are no tabs.
    - Section pages take their H1 from the sidebar item they live under ("Finance", "Quotes and loads", "Fleet"): the nav label and the H1 always agree.
    - Actions and the period control sit on the H1 row.
+   - **Phones (R4):** the H1 row carries at most one compact 36px action (the primary) and a "⋯" menu for the rest, right-aligned; never an action row under the head or under the tabs. `SectionHeader` does this from `actions` automatically (put the `--primary` button last; extras that only belong in the menu go in `menuItems`). If the row still does not fit, the primary joins the menu, then an ID title drops to 24px. Tabs are 44px on phones. Content starts at 146 (untabbed and detail pages) or 202 (tabbed) at 390. Subtitles and breadcrumbs wrap to at most 2 lines, never clip.
    - First data by 150px on lists and analytics, by 200px on details, and by 400px at 390 wide.
 10. **Gutters are 16 or 24px.** Nothing else, at any width.
 11. **Phone grids never orphan.** KPI rows are 2 columns on phones; an odd last tile (the 3rd of 3) spans the row with the same anatomy as its siblings. Never 3-up with truncated labels. `.tw-kpi-row` does this automatically.
@@ -392,6 +393,24 @@ The page toolbar is the first content block. Every control in it is `--control-h
 ```
 
 Plain HTML: `<div class="tw-toolbar">…<span class="tw-toolbar__meta">…</span><div class="tw-toolbar__end">…</div></div>`; search `<label class="tw-search-wrap"><svg/><input class="tw-search"/></label>`.
+
+### `<OverflowMenu>` (`src/components/ui/OverflowMenu.tsx`, styles `.tw-rowact-menu`)
+
+THE "⋯" menu button: `RowActions`, the phone page head and the account menu all use it. Real menu semantics: `aria-haspopup="menu"`, focus moves to the first item on open (ArrowUp: the last), Arrow keys wrap, Home/End, type-ahead, Escape closes and returns focus to the trigger, Tab closes and moves on. Disabled items stay focusable so their reason (`title`) is read. A two-state item (`checked`) is a `menuitemcheckbox` with a check and keeps the menu open.
+
+```tsx
+<OverflowMenu label="Invoice INV-1 actions" items={[
+  { label: 'Download PDF', icon: <Download size={16} />, onSelect: download },
+  { label: 'Dark theme', checked: theme === 'dark', onSelect: toggleTheme },
+  { label: 'Delete', danger: true, onSelect: remove },   // danger items go last, after a divider
+]} />
+```
+
+Props: `trigger`, `triggerLabel`, `triggerClassName`, `header` (non-interactive content above the items), `menuClassName`, `itemClassName`, `portal` (default true: fixed and portalled so no scroll region clips it). `items` may be a function, evaluated when the menu opens.
+
+### `<SectionTabs>` (`src/components/layout/SectionHeader.tsx`)
+
+In-page (state) tabs with the exact route-tab geometry (40px, 44px on phones), for pages like Insights whose tabs switch a query parameter: `<SectionTabs label="Insights sections" tabs={[{ id: 'findings', label: 'Findings' }]} value={tab} onChange={setTab} />` directly after the `SectionHeader`.
 
 ### Missing values
 

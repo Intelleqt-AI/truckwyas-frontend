@@ -65,7 +65,8 @@ export function NotificationBell() {
       <button
         onClick={() => setOpen(o => !o)}
         title="Notifications"
-        aria-label="Notifications"
+        aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+        aria-haspopup="dialog"
         aria-expanded={open}
         className="dashboard-notification-trigger"
         style={{

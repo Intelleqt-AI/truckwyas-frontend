@@ -151,34 +151,49 @@ export function RevenueCostBars({ months }: { months: MonthPoint[] }) {
 
 // ------------------------------------------------------------- quote pipeline
 
-const SENT = ['SENT', 'ACCEPTED', 'DECLINED', 'EXPIRED', 'IT', 'COMPLETED'];
-const WON = ['ACCEPTED', 'IT', 'COMPLETED'];
-const MOVING = ['IT', 'COMPLETED'];
+/**
+ * The Quotes board's stage for a quote (same rules as QuotesList and the
+ * backend's status filter): Accepted also holds the legacy IT/COMPLETED
+ * statuses, and a Sent quote marked lost sits in Declined, not Sent.
+ * Anything else (e.g. EXPIRED) is on no board column and is not counted.
+ */
+export function boardStage(q: any): 'DRAFT' | 'SENT' | 'ACCEPTED' | 'DECLINED' | null {
+  const st = String(q?.status || '').toUpperCase();
+  if (st === 'DRAFT') return 'DRAFT';
+  if (st === 'SENT') return q?.outcome === 'rejected' ? 'DECLINED' : 'SENT';
+  if (st === 'ACCEPTED' || st === 'IT' || st === 'COMPLETED') return 'ACCEPTED';
+  if (st === 'DECLINED') return 'DECLINED';
+  return null;
+}
 
-/** Quotes by how far they got, from the quotes the page already holds. */
-export function usePipeline(quotes: any[]) {
+/**
+ * Quotes by their board column, plus orders on the road. Counts are the
+ * board's (Draft, Sent, Accepted, Declined); "On the road" is the Orders
+ * tab's In transit count (loads with status IN_TRANSIT), not a quote status.
+ */
+export function usePipeline(quotes: any[], loads: any[] = []) {
   return useMemo(() => {
-    const st = (q: any) => String(q.status || '').toUpperCase();
-    const count = (set: string[]) => quotes.filter((q) => set.includes(st(q))).length;
+    const by = { DRAFT: 0, SENT: 0, ACCEPTED: 0, DECLINED: 0 };
+    for (const q of quotes) { const s = boardStage(q); if (s) by[s] += 1; }
+    const onTheRoad = loads.filter((l) => String(l?.status || '').toUpperCase() === 'IN_TRANSIT').length;
     const stages = [
-      { key: 'quoted', label: 'Quoted', count: quotes.length },
-      { key: 'sent', label: 'Sent', count: count(SENT) },
-      { key: 'won', label: 'Accepted', count: count(WON) },
-      { key: 'moving', label: 'On the road', count: count(MOVING) },
-      { key: 'done', label: 'Completed', count: count(['COMPLETED']) },
+      { key: 'draft', label: 'Draft', count: by.DRAFT },
+      { key: 'sent', label: 'Sent', count: by.SENT },
+      { key: 'won', label: 'Accepted', count: by.ACCEPTED },
+      { key: 'moving', label: 'On the road', count: onTheRoad },
+      { key: 'lost', label: 'Declined', count: by.DECLINED },
     ];
-    const awaiting = quotes.filter((q) => st(q) === 'SENT').length;
-    const drafts = quotes.length - count(SENT);
-    const sent = count(SENT);
-    const winRate = sent > 0 ? Math.round((count(WON) / sent) * 100) : null;
-    return { stages, awaiting, drafts, winRate };
-  }, [quotes]);
+    // Every quote that went out: still waiting, accepted or declined.
+    const sentEver = by.SENT + by.ACCEPTED + by.DECLINED;
+    const winRate = sentEver > 0 ? Math.round((by.ACCEPTED / sentEver) * 100) : null;
+    return { stages, awaiting: by.SENT, drafts: by.DRAFT, accepted: by.ACCEPTED, sentEver, winRate };
+  }, [quotes, loads]);
 }
 
 export function PipelineBars({ stages }: { stages: { key: string; label: string; count: number }[] }) {
-  const max = Math.max(1, stages[0]?.count || 0);
+  const max = Math.max(1, ...stages.map((s) => s.count));
   return (
-    <ol className="td-pipe" aria-label="Quotes by how far they progressed">
+    <ol className="td-pipe" aria-label="Quotes by board column, and orders on the road">
       {stages.map((s) => {
         // Stage-to-stage percentages read oddly beside the counts ("3 accepted
         // 75%"); the one rate that matters is the win rate, shown below.

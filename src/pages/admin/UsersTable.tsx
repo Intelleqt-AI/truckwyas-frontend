@@ -30,7 +30,7 @@ const sectionTitleStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
   padding: '8px 12px', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 400,
-  fontFamily: 'var(--font-sans)', minHeight: 40, width: 240,
+  fontFamily: 'var(--font-sans)', height: 36, width: 240, maxWidth: '100%', boxSizing: 'border-box',
 };
 const selectStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
@@ -205,11 +205,11 @@ export default function UsersTable() {
 
   return (
     <div className="card" style={cardStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div className="adm-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Users {data ? `(${data.count})` : ''}</h2>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="adm-toolbar__controls" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
-            className="admin-control"
+            className="admin-control adm-toolbar__search"
             style={inputStyle}
             aria-label="Search users"
             placeholder="Search name, email, company…"
@@ -217,7 +217,7 @@ export default function UsersTable() {
             onChange={e => setSearch(e.target.value)}
           />
           <Select value={statusFilter || 'all'} onValueChange={v => setStatusFilter((v === 'all' ? '' : v) as '' | 'active' | 'inactive')}>
-            <SelectTrigger aria-label="Filter by status" style={{ width: 'auto', minWidth: 150, minHeight: 40 }}>
+            <SelectTrigger aria-label="Filter by status" style={{ width: 'auto', minWidth: 150, height: 36, minHeight: 36 }}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -226,7 +226,7 @@ export default function UsersTable() {
               <SelectItem value="inactive">Inactive</SelectItem>
             </SelectContent>
           </Select>
-          <button className="btn-action admin-control" style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }} onClick={() => setShowCreate(s => !s)}>
+          <button className="btn-action admin-control" style={{ height: 36, minHeight: 36, borderRadius: 'var(--radius-control)' }} onClick={() => setShowCreate(s => !s)}>
             {showCreate ? 'Cancel' : 'New user'}
           </button>
         </div>
@@ -269,9 +269,9 @@ export default function UsersTable() {
             <thead>
               <tr>
                 <th style={thStyle}>Name</th>
-                <th style={thStyle}>Email</th>
-                <th style={thStyle}>Company</th>
-                <th style={thStyle}>Role</th>
+                <th className="adm-col-phone" style={thStyle}>Email</th>
+                <th className="adm-col-phone" style={thStyle}>Company</th>
+                <th className="adm-col-phone" style={thStyle}>Role</th>
                 <th style={thStyle}>Status</th>
                 <th className="adm-col-low" style={thStyle}>Last login</th>
                 <th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th>
@@ -285,10 +285,12 @@ export default function UsersTable() {
                     <td style={tdStyle}>
                       {u.name || '—'}
                       {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)' }}>Superuser</span>}
+                      {/* Phones: email and role ride under the name (their columns fold away). */}
+                      <div className="adm-status-sub adm-owner">{String(u.email || '').split('@')[0]}{String(u.email || '').includes('@') && <><wbr />@{String(u.email).split('@').slice(1).join('@')}</>}{u.role ? ` · ${roleLabel(u.role)}` : ''}</div>
                     </td>
-                    <td style={{ ...tdStyle, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.email}>{u.email}</td>
-                    <td style={tdStyle}>{u.company_name || '—'}</td>
-                    <td style={tdStyle}>{roleLabel(u.role)}</td>
+                    <td className="adm-col-phone" style={{ ...tdStyle, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.email}>{u.email}</td>
+                    <td className="adm-col-phone" style={tdStyle}>{u.company_name || '—'}</td>
+                    <td className="adm-col-phone" style={tdStyle}>{roleLabel(u.role)}</td>
                     <td style={tdStyle}>
                       <StatusChip status={u.is_active ? 'ACTIVE' : 'INACTIVE'} size="sm" />
                     </td>

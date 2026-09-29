@@ -43,25 +43,82 @@
   font-size: 14px; line-height: 20px;
   color: var(--text-tertiary);
   max-width: 72ch;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  /* Wraps to at most 2 lines, never hard-clipped (R4). The line box is a
+     block so the clamp works; the back link and separator stay inline. */
+  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
+.section-header__description > * { vertical-align: top; }
+.section-header__sep { margin: 0 6px; }
 .section-header__back {
-  display: inline-flex; align-items: center; gap: 2px;
+  display: inline-flex; align-items: center; gap: 2px; vertical-align: top; height: 20px;
   color: var(--text-secondary); text-decoration: none; flex-shrink: 0;
 }
 .section-header__back:hover { color: var(--text-primary); }
 .section-header__back:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: var(--radius-chip); }
 .section-header__sep { color: var(--text-tertiary); }
 .section-header__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 34px; }
+/* Overflow "⋯" (phones always; desktop only when the page passes menuItems). */
+.section-header__more { display: none; }
+.section-header.has-menu .section-header__more { display: inline-flex; }
+.section-header__more-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; padding: 0;
+  border: 1px solid var(--border-default, var(--border-subtle)); border-radius: var(--radius-control, 8px);
+  background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;
+}
+.section-header__more-btn:hover,
+.section-header__more-btn[aria-expanded="true"] { background: var(--nav-hover-bg, var(--bg-raised)); color: var(--text-primary); }
+.section-header__more-btn:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
+
 @media (max-width: 768px) {
-  /* Phones: the H1 and the tabs row keep fixed coordinates; actions become a
-     toolbar under the tabs (or under the head when there are no tabs), so a
-     page with three buttons does not push its tabs lower than a page with one. */
-  .section-header__top { display: contents; }
-  .section-header__titles { order: 1; }
-  .section-header__tabs { order: 2; }
-  .section-header__actions { order: 3; width: 100%; min-height: 0; margin-top: 12px; }
-  .section-header__actions:empty { display: none; }
+  /* Phones (R4): the title row carries at most one compact 36px action and
+     the "⋯" menu, right-aligned; the tabs follow the head directly. The
+     actions sit over the title row's right end so the subtitle keeps the
+     full width; the title row reserves their width (--sh-actions-w, set by
+     SectionHeader's fit step). */
+  .section-header { position: relative; }
+  .section-header__top { display: block; }
+  .section-header__titles { min-height: var(--page-head-h, 58px); }
+  .section-header__title { white-space: nowrap; }
+  .section-header[data-sh-fit="4"] .section-header__title { font-size: 24px; letter-spacing: -0.02em; }
+  .section-header[data-sh-fit="5"] .section-header__title { font-size: 24px; letter-spacing: -0.02em; white-space: normal; }
+  .section-header__title-row { padding-right: calc(var(--sh-actions-w, 0px) + 12px); }
+  .section-header__title-row > * { flex-shrink: 0; }
+  .section-header[data-sh-fit="5"] .section-header__title-row > .section-header__title { flex-shrink: 1; min-width: 0; }
+  .section-header__actions {
+    position: absolute; top: -1px; right: 0;
+    flex-wrap: nowrap; gap: 8px; min-height: 36px; margin: 0;
+  }
+  .section-header.has-menu .section-header__more,
+  .section-header[data-sh-more] .section-header__more { display: inline-flex; }
+  /* Moved actions stay mounted at the "⋯" position (their popovers anchor there). */
+  .section-header__actions [data-sh-hidden] {
+    position: absolute !important; top: 0; right: 0;
+    visibility: hidden !important; pointer-events: none;
+  }
+  /* The compact action: 36px drawn, 44px touch target via ::after. */
+  .section-header__actions > *:not([data-sh-hidden]),
+  .section-header__actions [data-sh-primary] {
+    height: 36px !important; min-height: 36px !important;
+    position: relative;
+    white-space: nowrap;
+  }
+  .section-header__actions [data-sh-primary] { padding-left: 12px; padding-right: 12px; }
+  .section-header__actions [data-sh-primary]::after,
+  .section-header__more-btn::after {
+    content: ''; position: absolute; inset: min(0px, calc(50% - 22px));
+  }
+  .section-header__more-btn { position: relative; }
+  .section-header__actions [data-sh-icon] {
+    width: 36px; min-width: 36px !important; padding: 0 !important; gap: 0 !important;
+    font-size: 0 !important; justify-content: center;
+  }
 }
 .section-header__tabs {
   display: flex;
@@ -87,9 +144,16 @@
   text-decoration: none;
   white-space: nowrap;
   /* Underline is drawn inside the box so the active tab never changes height. */
+  border: 0;
   border-bottom: 2px solid transparent;
   box-sizing: border-box;
+  /* Same look when a tab is a <button> (in-page tabs, SectionTabs). */
+  flex-shrink: 0; margin: 0; background: none; cursor: pointer;
+  font-family: var(--font-sans); letter-spacing: normal;
 }
+/* SectionTabs (in-page tabs rendered after a SectionHeader): same rhythm as route tabs. */
+.os-app-shell .section-header:has(+ .section-tabs) { margin-bottom: 0; }
+.section-tabs.section-header__tabs { margin-bottom: var(--tabs-to-content, 24px); }
 /* Reserve the bold width so activating a tab never shifts its neighbours. */
 .section-header__tab::after {
   content: attr(data-label);

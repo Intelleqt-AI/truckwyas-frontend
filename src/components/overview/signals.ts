@@ -60,14 +60,17 @@ export function presentSignal(s: { title?: string; body?: string; action?: strin
   // date, from the same loads the page already has.
   if (/loads?\s+in\s+transit/i.test(rawTitle)) {
     const today = new Date();
-    const late = loads.filter((l) => l?.status === 'IN_TRANSIT' && (toDate(l.delivery_date)?.getTime() ?? Infinity) < today.getTime()).length;
+    const moving = loads.filter((l) => l?.status === 'IN_TRANSIT');
+    const late = moving.filter((l) => (toDate(l.delivery_date)?.getTime() ?? Infinity) < today.getTime()).length;
     const body = rawBody.replace(/\s*All tracking normally\.?/i, '').trim();
-    return {
-      kind: 'fleet',
-      title: sentenceCaseLabel(normaliseFigures(rawTitle)),
-      detail: late > 0 ? `${late} past the delivery date` : normaliseFigures(body),
-      actionLabel,
-    };
+    // The count comes from the same loads as the Orders tab's In transit, and
+    // is said once: "4 loads in transit" + "All past the delivery date".
+    const n = moving.length;
+    const title = n > 0 ? `${n} ${n === 1 ? 'load' : 'loads'} in transit` : sentenceCaseLabel(normaliseFigures(rawTitle));
+    const detail = late > 0
+      ? (late === n ? (n === 1 ? 'Past the delivery date' : 'All past the delivery date') : `${late} of them past the delivery date`)
+      : normaliseFigures(body);
+    return { kind: 'fleet', title, detail, actionLabel };
   }
 
   const fleet = /fleet|vehicle|driver|truck/i.test(`${s.category || ''} ${rawTitle}`);

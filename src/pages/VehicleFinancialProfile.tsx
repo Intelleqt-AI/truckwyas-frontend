@@ -5,39 +5,35 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, patchData } from '@/lib/Api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  AlertsPanel, DetailMessage, MiniStats, DetailSkeleton, Group, InfoTip, Kpi, KpiStrip, Panel, RecordHeader, Row, StatusChip,
-  StatusControl, Tag, dateText, monthsWithRevenue, daysUntil, expiryAlert, formatStatus, isNotFound, kmText, monthlySeries, num, plural,
-  randCents, randWhole, type AlertItem, type Tone,
+  DetailMessage, DetailSkeleton, InfoTip, Panel, RecordHeader, StatusChip, StatusControl,
+  capacityTonnes, dateText, formatStatus, isNotFound, kmText, num, plural,
 } from '@/components/fleet-detail/parts';
-import { MonthlyBars } from '@/components/fleet-detail/MonthlyBars';
+import {
+  ComplianceCard, ConditionCard, FactsCard, LinkCard, LoadLink, NowLine, PerformanceCard,
+  daysSince, isDelivered, isOpenLoad, latest, perfFigures, performance, dateToDo, type ToDo,
+} from '@/components/fleet-detail/record';
 import { formatNumber, formatPercent, formatWeight, sentenceCaseLabel } from '@/lib/formatters';
 import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
 import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
+import { useLedger } from '@/components/reports/data';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import { Link } from 'react-router-dom';
 
 const VEHICLE_STATUSES = ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'OUT_OF_SERVICE'] as const;
-
-const STATUS_TONE: Record<string, Tone> = {
-  AVAILABLE: 'success',
-  ACTIVE: 'success',
-  IN_USE: 'info',
-  MAINTENANCE: 'warning',
-  OUT_OF_SERVICE: 'neutral',
-  INACTIVE: 'neutral',
-};
 
 /** The model default for `fuel_consumption_per_km` (core/models/vehicle.py). */
 const DEFAULT_L_PER_KM = 0.35;
 /** Warn this many km before a service falls due. */
 const SERVICE_SOON_KM = 1000;
 
-/* One page per truck: identity and actions, the money strip, revenue by
-   month and recent loads on the left, every stored field and real alerts on
-   the right. /fleet/vehicles/:id and /fleet/vehicles/:id/financial both land
-   here. Figures the backend models (cost per km, margin after fuel, the
-   condition scores) are tagged as such; cost per km is withheld while it can
-   only be the default-consumption fallback. */
+/* One page per truck (owner redesign, round 4). The head says what it is
+   (plate, make and model, type, year, payload) and what it is doing now;
+   the main column says what it earns (Performance, then its loads with
+   money); the rail holds what the owner acts on (Compliance to-dos), its
+   condition, and the facts. /fleet/vehicles/:id and /:id/financial both
+   land here. Figures come from this truck's loads and the Reports expense
+   ledger only. */
 export default function VehicleFinancialProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -68,6 +64,9 @@ export default function VehicleFinancialProfile() {
     enabled: !!id,
   });
 
+  // Costs logged on this truck, from the same expense ledger as the P&L.
+  const ledger = useLedger(['expenses']);
+
   const { data: vtData } = useQuery({
     queryKey: ['vehicle-types'],
     queryFn: () => fetchData('api/v1/vehicle-types/'),
@@ -94,8 +93,9 @@ export default function VehicleFinancialProfile() {
       <LoadError what="this vehicle" error={loadError} busy={vehicleQuery.isFetching} onRetry={() => refetch()} />
     </div>
   );
-  // Loads decide the layout (one column or a rail): wait for them so nothing jumps.
-  if ((isLoading || loadsLoading) && !isError) return <DetailSkeleton crumb="Vehicles" crumbTo="/fleet/vehicles" />;
+  // Loads and the cost ledger decide the cards: wait for them so nothing jumps.
+  // A failed ledger does not block the page; the margin figure is left out.
+  if ((isLoading || loadsLoading || ledger.loading) && !isError) return <DetailSkeleton crumb="Vehicles" crumbTo="/fleet/vehicles" />;
   if (!vehicle) return (
     <DetailMessage
       title="Vehicle not found"
@@ -106,25 +106,15 @@ export default function VehicleFinancialProfile() {
 
   const loads: any[] = Array.isArray(loadsData) ? loadsData : (loadsData?.results || []);
   const loadsTotal: number = loadsData?.count ?? loads.length;
-  const delivered = loads.filter((l: any) => l.status === 'DELIVERED');
-  const totalRevenue = delivered.reduce((s: number, l: any) => s + num(l.total_amount), 0);
-  const avgRevPerTrip = delivered.length > 0 ? totalRevenue / delivered.length : 0;
-  const totalDistance = delivered.reduce((s: number, l: any) => s + num(l.distance), 0);
-  const revPerKm = totalDistance > 0 ? totalRevenue / totalDistance : 0;
-  const months = monthlySeries(delivered);
-  const monthLabels = months.map(m => m.label);
   const partial = loadsTotal > loads.length;
+  const vid = Number(id);
+  const expenses = ledger.data ? ledger.data.expenses.filter((e: any) => e.vehicle === vid) : null;
+  const perf = performance(loads, expenses);
+  const deliveredCount = perf.delivered.length;
+  const thin = deliveredCount > 0 && deliveredCount < 3;
 
-  // Stored economics. cost_per_km is modelled fuel (L/km × settings diesel)
-  // plus logged maintenance; with no km, or with the 0.35 L/km model default,
-  // it is the fallback, so it is withheld rather than shown as a fact.
   const lPerKm = num(vehicle.fuel_consumption_per_km);
   const defaultFuel = Math.abs(lPerKm - DEFAULT_L_PER_KM) < 0.001;
-  const storedCostPerKm = num(vehicle.cost_per_km);
-  const costPerKmReal = storedCostPerKm > 0 && totalDistance > 0 && !defaultFuel;
-  const marginPerTrip = num(vehicle.margin_per_trip);
-
-  const healthScore = vehicle.ai_health_score ?? 0;
 
   const nextServiceKm = (vehicle.service_interval_km && vehicle.last_service_mileage)
     ? parseFloat(vehicle.last_service_mileage) + Number(vehicle.service_interval_km)
@@ -132,19 +122,6 @@ export default function VehicleFinancialProfile() {
   const kmUntilService = (nextServiceKm !== null && vehicle.mileage)
     ? nextServiceKm - parseFloat(vehicle.mileage)
     : null;
-
-  const alerts = [
-    kmUntilService !== null && kmUntilService <= 0
-      ? { key: 'service', tone: 'danger', text: 'Service overdue', when: `${kmText(-kmUntilService)} over` } as AlertItem
-      : kmUntilService !== null && kmUntilService <= SERVICE_SOON_KM
-        ? { key: 'service', tone: 'warning', text: `Service due in ${kmText(kmUntilService)}`, when: nextServiceKm ? `at ${kmText(nextServiceKm)}` : null } as AlertItem
-        : null,
-    expiryAlert('maint', 'Maintenance', vehicle.next_maintenance_due, 14),
-    expiryAlert('reg', 'Registration', vehicle.registration_expiry, 30),
-    expiryAlert('ins', 'Insurance', vehicle.insurance_expiry, 30),
-  ].filter(Boolean) as AlertItem[];
-  // "Maintenance expired" reads wrong; a past due date is "overdue".
-  alerts.forEach(a => { if (a.key === 'maint') a.text = a.text.replace('expired', 'overdue').replace('expires', 'due'); });
 
   const openEdit = () => {
     setShowEditForm(true);
@@ -177,12 +154,131 @@ export default function VehicleFinancialProfile() {
   };
 
   const makeModel = [vehicle.make, vehicle.model].filter(Boolean).join(' ');
-  const meta = [makeModel, sentenceCaseLabel(vehicle.vehicle_type_name), vehicle.year].filter(Boolean).join(' · ');
+  const tonnes = capacityTonnes(vehicle);
+  // Year steps aside on phones so the subtitle keeps one line (content at 146).
+  const metaParts = [
+    makeModel && { k: 'mm', v: makeModel },
+    vehicle.vehicle_type_name && { k: 'type', v: sentenceCaseLabel(vehicle.vehicle_type_name) },
+    vehicle.year && { k: 'year', v: String(vehicle.year), phoneHide: true },
+    tonnes && { k: 't', v: formatWeight(tonnes) },
+  ].filter(Boolean) as { k: string; v: string; phoneHide?: boolean }[];
+  const meta = metaParts.length ? <>{metaParts.map((m, i) => (
+    <span key={m.k} className={m.phoneHide ? 'fd-hide-phone' : undefined}>{i > 0 ? ' · ' : ''}{m.v}</span>
+  ))}</> : null;
   const title = vehicle.plate || vehicle.registration || `Vehicle ${id}`;
-  const score = (v: any) => (Number(v) ? `${v}` : null);
-  const regDays = daysUntil(vehicle.registration_expiry);
-  const hasDelivered = delivered.length > 0;
-  const wideLayout = !hasDelivered || loads.length < 6;
+  const status = String(vehicle.status || '').toUpperCase();
+
+  // ---- Now: from the open order that names this truck, else its status.
+  const openLoad = loads.filter(isOpenLoad).sort((a, b) => String(b.pickup_date || '').localeCompare(String(a.pickup_date || '')))[0];
+  const lastDelivered = latest(loads.filter(isDelivered));
+  const lastWhen = lastDelivered ? dateText(lastDelivered.delivery_date || lastDelivered.pickup_date) : null;
+  const idleDays = lastDelivered ? daysSince(lastDelivered.delivery_date || lastDelivered.pickup_date) : null;
+  const openOrders = <button type="button" className="fd-ghost" onClick={() => navigate('/bookings/orders')}>Open orders</button>;
+  let now: JSX.Element;
+  if (openLoad) {
+    const to = openLoad.delivery_city || openLoad.delivery_location;
+    const driverName = vehicle.driver_name || openLoad.driver_name;
+    const flag = status === 'AVAILABLE' ? 'Marked available' : status === 'MAINTENANCE' || status === 'OUT_OF_SERVICE' ? `Marked ${formatStatus(status).toLowerCase()}` : undefined;
+    now = (
+      <NowLine flag={flag}>
+        <strong>{({ IN_TRANSIT: 'In transit', LOADING: 'Loading', ASSIGNED: 'Assigned' } as Record<string, string>)[String(openLoad.status).toUpperCase()] ?? 'On an order'}</strong>{': '}
+        {driverName ? driverName : <span className="fd-now__warn">no driver on the order</span>}
+        {to ? <> to {to}</> : null}
+        {openLoad.customer_name ? <> for {openLoad.customer_name}</> : null}
+        {' · '}<LoadLink load={openLoad} />
+      </NowLine>
+    );
+  } else if (status === 'IN_USE') {
+    now = (
+      <NowLine flag="No open order" action={openOrders}>
+        Marked in use{lastWhen ? `, last load delivered ${lastWhen}` : ', and it has no loads'}
+      </NowLine>
+    );
+  } else if (status === 'MAINTENANCE') {
+    now = <NowLine>In maintenance{vehicle.last_maintenance_date ? ` since ${dateText(vehicle.last_maintenance_date)}` : ''}</NowLine>;
+  } else if (status === 'OUT_OF_SERVICE' || status === 'INACTIVE') {
+    now = <NowLine>{formatStatus(status)}</NowLine>;
+  } else if (lastDelivered && idleDays !== null) {
+    now = (
+      <NowLine action={openOrders}>
+        <strong>Idle {plural(Math.max(0, idleDays), 'day')}</strong>, last load delivered {lastWhen}
+        {lastDelivered.delivery_city ? ` in ${lastDelivered.delivery_city}` : ''}
+      </NowLine>
+    );
+  } else {
+    now = <NowLine>Available, no loads yet</NowLine>;
+  }
+
+  // ---- Compliance: what the owner acts on.
+  const addEdit = (what: string) => ({ label: 'Add', onClick: openEdit, aria: `Add ${what}` });
+  const todos: ToDo[] = [];
+  if (kmUntilService !== null) {
+    todos.push(kmUntilService <= 0
+      ? { key: 'service', tone: 'danger', title: 'Service overdue', detail: `${kmText(-kmUntilService)} over · due at ${kmText(nextServiceKm!)}` }
+      : { key: 'service', tone: kmUntilService <= SERVICE_SOON_KM ? 'warning' : 'ok', title: `Service due in ${kmText(kmUntilService)}`, detail: `At ${kmText(nextServiceKm!)}` });
+  } else {
+    todos.push({ key: 'service', tone: 'missing', title: 'Service interval', detail: vehicle.service_interval_km ? 'Last service odometer not recorded' : 'Not recorded', action: addEdit('service interval') });
+  }
+  [
+    dateToDo('reg', 'Licence disc', vehicle.registration_expiry, 30, addEdit('licence disc expiry')),
+    dateToDo('ins', 'Insurance', vehicle.insurance_expiry, 30),
+  ].forEach(t => { if (t) todos.push(t); });
+  const maintDays = vehicle.next_maintenance_due ? daysSince(vehicle.next_maintenance_due) : null;
+  if (maintDays !== null) {
+    todos.push(maintDays > 0
+      ? { key: 'maint', tone: 'danger', title: 'Maintenance overdue', detail: `${plural(maintDays, 'day')} · ${dateText(vehicle.next_maintenance_due)}` }
+      : { key: 'maint', tone: -maintDays <= 14 ? 'warning' : 'ok', title: maintDays === 0 ? 'Maintenance due today' : `Maintenance due in ${plural(-maintDays, 'day')}`, detail: dateText(vehicle.next_maintenance_due) });
+  }
+
+  // ---- Performance
+  const basis = <>
+    Delivered and invoiced loads on this truck, counted in the month of delivery, over the last 12 months (the Reports definition).
+    {' '}Margin after truck costs: revenue less approved expenses logged on this truck (fuel, tolls, maintenance, insurance) in the same months; expenses waiting for approval are listed, not deducted, as in the P&L.
+    {' '}Revenue per km uses loads with a distance. Days on a job count calendar days from pickup to delivery.
+    {partial ? ` Based on the latest ${loads.length} of ${loadsTotal} loads.` : ''}
+    {perf.older > 0 ? ` ${plural(perf.older, 'older delivered load')} fall outside the 12 months.` : ''}
+  </>;
+  const figures = perfFigures(perf, { revenueLabel: 'Revenue', thin, costs: true });
+
+  // ---- Condition
+  const overall = Number(vehicle.ai_health_score) || null;
+  const uptimePct = Number(vehicle.uptime_percentage) ? formatPercent(parseFloat(vehicle.uptime_percentage), 1) : null;
+
+  // ---- Driver
+  const driverId = vehicle.driver ?? null;
+  const driverName = vehicle.driver_name || null;
+  const driverCard = driverId && driverName ? (
+    <LinkCard title="Driver" className="fd-o-driver"
+      primary={<Link className="fd-inline-link" to={`/fleet/drivers/${driverId}`}>{driverName}</Link>}
+      secondary="Assigned to this truck" />
+  ) : openLoad?.driver_name ? (
+    <LinkCard title="Driver" className="fd-o-driver"
+      primary={openLoad.driver ? <Link className="fd-inline-link" to={`/fleet/drivers/${openLoad.driver}`}>{openLoad.driver_name}</Link> : openLoad.driver_name}
+      secondary={<>On {openLoad.load_number}, not assigned to the truck</>}
+      action={<button type="button" className="fd-ghost" onClick={openEdit}>Assign</button>} />
+  ) : (
+    <LinkCard title="Driver" className="fd-o-driver" primary={<span className="fd-muted">No driver assigned</span>}
+      action={<button type="button" className="fd-ghost" onClick={openEdit}>Assign</button>} />
+  );
+
+  // With no loads the main column is short: the facts sit there, two columns wide.
+  const factsCard = (
+    <FactsCard className={`fd-o-facts${loads.length === 0 ? ' fd-facts--wide' : ''}`} title="Vehicle" facts={[
+                { label: 'Registration', value: vehicle.plate, mono: true },
+                { label: 'VIN', value: vehicle.vin, mono: true, add: openEdit },
+                { label: 'Make and model', value: makeModel || null, add: openEdit },
+                { label: 'Type', value: sentenceCaseLabel(vehicle.vehicle_type_name) || null },
+                { label: 'Year', value: vehicle.year, add: openEdit },
+                { label: 'Payload', value: tonnes ? formatWeight(tonnes) : null, add: openEdit },
+                { label: 'Fuel', value: vehicle.fuel_type ? formatStatus(vehicle.fuel_type) : null },
+                {
+                  label: 'Fuel use',
+                  value: lPerKm ? <>{formatNumber(lPerKm, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L/km{defaultFuel ? <span className="fd-row__note fd-muted">default</span> : null}</> : null,
+                },
+                { label: 'Odometer', value: Number(vehicle.mileage) ? kmText(parseFloat(vehicle.mileage)) : null, add: openEdit },
+                { label: 'Last maintenance', value: dateText(vehicle.last_maintenance_date) },
+              ]} />
+  );
 
   return (
     <div className="fleet-detail">
@@ -193,136 +289,52 @@ export default function VehicleFinancialProfile() {
         chip={<StatusChip status={vehicle.status} />}
         meta={meta || undefined}
         actions={<>
+          <button type="button" className="fd-button fd-head-secondary" onClick={openEdit}>Edit vehicle</button>
           <StatusControl label="Set vehicle status" subject={title} options={VEHICLE_STATUSES} current={vehicle.status} busy={updating} onPick={setStatus} />
-          <button type="button" className="fd-button" onClick={openEdit}>Edit vehicle</button>
         </>}
       />
 
-      {hasDelivered ? (
-      <KpiStrip label="Truck economics">
-        <Kpi
-          label="Revenue"
-          value={delivered.length > 0 ? randWhole(totalRevenue) : null}
-          empty="No delivered loads"
-          sub={delivered.length > 1 ? <>{randWhole(avgRevPerTrip)} per load</> : delivered.length === 1 ? 'From 1 load' : undefined}
-          info={<>Delivered loads on this truck{partial ? `, latest ${loads.length} of ${loadsTotal}` : ''}. Invoiced and in-progress loads are not counted.</>}
-        />
-        <Kpi
-          label="Cost per km"
-          value={costPerKmReal ? randCents(storedCostPerKm) : null}
-          tag={costPerKmReal ? <Tag>Modelled</Tag> : undefined}
-          sub={revPerKm > 0 ? <>Earns {randCents(revPerKm)} per km</> : undefined}
-          info={costPerKmReal
-            ? <>Modelled: fuel at {formatNumber(lPerKm, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L/km times the diesel price in settings, plus maintenance logged on this truck, over delivered km.</>
-            : <>Needs this truck's own fuel use{totalDistance > 0 ? '' : ' and delivered km'}. The stored {storedCostPerKm ? randCents(storedCostPerKm) : 'figure'} uses the {DEFAULT_L_PER_KM} L/km default, so it is not shown.{revPerKm > 0 ? ` Earnings per km are from ${kmText(totalDistance)} of delivered loads.` : ''}</>}
-        />
-        <Kpi
-          label="Margin after fuel"
-          value={marginPerTrip && delivered.length > 0 ? randWhole(marginPerTrip) : null}
-          empty={delivered.length > 0 ? 'Not calculated' : 'No delivered loads'}
-          tag={marginPerTrip && delivered.length > 0 ? <Tag>Modelled</Tag> : undefined}
-          sub={marginPerTrip && delivered.length > 0 ? 'Per load' : undefined}
-          info={<>Average revenue per completed load less modelled fuel (distance × {formatNumber(lPerKm || DEFAULT_L_PER_KM, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L/km{defaultFuel ? ', the default' : ''} × settings diesel). Tolls, driver and fixed costs are not deducted.</>}
-        />
-        <Kpi
-          label="Loads delivered"
-          value={formatNumber(delivered.length)}
-          sub={delivered.length === loads.length && !partial ? (loads.length === 1 ? 'Its only load' : 'All of its loads') : <>of {plural(loads.length, 'load')}{partial ? ` (latest of ${loadsTotal})` : ''}</>}
-        />
-      </KpiStrip>
-      ) : (
-        <section className="fd-panel fd-empty-line" aria-label="Truck economics">
-          <p className="fd-empty-line__text">No delivered loads yet. Assign {title} to a load to see what it earns.</p>
-          <button type="button" className="fd-button" onClick={() => navigate('/bookings/orders')}>Open orders</button>
-        </section>
-      )}
+      {now}
 
-      {/* Few loads: one column, with Details laid out across the width, so the
-          two columns never end hundreds of pixels apart. Otherwise the side
-          rail is sticky beside the longer main column. */}
-      <div className={`fd-body${wideLayout ? ' fd-body--wide' : ''}`}>
-        {(hasDelivered || loads.length > 0) && (
+      <div className="fd-record">
         <div className="fd-main">
-          {hasDelivered && monthsWithRevenue(months) >= 2 && (
-          <Panel
-            title="Revenue by month"
-            sub="Delivered loads, last 12 months"
-            info={<>Each load counts in the month of its delivery date (pickup or created date when missing).{partial ? ` Based on the latest ${loads.length} of ${loadsTotal} loads.` : ''}</>}
-            aside={delivered.length > 0 ? <span className="fd-aside-figure">{randWhole(months.reduce((s, m) => s + m.revenue, 0))}</span> : undefined}
-          >
-            {delivered.length > 0
-              ? <MonthlyBars data={months} caption="Delivered revenue by month" />
-              : <p className="fd-empty">No delivered loads yet.</p>}
-            <MiniStats items={[
-              { label: 'Revenue per load', value: delivered.length > 0 ? randWhole(avgRevPerTrip) : null },
-              { label: 'Revenue per km', value: revPerKm > 0 ? randCents(revPerKm) : null },
-              { label: 'Delivered distance', value: totalDistance > 0 ? kmText(totalDistance) : null },
-              { label: 'Fuel use', value: lPerKm ? `${formatNumber(lPerKm, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L/km` : null, note: defaultFuel ? <Tag>Default</Tag> : undefined },
-            ]} />
-          </Panel>
-          )}
+          <PerformanceCard
+            className="fd-o-perf"
+            perf={perf}
+            figures={figures}
+            basis={basis}
+            thinLine={thin ? <>{plural(deliveredCount, 'load')} so far. Figures build as it runs.</> : undefined}
+            empty={deliveredCount === 0 ? {
+              text: loads.length > 0
+                ? <>{plural(loads.length, 'load')} on this truck, none delivered in the last 12 months.</>
+                : <>Assign {title} to a load to see what it earns.</>,
+              action: loads.length === 0 ? <button type="button" className="fd-ghost" onClick={() => navigate('/bookings/orders')}>Open orders</button> : undefined,
+            } : undefined}
+          />
 
           {loads.length > 0 && (
-          <Panel title="Recent loads" sub={plural(loadsTotal, 'load')} flush>
-            <LoadsTable loads={loads} />
-          </Panel>
+            <Panel title="Loads" sub={plural(loadsTotal, 'load')} flush className="fd-o-loads">
+              <LoadsTable loads={loads} />
+            </Panel>
           )}
+
+          <ConditionCard
+            className="fd-o-condition"
+            overall={overall}
+            info={<>Rule-based, not a prediction: maintenance 35%, uptime 25%, fuel use 25% and age 15%, each out of 100. A factor with no data scores a neutral value. 80 or more is good, 60 to 79 fair, 40 to 59 low; below 40 needs action.</>}
+            parts={[
+              { label: 'Maintenance', score: Number(vehicle.maintenance_score) || null },
+              { label: 'Fuel efficiency', score: Number(vehicle.fuel_efficiency_score) || null },
+              { label: 'Uptime', score: Number(vehicle.uptime_score) || null, note: uptimePct ? `${uptimePct} of the time` : undefined },
+            ]}
+          />
+          {loads.length === 0 && factsCard}
         </div>
-        )}
 
         <aside ref={railRef} className="fd-side">
-          <AlertsPanel items={alerts} />
-
-          <Panel title="Details">
-            <div className="fd-groups">
-            <Group title="Vehicle" onAdd={openEdit} rows={[
-              { label: 'Registration', value: vehicle.plate, mono: true },
-              { label: 'VIN', value: vehicle.vin, mono: true },
-              { label: 'Make and model', value: makeModel || null },
-              { label: 'Type', value: sentenceCaseLabel(vehicle.vehicle_type_name) || null },
-              { label: 'Year', value: vehicle.year },
-              { label: 'Capacity', value: vehicle.capacity ? formatWeight(parseFloat(vehicle.capacity) / 1000) : null },
-              { label: 'Fuel type', value: vehicle.fuel_type ? formatStatus(vehicle.fuel_type) : null },
-              { label: 'Driver', value: vehicle.driver_name },
-            ]} />
-
-            <Group title="Service and compliance" onAdd={openEdit} rows={[
-              { label: 'Odometer', value: Number(vehicle.mileage) ? kmText(parseFloat(vehicle.mileage)) : null },
-              { label: 'Last maintenance', value: dateText(vehicle.last_maintenance_date) },
-              { label: 'Service interval', value: vehicle.service_interval_km ? kmText(Number(vehicle.service_interval_km)) : null },
-              { label: 'Last service odometer', value: vehicle.last_service_mileage ? kmText(parseFloat(vehicle.last_service_mileage)) : null },
-              { label: 'Next service at', value: nextServiceKm ? kmText(nextServiceKm) : null, derived: true },
-              {
-                label: 'Km until service',
-                value: kmUntilService !== null ? (kmUntilService > 0 ? kmText(kmUntilService) : 'Overdue') : null,
-                tone: kmUntilService !== null && kmUntilService <= 0 ? 'danger' : kmUntilService !== null && kmUntilService <= SERVICE_SOON_KM ? 'warning' : undefined,
-                derived: true,
-              },
-              {
-                label: 'Registration expiry',
-                value: dateText(vehicle.registration_expiry),
-                tone: regDays !== null && regDays < 0 ? 'danger' : regDays !== null && regDays <= 30 ? 'warning' : undefined,
-              },
-              { label: 'Insurance expiry', value: dateText(vehicle.insurance_expiry), derived: !vehicle.insurance_expiry },
-            ]} />
-
-            <Group
-              title="Condition scores"
-              missingText={healthScore ? undefined : 'Not scored yet'}
-              extra={<>
-                <Tag>Rule-based</Tag>
-                <InfoTip label="condition scores">Out of 100, from a fixed formula: maintenance 35%, uptime 25%, fuel 25%, age 15%. A factor with no data scores a neutral value, so treat these as indicative.</InfoTip>
-              </>}
-              rows={[
-                { label: 'Health score', value: score(healthScore) },
-                { label: 'Uptime score', value: score(vehicle.uptime_score) },
-                { label: 'Fuel efficiency', value: score(vehicle.fuel_efficiency_score) },
-                { label: 'Maintenance score', value: score(vehicle.maintenance_score) },
-                { label: 'Uptime', value: Number(vehicle.uptime_percentage) ? formatPercent(parseFloat(vehicle.uptime_percentage), 1) : null },
-              ]}
-            />
-            </div>
-          </Panel>
+          <ComplianceCard className="fd-o-todo" items={todos} />
+          {driverCard}
+          {loads.length > 0 && factsCard}
         </aside>
       </div>
 

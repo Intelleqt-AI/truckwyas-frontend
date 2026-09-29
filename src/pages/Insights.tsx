@@ -2,7 +2,9 @@ import './insights-page-brand.css';
 import { localDateISO } from '@/lib/dates';
 import { useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import SectionHeader from '@/components/layout/SectionHeader';
 import { Segmented } from '@/components/ui/Segmented';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import InsightCard from '@/components/insights/InsightCard';
 import KpiTile from '@/components/insights/KpiTile';
 import RankedList from '@/components/insights/RankedList';
@@ -32,12 +34,13 @@ const monthSpan = (a: string, b: string) => (a === b ? monthYear(a) : a.slice(0,
 type TabType = 'findings' | 'margin' | 'paid' | 'fleet' | 'lanes';
 type PeriodType = PeriodId;
 
-const TABS: { id: TabType; label: string }[] = [
-  { id: 'findings', label: 'Findings' },
-  { id: 'margin', label: 'Margin' },
-  { id: 'paid', label: 'Getting paid' },
-  { id: 'fleet', label: 'Fleet' },
-  { id: 'lanes', label: 'Lanes' },
+// Each tab carries its own subtitle (at most 8 words): the question it answers.
+const TABS: { id: TabType; label: string; subtitle: string }[] = [
+  { id: 'findings', label: 'Findings', subtitle: 'Findings worth money, each with one next step' },
+  { id: 'margin', label: 'Margin', subtitle: 'What you keep after approved costs' },
+  { id: 'paid', label: 'Getting paid', subtitle: 'How fast invoices turn into cash' },
+  { id: 'fleet', label: 'Fleet', subtitle: 'Which trucks bring in the revenue' },
+  { id: 'lanes', label: 'Lanes', subtitle: 'Which routes pay best per kilometre' },
 ];
 
 // The Profit and loss report's periods: whole calendar months, the current one included.
@@ -91,16 +94,14 @@ export default function Insights() {
 
   return (
     <div className="insights-page-brand">
-      <header className="tw-page-head insights-header">
-        <div className="tw-page-head__titles">
-          <h1 className="tw-title">Insights</h1>
-          <p className="tw-subtitle">Findings worth money, each with one next step.</p>
-        </div>
-      </header>
+      {/* THE page head (same component and geometry as every other page); the
+          tabs switch on a query parameter, so they are rendered below it. */}
+      <SectionHeader title="Insights" description={TABS.find(t => t.id === tab)!.subtitle} />
 
-      <nav className="insights-tabs" aria-label="Insights sections">
+      {/* The shared section tab row (section-header.css): one tab height on every tabbed page. */}
+      <nav className="section-header__tabs insights-tabs" aria-label="Insights sections">
         {TABS.map(t => (
-          <button key={t.id} type="button" className="insights-brand-tab" aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>
+          <button key={t.id} type="button" data-label={t.label} className={`section-header__tab insights-brand-tab${tab === t.id ? ' is-active' : ''}`} aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>
             {t.label}
           </button>
         ))}
@@ -136,7 +137,21 @@ function MarginTab({ period, setPeriod, customFrom, setCustomFrom, customTo, set
     <Stack>
       {/* The period is the tab's first content block (R3 toolbar), not a head action, so the head keeps one shape on every tab. */}
       <div className="tw-toolbar insights-period">
-        <Segmented label="Period" value={period} onChange={pickPeriod} options={PERIOD_OPTIONS} />
+        {/* Wide screens: the segmented control. Phones: six options never fit a
+            row, so the same choice becomes a compact menu (as on Reports). */}
+        <span className="insights-period__seg">
+          <Segmented label="Period" value={period} onChange={pickPeriod} options={PERIOD_OPTIONS} />
+        </span>
+        <span className="insights-period__menu">
+          <Select value={period} onValueChange={v => pickPeriod(v as PeriodType)}>
+            <SelectTrigger aria-label="Period" className="insights-period__select">
+              <SelectValue>{PERIOD_OPTIONS.find(o => o.value === period)?.ariaLabel ?? PERIOD_OPTIONS.find(o => o.value === period)?.label}</SelectValue>
+            </SelectTrigger>
+            <SelectContent align="start">
+              {PERIOD_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.ariaLabel ?? o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </span>
         {period === 'custom' && (
           <span className="insights-custom">
             <input type="month" className="tw-input insights-month" aria-label="From month" value={p.from} max={p.to} onChange={e => e.target.value && setCustomFrom(e.target.value)} />
@@ -213,7 +228,7 @@ function MarginTab({ period, setPeriod, customFrom, setCustomFrom, customTo, set
             {shown.length > 1 && (
               <InsightCard
                 title="Net margin by month"
-                description={`${span}, adding up to ${rand(r.net, 0)}`}
+                description="Each month's revenue less approved costs"
                 info={`Each month's revenue (money received, excl. VAT) less approved expenses, added to the months before. The bars add up to the period's net margin above and to the Net profit line of the P&L.${partial}`}
               >
                 <Waterfall
@@ -414,7 +429,7 @@ function LanesTab() {
         ) : (
           <>
             <p className="insights-takeaway">{laneTakeaway(points, overall)}</p>
-            <LaneScatter points={points} overallPerKm={overall} minTrips={MIN_TRIPS} />
+            <LaneScatter points={points} overallPerKm={overall} minTrips={MIN_TRIPS} height={380} />
           </>
         )}
       </InsightCard>

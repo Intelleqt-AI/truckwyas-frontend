@@ -1,21 +1,8 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { MoreHorizontal } from 'lucide-react';
+import { useId } from 'react';
+import OverflowMenu, { type MenuItem } from './OverflowMenu';
 import './row-actions.css';
 
-export interface RowActionItem {
-  label: string;
-  onSelect: () => void;
-  danger?: boolean;
-  disabled?: boolean;
-  /** Optional second line, e.g. why an item is unavailable. */
-  hint?: string;
-  /**
-   * Tooltip for the item. On a disabled item this is the reason it is
-   * unavailable; it is also announced to screen readers. Falls back to `hint`.
-   */
-  title?: string;
-}
+export type RowActionItem = Pick<MenuItem, 'label' | 'onSelect' | 'danger' | 'disabled' | 'hint' | 'title'>;
 
 /**
  * One action control per table row (owner review, 28 Sep 2026: "edit and
@@ -41,88 +28,13 @@ export default function RowActions({ label, onEdit, editDisabledReason, items }:
   editDisabledReason?: string;
   items?: RowActionItem[];
 }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number; up: boolean } | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const focusFirstOnOpen = useRef<'first' | 'last' | null>(null);
   const uid = useId();
-  const menuId = `rowact-${uid.replace(/[^a-zA-Z0-9_-]/g, '')}`;
-
   const list = items ?? [];
-  const safe = list.filter((i) => !i.danger);
-  const danger = list.filter((i) => i.danger);
-  const ordered = [...safe, ...danger];
-
-  const close = useCallback((restoreFocus: boolean) => {
-    setOpen(false);
-    if (restoreFocus) triggerRef.current?.focus();
-  }, []);
-
-  const place = useCallback(() => {
-    const t = triggerRef.current;
-    if (!t) return;
-    const r = t.getBoundingClientRect();
-    const menuW = menuRef.current?.offsetWidth || 200;
-    const menuH = menuRef.current?.offsetHeight || 40 * Math.max(1, ordered.length) + 16;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const up = r.bottom + 4 + menuH > vh - 8 && r.top - 4 - menuH > 8;
-    let left = r.right - menuW;
-    if (left < 8) left = Math.min(r.left, vw - menuW - 8);
-    left = Math.max(8, left);
-    setPos({ top: up ? r.top - 4 - menuH : r.bottom + 4, left, up });
-  }, [ordered.length]);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    place();
-    // Measure again once the menu has real dimensions.
-    const id = requestAnimationFrame(place);
-    return () => cancelAnimationFrame(id);
-  }, [open, place]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: Event) => {
-      const n = e.target as Node;
-      if (menuRef.current?.contains(n) || triggerRef.current?.contains(n)) return;
-      setOpen(false);
-    };
-    // Any scroll outside the menu (page or table region) closes it rather than
-    // leaving it detached from its row.
-    const onScroll = (e: Event) => {
-      if (menuRef.current && e.target instanceof Node && menuRef.current.contains(e.target)) return;
-      setOpen(false);
-    };
-    const onResize = () => setOpen(false);
-    document.addEventListener('pointerdown', onDown);
-    window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', onResize);
-    return () => {
-      document.removeEventListener('pointerdown', onDown);
-      window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', onResize);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || !pos) return;
-    const want = focusFirstOnOpen.current;
-    focusFirstOnOpen.current = null;
-    const all = itemRefs.current.filter((b): b is HTMLButtonElement => !!b);
-    const enabled = all.filter((b) => b.getAttribute('aria-disabled') !== 'true');
-    const pool = enabled.length ? enabled : all;
-    if (!pool.length) { menuRef.current?.focus(); return; }
-    (want === 'last' ? pool[pool.length - 1] : pool[0]).focus();
-  }, [open, pos]);
-
   const editDisabled = !!editDisabledReason;
 
   if (!list.length) {
     if (!onEdit) return null;
-    const reasonId = `${menuId}-edit-reason`;
+    const reasonId = `rowact-${uid.replace(/[^a-zA-Z0-9_-]/g, '')}-edit-reason`;
     return (
       <>
         <button
@@ -142,103 +54,8 @@ export default function RowActions({ label, onEdit, editDisabledReason, items }:
   }
 
   // With a menu, Edit becomes its first item so the row keeps one control.
-  const menuItems: RowActionItem[] = onEdit
-    ? [{ label: 'Edit', onSelect: onEdit, disabled: editDisabled, title: editDisabledReason }, ...ordered]
-    : ordered;
-  const firstDanger = menuItems.findIndex((i) => i.danger);
-
-  const moveFocus = (dir: 1 | -1 | 'first' | 'last') => {
-    // Disabled items stay in the focus order so their reason can be read.
-    const enabled = itemRefs.current.filter((b): b is HTMLButtonElement => !!b);
-    if (!enabled.length) return;
-    const cur = enabled.indexOf(document.activeElement as HTMLButtonElement);
-    let next = 0;
-    if (dir === 'first') next = 0;
-    else if (dir === 'last') next = enabled.length - 1;
-    else next = cur < 0 ? 0 : (cur + dir + enabled.length) % enabled.length;
-    enabled[next].focus();
-  };
-
-  const onTriggerKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      e.stopPropagation();
-      focusFirstOnOpen.current = e.key === 'ArrowUp' ? 'last' : 'first';
-      setOpen(true);
-    }
-  };
-
-  const onMenuKey = (e: React.KeyboardEvent) => {
-    e.stopPropagation();
-    switch (e.key) {
-      case 'ArrowDown': e.preventDefault(); moveFocus(1); break;
-      case 'ArrowUp': e.preventDefault(); moveFocus(-1); break;
-      case 'Home': e.preventDefault(); moveFocus('first'); break;
-      case 'End': e.preventDefault(); moveFocus('last'); break;
-      case 'Escape': e.preventDefault(); close(true); break;
-      case 'Tab': e.preventDefault(); close(true); break;
-      default: break;
-    }
-  };
-
-  return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        className="tw-rowact tw-rowact--icon"
-        aria-label={`${label} actions`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
-        onKeyDown={onTriggerKey}
-      >
-        <MoreHorizontal size={16} strokeWidth={2} aria-hidden="true" />
-      </button>
-      {open && createPortal(
-        <div
-          ref={menuRef}
-          id={menuId}
-          role="menu"
-          aria-label={`${label} actions`}
-          tabIndex={-1}
-          className="tw-rowact-menu"
-          style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, visibility: pos ? 'visible' : 'hidden' }}
-          onKeyDown={onMenuKey}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {menuItems.map((item, i) => {
-            const tip = item.title ?? (item.disabled ? item.hint : undefined);
-            // The hint is already visible text inside the item; only a tooltip-only reason needs describing.
-            const reasonId = item.disabled && item.title && item.title !== item.hint ? `${menuId}-reason-${i}` : undefined;
-            return (
-              <div key={`${item.label}-${i}`} role="none">
-                {i === firstDanger && firstDanger > 0 && <div className="tw-rowact-menu__sep" role="separator" />}
-                <button
-                  ref={(el) => { itemRefs.current[i] = el; }}
-                  type="button"
-                  role="menuitem"
-                  aria-disabled={item.disabled || undefined}
-                  aria-describedby={reasonId}
-                  title={tip}
-                  className={`tw-rowact-menu__item${item.danger ? ' is-danger' : ''}${item.disabled ? ' is-disabled' : ''}`}
-                  onClick={() => {
-                    if (item.disabled) return;
-                    close(true);
-                    item.onSelect();
-                  }}
-                >
-                  <span className="tw-rowact-menu__label">{item.label}</span>
-                  {item.hint && <span className="tw-rowact-menu__hint">{item.hint}</span>}
-                  {reasonId && <span id={reasonId} className="tw-rowact-sr">{item.title}</span>}
-                </button>
-              </div>
-            );
-          })}
-        </div>,
-        document.body,
-      )}
-    </>
-  );
+  const menuItems: MenuItem[] = onEdit
+    ? [{ label: 'Edit', onSelect: onEdit, disabled: editDisabled, title: editDisabledReason }, ...list]
+    : list;
+  return <OverflowMenu label={`${label} actions`} items={menuItems} />;
 }

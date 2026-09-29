@@ -111,3 +111,8 @@
 @media (max-width: 720px) { .ops-skel-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
 @media (prefers-reduced-motion: reduce) { .ops-skel, .ops-skel-block::after { animation: none; } }
 
+
+/* R4 phone: tile labels and notes wrap (never an ellipsis) on list pages. */
+@media (max-width: 767px) {
+  .bk-kpis .tw-kpi__label, .bk-kpis .tw-kpi__note { white-space: normal; overflow: visible; text-overflow: clip; }
+}

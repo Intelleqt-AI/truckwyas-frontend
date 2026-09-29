@@ -8,7 +8,7 @@ import InfoTip from './InfoTip';
 import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 import {
   computeFindings, fetchAllPages, plural, randWhole, summarise,
-  type CashflowRec, type CompanyRec, type ExpenseRec, type FinanceRec, type FindingInputs, type FuelRec,
+  type CashflowRec, type CompanyRec, type ExpenseRec, type FindingInputs, type FuelRec,
   type InvoiceRec, type LoadRec, type PaymentRec, type QuoteRec, type Source,
 } from './findings';
 
@@ -39,12 +39,11 @@ export default function FindingsFeed() {
   const expenses = useAllRows<ExpenseRec>('expenses', 'api/v1/expenses/');
   const loads = useAllRows<LoadRec>('loads', 'api/v1/loads/');
   const quotes = useAllRows<QuoteRec>('quotes', 'api/v1/quotes/');
-  const finance = useQuery<FinanceRec>({ queryKey: sourceKey('finance-all'), queryFn: () => fetchData('api/v1/dashboard/finance/'), staleTime: STALE, ...RETRY });
   const fuel = useQuery<FuelRec>({ queryKey: sourceKey('fuel'), queryFn: () => fetchData('api/v1/fuel-prices/current/'), staleTime: STALE, ...RETRY });
   const company = useQuery<CompanyRec>({ queryKey: sourceKey('company'), queryFn: () => fetchData('api/v1/company/profile/'), staleTime: STALE, ...RETRY });
   const cashflow = useQuery<CashflowRec>({ queryKey: sourceKey('cashflow'), queryFn: () => fetchData('api/v1/dashboard/cashflow/'), staleTime: STALE, ...RETRY });
 
-  const all = [invoices, payments, expenses, loads, quotes, finance, fuel, company, cashflow];
+  const all = [invoices, payments, expenses, loads, quotes, fuel, company, cashflow];
   const loading = all.some(q => q.isLoading);
 
   const result = useMemo(() => {
@@ -55,14 +54,13 @@ export default function FindingsFeed() {
       expenses: expenses.data ?? null,
       loads: loads.data ?? null,
       quotes: quotes.data ?? null,
-      finance: finance.data ?? null,
       fuel: fuel.data ?? null,
       company: company.data ?? null,
       cashflow: cashflow.data ?? null,
     };
     const findings = computeFindings(input);
     return { input, findings, summary: summarise(findings, input) };
-  }, [invoices.data, payments.data, expenses.data, loads.data, quotes.data, finance.data, fuel.data, company.data, cashflow.data]);
+  }, [invoices.data, payments.data, expenses.data, loads.data, quotes.data, fuel.data, company.data, cashflow.data]);
 
   if (loading) return <FeedSkeleton />;
 
@@ -79,7 +77,7 @@ export default function FindingsFeed() {
   const main = findings.filter(f => f.confidence !== 'low');
   const checking = findings.filter(f => f.confidence === 'low');
   const unavailable = [
-    expenses.isError || finance.isError ? 'costs' : null,
+    expenses.isError || payments.isError ? 'costs' : null,
     loads.isError ? 'loads' : null,
     quotes.isError || fuel.isError ? 'quotes' : null,
     cashflow.isError ? 'the cash forecast' : null,

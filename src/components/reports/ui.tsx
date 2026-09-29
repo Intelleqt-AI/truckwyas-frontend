@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Check as CheckIcon, ChevronLeft, ChevronRight, Download, Printer } from 'lucide-react';
 import { InfoTip } from '@/components/ui/InfoTip';
@@ -120,7 +120,19 @@ export interface ReportFrameProps {
   companyName?: string;
 }
 
+/** Phones: Export CSV and Print live in the page head's "⋯" menu, not in a
+ *  row of their own. The report registers its export here; the page (which
+ *  owns the head) reads it when the menu item is chosen. */
+export const ReportExportContext = createContext<{ current: (() => void) | null } | null>(null);
+
 export function ReportFrame({ title, sub, info, controls, tiles, gaps, csv, csvName, children, companyName, printTitle }: ReportFrameProps) {
+  const exportRef = useContext(ReportExportContext);
+  const exportCsv = csv ? () => downloadCsv(`truckwys-${csvName || slug(title)}.csv`, csv()) : null;
+  useEffect(() => {
+    if (!exportRef) return;
+    exportRef.current = exportCsv;
+    return () => { exportRef.current = null; };
+  });
   // The page head (SectionHeader) carries the report title as the one H1 and
   // a back link to the library. This row holds the basis line with its info
   // tip on the left, and the controls, Export and Print on the right; data
@@ -140,7 +152,7 @@ export function ReportFrame({ title, sub, info, controls, tiles, gaps, csv, csvN
           {controls}
           <div className="tw-toolbar__end fr-head__actions">
             {csv && (
-              <button type="button" className="tw-btn fr-head__btn" onClick={() => downloadCsv(`truckwys-${csvName || slug(title)}.csv`, csv())}>
+              <button type="button" className="tw-btn fr-head__btn" onClick={() => exportCsv?.()}>
                 <Download size={16} strokeWidth={1.75} aria-hidden="true" />
                 Export CSV
               </button>
@@ -290,15 +302,88 @@ function cell(v: CsvCell, type: ColType = 'text', density: Density = 0) {
   }
 }
 
-export function StatementTable({ table, caption, stickyFirst = true, footer, fit = false, pinLast = false, cue = ['Earlier months', 'Later months'] as [string, string] | null }: {
+/** Phones (up to 640px): how a statement becomes a stacked list instead of
+ *  a table that scrolls sideways. 'pairs': each row is a heading and one
+ *  label/value line per column. A ledger spec: one line per entry (date and
+ *  what it is, the amount on the right), the reference and running balance
+ *  under it; totals rows keep the balance in full view. */
+export type Stack = 'pairs' | {
+  date: number; title: number; ref?: number;
+  /** Column added to the balance (shown as is) and taken off it (shown with a minus). */
+  plus: number; minus: number;
+  balance: number; balanceLabel: string;
+};
+
+function StackList({ table, stack, caption }: { table: Statement; stack: Stack; caption: string }) {
+  const { columns, rows } = table;
+  const shown = (v: CsvCell, i: number) => cell(v, columns[i]?.type);
+  // Pairs leave out empty and zero cells (an age bucket with nothing in it).
+  const has = (v: CsvCell) => v !== '' && v != null && !(typeof v === 'number' && Math.abs(v) < 0.005);
+  if (stack === 'pairs') {
+    return (
+      <div className="fr-stack fr-noprint" aria-label={caption} role="group">
+        {rows.filter(r => r.kind !== 'section').map(r => (
+          <dl key={r.key} className={`fr-stack__pairs fr-stack--${r.kind || 'row'}`}>
+            <div className="fr-stack__pairs-head"><dt>{shown(r.cells[0], 0)}</dt></div>
+            {r.cells.slice(1).map((v, j) => {
+              const i = j + 1;
+              if (!has(v)) return null;
+              return <div key={i} className={i === r.cells.length - 1 ? 'is-last' : undefined}><dt>{columns[i]?.label}</dt><dd>{shown(v, i)}</dd></div>;
+            })}
+          </dl>
+        ))}
+      </div>
+    );
+  }
+  const amt = (v: CsvCell) => (typeof v === 'number' && Math.abs(v) >= 0.005 ? v : null);
+  return (
+    <ul className="fr-stack fr-noprint" aria-label={caption}>
+      {rows.filter(r => r.kind !== 'section').map(r => {
+        const plus = amt(r.cells[stack.plus]);
+        const minus = amt(r.cells[stack.minus]);
+        const bal = r.cells[stack.balance];
+        const title = shown(r.cells[stack.title], stack.title) || shown(r.cells[0], 0);
+        if (r.kind === 'grand' || r.kind === 'subtotal') {
+          // A totals row is named by its first text cell that is not a date ("Total", "Closing balance").
+          const isName = (v: CsvCell) => typeof v === 'string' && v !== '' && !/^\d{4}-\d{2}-\d{2}/.test(v);
+          const name = [r.cells[0], r.cells[stack.title]].find(isName) ?? title;
+          const parts = [plus != null ? `${columns[stack.plus]?.label} ${money(plus)}` : '', minus != null ? `${columns[stack.minus]?.label} ${money(minus)}` : ''].filter(Boolean);
+          return (
+            <li key={r.key} className={`fr-stack__row fr-stack--${r.kind}`}>
+              <span className="fr-stack__title">{name}</span>
+              <span className="fr-stack__amt">{shown(bal, stack.balance)}</span>
+              {parts.length > 0 && <span className="fr-stack__ref">{parts.join(' · ')}</span>}
+            </li>
+          );
+        }
+        const ref = stack.ref != null ? shown(r.cells[stack.ref], stack.ref) : '';
+        return (
+          <li key={r.key} className="fr-stack__row">
+            <span className="fr-stack__title">{title}</span>
+            <span className="fr-stack__amt">{plus != null ? money(plus) : minus != null ? `−${money(minus)}` : ''}</span>
+            <span className="fr-stack__sub">{shown(r.cells[stack.date], stack.date)}</span>
+            <span className="fr-stack__sub fr-stack__bal">{stack.balanceLabel} {shown(bal, stack.balance)}</span>
+            {ref && <span className="fr-stack__ref">{r.href ? <Link to={r.href} className="fr-link">{ref}</Link> : ref}</span>}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export function StatementTable({ table, caption, stickyFirst = true, footer, fit = false, pinLast = false, cue = ['Earlier months', 'Later months'] as [string, string] | null, stack }: {
   table: Statement; caption: string; stickyFirst?: boolean; footer?: ReactNode;
+  /** Phones: show the statement as a stacked list instead of a sideways-scrolling table. */
+  stack?: Stack;
   /** Month statements: tighten cells (then drop the currency sign, then the
    *  cents) only as far as needed to show every column without scrolling.
    *  Display only: the CSV and the check lines keep cents. */
   fit?: boolean;
   /** Keep the last column (Total) in view on the right while the rest scroll. */
   pinLast?: boolean;
-  /** Labels for the scroll buttons when the table still has to scroll; null for none. */
+  /** Labels for the scroll buttons when the table still has to scroll; null
+   *  for the generic "Previous columns" / "More columns". A table that scrolls
+   *  always shows the cue: no column is ever off-screen without one. */
   cue?: [string, string] | null;
 }) {
   const { columns, rows } = table;
@@ -351,6 +436,7 @@ export function StatementTable({ table, caption, stickyFirst = true, footer, fit
 
   const level: Density = fit && dense.sig === sig ? dense.level : 0;
   const scrolls = edges.l || edges.r;
+  const cueText: [string, string] = cue ?? ['Previous columns', 'More columns'];
   const page = (dir: -1 | 1) => {
     const el = scroller.current;
     if (!el) return;
@@ -362,17 +448,18 @@ export function StatementTable({ table, caption, stickyFirst = true, footer, fit
   const units = level >= 3 ? 'Amounts in rand, rounded to the nearest rand. Export CSV has the cents.' : level >= 2 ? 'Amounts in rand.' : null;
 
   return (
-    <section className={`tw-card tw-card--flush fr-statement${scrolls ? ' is-scrolling' : ''}`} aria-label={caption}>
-      {fit && scrolls && cue && (
+    <section className={`tw-card tw-card--flush fr-statement${scrolls ? ' is-scrolling' : ''}${stack ? ' has-stack' : ''}`} aria-label={caption}>
+      {scrolls && (
         <div className="fr-cue fr-noprint">
-          <button type="button" className="fr-cue__btn" onClick={() => page(-1)} disabled={!edges.l} aria-label={`Show ${cue[0].toLowerCase()}`}>
-            <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />{cue[0]}
+          <button type="button" className="fr-cue__btn" onClick={() => page(-1)} disabled={!edges.l} aria-label={`Show ${cueText[0].toLowerCase()}`}>
+            <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />{cueText[0]}
           </button>
-          <button type="button" className="fr-cue__btn" onClick={() => page(1)} disabled={!edges.r} aria-label={`Show ${cue[1].toLowerCase()}`}>
-            {cue[1]}<ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" />
+          <button type="button" className="fr-cue__btn" onClick={() => page(1)} disabled={!edges.r} aria-label={`Show ${cueText[1].toLowerCase()}`}>
+            {cueText[1]}<ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
       )}
+      {stack && <StackList table={table} stack={stack} caption={caption} />}
       <div className={`fr-scrollbox${edges.l ? ' has-l' : ''}${edges.r ? ' has-r' : ''}`}>
         <div ref={scroller} className="fr-scroll" tabIndex={0} role="region" aria-label={`${caption}, scrolls sideways`} onScroll={readEdges}>
           <table className={tableCls}>

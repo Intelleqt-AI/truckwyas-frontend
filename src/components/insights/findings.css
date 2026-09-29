@@ -146,11 +146,15 @@
 @media (max-width: 767px) {
   .ff-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .fc {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "meta meta" "fig fig" "line line" "act tog" "ev ev";
+    /* One column: the action and the evidence toggle each get their own row, so a
+       long action label ("Call about the skipped invoice") can never run into the
+       toggle beside it. The toggle sits directly above the evidence it opens. */
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "meta" "fig" "line" "act" "tog" "ev";
     row-gap: 6px; padding: var(--card-pad, 16px);
   }
-  .fc__action { justify-self: start; }
+  .fc__action { justify-self: start; max-width: 100%; margin-top: 6px; white-space: normal; text-align: left; }
+  .fc__evidence-toggle { justify-self: start; min-height: 32px; }
   .fc__amount { font-size: 22px; line-height: 28px; }
   /* The rank bar repeats the figure beside it; on a phone the figure carries it alone. */
   .fc__bar { display: none; }

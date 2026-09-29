@@ -109,7 +109,9 @@ export function SettingsSwitch({ checked, onChange, label, disabled, title }: Se
   return (
     <button
       type="button"
-      className="settings-control settings-switch"
+      // Not a .settings-control: the coarse-pointer 44px floor must not
+      // resize the switch; its hit area grows via ::after instead.
+      className="settings-switch"
       role="switch"
       aria-checked={checked}
       aria-label={label}

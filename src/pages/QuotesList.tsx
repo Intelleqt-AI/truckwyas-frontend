@@ -36,6 +36,7 @@ import QuoteSendPreview from '@/components/QuoteSendPreview';
 import { rowLink } from '@/lib/rowLink';
 import { StatusChip, statusTone } from '@/components/ui/StatusChip';
 import { Segmented } from '@/components/ui/Segmented';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 // Pipeline stage -> dot/chip tone. Colour only ever sits next to its text label.
@@ -255,13 +256,43 @@ interface QuotesListProps {
   onViewChange?: (value: 'board' | 'list') => void;
 }
 
+/**
+ * A status filter: the segmented control on wider screens; on phones, when
+ * there are more than four options, a compact select (R4 phone rule). Both
+ * stay mounted and CSS picks one, so nothing shifts when the width changes.
+ */
+export function StatusFilter<V extends string>({ label, value, onChange, options, className }: {
+  label: string; value: V; onChange: (v: V) => void;
+  options: { value: V; label: string; count?: number }[]; className?: string;
+}) {
+  const compact = options.length > 4;
+  const current = options.find(o => o.value === value) ?? options[0];
+  const text = (o: { label: string; count?: number }) => (o.count != null ? `${o.label} (${o.count})` : o.label);
+  return (
+    <div className={`bk-filter${compact ? ' bk-filter--compact' : ''}${className ? ` ${className}` : ''}`}>
+      <Segmented<V> label={label} value={value} onChange={onChange} options={options} className="bk-filter__seg" />
+      {compact && (
+        <Select value={value} onValueChange={v => onChange(v as V)}>
+          <SelectTrigger aria-label={label} className="bk-filter__select">
+            <SelectValue>{current ? text(current) : ''}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {options.map(o => <SelectItem key={o.value} value={o.value}>{text(o)}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      )}
+    </div>
+  );
+}
+
 export function QuotesList({ embedded = false, search: searchProp, onSearchChange, view: viewProp, onViewChange }: QuotesListProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
   const [internalSearch, setInternalSearch] = useState('');
-  const [internalView, setInternalView] = useState<'board' | 'list'>('board');
+  const [internalView, setInternalView] = useState<'board' | 'list'>(() =>
+    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches ? 'list' : 'board');
   const search = searchProp ?? internalSearch;
   const setSearch = onSearchChange ?? setInternalSearch;
   const view = viewProp ?? internalView;
@@ -621,7 +652,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
           {/* Status filters */}
           <div style={{ marginBottom: 16, flexShrink: 0, maxWidth: '100%', overflowX: 'auto' }}>
-            <Segmented
+            <StatusFilter
               label="Filter quotes by status"
               value={statusFilter}
               onChange={setStatusFilter}
@@ -647,14 +678,14 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
             <table className="table-heading-roles bk-table">
               <thead>
                 <tr style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                  <th scope="col">Quote #</th>
+                  <th scope="col" className="bk-col-load">Quote #</th>
                   <th scope="col">Customer</th>
-                  <th scope="col">Route</th>
+                  <th scope="col" className="bk-col-route">Route</th>
                   <th scope="col">Status</th>
-                  <th scope="col">Outcome</th>
-                  <th scope="col">Created</th>
+                  <th scope="col" className="bk-col-phone">Outcome</th>
+                  <th scope="col" className="bk-col-phone">Created</th>
                   <th scope="col" className="is-num">Amount</th>
-                  <th scope="col" className="is-num"><span className="sr-only">Action</span></th>
+                  <th scope="col" className="is-num bk-col-action"><span className="sr-only">Action</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -665,29 +696,33 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                     {...rowLink(() => navigate(`/bookings/quotes/${quote.id}`))}
                     onClick={() => navigate(`/bookings/quotes/${quote.id}`)}
                   >
-                    <td className="is-id">
+                    <td className="is-id bk-col-load">
                       {quote.quote_number}
                       {quote.fuel_alert && (
                         <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: 6, color: 'var(--status-warning-text)' }}><Fuel size={16} aria-hidden="true" /></span>
                       )}
                     </td>
-                    <td className="is-primary">{quote.customer_name || '—'}</td>
-                    <td className="is-truncate" title={routeOf(quote)}>{routeOf(quote)}</td>
+                    <td className="is-primary bk-col-customer" title={quote.customer_name || ''}>
+                      {quote.customer_name || '—'}
+                      {/* Phones: the quote number rides under the customer (its column folds away). */}
+                      <span className="bk-phone-sub" title={quote.quote_number}>{quote.quote_number}</span>
+                    </td>
+                    <td className="is-truncate bk-col-route" title={routeOf(quote)}>{routeOf(quote)}</td>
                     <td>
                       <StatusChip status={quote.status === 'IT' ? 'IN_TRANSIT' : quote.status} label={COLUMN_LABELS[quote.status]} size="sm" />
                     </td>
-                    <td>
+                    <td className="bk-col-phone">
                       {quote.outcome === 'accepted' && <StatusChip status="WON" size="sm" />}
                       {quote.outcome === 'rejected' && <StatusChip status="LOST" size="sm" />}
                       {(!quote.outcome || quote.outcome === 'pending') && <span>—</span>}
                     </td>
-                    <td className="is-date">
+                    <td className="is-date bk-col-phone">
                       {quote.created_at ? formatDate(quote.created_at) : '—'}
                     </td>
                     <td className="is-money">
                       {formatCurrency(parseFloat(quote.total_amount || '0'))}
                     </td>
-                    <td className="is-num" onClick={(e) => e.stopPropagation()}>
+                    <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
                       {quote.status === 'ACCEPTED' && loadByQuoteId.has(String(quote.id)) && (
                         <button
                           type="button"

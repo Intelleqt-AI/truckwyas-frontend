@@ -8,6 +8,7 @@ import { fetchData } from '@/lib/Api';
 import { formatDate, formatPercent } from '@/lib/formatters';
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 
 // Sentence-case a single token for display: "PRIME" → "Prime".
@@ -110,7 +111,8 @@ export default function RiskScoreView() {
       <SectionHeader
         title="Customer risk scores"
         back={{ to: '/capital', label: 'Fast Pay' }}
-        description={<>Out of 100 by the Fast Pay rules; higher is safer.{!CAPITAL_LAUNCHED && ' Not live yet.'}</>}
+        titleAdornment={!CAPITAL_LAUNCHED ? <StatusChip tone="neutral" label="Not live yet" /> : undefined}
+        description="Scored out of 100; higher is safer"
       />
 
       <div className="fin-stack fin-stack--16 risk-stack">
@@ -118,11 +120,14 @@ export default function RiskScoreView() {
         <section className="card" aria-labelledby="tiers-title">
           <div className="fin-panel-head">
             <div className="fin-panel-head__text">
-              <h2 id="tiers-title" className="fin-panel-title">How are your customers spread across risk tiers?</h2>
-              <p className="fin-panel-desc risk-desc-2">
+              <h2 id="tiers-title" className="fin-panel-title fin-panel-title--tip">
+                Customers by risk tier
+                <InfoTip align="end">Each customer's highest stored score is shown. An expired score is out of date until the customer is scored again.</InfoTip>
+              </h2>
+              <p className="fin-panel-desc">
                 {isLoading ? 'Loading scores…' : customerScores.length > 0
-                  ? `${customerScores.length} customers scored, average ${avgScore} out of 100. Each customer's highest stored score is shown.${expiredCount > 0 ? ` ${expiredCount === customerScores.length ? 'All' : expiredCount} of these scores ${expiredCount === 1 ? 'has' : 'have'} expired, so treat them as out of date.` : ''}`
-                  : 'Customers appear here once their invoices are scored.'}
+                  ? `${customerScores.length} scored, average ${avgScore} of 100${expiredCount > 0 ? ` · ${expiredCount === customerScores.length ? 'all' : expiredCount} expired` : ''}`
+                  : 'Scored once they have invoices'}
               </p>
             </div>
           </div>
@@ -151,8 +156,8 @@ export default function RiskScoreView() {
         <section className="card" aria-labelledby="factors-title">
           <div className="fin-panel-head">
             <div className="fin-panel-head__text">
-              <h2 id="factors-title" className="fin-panel-title">What goes into a score?</h2>
-              <p className="fin-panel-desc">{pillars.length > 0 ? `The ${pillars.length} areas the model scores, and how much each counts towards 100.` : 'The areas the model scores.'}</p>
+              <h2 id="factors-title" className="fin-panel-title">What goes into a score</h2>
+              <p className="fin-panel-desc">{pillars.length > 0 ? `${pillars.length} areas, points out of 100` : 'The areas the model scores'}</p>
             </div>
           </div>
           {pillars.length === 0 && isLoading ? (
@@ -176,8 +181,11 @@ export default function RiskScoreView() {
       <section className="card fin-table-card" aria-labelledby="scores-title">
         <div className="fin-panel-head">
           <div className="fin-panel-head__text">
-            <h2 id="scores-title" className="fin-panel-title">Which customers are safest to advance against?</h2>
-            <p className="fin-panel-desc">Highest score first. Eligibility follows the Fast Pay rules at the time of scoring.</p>
+            <h2 id="scores-title" className="fin-panel-title fin-panel-title--tip">
+              Safest customers first
+              <InfoTip align="end">Highest score first. Whether a customer meets the rules follows the Fast Pay rules at the time of scoring.</InfoTip>
+            </h2>
+            <p className="fin-panel-desc">By score, highest first</p>
           </div>
         </div>
         {isLoading ? (

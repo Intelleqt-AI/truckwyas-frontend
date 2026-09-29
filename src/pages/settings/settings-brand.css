@@ -3,7 +3,8 @@
    inline `outline: none`. Table scroll wrappers are keyboard-focusable
    labelled regions, so the ring draws inside their own box. */
 
-.settings-control:focus-visible {
+.settings-control:focus-visible,
+.settings-switch:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 3px;
 }
@@ -24,7 +25,7 @@
   padding: 0;
   border-radius: 12px;
   border: 1px solid var(--text-tertiary);
-  background: transparent;
+  background: var(--status-neutral-bg, transparent);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
   box-sizing: border-box;
@@ -41,12 +42,15 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--text-tertiary);
+  /* Off: a light knob with a hairline, so off reads as "off", not "disabled". */
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 1px var(--text-tertiary), 0 1px 2px rgba(0, 0, 0, 0.12);
   transition: left 0.15s, background 0.15s;
 }
 .settings-switch[data-state="on"] .settings-switch-knob {
   left: 19px;
   background: var(--on-accent);
+  box-shadow: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .settings-switch, .settings-switch-knob { transition: none; }
@@ -146,7 +150,8 @@ table.settings-table.is-inset :is(th, td):last-child { padding-right: 0; }
 @media (max-width: 768px) {
   .tw-settings-shell { flex-direction: column; gap: 0; }
   .tw-settings-shell > .tw-settings-shell__side { display: none !important; }
-  .tw-settings-phone-nav { display: block; margin: calc(-1 * var(--head-to-content, 16px) + 4px) 0 var(--head-to-content, 16px); }
+  /* R4: the picker is the first content block, at the same y as every untabbed page (146). */
+  .tw-settings-phone-nav { display: block; margin: 0 0 var(--head-to-content, 16px); }
   .tw-settings-phone-nav .tw-settings-phone-nav__trigger { width: 100%; }
   .tw-settings-shell > .tw-settings-shell__content { padding: 0 0 24px; }
 }
@@ -166,15 +171,19 @@ table.settings-table.is-inset :is(th, td):last-child { padding-right: 0; }
 .cs-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .cs-select > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cs-live { margin-top: 6px; font: 400 13px/20px var(--font-sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
-/* Save stays in view while the form scrolls. */
+/* Save stays in view while the form scrolls. Chrome sticks to the scroll
+   container's content box, so bottom: 0 left the bar floating the height of
+   <main>'s bottom padding (48px desktop, 32px phone) above the viewport edge,
+   with the form showing below it. A matching negative offset pins it flush. */
 .cs-savebar {
-  position: sticky; bottom: 0; z-index: 5;
+  position: sticky; bottom: -48px; z-index: 5;
   display: flex; align-items: center; justify-content: flex-end; gap: 16px;
-  margin: 0; padding: 12px 0;
-  background: var(--bg-deep);
+  margin: 0; padding: 12px var(--card-pad, 20px);
+  background: var(--bg-surface);
   border-top: 1px solid var(--border-subtle);
   box-shadow: 0 -8px 16px -12px rgba(0, 0, 0, 0.12);
 }
+@media (max-width: 768px) { .cs-savebar { bottom: -32px; } }
 .cs-savebar__note { font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); margin-right: auto; }
 .cs-savebar .btn-action { min-height: var(--control-h, 36px); }
 @media (max-width: 640px) {
@@ -184,3 +193,20 @@ table.settings-table.is-inset :is(th, td):last-child { padding-right: 0; }
 }
 .st-note { display: flex; align-items: baseline; gap: 8px; margin: 0; padding: 12px var(--card-pad, 20px); border-bottom: 1px solid var(--border-row); font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
 .st-note .bk-dot { flex-shrink: 0; transform: translateY(-1px); }
+
+/* ---- Security (R4): one line per recent sign-in; the device line drops
+   under the label on phones (never clipped). */
+.sec-activity { display: grid; grid-template-columns: 8px auto minmax(0, 1fr) auto; align-items: center; column-gap: 10px; padding: 10px var(--card-pad, 20px); }
+.sec-activity__dot { width: 8px; height: 8px; border-radius: 50%; }
+.sec-activity__label { font: 400 14px/20px var(--font-sans); color: var(--text-primary); white-space: nowrap; }
+.sec-activity__meta, .sec-activity__time { font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); min-width: 0; overflow-wrap: anywhere; }
+.sec-activity__time { white-space: nowrap; text-align: right; }
+@media (max-width: 640px) {
+  .sec-activity { grid-template-columns: 8px minmax(0, 1fr) auto; }
+  .sec-activity__meta { grid-column: 2 / -1; grid-row: 2; }
+}
+/* Users on phones: the search takes the row; emails wrap instead of clipping. */
+@media (max-width: 600px) {
+  .st-search { flex: 1 1 auto; width: auto !important; }
+  table.settings-table .st-email { max-width: none; white-space: normal; overflow-wrap: break-word; }
+}

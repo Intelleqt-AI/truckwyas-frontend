@@ -294,3 +294,177 @@
   .fleet-detail .fd-table th:first-child, .fleet-detail .fd-table td:first-child { padding-left: var(--fd-pad); }
   .fleet-detail .fd-table th:last-child, .fleet-detail .fd-table td:last-child { padding-right: var(--fd-pad); }
 }
+
+/* ======================================================= Round 4: record
+   Vehicle and driver pages (owner redesign). Head, then one "Now" line, then
+   a main column (Performance, Loads, Condition) beside a sticky rail
+   (Compliance, the linked driver or truck, the facts). Below 1100px the two
+   columns dissolve and the cards stack in the order the owner acts on them:
+   Now, Compliance, Performance, Loads, Condition, Driver/Truck, Facts. */
+.fleet-detail .fd-record {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+  gap: var(--fd-gap); align-items: start;
+}
+.fleet-detail .fd-record > .fd-side { position: sticky; top: 24px; }
+@media (max-width: 1100px) {
+  .fleet-detail .fd-record { display: flex; flex-direction: column; align-items: stretch; }
+  .fleet-detail .fd-record > .fd-main,
+  .fleet-detail .fd-record > .fd-side { display: contents; }
+  .fleet-detail .fd-record .fd-o-todo { order: 1; }
+  .fleet-detail .fd-record .fd-o-perf { order: 2; }
+  .fleet-detail .fd-record .fd-o-loads { order: 3; }
+  .fleet-detail .fd-record .fd-o-condition { order: 4; }
+  .fleet-detail .fd-record .fd-o-driver { order: 5; }
+  .fleet-detail .fd-record .fd-o-contact { order: 6; }
+  .fleet-detail .fd-record .fd-o-facts { order: 7; }
+}
+.fleet-detail .fd-record > .fd-main,
+.fleet-detail .fd-record > .fd-side { min-width: 0; }
+
+/* Shared quiet bits */
+.fleet-detail .fd-muted { color: var(--text-tertiary); font-weight: 400; }
+.fleet-detail .fd-struck { text-decoration: line-through; color: var(--text-tertiary); }
+.fleet-detail .fd-inline-link { color: var(--accent-primary); text-decoration: none; font-weight: 500; }
+.fleet-detail .fd-inline-link:hover { text-decoration: underline; }
+.fleet-detail .fd-inline-link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
+/* Row and card actions: quiet outline, 32px drawn, 44px touch target. */
+.fleet-detail .fd-ghost {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  height: 32px; padding: 0 12px; border: 1px solid var(--fd-line); border-radius: var(--radius-control, 8px);
+  background: none; color: var(--text-primary); font: 500 13px/20px var(--font-sans); cursor: pointer; white-space: nowrap;
+}
+.fleet-detail .fd-ghost:hover { background: var(--bg-surface-hover); }
+.fleet-detail .fd-ghost:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.fleet-detail .fd-ghost::after { content: ''; position: absolute; inset: -6px -2px; }
+.fleet-detail .fd-ghost--row { height: 28px; padding: 0 10px; font-size: 12px; }
+.fleet-detail .fd-row__note { margin-left: 6px; font-weight: 400; }
+
+/* Initials avatar (driver), leading the Contact card. */
+.fleet-detail .fd-person { display: flex; align-items: center; gap: 12px; padding: 4px 0 12px; border-bottom: 1px solid var(--fd-row-line); }
+.fleet-detail .fd-person__text { display: flex; flex-direction: column; min-width: 0; }
+.fleet-detail .fd-person__name { font: 500 14px/20px var(--font-sans); color: var(--text-primary); }
+.fleet-detail .fd-person__sub { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fleet-detail .fd-avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg-surface-hover); border: 1px solid var(--fd-line);
+  font: 600 13px/1 var(--font-sans); letter-spacing: 0.02em; color: var(--text-secondary);
+}
+
+/* Now line */
+.fleet-detail .fd-now {
+  display: flex; align-items: center; gap: 12px; min-height: 52px; box-sizing: border-box;
+  margin-bottom: var(--fd-gap); padding: 8px 12px 8px var(--fd-pad);
+  background: var(--fd-panel-bg); border: 1px solid var(--fd-line); border-radius: var(--radius-card, 12px);
+}
+.fleet-detail .fd-now__label { flex-shrink: 0; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fleet-detail .fd-now__text { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-now__sentence { min-width: 0; }
+.fleet-detail .fd-now__text strong { font-weight: 500; color: var(--text-primary); }
+.fleet-detail .fd-now__warn { color: var(--status-warning-text); font-weight: 500; }
+.fleet-detail .fd-now__action { flex-shrink: 0; display: inline-flex; align-items: center; }
+.fleet-detail .fd-now--skel { align-items: center; }
+
+/* Performance */
+.fleet-detail .fd-perf { container-type: inline-size; }
+.fleet-detail .fd-perf .fd-panel__head { margin-bottom: 12px; }
+.fleet-detail .fd-perf__figs {
+  display: grid; grid-template-columns: repeat(var(--figs, 4), minmax(0, 1fr)); margin: 0;
+}
+.fleet-detail .fd-perf__fig { min-width: 0; padding: 4px 16px 4px 16px; border-left: 1px solid var(--fd-row-line); }
+.fleet-detail .fd-perf__fig:first-child { padding-left: 0; border-left: 0; }
+.fleet-detail .fd-perf__fig dt { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fleet-detail .fd-perf__fig dd { margin: 4px 0 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fleet-detail .fd-perf__value {
+  font: 600 20px/28px var(--font-sans); letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+  color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fleet-detail .fd-perf__fig.is-lead .fd-perf__value { font-size: 28px; line-height: 34px; letter-spacing: var(--tracking-figure, -0.02em); color: var(--emphasis-fg, var(--accent-primary)); }
+.fleet-detail .fd-perf__fig:not(.is-lead) dd { padding-top: 6px; }
+.fleet-detail .fd-perf__note { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); overflow-wrap: anywhere; }
+.fleet-detail .fd-perf__trend { margin: 16px calc(var(--fd-pad) * -1) 0; padding: 16px var(--fd-pad) 0; border-top: 1px solid var(--fd-row-line); }
+.fleet-detail .fd-perf__trend .fd-bars { margin: 0; }
+.fleet-detail .fd-perf__empty { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.fleet-detail .fd-perf__empty-text { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+@container (max-width: 560px) {
+  .fleet-detail .fd-perf__figs { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; }
+  .fleet-detail .fd-perf__fig:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .fleet-detail .fd-perf__fig.is-lead { grid-column: 1 / -1; }
+  .fleet-detail .fd-perf__fig.is-lead ~ .fd-perf__fig:nth-child(odd) { padding-left: 16px; border-left: 1px solid var(--fd-row-line); }
+  .fleet-detail .fd-perf__fig.is-lead ~ .fd-perf__fig:nth-child(even) { padding-left: 0; border-left: 0; }
+}
+
+/* Meter: 0-100, ticks cut at 40 / 60 / 80 (the bands); neutral fill,
+   danger only below the action threshold (40). */
+.fleet-detail .fd-meter { position: relative; display: block; height: 6px; border-radius: 3px; background: var(--bg-surface-hover); overflow: hidden; }
+.fleet-detail .fd-meter--lg { height: 8px; border-radius: 4px; }
+.fleet-detail .fd-meter__fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--text-tertiary); border-radius: inherit; }
+.fleet-detail .fd-meter--lg .fd-meter__fill { background: var(--text-secondary); }
+.fleet-detail .fd-meter__fill.is-action { background: var(--status-danger-dot); }
+.fleet-detail .fd-meter__tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--fd-panel-bg); }
+
+/* Condition */
+.fleet-detail .fd-condition__overall { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 4px 10px; }
+.fleet-detail .fd-condition__score { font: 600 28px/34px var(--font-sans); letter-spacing: var(--tracking-figure, -0.02em); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.fleet-detail .fd-condition__band { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-condition__band.is-action, .fleet-detail .fd-condition__n.is-action { color: var(--status-danger-text); }
+.fleet-detail .fd-condition__overall .fd-meter { grid-column: 1 / -1; margin-top: 8px; }
+.fleet-detail .fd-condition__parts { list-style: none; margin: 16px 0 0; padding: 12px 0 0; border-top: 1px solid var(--fd-row-line); display: grid; gap: 4px; }
+.fleet-detail .fd-condition__part { display: grid; grid-template-columns: minmax(0, 1fr) minmax(80px, 40%) 3ch; align-items: center; gap: 12px; min-height: 36px; }
+.fleet-detail .fd-condition__label { display: flex; flex-direction: column; min-width: 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-condition__note { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fleet-detail .fd-condition__n { text-align: right; font: 500 13px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+
+/* Compliance to-dos */
+.fleet-detail .fd-todo { padding-bottom: 8px; }
+.fleet-detail .fd-todo .fd-panel__head { margin-bottom: 4px; }
+.fleet-detail .fd-todo__list { list-style: none; margin: 0; padding: 0; }
+.fleet-detail .fd-todo__item { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 0; border-bottom: 1px solid var(--fd-row-line); }
+.fleet-detail .fd-todo__item:last-child { border-bottom: 0; }
+.fleet-detail .fd-todo__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-sizing: border-box; }
+.fleet-detail .fd-todo__item.is-danger .fd-todo__dot { background: var(--status-danger-dot); }
+.fleet-detail .fd-todo__item.is-warning .fd-todo__dot { background: var(--status-warning-dot); }
+.fleet-detail .fd-todo__item.is-ok .fd-todo__dot { background: var(--status-success-dot); }
+.fleet-detail .fd-todo__item.is-missing .fd-todo__dot { border: 1.5px solid var(--text-tertiary); background: transparent; }
+.fleet-detail .fd-todo__body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fleet-detail .fd-todo__title { font: 500 13px/20px var(--font-sans); color: var(--text-primary); }
+.fleet-detail .fd-todo__item.is-danger .fd-todo__title { color: var(--status-danger-text); }
+.fleet-detail .fd-todo__detail { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+
+/* Facts and link cards */
+.fleet-detail .fd-facts .fd-panel__head { margin-bottom: 4px; }
+.fleet-detail .fd-facts .fd-rows + .fd-rows { border-top: 1px solid var(--fd-row-line); }
+.fleet-detail .fd-linkcard__title { margin-bottom: 8px; }
+.fleet-detail .fd-linkcard__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
+.fleet-detail .fd-linkcard__body { display: flex; flex-direction: column; min-width: 0; }
+.fleet-detail .fd-linkcard__primary { font: 500 14px/20px var(--font-sans); color: var(--text-primary); overflow-wrap: anywhere; }
+.fleet-detail .fd-linkcard__secondary { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+
+/* Loads: optional columns shed as the card narrows (the nearest container
+   is the main column on desktop, the card itself once the columns stack). */
+@container (max-width: 940px) { .fleet-detail .fd-table .fd-col-customer { display: none; } }
+@container (max-width: 800px) { .fleet-detail .fd-table .fd-col-dist { display: none; } }
+@container (max-width: 620px) { .fleet-detail .fd-table .fd-col-perkm { display: none; } }
+@media (max-width: 1100px) {
+  .fleet-detail .fd-record .fd-panel { container-type: inline-size; }
+}
+
+@media (max-width: 640px) {
+  .fleet-detail .fd-now { padding: 10px 12px 10px var(--fd-pad); gap: 8px 12px; }
+  .fleet-detail .fd-now__label { display: none; }
+  .fleet-detail .fd-perf__fig.is-lead .fd-perf__value { font-size: 24px; line-height: 30px; }
+  .fleet-detail .fd-todo__item { min-height: 56px; }
+}
+.fleet-detail .fd-break { overflow-wrap: anywhere; }
+
+/* Condition with no scores: the head alone. */
+.fleet-detail .fd-condition .fd-panel__head:last-child { margin-bottom: 0; }
+/* Facts in the main column (a truck with no loads): two columns of rows. */
+.fleet-detail .fd-facts--wide .fd-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; }
+.fleet-detail .fd-facts--wide .fd-row:last-child { border-bottom: 1px solid var(--fd-row-line); }
+.fleet-detail .fd-facts--wide .fd-row:nth-last-child(-n+2):nth-child(odd),
+.fleet-detail .fd-facts--wide .fd-row:last-child { border-bottom: 0; }
+@media (max-width: 1100px) { .fleet-detail .fd-facts--wide .fd-rows { display: block; } .fleet-detail .fd-facts--wide .fd-row:not(:last-child) { border-bottom: 1px solid var(--fd-row-line); } }
+.fleet-detail .fd-avatar { width: 40px; height: 40px; font-size: 14px; }
+@media (max-width: 640px) { .fleet-detail .fd-hide-phone { display: none; } }
+.fleet-detail .fd-now .fd-inline-link.fd-mono { white-space: nowrap; }

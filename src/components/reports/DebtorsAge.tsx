@@ -113,7 +113,9 @@ export default function DebtorsAge({ d, companyName }: { d: Ledger; companyName?
   return (
     <ReportFrame
       title="Debtors age analysis"
-      sub={`As at ${dateText} · Incl. VAT, by due date${allOverdue ? (over60 > total - 0.005 ? ' · All over 60 days' : ' · All past due') : ''}`}
+      // The date is in the "As at" menu beside it, so the line does not repeat it.
+      sub={allOverdue ? `Incl. VAT · ${over60 > total - 0.005 ? 'all over 60 days' : 'all past due'}` : 'Incl. VAT, aged by due date'}
+      printTitle={`Debtors age analysis as at ${dateText}`}
       companyName={companyName}
       info={<Info title="Debtors age analysis" lines={[
         'Unpaid balances on issued invoices, including VAT. Drafts and cancelled invoices are not owed.',

@@ -89,7 +89,7 @@ export function ProfileSettings() {
 
   return (
     <div className="tw-profile-settings" style={{ maxWidth: 'var(--form-max, 720px)' }}>
-      <SettingsPageHeader title="Profile settings" description="Manage your personal information and account preferences" />
+      <SettingsPageHeader title="Profile" description="Your name, contact details and preferences" />
 
       {/* Profile picture */}
       <div style={sectionStyle}>

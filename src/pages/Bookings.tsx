@@ -345,7 +345,9 @@ export default function Bookings() {
       <SectionHeader
         title={load.load_number}
         back={{ to: '/bookings/orders', label: 'Orders' }}
-        titleAdornment={<><StatusChip status={load.status} /></>}
+        // Phones: the stepper below already marks the current status, so the
+        // chip steps aside and the load number keeps the title row whole.
+        titleAdornment={<span className={['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED'].includes(load.status) ? 'bk-head-chip bk-head-chip--stepper' : 'bk-head-chip'}><StatusChip status={load.status} /></span>}
         description={<>{load.customer_name}</>}
         actions={<>
           <StatusMenu

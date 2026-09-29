@@ -11,6 +11,8 @@
 
 import { formatMoney, formatMoneyWhole, formatPercent } from '@/lib/formatters';
 import { fetchData } from '@/lib/Api';
+import { resolvePeriod, periodText, type Ledger } from '@/components/reports/data';
+import { marginFromLedger } from './margin-ledger';
 
 // ---------------------------------------------------------------- fetching
 
@@ -79,7 +81,8 @@ export interface FindingInputs {
   expenses: Source<ExpenseRec> | null;
   loads: Source<LoadRec> | null;
   quotes: Source<QuoteRec> | null;
-  finance: FinanceRec | null;
+  /** No longer read: margin comes from the ledgers (margin-ledger.ts). Kept optional for callers. */
+  finance?: FinanceRec | null;
   fuel: FuelRec | null;
   company: CompanyRec | null;
   /** Weekly cash forecast (dashboard/cashflow). Optional: only the shortfall finding uses it. */
@@ -327,28 +330,33 @@ export function computeFindings(input: FindingInputs, now = new Date()): Finding
   }
 
   // 6. Costs waiting for approval distort the margin ----------------------
-  if (input.expenses && input.finance) {
+  // The margin is the Margin tab's and the P&L's (margin-ledger.ts, last 12
+  // months, excl. VAT, cash basis), never the backend finance endpoint, so the
+  // three pages print the same percentage and the same "with pending" figure.
+  if (input.expenses && input.payments) {
     const pending = input.expenses.rows
       .filter(e => (e.status || '').toUpperCase() === 'PENDING' && num(e.amount) > 0 && daysBetween(e.created_at || e.expense_date, today) >= 7)
       .sort((a, b) => num(b.amount) - num(a.amount));
     const pendingTotal = pending.reduce((s, e) => s + num(e.amount), 0);
-    const revenue = num(input.finance.total_revenue);
-    const approved = num(input.finance.total_expenses);
-    const margin = revenue - approved;
-    const withPending = margin - pendingTotal;
-    const flips = margin >= 0 && withPending < 0;
-    if (pending.length && pendingTotal >= THRESHOLD && (flips || pendingTotal > 0.05 * approved)) {
-      const pct = revenue > 0 ? (margin / revenue) * 100 : null;
+    const period = resolvePeriod('last-12');
+    const m = marginFromLedger({
+      invoices: invoices as unknown as Ledger['invoices'],
+      payments: input.payments.rows as unknown as Ledger['payments'],
+      expenses: input.expenses.rows as unknown as Ledger['expenses'],
+    }, period);
+    const withPending = m.net - m.pending;
+    const flips = m.net >= 0 && withPending < 0;
+    if (pending.length && pendingTotal >= THRESHOLD && (flips || pendingTotal > 0.05 * m.costs)) {
       out.push({
         id: 'pending_costs', kind: 'pending_costs', category: 'Know your margin', basis: 'Measured', confidence: 'high',
         severity: flips ? 'high' : 'medium',
         amount: pendingTotal,
         headline: 'Costs left out of profit',
-        line: flips && pct != null
-          ? `Counted, your ${formatPercent(pct)} margin becomes a ${randWhole(Math.abs(withPending))} loss.`
+        line: flips && m.pct != null
+          ? `Counted, your ${formatPercent(m.pct)} margin becomes a ${randWhole(Math.abs(withPending))} loss.`
           : `${plural(pending.length, 'expense')} waiting for approval, not in your margin yet.`,
         action: { label: `Review ${plural(pending.length, 'expense')}`, href: '/finance/expenses' },
-        method: `Expenses still Pending 7 or more days after they were entered. Reports count approved expenses only. Margin to date: paid invoices ${randWhole(revenue)} less approved expenses ${randWhole(approved)}, then less these pending costs.${input.expenses.complete ? '' : ` Based on the first ${input.expenses.rows.length} of ${input.expenses.count} expenses.`}`,
+        method: `Expenses still Pending 7 or more days after they were entered. Reports count approved expenses only. Margin, ${periodText(period)}, excl. VAT, cash basis (as on the Margin tab and the P&L): revenue ${randWhole(m.revenue)} less approved costs ${randWhole(m.costs)} is ${randWhole(m.net)}; less the ${randWhole(m.pending)} pending in those months it is ${randWhole(withPending)}.${input.expenses.complete ? '' : ` Based on the first ${input.expenses.rows.length} of ${input.expenses.count} expenses.`}`,
         evidence: pending.map(e => ({
           id: `exp-${e.id}`, ref: e.expense_number || `#${e.id}`, label: (e.category || '').charAt(0) + (e.category || '').slice(1).toLowerCase(),
           note: `dated ${e.expense_date}`, amount: num(e.amount), href: '/finance/expenses',
@@ -380,7 +388,11 @@ export function computeFindings(input: FindingInputs, now = new Date()): Finding
     const total = rows.reduce((s, r) => s + r.short, 0);
     if (rows.length && total >= THRESHOLD) {
       const lo = Math.min(...rows.map(r => r.price));
-      const setting = num(input.company?.fuel_price_per_litre);
+      // Company settings shows the live zone price while the saved diesel is
+      // still the 23,50 factory default (CompanySettings loadLivePrice), so a
+      // default is not "your setting": only a price the company chose is quoted.
+      const saved = num(input.company?.fuel_price_per_litre);
+      const setting = saved > 0 && Math.abs(saved - 23.5) >= 0.001 ? saved : 0;
       out.push({
         id: 'diesel', kind: 'diesel', category: 'Quote better', basis: 'Estimated', confidence: 'high',
         severity: 'medium',

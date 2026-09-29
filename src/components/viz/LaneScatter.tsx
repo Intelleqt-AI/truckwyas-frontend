@@ -18,7 +18,7 @@ import { Legend, TableTwin, Tip, TipRow, VIZ, num0, overlaps, textBox, type Box,
  */
 export interface LanePoint { id: string; label: string; kmPerTrip: number; perKm: number; revenue: number; trips: number; thin: boolean }
 
-export function LaneScatter({ points, overallPerKm, minTrips, height = 320 }: {
+export function LaneScatter({ points, overallPerKm, minTrips, height: heightProp = 320 }: {
   points: LanePoint[];
   /** Total revenue / total km over every plotted lane. */
   overallPerKm: number | null;
@@ -26,6 +26,8 @@ export function LaneScatter({ points, overallPerKm, minTrips, height = 320 }: {
   height?: number;
 }) {
   const [ref, W] = useWidth<HTMLDivElement>(720);
+  // Phones keep the plot near a square so the key beneath stays in view.
+  const height = W < 520 ? Math.min(heightProp, 300) : heightProp;
   const svgRef = useRef<SVGSVGElement>(null);
   const figRef = useRef<HTMLDivElement>(null);
   const { tip, show, hide } = useTip();
@@ -51,8 +53,9 @@ export function LaneScatter({ points, overallPerKm, minTrips, height = 320 }: {
   // Lanes above the scale (thin data only) are not drawn: a line under the plot counts them and opens the table.
   const plotted = points.filter((p) => p.perKm <= yTop);
   const py = (p: LanePoint) => y(p.perKm);
-  const maxRev = Math.max(...points.map((p) => p.revenue), 1);
-  const r = (v: number) => 4 + Math.sqrt(Math.max(0, v) / maxRev) * 10; // area ∝ revenue, r 4..14
+  // One size per evidence class. Area-by-revenue read as "all the same" between the
+  // lanes that matter (R4 review), so size no longer encodes anything; revenue is in the tooltip and table.
+  const r = (_v: number, thin?: boolean) => (thin ? 5 : 7);
 
   // Draw big points first so small ones stay on top and hoverable.
   const order = [...plotted].sort((a, b) => b.revenue - a.revenue);
@@ -60,6 +63,7 @@ export function LaneScatter({ points, overallPerKm, minTrips, height = 320 }: {
   // Direct labels: evidenced lanes only, largest revenue first; thin lanes stay unlabelled
   // (tooltip and table). With no evidenced lane at all, the three largest lanes are named.
   const byRev = [...plotted].sort((a, b) => b.revenue - a.revenue);
+  const narrow = W < 520;
   const want = evidenced.length > 0 ? byRev.filter((p) => !p.thin) : byRev.slice(0, 3);
   // The fleet-average rule and its own label are obstacles: lane labels keep 4px clear of both.
   const avgY = overallPerKm != null && overallPerKm > 0 ? y(overallPerKm) : null;
@@ -74,9 +78,9 @@ export function LaneScatter({ points, overallPerKm, minTrips, height = 320 }: {
     if (labels.some((l) => l.p.id === p.id)) continue;
     const px = x(p.kmPerTrip);
     const pyy = py(p);
-    const max = W < 520 ? 18 : 30;
-    const text = p.label.length > max ? p.label.slice(0, max - 1) + '…' : p.label;
-    const pr = r(p.revenue);
+    // Phones: a number beside the point, keyed to the full lane name under the chart (never a truncated name).
+    const text = narrow ? String(labels.length + 1) : (p.label.length > 30 ? p.label.slice(0, 29) + '…' : p.label);
+    const pr = r(p.revenue, p.thin);
     // Try right of the point, then left, then above and below; each must clear the average rule, other labels and points.
     const tries: { lx: number; ly: number; anchor: 'start' | 'end' | 'middle' }[] = [
       { lx: px + pr + 6, ly: pyy + 4, anchor: 'start' },
@@ -88,7 +92,7 @@ export function LaneScatter({ points, overallPerKm, minTrips, height = 320 }: {
     for (const t of tries) {
       const box = textBox(text, t.lx, t.ly, t.anchor);
       if (box.x0 < 0 || box.x1 > W - padR + 2 || box.y0 < padT - 8 || box.y1 > height - padB) continue;
-      const hitsPoint = plotted.some((q) => { const qr = r(q.revenue); const qx = x(q.kmPerTrip); const qy = py(q); return overlaps(box, { x0: qx - qr, x1: qx + qr, y0: qy - qr, y1: qy + qr }, q.id === p.id ? -1 : 1); });
+      const hitsPoint = plotted.some((q) => { const qr = r(q.revenue, q.thin); const qx = x(q.kmPerTrip); const qy = py(q); return overlaps(box, { x0: qx - qr, x1: qx + qr, y0: qy - qr, y1: qy + qr }, q.id === p.id ? -1 : 1); });
       if (placed.some((b) => overlaps(box, b, 4)) || hitsPoint) continue;
       placed.push(box);
       labels.push({ p: { ...p, label: text }, lx: t.lx, ly: t.ly, anchor: t.anchor });
@@ -101,7 +105,7 @@ export function LaneScatter({ points, overallPerKm, minTrips, height = 320 }: {
   const offsetY = () => (figRef.current && svgRef.current ? svgRef.current.getBoundingClientRect().top - figRef.current.getBoundingClientRect().top : 0);
   const openP = (p: LanePoint) => {
     setActive(p.id);
-    show(x(p.kmPerTrip), py(p) - r(p.revenue) + offsetY(), (
+    show(x(p.kmPerTrip), py(p) - r(p.revenue, p.thin) + offsetY(), (
       <>
         <div className="viz-tip__title">{p.label}</div>
         <TipRow color={p.thin ? undefined : VIZ.accent} keyShape={p.thin ? 'ring' : 'line'} value={`${rand(p.perKm)}/km`} label="revenue per km" />
@@ -125,13 +129,13 @@ export function LaneScatter({ points, overallPerKm, minTrips, height = 320 }: {
   return (
     <div className="viz" ref={figRef}>
       <Legend items={[
-        { label: `${minTrips}+ trips, size is revenue`, color: VIZ.accent, shape: 'dot' },
+        { label: `${minTrips}+ trips`, color: VIZ.accent, shape: 'dot' },
         { label: `Fewer than ${minTrips} trips`, color: VIZ.neutralStrong, shape: 'ring' },
         ...(overallPerKm ? [{ label: `Your average, ${rand(overallPerKm)}/km`, color: 'var(--text-secondary)', shape: 'line' as const }] : []),
       ]} />
       <div ref={ref} onPointerLeave={close}>
         <svg ref={svgRef} width={W} height={height} role="img" tabIndex={0} className="viz-focusable"
-          aria-label={`Revenue per kilometre against kilometres per trip for ${plural(points.length, 'lane')}. Point size is total revenue. Use the table for every value.`}
+          aria-label={`Revenue per kilometre against kilometres per trip for ${plural(points.length, 'lane')}. Use the table for every value.`}
           onPointerMove={(e) => { const pt = localPoint(svgRef.current!, e); const p = nearest(pt.x, pt.y); if (p) openP(p); else close(); }}
           onFocus={() => kbOrder[0] && openP(kbOrder[0])} onBlur={close}
           onKeyDown={(e) => {
@@ -161,9 +165,9 @@ export function LaneScatter({ points, overallPerKm, minTrips, height = 320 }: {
             const on = active === p.id;
             // Thin lanes: a light neutral wash inside the ring, so where two overlap the overlap reads darker instead of as tangled outlines.
             return p.thin ? (
-              <circle key={p.id} cx={x(p.kmPerTrip)} cy={y(p.perKm)} r={r(p.revenue)} fill={VIZ.neutralStrong} fillOpacity={0.14} stroke={on ? 'var(--text-primary)' : VIZ.neutralStrong} strokeOpacity={on ? 1 : 0.9} strokeWidth={on ? 2.5 : 1.25} />
+              <circle key={p.id} cx={x(p.kmPerTrip)} cy={y(p.perKm)} r={r(p.revenue, p.thin)} fill={VIZ.neutralStrong} fillOpacity={0.14} stroke={on ? 'var(--text-primary)' : VIZ.neutralStrong} strokeOpacity={on ? 1 : 0.9} strokeWidth={on ? 2.5 : 1.25} />
             ) : (
-              <circle key={p.id} cx={x(p.kmPerTrip)} cy={y(p.perKm)} r={r(p.revenue)} fill={VIZ.accent} fillOpacity={0.85} stroke={on ? 'var(--text-primary)' : 'var(--viz-surface)'} strokeWidth={2} />
+              <circle key={p.id} cx={x(p.kmPerTrip)} cy={y(p.perKm)} r={r(p.revenue, p.thin)} fill={VIZ.accent} fillOpacity={0.85} stroke={on ? 'var(--text-primary)' : 'var(--viz-surface)'} strokeWidth={2} />
             );
           })}
           {labels.map(({ p, lx, ly, anchor }) => (
@@ -171,6 +175,11 @@ export function LaneScatter({ points, overallPerKm, minTrips, height = 320 }: {
           ))}
         </svg>
       </div>
+      {narrow && labels.length > 0 && (
+        <ol className="viz-lane-key">
+          {labels.map(({ p }) => { const full = points.find((q) => q.id === p.id)!; return <li key={`k${p.id}`}><span className="viz-lane-key__n">{p.label}</span>{full.label} · {rand(full.perKm)}/km</li>; })}
+        </ol>
+      )}
       <Tip tip={tip} width={W} />
       <TableTwin
         note={offScale.length > 0 ? `${plural(offScale.length, 'lane')} above ${yLabel(yTop)}/km (fewer than ${minTrips} trips each) ${offScale.length === 1 ? 'is' : 'are'} off the chart; see the table.` : undefined}

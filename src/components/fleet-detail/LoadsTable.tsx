@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { formatDistance } from '@/lib/formatters';
 import { useNavigate } from 'react-router-dom';
-import { dateText, loadDate, num, randWhole } from './parts';
+import { dateText, loadDate, num, randCents, randWhole } from './parts';
 import { StatusChip } from '@/components/ui/StatusChip';
+import { isDelivered } from './record';
 
 
 /**
- * Recent loads: 48px rows, identifiers in mono, money right-aligned.
+ * Loads with their money: 48px rows, money right-aligned at the end.
+ * Revenue is the order value; loads not yet delivered show it muted, because
+ * Performance counts delivered work only. "Per km" is revenue over the load's
+ * distance (no fuel or margin column: loads carry no cost of their own).
  * Rows open the booking. Ten rows, then "Show all".
  */
 export function LoadsTable({ loads, showCustomer = true, initial = 10 }: { loads: any[]; showCustomer?: boolean; initial?: number }) {
@@ -18,23 +22,27 @@ export function LoadsTable({ loads, showCustomer = true, initial = 10 }: { loads
 
   return (
     <>
-      <div className="fd-table-scroll" role="region" aria-label="Recent loads" tabIndex={0}>
+      <div className="fd-table-scroll" role="region" aria-label="Loads" tabIndex={0}>
         <table className="fd-table">
           <thead>
             <tr>
               <th scope="col">Load</th>
               <th scope="col" className="fd-col-route">Route</th>
               {showCustomer && <th scope="col" className="fd-col-opt fd-col-customer">Customer</th>}
-              <th scope="col" className="is-num fd-col-opt fd-col-dist">Distance</th>
-              <th scope="col" className="is-num">Revenue</th>
               <th scope="col" className="fd-col-status">Status</th>
               <th scope="col" className="fd-col-opt">Date</th>
+              <th scope="col" className="is-num fd-col-opt fd-col-dist">Distance</th>
+              <th scope="col" className="is-num">Revenue</th>
+              <th scope="col" className="is-num fd-col-opt fd-col-perkm">Per km</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((l: any) => {
               const route = `${l.pickup_city || '—'} → ${l.delivery_city || '—'}`;
               const amount = num(l.total_amount);
+              const km = num(l.distance);
+              const done = isDelivered(l);
+              const cancelled = /^CANCEL/.test(String(l.status || '').toUpperCase());
               return (
                 <tr
                   key={l.id}
@@ -48,12 +56,13 @@ export function LoadsTable({ loads, showCustomer = true, initial = 10 }: { loads
                   </td>
                   <td className="fd-col-route fd-ellipsis" title={route}>{route}</td>
                   {showCustomer && <td className="fd-col-opt fd-col-customer fd-ellipsis" title={l.customer_name || undefined}>{l.customer_name || '—'}</td>}
-                  <td className="is-num fd-col-opt fd-col-dist">{num(l.distance) ? formatDistance(num(l.distance)) : '—'}</td>
-                  <td className="is-num fd-strong">{amount ? randWhole(amount) : '—'}</td>
                   <td className="fd-col-status">
                     <StatusChip status={l.status} size="sm" />
                   </td>
                   <td className="fd-col-opt" title={l.created_at ? `Created ${dateText(l.created_at)}` : undefined}>{dateText(loadDate(l)) || '—'}</td>
+                  <td className="is-num fd-col-opt fd-col-dist">{km ? formatDistance(km) : '—'}</td>
+                  <td className={`is-num${done ? ' fd-strong' : ''}${cancelled ? ' fd-struck' : ''}`} title={done ? undefined : 'Order value; counted once delivered'}>{amount ? randWhole(amount) : '—'}</td>
+                  <td className="is-num fd-col-opt fd-col-perkm">{amount && km && !cancelled ? randCents(amount / km) : '—'}</td>
                 </tr>
               );
             })}

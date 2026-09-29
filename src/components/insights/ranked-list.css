@@ -76,14 +76,17 @@
 
 .rl-empty { margin: 0; padding: 12px 0; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
 
-/* Phone: label and value on the first line, bar and share beneath. */
+/* Phone: label (and its meta line) beside the value and share, then the bar
+   across the full row, so every bar runs on the same full-width scale. */
 @media (max-width: 640px) {
-  .rl-row, .rl-row--share {
-    /* Fixed value column so bars end on the same edge from row to row. */
-    grid-template-columns: minmax(0, 1fr) minmax(104px, max-content);
-    grid-template-areas: 'label value' 'bar share';
-    row-gap: 6px; padding: 10px 0;
+  .rl-row { grid-template-columns: minmax(0, 1fr) max-content; grid-template-areas: 'label value' 'bar bar'; row-gap: 8px; padding: 10px 0; }
+  .rl-row--share {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    grid-template-areas: 'label value' 'label share' 'bar bar';
+    row-gap: 0; padding: 10px 0;
   }
+  .rl-row--share .rl-bar, .rl-row--share .rl-bar-note { margin-top: 8px; }
+  .rl-share { align-self: start; }
   .rl-row--link { padding: 10px 8px; }
   .rl-label { grid-area: label; }
   .rl-value { grid-area: value; align-self: start; }

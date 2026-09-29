@@ -7,7 +7,7 @@ import StaleDataNotice from '@/components/data/StaleDataNotice';
 import './table-heading-roles.css';
 import { Plus, UserRound as EmptyDriversIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -220,6 +220,45 @@ export default function Drivers() {
   const loading = driversQuery.isLoading && !failed;
 
   const drivers: Driver[] = data?.drivers ?? [];
+
+  // Opens the Edit panel for one driver (row menu, or ?edit=<id> from the driver page).
+  const openEdit = (d: Driver) => {
+    setEditDriver(d);
+    const dUd: any = d.user_details || {};
+    setEditForm({
+      first_name: d.first_name || '',
+      last_name: d.last_name || '',
+      email: dUd.email || '',
+      phone: dUd.phone || '',
+      address: dUd.address || '',
+      license_number: d.license_number || '',
+      license_expiry: d.license_expiry || '',
+      medical_card_expiry: d.medical_card_expiry || '',
+      hire_date: d.hire_date || '',
+      status: d.status || 'ACTIVE',
+      license_state: d.license_state || 'GP',
+      emergency_contact: d.emergency_contact || d.emergency_phone || '',
+      vehicle: vehicles.find(v => v.driver_id === d.id)?.id?.toString() ?? '',
+    });
+  };
+
+  // The driver page's "Add" and "Assign" rows land here with ?edit=<id>:
+  // open that driver's Edit panel, and go back to their page when it closes.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [returnTo, setReturnTo] = useState<string | null>(null);
+  useEffect(() => {
+    const want = Number(searchParams.get('edit'));
+    if (!want || !data) return;
+    const d = drivers.find(x => x.id === want);
+    const next = new URLSearchParams(searchParams); next.delete('edit');
+    setSearchParams(next, { replace: true });
+    if (d && !isDemo) { openEdit(d); setReturnTo(`/fleet/drivers/${d.id}`); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, data]);
+  useEffect(() => {
+    if (!editDriver && returnTo) { const to = returnTo; setReturnTo(null); navigate(to); }
+  }, [editDriver, returnTo, navigate]);
+
   const vehicles: { id: number; plate: string; make?: string; model?: string; driver_id?: number | null }[] = data?.vehicles ?? [];
   const overview: DriverOverview | null = data?.overview ?? null;
 
@@ -279,7 +318,7 @@ export default function Drivers() {
           <KpiTile
             aria-label="Completed loads"
             label="Completed loads"
-            aside={<InfoTip>Loads delivered or invoiced, all time.</InfoTip>}
+            aside={<InfoTip>Loads delivered or invoiced with a driver recorded, all time. Delivered loads with no driver are not counted here.</InfoTip>}
             figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : completedLoads}
             note={loading ? 'Loading' : 'All time'}
           />
@@ -431,23 +470,7 @@ export default function Drivers() {
                           label: 'Edit',
                           disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined,
                           onSelect: () => {
-                            setEditDriver(d);
-                            const dUd: any = d.user_details || {};
-                            setEditForm({
-                              first_name: d.first_name || '',
-                              last_name: d.last_name || '',
-                              email: dUd.email || '',
-                              phone: dUd.phone || '',
-                              address: dUd.address || '',
-                              license_number: d.license_number || '',
-                              license_expiry: d.license_expiry || '',
-                              medical_card_expiry: d.medical_card_expiry || '',
-                              hire_date: d.hire_date || '',
-                              status: d.status || 'ACTIVE',
-                              license_state: d.license_state || 'GP',
-                              emergency_contact: d.emergency_contact || d.emergency_phone || '',
-                              vehicle: vehicles.find(v => v.driver_id === d.id)?.id?.toString() ?? '',
-                            });
+                            openEdit(d);
                           },
                         },
                         {

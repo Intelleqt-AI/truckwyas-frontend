@@ -254,8 +254,12 @@ export default function CustomerDetail() {
 
       <div className="bk-detail-grid bk-detail-grid--rail">
         <div className="bk-stack">
-          {/* Key figures first: what they owe you, then what they are worth. */}
-          {(owed > 0 || totalQuotes > 0) ? (
+          {/* Key figures first: what they owe you, then what they are worth.
+              Until quotes and invoices arrive, tile placeholders hold the row
+              (never the "not quoted yet" notice, which would then swap out). */}
+          {quotesData === undefined || (!ledger.data && !ledger.error) ? (
+            <div className="cd-tiles-skel"><TilesSkeleton count={2} /></div>
+          ) : (owed > 0 || totalQuotes > 0) ? (
             <KpiRow>
               {owed > 0 && (
                 <KpiTile
@@ -307,18 +311,18 @@ export default function CustomerDetail() {
               label/value rows with the value 700px from its label. */}
           <section className="bk-card" aria-labelledby="cd-contact-title">
             <div className="bk-card__head"><h2 className="bk-card__title" id="cd-contact-title">Contact details</h2></div>
-            <dl className="bk-facts bk-facts--auto">
+            <dl className="bk-facts bk-facts--auto cd-contact">
               {[
                 ...(showContact ? [{ label: "Contact", value: contact }] : []),
-                { label: "Email", value: customer.email },
+                { label: "Email", value: customer.email, wide: true },
                 { label: "Phone", value: customer.phone },
                 { label: "City", value: customer.city },
                 { label: "Province", value: customer.state },
                 { label: "Postal code", value: customer.zip_code },
-                { label: "Address", value: customer.address },
-                { label: "Billing address", value: customer.billing_address || customer.address },
-              ].map(r => (
-                <div key={r.label}>
+                { label: "Address", value: customer.address, wide: true },
+                { label: "Billing address", value: customer.billing_address || customer.address, wide: true },
+              ].map((r: { label: string; value?: string; wide?: boolean }) => (
+                <div key={r.label} className={r.wide ? 'bk-fact--wide' : undefined}>
                   <dt className="bk-fact__label">{r.label}</dt>
                   <dd className="bk-fact__value">{r.value || <span className="bk-muted">Not recorded</span>}</dd>
                 </div>
@@ -374,7 +378,8 @@ export default function CustomerDetail() {
           ledger.error ? (
             <div className="bk-empty"><p className="bk-empty__text">Invoices could not be loaded. <button type="button" className="bk-link" onClick={ledger.retry}>Try again</button></p></div>
           ) : (
-            <div style={{ padding: "var(--card-pad, 20px)" }}><div className="ops-skel" style={{ height: 120 }} /></div>
+            // Header plus one row: most customers have one or two invoices.
+            <div style={{ padding: "var(--card-pad, 20px)" }}><div className="ops-skel" style={{ height: 52 }} /></div>
           )
         ) : theirInvoices.length === 0 ? (
           <div className="bk-empty"><p className="bk-empty__text">No invoices for this customer yet.</p></div>
@@ -404,7 +409,7 @@ export default function CustomerDetail() {
                       </td>
                       <td><StatusChip status={late && String(inv.status).toUpperCase() === "SENT" ? "OVERDUE" : inv.status} size="sm" /></td>
                       <td className="is-num bk-col-narrow">{formatZAR(num(inv.total_amount))}</td>
-                      <td className="is-money">{isOpen(inv) ? formatZAR(num(inv.balance)) : <span className="bk-muted">Paid</span>}</td>
+                      <td className="is-money">{isOpen(inv) ? formatZAR(num(inv.balance)) : <span className="bk-muted" aria-label="Nothing due">—</span>}</td>
                     </tr>
                   );
                 })}

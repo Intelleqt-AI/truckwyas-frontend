@@ -238,6 +238,38 @@ export const DELIVERED = new Set(['DELIVERED', 'INVOICED', 'COMPLETED', 'PAID'])
 export const isApproved = (e: Expense) => st(e.status) === 'APPROVED';
 export const isPending = (e: Expense) => st(e.status) === 'PENDING';
 
+/** Paid in full: the Invoices page "Paid" filter (status Paid). */
+export const isPaid = (i: Pick<Invoice, 'status'>) => st(i.status) === 'PAID';
+
+export interface PaidTiming {
+  /** Invoices paid in full (status Paid): the Invoices "Paid" filter count. */
+  count: number;
+  /** How many of them have both an issue date and a paid date. */
+  timed: number;
+  /** Average days from issue date to paid date over `timed`; null when none. */
+  avgDays: number | null;
+}
+
+/** THE "time to get paid" definition, shared by Invoices and Fast Pay so the
+ *  count beside it always equals the Invoices "Paid" filter (the backend
+ *  stats endpoint misses some paid invoices, e.g. INV-20260615-96400).
+ *  Paid = status Paid. Days = issue date to paid_at (never below 0),
+ *  averaged over the paid invoices that have both dates. Pass the complete
+ *  invoice list (the Reports ledger, or the Invoices page's full list). */
+export function paidInvoiceTiming(invoices: Pick<Invoice, 'status' | 'issue_date' | 'paid_at'>[]): PaidTiming {
+  const paid = invoices.filter(isPaid);
+  const days = paid.flatMap(i => {
+    const paidOn = (i.paid_at || '').slice(0, 10);
+    if (!i.issue_date || !paidOn) return [];
+    return [Math.max(0, daysBetween(i.issue_date, paidOn))];
+  });
+  return {
+    count: paid.length,
+    timed: days.length,
+    avgDays: days.length ? days.reduce((s, v) => s + v, 0) / days.length : null,
+  };
+}
+
 /** Share of an invoice's total that is VAT (from the invoice itself, not a rate field). */
 export const vatShare = (i?: Invoice) => {
   if (!i) return 0;

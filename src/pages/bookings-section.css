@@ -179,8 +179,11 @@
   .bk-table .bk-col-load, .bk-table .bk-col-overdue, .bk-table .bk-col-phone, .bk-table .bk-col-select { display: none; }
   .bk-table .bk-col-customer { max-width: 14ch; }
   .bk-table td { font-size: 13px; }
-  .bk-table th, .bk-table td { padding-left: 8px; padding-right: 8px; }
-  .bk-table th:first-child, .bk-table td:first-child { padding-left: 16px; }
+  /* R4: cells keep at least 12px; the outer edge matches the 16px card pad,
+     also when the hidden select column was the first one. */
+  .bk-table th, .bk-table td { padding-left: 12px; padding-right: 12px; }
+  .bk-table th:first-child, .bk-table td:first-child,
+  .bk-table .bk-col-select + th, .bk-table .bk-col-select + td { padding-left: 16px; }
   .bk-table th:last-child, .bk-table td:last-child { padding-right: 16px; }
 }
 /* Columns size to their content; the card scrolls sideways before any cell is cut. */
@@ -304,7 +307,12 @@
 .bk-help { font-size: 13px; line-height: 20px; color: var(--text-secondary); margin: 0; }
 .bk-help--warning { color: var(--status-warning-text); }
 .bk-help--danger { color: var(--status-danger-text); }
-.bk-link { background: none; border: none; padding: 0; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+.bk-link { background: none; border: none; padding: 0; color: var(--link, var(--accent-primary)); font: inherit; font-weight: 500; text-decoration: none; cursor: pointer; }
+/* One link style app-wide (R4): accent text, underline on hover. */
+.bk-link:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.bk-link:disabled { color: var(--text-tertiary); cursor: default; }
+.bk-link:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
+.bk-link--sm { font-size: 13px; line-height: 20px; }
 .bk-mono { font-family: var(--font-sans); font-size: 14px; line-height: 20px; font-variant-numeric: tabular-nums; }
 
 .bk-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--card-gap, 16px); align-items: start; }
@@ -485,17 +493,13 @@
 /* ---- Round 3: customer detail ---- */
 .bk-kv__label { display: inline-flex; align-items: center; gap: 4px; }
 .cd-status { display: inline-flex; align-items: baseline; gap: 12px; }
-.cd-status .bk-link { font-size: 13px; color: var(--text-secondary); }
-.cd-status .bk-link:hover:not(:disabled) { color: var(--text-primary); }
+.cd-status .bk-link { font-size: 13px; }
 .cd-more { display: flex; justify-content: center; padding: 8px var(--card-pad, 20px) 12px; border-top: 1px solid var(--border-row); }
 
 /* ---- Round 3: orders and history ---- */
 /* Routes are city to city now; give them the room the customer column does not need. */
 @container (min-width: 1041px) { .bk-table .bk-col-route { max-width: 36ch; } }
 .bk-table .bk-col-assign .tw-status { max-width: 100%; }
-/* A quiet row action: no outline stack down the right edge. */
-.bk-table .bk-row-action { color: var(--accent-primary); font-weight: 500; }
-.bk-table .bk-row-action:hover:not(:disabled) { color: var(--accent-primary); background: var(--bg-surface-hover); }
 
 /* ---- Round 3: booking detail ---- */
 .bk-progress { margin-bottom: var(--section-gap, 24px); padding: 16px var(--card-pad, 20px); display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
@@ -518,6 +522,49 @@
 .bk-assign__flag { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border-row); }
 .bk-assign__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
 .bk-kv__value.bk-muted { color: var(--text-tertiary); }
-/* Long record IDs (LOAD-20260616-9737) stay on one line; the chip wraps instead. */
-.bk-detail .section-header__title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* Long record IDs (LOAD-20260616-9737) stay on one line at desktop widths.
+   Phones leave the title to the shared head fit (24px, then wrap), which
+   needs the row to overflow to notice, so no ellipsis there. */
+@media (min-width: 769px) {
+  .bk-detail .section-header__title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+}
 @container (max-width: 520px) { .bk-table .bk-col-action { display: none; } }
+
+/* ---- Round 4: orders flag and history row action ---- */
+/* A contradiction (on the move, no vehicle) is one short amber line under the
+   status chip: the only amber element in the row, never a truncated chip. */
+.bk-table .bk-status-flag { display: block; margin-top: 2px; font: 500 12px/16px var(--font-sans); color: var(--status-warning-text); white-space: nowrap; }
+/* The quotes toolbar's Board/List seg matches every other 36px toolbar control. */
+.bk-toolbar .tw-seg { padding: 3px; }
+.bk-toolbar .tw-seg__opt { height: calc(var(--control-h, 36px) - 6px); }
+
+/* Status filters (StatusFilter in QuotesList.tsx): the seg on wider screens;
+   a compact select on phones when there are more than four options. */
+.bk-filter { display: inline-flex; max-width: 100%; min-width: 0; }
+.bk-filter .bk-filter__select { display: none; }
+@media (max-width: 767px) {
+  .bk-filter.bk-filter--compact .bk-filter__seg { display: none; }
+  .bk-filter.bk-filter--compact { display: flex; width: 100%; }
+  .bk-filter.bk-filter--compact .bk-filter__select { display: flex; flex: 1 1 auto; width: auto; min-width: 180px; height: var(--control-h, 44px); }
+}
+/* Phone rows: the record number rides under the customer when its own column folds away. */
+.bk-table .bk-phone-sub { display: none; }
+@container (max-width: 520px) {
+  .bk-table .bk-phone-sub { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; }
+}
+/* Booking detail head on phones: the status chip repeats the stepper, so it
+   gives the title row back to the load number. */
+.bk-head-chip { display: inline-flex; }
+@media (max-width: 768px) { .bk-head-chip--stepper { display: none; } }
+/* Loads on phones: customer and load number get the room Status does not need. */
+@container (max-width: 520px) { .bk-table--loads .bk-col-customer { max-width: 17ch; } }
+/* Customer contact on phones: short facts pair up two per row; email and
+   addresses take the full width, so the card is not one long column. */
+@media (max-width: 520px) {
+  .bk-facts.cd-contact { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+  .bk-facts.cd-contact .bk-fact--wide { grid-column: 1 / -1; }
+}
+.cd-tiles-skel .ops-kpis { margin-bottom: 0; }
+/* History toolbar on phones: the four-option seg always takes its own line,
+   so the count arriving ("0" to "17 records") never re-wraps the row. */
+@media (max-width: 767px) { .bk-hist-toolbar .tw-toolbar__end { flex-basis: 100%; } }

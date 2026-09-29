@@ -466,7 +466,7 @@ export function IntegrationsSettings() {
         </div>
 
         {loadingXero ? (
-          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><Loader size={20} /></div>
+          <div style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : xeroStatus?.connected ? (
           <>
             <div style={{
@@ -547,7 +547,7 @@ export function IntegrationsSettings() {
         </div>
 
         {loadingCartrack ? (
-          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><Loader size={20} /></div>
+          <div style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : cartrackStatus?.connected ? (
           <div style={{
             ...nestedBoxStyle, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
@@ -637,7 +637,7 @@ export function IntegrationsSettings() {
         </div>
 
         {loadingCtrlfleet ? (
-          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><Loader size={20} /></div>
+          <div style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : ctrlfleetStatus?.connected ? (
           <>
             <div style={{
@@ -732,10 +732,10 @@ export function IntegrationsSettings() {
                         display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
                       }}>
                         <div style={{ flex: '1 1 160px', minWidth: 140 }}>
-                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)' }}>
-                            {cf.licence_number || '(no plate)'}
+                          <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
+                            {cf.licence_number || 'No plate'}
                           </div>
-                          <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
                             {cf.vehicle_code}{cf.type ? ` · ${cf.type}` : ''}
                           </div>
                         </div>
@@ -874,7 +874,8 @@ export function IntegrationsSettings() {
         )}
 
         {loadingKeys ? (
-          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
+          // One key row's height: the list usually holds at least one key.
+          <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : apiKeys.length === 0 ? (
           <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
             No API keys yet. Generate one to enable programmatic access.
@@ -890,7 +891,7 @@ export function IntegrationsSettings() {
                     {key.name}
                   </div>
                   <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                    {/* Only the key prefix is an identifier (mono); dates stay sans. */}
+                    {/* Monospace only for code: URLs and key material. Event names, plates and dates stay sans. */}
                     {/* Never the whole key: a masked start and end when the API sends it, else "Key hidden". */}
                     <span style={{ fontVariantNumeric: 'tabular-nums' }}>{maskKey(key)}</span> · Created {formatDate(key.created_at)}
                     {(key.last_used || (key as any).last_used_at) && ` · Last used ${formatDate(key.last_used || (key as any).last_used_at)}`}
@@ -940,7 +941,7 @@ export function IntegrationsSettings() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
               {EVENT_OPTIONS.map((evt) => (
-                <label key={evt} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                <label key={evt} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={selectedEvents.includes(evt)}
@@ -974,7 +975,7 @@ export function IntegrationsSettings() {
         )}
 
         {loadingWebhooks ? (
-          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
+          <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : webhooks.length === 0 ? (
           <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
             No webhooks configured. Add one to receive real-time event notifications.
@@ -992,7 +993,7 @@ export function IntegrationsSettings() {
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {webhook.events.map((evt) => (
                       <span key={evt} style={{
-                        fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', padding: '2px 8px',
+                        fontSize: 13, lineHeight: '20px', padding: '0 8px',
                         background: 'var(--bg-surface)', color: 'var(--text-tertiary)', borderRadius: 'var(--radius-chip)',
                       }}>
                         {evt}

@@ -1,5 +1,5 @@
 import '@/pages/settings/settings-brand.css';
-import { formatDateTime, formatMoney, formatNumber } from '@/lib/formatters';
+import { formatDateTime, formatMoney, formatMonth, formatNumber } from '@/lib/formatters';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData, postData } from "@/lib/Api";
@@ -547,7 +547,7 @@ export function CompanySettings() {
                   <SelectItem value="no">No</SelectItem>
                 </SelectContent>
               </Select>
-              <div style={helpTextStyle}>No refuses quotes that cross a border.</div>
+              <div style={helpTextStyle}>Choose No to refuse quotes that cross a border.</div>
             </div>
           </div>
 
@@ -655,7 +655,7 @@ export function CompanySettings() {
                   {livePrice.inland_price != null ? (
                     <>
                       Live: {formatMoney(Number(livePrice.inland_price))}/L
-                      {livePrice.last_updated && `, ${new Date(livePrice.last_updated).toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })}`}
+                      {livePrice.last_updated && `, ${formatMonth(livePrice.last_updated)}`}
                       {livePrice.stale_warning && ', may be out of date'}
                     </>
                   ) : (

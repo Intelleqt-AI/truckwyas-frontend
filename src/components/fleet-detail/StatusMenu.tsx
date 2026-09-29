@@ -40,10 +40,13 @@ export interface StatusMenuProps {
   intercept?: (value: string) => boolean;
   /** Button text; defaults to "Change status". */
   buttonLabel?: string;
+  /** Extra class on the trigger, e.g. to mark it as the page head's primary
+   *  (a `--primary` class keeps it on the phone title row; see SectionHeader). */
+  triggerClassName?: string;
 }
 
 export function StatusMenu({
-  subject, current, options, onChange, busy, disabledReason, confirmText, intercept, buttonLabel = 'Change status',
+  subject, current, options, onChange, busy, disabledReason, confirmText, intercept, buttonLabel = 'Change status', triggerClassName,
 }: StatusMenuProps) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -129,7 +132,7 @@ export function StatusMenu({
       <button
         ref={triggerRef}
         type="button"
-        className="bk-btn bk-btn--secondary"
+        className={`bk-btn bk-btn--secondary${triggerClassName ? ` ${triggerClassName}` : ''}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -142,7 +145,8 @@ export function StatusMenu({
         }}
         style={blocked || busy ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
       >
-        {busy ? 'Saving…' : buttonLabel}
+        {/* A text first child: the phone head never shrinks this to its chevron alone. */}
+        <span>{busy ? 'Saving…' : buttonLabel}</span>
         <ChevronDown size={16} aria-hidden="true" />
       </button>
       {open && createPortal(

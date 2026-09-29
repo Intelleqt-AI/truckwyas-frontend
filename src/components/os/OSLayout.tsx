@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Search, MessageSquareText, Sun, Moon, ChevronDown } from 'lucide-react';
+import { Search, Moon, ChevronDown, Settings as SettingsIcon, CreditCard, LogOut } from 'lucide-react';
+import OverflowMenu, { type MenuItem } from '@/components/ui/OverflowMenu';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LiveEvents } from '@/components/LiveEvents';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -22,7 +23,6 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('tw-theme') as 'dark' | 'light') || 'dark';
   });
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem('tw-nav-collapsed') === '1'; } catch { return false; }
   });
@@ -32,7 +32,6 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   const [agentQuery, setAgentQuery] = useState('');
   // Default ON to match the backend default; corrected by the fetch below.
   const [sessionTimeoutEnabled, setSessionTimeoutEnabled] = useState(true);
-  const profileRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -50,17 +49,6 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
       .join('')
       .toUpperCase()
       .slice(0, 2) || 'TW';
-
-  // Close menu on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
-        setShowProfileMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   const signOut = (message?: string) => {
     // Best-effort server-side session kill; the local token is cleared regardless.
@@ -273,52 +261,41 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
             </span>
           )}
           {canAsk && (
+            // Phones: the same Ask glyph as the desktop Ask box (a search mark, not a chat bubble).
             <button type="button" className="tw-icon-btn tw-top__ask" aria-label="Ask Copilot" onClick={() => navigate('/copilot')}>
-              <MessageSquareText size={18} strokeWidth={1.75} />
+              <Search size={18} strokeWidth={1.75} aria-hidden="true" />
             </button>
           )}
           <NotificationBell />
-          <div ref={profileRef} className="os-profile-anchor tw-profile">
-            <button type="button" className="os-profile-trigger tw-profile__trigger" aria-label={`Account menu for ${userName}`} aria-expanded={showProfileMenu}
-              onClick={() => setShowProfileMenu(p => !p)}
-              title={userName}
-            >
-              <span className="tw-avatar" aria-hidden="true">
-                {avatarUrl ? <img src={avatarUrl} alt="" /> : initials}
-              </span>
-            </button>
-            {showProfileMenu && (
-              <div className="os-header-popover tw-menu" role="menu">
+          <div className="os-profile-anchor tw-profile">
+            <OverflowMenu
+              label={`Account: ${userName}`}
+              triggerLabel={`Account menu for ${userName}`}
+              triggerTitle={userName}
+              triggerClassName="os-profile-trigger tw-profile__trigger"
+              trigger={(
+                <span className="tw-avatar" aria-hidden="true">
+                  {avatarUrl ? <img src={avatarUrl} alt="" /> : initials}
+                </span>
+              )}
+              portal={false}
+              menuClassName="os-header-popover tw-menu"
+              itemClassName="os-profile-action tw-menu__item"
+              header={(
                 <div className="tw-menu__head">
                   <div className="tw-menu__name">{userName}</div>
                   <div className="tw-menu__email">{authUser?.email || authUser?.username || ''}</div>
                   {roleLabel && <div className="tw-menu__email">{roleLabel}</div>}
                 </div>
-                <button type="button" role="menuitem" className="os-profile-action tw-menu__item theme-toggle"
-                  onClick={() => { toggleTheme(); }}
-                >
-                  {theme === 'dark' ? <Sun size={16} strokeWidth={1.75} aria-hidden="true" /> : <Moon size={16} strokeWidth={1.75} aria-hidden="true" />}
-                  {theme === 'dark' ? 'Light theme' : 'Dark theme'}
-                </button>
-                <button type="button" role="menuitem" className="os-profile-action tw-menu__item"
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    navigate('/settings');
-                  }}
-                >
-                  Profile & settings
-                </button>
-                {status.needsBilling && (
-                  <button type="button" role="menuitem" className="os-profile-action tw-menu__item"
-                    onClick={() => { setShowProfileMenu(false); navigate('/settings/billing'); }}>
-                    Go to billing
-                  </button>
-                )}
-                <button type="button" role="menuitem" className="os-profile-action tw-menu__item tw-menu__item--danger" onClick={handleLogout}>
-                  Sign out
-                </button>
-              </div>
-            )}
+              )}
+              items={[
+                // A two-state item: "Dark theme" with a check when it is on.
+                { label: 'Dark theme', icon: <Moon size={16} strokeWidth={1.75} />, checked: theme === 'dark', onSelect: toggleTheme },
+                { label: 'Profile and settings', icon: <SettingsIcon size={16} strokeWidth={1.75} />, onSelect: () => navigate('/settings') },
+                ...(status.needsBilling ? [{ label: 'Go to billing', icon: <CreditCard size={16} strokeWidth={1.75} />, onSelect: () => navigate('/settings/billing') } as MenuItem] : []),
+                { label: 'Sign out', icon: <LogOut size={16} strokeWidth={1.75} />, danger: true, onSelect: handleLogout },
+              ]}
+            />
           </div>
         </div>
       </header>

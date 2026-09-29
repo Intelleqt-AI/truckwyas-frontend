@@ -243,12 +243,12 @@ export function UsersPermissions() {
           <h2 style={sectionTitleStyle}>Team members</h2>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <input
-              className="settings-control"
+              className="settings-control st-search"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search users…"
               aria-label="Search users"
-              style={{ ...settingsInputStyle, minHeight: 'var(--control-h, 36px)', width: 180, maxWidth: '100%' }}
+              style={{ ...settingsInputStyle, height: 'var(--control-h, 36px)', minHeight: 'var(--control-h, 36px)', paddingTop: 0, paddingBottom: 0, width: 220, maxWidth: '100%' }}
             />
             {isAdmin && (
               <button
@@ -371,7 +371,7 @@ export function UsersPermissions() {
                     )}
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{u.name}</div>
-                      <div className="st-email" title={u.email} style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{u.email}</div>
+                      <div className="st-email" title={u.email} style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{/* A break opportunity before "@", so a wrapped email splits there, not mid-word. */}{String(u.email || '').split('@')[0]}{String(u.email || '').includes('@') && <><wbr />@{String(u.email).split('@').slice(1).join('@')}</>}</div>
                     </div>
                   </div>
                 </td>

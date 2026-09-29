@@ -216,10 +216,11 @@ export default function CustomerRisk() {
       <section className="card fin-section" aria-labelledby="lateness-title">
         <div className="fin-panel-head">
           <div className="fin-panel-head__text">
-            <h2 id="lateness-title" className="fin-panel-title">How late does {name} pay?</h2>
-            <p className="fin-panel-desc">
-              Days past the due date for each invoice, oldest first by issue date. Settled invoices show when they were paid; open ones show days late so far.
-            </p>
+            <h2 id="lateness-title" className="fin-panel-title fin-panel-title--tip">
+              How late they pay
+              <InfoTip align="end">Days past the due date for each invoice, oldest first by issue date. Settled invoices show when they were paid; open ones show days late so far.</InfoTip>
+            </h2>
+            <p className="fin-panel-desc">Days past due, per invoice</p>
           </div>
         </div>
         <div className="fin-legend-inline" style={{ marginBottom: 12 }}>
@@ -281,9 +282,12 @@ export default function CustomerRisk() {
       <section className="card fin-table-card" aria-labelledby="behaviour-title">
         <div className="fin-panel-head">
           <div className="fin-panel-head__text">
-            <h2 id="behaviour-title" className="fin-panel-title">Which invoices drive the score?</h2>
+            <h2 id="behaviour-title" className="fin-panel-title fin-panel-title--tip">
+              Invoices behind the score
+              <InfoTip align="end">Drafts and cancelled invoices are left out.</InfoTip>
+            </h2>
             <p className="fin-panel-desc">
-              {rows.length} {rows.length === 1 ? "invoice" : "invoices"} considered, newest first. Drafts and cancelled invoices are left out.
+              {rows.length} {rows.length === 1 ? "invoice" : "invoices"}, newest first
             </p>
           </div>
         </div>

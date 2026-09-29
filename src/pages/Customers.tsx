@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { fetchAllPages } from '@/components/insights/findings';
 import { useLedger, isOpen, num, todayISO } from '@/components/reports/data';
+import { InfoTip } from '@/components/ui/InfoTip';
 import { formatCurrency } from '@/lib/formatters';
 import { useAuth } from '@/lib/AuthContext';
 import RowActions from '@/components/ui/RowActions';
@@ -161,19 +162,23 @@ export default function Customers() {
     if (inv.due_date && inv.due_date.slice(0, 10) < today) row.overdue += num(inv.balance);
     owedBy.set(inv.customer, row);
   }
-  // One money column (R3): Owed, with the overdue part as a second line only
-  // when it tells you something (all of it, or a part of it, is late).
+  // Some balance is partly late: every row then takes the two-line height.
+  const anyPartlyLate = [...owedBy.values()].some(r => r.overdue >= 0.005 && Math.abs(r.overdue - r.owed) >= 0.005);
+  // One money column: Owed. When all of it is late the figure itself turns the
+  // danger text colour (no extra line); only a partly late balance gets a
+  // second line with the overdue part, because only then does it differ.
   const owedCell = (row: { owed: number; overdue: number } | undefined) => {
     if (!ledger.data) return <span className="bk-muted">{ledger.error ? 'Not loaded' : '…'}</span>;
     const owed = row?.owed ?? 0;
     const overdue = row?.overdue ?? 0;
     if (owed < 0.005) return <span className="bk-muted">—</span>;
+    if (overdue >= 0.005 && Math.abs(overdue - owed) < 0.005) {
+      return <span className="cu-owed__late" title="All overdue">{formatCurrency(owed)}<span className="sr-only">, all overdue</span></span>;
+    }
     return (
       <>
         {formatCurrency(owed)}
-        {overdue >= 0.005 && (
-          <span className="cu-owed__sub">{Math.abs(overdue - owed) < 0.005 ? 'All overdue' : `${formatCurrency(overdue)} overdue`}</span>
-        )}
+        {overdue >= 0.005 && <span className="cu-owed__sub">{formatCurrency(overdue)} overdue</span>}
       </>
     );
   };
@@ -322,7 +327,7 @@ export default function Customers() {
           />
         </div>
         <div className="bk-table-wrap bk-table-wrap--bare">
-        <table className="table-heading-roles bk-table bk-table--pin-actions">
+        <table className={`table-heading-roles bk-table bk-table--pin-actions${anyPartlyLate ? ' cu-two-line' : ''}`}>
           <thead>
             <tr>
               <th scope="col" className="bk-col-select" style={{ paddingRight: 0, width: 32 }}>
@@ -338,7 +343,7 @@ export default function Customers() {
               <th scope="col" className="bk-col-opt">Email</th>
               <th scope="col" className="bk-col-city">City</th>
               <th scope="col" className="bk-col-terms bk-col-narrow">Terms</th>
-              <th scope="col" className="is-num bk-col-money">Owed</th>
+              <th scope="col" className="is-num bk-col-money"><span className="cu-owed__head">Owed<InfoTip align="end">Unpaid invoice balances, incl. VAT. Red means all of it is past its due date; a second line shows the overdue part when only some is late.</InfoTip></span></th>
               {anyInactive && <th scope="col">Status</th>}
               <th scope="col" className="is-num"><span className="sr-only">Actions</span></th>
             </tr>

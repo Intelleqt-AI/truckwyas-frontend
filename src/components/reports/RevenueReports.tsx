@@ -54,7 +54,8 @@ export function RevenueByCustomer({ d, companyName }: { d: Ledger; companyName?:
   return (
     <ReportFrame
       title="Revenue by customer"
-      sub={`${periodText(period)} · ${basisText}`}
+      sub={`${periodText(period)} · excl. VAT`}
+      printTitle={`Revenue by customer, ${basis === 'invoice' ? 'invoiced' : 'received'}`}
       companyName={companyName}
       info={<Info title="Revenue by customer" lines={[
         'Invoiced: issued invoices (not drafts or cancelled) by issue date.',
@@ -105,7 +106,7 @@ export function RevenueByLane({ d, companyName }: { d: Ledger; companyName?: str
   const avgPerKm = kmAll.length ? kmAll.reduce((s, l) => s + num(l.total_amount), 0) / kmAll.reduce((s, l) => s + num(l.distance), 0) : null;
 
   const table: Statement = {
-    columns: [{ label: 'Lane' }, { label: 'Loads', type: 'int' }, { label: 'Distance', type: 'km' }, { label: 'Revenue excl. VAT', type: 'money' }, { label: 'Per km', type: 'money' }, { label: 'Share', type: 'pct' }],
+    columns: [{ label: 'Lane' }, { label: 'Loads', type: 'int' }, { label: 'Distance', type: 'km', phone: false }, { label: 'Revenue excl. VAT', type: 'money' }, { label: 'Per km', type: 'money' }, { label: 'Share', type: 'pct' }],
     rows: [
       ...lanes.map<SRow>(l => ({ key: l.lane, cells: [l.lane, l.loads, l.km, l.rev, l.perKm, total > 0 ? (l.rev / total) * 100 : null] })),
       ...(unknown.length ? [{ key: 'unknown', kind: 'muted' as const, cells: ['Route not recorded', unknown.length, null, unknownRev, null, total > 0 ? (unknownRev / total) * 100 : null] }] : []),
@@ -116,7 +117,7 @@ export function RevenueByLane({ d, companyName }: { d: Ledger; companyName?: str
   return (
     <ReportFrame
       title="Revenue by lane"
-      sub={`${periodText(period)} · Delivered loads, excl. VAT`}
+      sub={`${periodText(period)} · delivered loads`}
       companyName={companyName}
       info={<Info title="Revenue by lane" lines={[
         'Loads delivered or invoiced, by delivery date. Revenue is the load total, excluding VAT.',
@@ -133,7 +134,7 @@ export function RevenueByLane({ d, companyName }: { d: Ledger; companyName?: str
       csvName={`revenue-by-lane-${period.from}-to-${period.to}`}
     >
       {done.length === 0 ? <Empty line={`No loads delivered in ${periodText(period)}.`} action={{ label: 'See orders', to: '/bookings/orders' }} /> : (
-        <StatementTable table={table} caption="Revenue by lane"
+        <StatementTable cue={null} table={table} caption="Revenue by lane"
           footer={<Check>Total equals the {plural(done.length, 'delivered load')} in the period.</Check>} />
       )}
     </ReportFrame>
@@ -171,7 +172,7 @@ export function SalesByMonth({ d, companyName }: { d: Ledger; companyName?: stri
   return (
     <ReportFrame
       title="Sales by month"
-      sub={`${periodText(period)} · Issued invoices, by issue date`}
+      sub={`${periodText(period)} · issued invoices`}
       companyName={companyName}
       info={<Info title="Sales by month" lines={[
         'Every issued invoice (not drafts or cancelled), by issue date.',

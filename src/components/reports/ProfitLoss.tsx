@@ -58,7 +58,9 @@ export default function ProfitLoss({ d, companyName }: { d: Ledger; companyName?
   return (
     <ReportFrame
       title="Profit and loss"
-      sub={`${periodText(period)} · ${basisText}`}
+      // Basis is in the Basis menu beside it; the line keeps to the period and VAT.
+      sub={`${periodText(period)} · excl. VAT`}
+      printTitle={`Profit and loss, ${basis === 'cash' ? 'cash' : 'invoice'} basis`}
       companyName={companyName}
       info={<Info title="Profit and loss" lines={[
         basis === 'cash'

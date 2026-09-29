@@ -220,16 +220,23 @@
 /* --------------------------------------------------------------- phones */
 @media (max-width: 640px) {
   .fr-top > .fr-head.tw-toolbar { flex-wrap: wrap; gap: 8px; }
-  .fr-period { flex: 1 1 140px; flex-wrap: wrap; }
-  .fr-head > .fr-choice.tw-select-trigger { flex: 1 1 140px; min-width: 0; }
+  .fr-period { flex: 1 1 auto; flex-wrap: wrap; min-width: 0; }
+  /* Menus size to their label and share the row; a third that does not fit
+     wraps to a full row rather than cutting a label ("Invoice b…"). */
+  .fr-head > .fr-choice.tw-select-trigger { flex: 1 1 auto; min-width: 0; }
+  /* The customer name is a name, not an ID: its menu takes the whole row. */
+  .fr-head > .fr-choice--wide.tw-select-trigger { flex: 1 1 100%; max-width: none; }
   .fr-period__seg { display: none; }
   .fr-period__menu { display: contents; }
-  .fr-head .fr-period .fr-choice.tw-select-trigger { flex: 1 1 0; min-width: 0; }
-  .fr-head > .fr-seg-wrap, .fr-head .fr-seg { flex: 1 1 100%; }
+  .fr-head .fr-period .fr-choice.tw-select-trigger { flex: 1 1 auto; min-width: 0; }
+  /* A full-width view seg goes last, so Export and Print stay on the first
+     row beside the menus instead of dropping to a row of their own. */
+  .fr-head > .fr-seg-wrap, .fr-head .fr-seg { flex: 1 1 100%; order: 3; }
   .fr-head .tw-seg { width: 100%; }
   .fr-head .tw-seg__opt { flex: 1 1 0; }
-  .fr-head__actions.tw-toolbar__end { flex: 1 1 100%; margin-left: 0; }
-  .fr-head__actions .fr-head__btn { flex: 1; }
+  /* Export and Print move to the page head's "⋯" menu (FinanceReports), so
+     the toolbar holds only the report's settings: no row of buttons. */
+  .fr-head__actions.tw-toolbar__end { display: none; }
   .fr-period__custom { flex: 1 1 100%; }
   .fr-period__custom .fr-input { flex: 1 1 0; }
   .fr-parties { grid-template-columns: minmax(0, 1fr); }
@@ -237,11 +244,12 @@
   /* Headers may take two lines on a phone ("61 to 90 / days"); figures set the width. */
   .fr-table thead th:not(:first-child) { white-space: normal; vertical-align: bottom; min-width: 56px; }
   /* Phone: the label column is pinned and capped so a month or two and the
-     pinned Total stay in view; the full label is in the cell's title. */
+     pinned Total stay in view; a long label wraps onto a second line
+     ("Maintenance and / repairs") instead of being cut off. */
   .fr-table--sticky tr > :first-child,
   .fr-table--d1.fr-table--sticky tr > :first-child,
   .fr-table--d2.fr-table--sticky tr > :first-child,
-  .fr-table--d3.fr-table--sticky tr > :first-child { min-width: 112px; max-width: 124px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fr-table--d3.fr-table--sticky tr > :first-child { min-width: 112px; max-width: 124px; overflow: hidden; white-space: normal; overflow-wrap: break-word; }
   .fr-table th, .fr-table td,
   .fr-table--d1 th, .fr-table--d1 td, .fr-table--d2 th, .fr-table--d2 td, .fr-table--d3 th, .fr-table--d3 td { padding-left: 8px; padding-right: 8px; }
   .fr-table tr > :first-child, .fr-table tr > .is-indent:first-child,
@@ -277,3 +285,39 @@
 }
 .fr-seg-wrap { display: contents; }
 .fr-stats.tw-kpi-stats { padding: var(--card-pad); }
+
+/* ------------------------------------------------ phone stacked statements
+   A statement that cannot fit a phone (the customer statement, the cash
+   book, a one-row age table) becomes a stacked list: every figure on screen,
+   no columns off to the side. The table stays for wider screens and print. */
+.fr-stack { display: none; }
+@media (max-width: 640px) {
+  .fr-statement.has-stack > .fr-scrollbox,
+  .fr-statement.has-stack > .fr-cue { display: none; }
+  .fr-stack { display: block; list-style: none; margin: 0; padding: 0; }
+  /* Ledger row: what it is and the amount; the date and the running
+     balance; the reference on its own full-width line. */
+  .fr-stack__row {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: baseline;
+    min-height: 44px; padding: 10px 16px; border-top: 1px solid var(--border-row);
+  }
+  .fr-stack__row:first-child { border-top: 0; }
+  .fr-stack__title { font: 500 14px/20px var(--font-sans); color: var(--text-primary); min-width: 0; }
+  .fr-stack__amt { font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+  .fr-stack__sub { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fr-stack__bal { text-align: right; }
+  .fr-stack__ref { grid-column: 1 / -1; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+  .fr-stack__ref .fr-link { font-size: 12px; line-height: 16px; }
+  .fr-stack__row.fr-stack--subtotal { border-top-color: var(--border-subtle); }
+  .fr-stack__row.fr-stack--grand { border-top: 1px solid var(--border-subtle); padding-top: 12px; padding-bottom: 12px; }
+  .fr-stack--grand .fr-stack__title, .fr-stack--grand .fr-stack__amt { font-weight: 600; font-size: 16px; line-height: 24px; }
+  /* 'pairs': a heading, then one label/value line per figure. */
+  .fr-stack__pairs { margin: 0; padding: 4px 16px 8px; }
+  .fr-stack__pairs + .fr-stack__pairs { border-top: 1px solid var(--border-subtle); }
+  .fr-stack__pairs > div { display: flex; justify-content: space-between; gap: 12px; min-height: 36px; align-items: center; border-top: 1px solid var(--border-row); }
+  .fr-stack__pairs > .fr-stack__pairs-head { border-top: 0; min-height: 40px; }
+  .fr-stack__pairs dt { font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+  .fr-stack__pairs-head dt { font-weight: 500; color: var(--text-primary); }
+  .fr-stack__pairs dd { margin: 0; font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fr-stack__pairs > .is-last dt, .fr-stack__pairs > .is-last dd { font-weight: 600; color: var(--text-primary); }
+}

@@ -9,6 +9,8 @@ import './capital-prelaunch.css';
 import { AgeingStrip } from '@/components/viz';
 import { StatusChip } from '@/components/ui/StatusChip';
 import InfoTip from '@/components/insights/InfoTip';
+import { fetchAllPages, type Source } from '@/components/insights/findings';
+import { paidInvoiceTiming, type PaidTiming } from '@/components/reports/data';
 
 /**
  * Fast Pay before launch. There is no funding partner yet, so this view shows
@@ -127,10 +129,18 @@ function Skeleton({ rows = 3 }: { rows?: number }) {
 
 // ---- Panels ---------------------------------------------------------------
 
-interface InvoiceStats { avg_days_to_pay?: number | null; by_status?: Record<string, number> }
 type Q<T> = { data: T | undefined; isError: boolean; refetch: () => unknown };
 
-function WaitingCash({ aging, stats }: { aging: Q<AgingReport>; stats: InvoiceStats | null | undefined }) {
+/** Open (sent, unpaid) invoices as the Invoices page and Home count them: status not
+ *  paid, draft, cancelled or void, with a balance. */
+interface ListInvoice { status: string; balance?: string | number; issue_date: string; paid_at: string | null }
+const CLOSED = new Set(['PAID', 'DRAFT', 'CANCELLED', 'CANCELED', 'VOID', 'WRITTEN_OFF']);
+function openOf(rows: ListInvoice[]) {
+  const open = rows.filter((i) => !CLOSED.has((i.status || '').toUpperCase()) && Number(i.balance) > 0.005);
+  return { count: open.length, total: open.reduce((s, i) => s + Number(i.balance || 0), 0) };
+}
+
+function WaitingCash({ aging, timing, listOpen }: { aging: Q<AgingReport>; timing: PaidTiming | null; listOpen: { count: number; total: number } | null }) {
   const headId = useId();
   const [allCustomers, setAllCustomers] = useState(false);
   const data = aging.data;
@@ -143,12 +153,18 @@ function WaitingCash({ aging, stats }: { aging: Q<AgingReport>; stats: InvoiceSt
       const b = data.buckets?.find((x) => x.bucket_name === key);
       return { key, label: BUCKET_LABELS[key], amount: Number(b?.total_amount ?? 0), count: Number(b?.invoice_count ?? 0) };
     });
+    // Basis note, only when this figure differs from the invoice list (Home, Invoices, Debtors).
+    const extraCount = listOpen ? listOpen.count - Number(count) : 0;
+    const extraValue = listOpen ? listOpen.total - Number(total) : 0;
+    const basis = listOpen && extraCount > 0 && extraValue > 0.5
+      ? `Invoices lists ${listOpen.count} unpaid; ${extraCount} of them (${formatMoneyWhole(extraValue)}) are not on your company's account, so are left out.`
+      : null;
     const pastDue = buckets.filter((b) => b.key !== 'current').reduce((s, b) => s + b.amount, 0);
     const pastDueCount = buckets.filter((b) => b.key !== 'current').reduce((s, b) => s + b.count, 0);
-    // "Time to get paid" is the Invoices page tile: the same endpoint and definition
-    // (issue date to payment date, averaged over every paid invoice), so the two agree.
-    const paidCount = Number(stats?.by_status?.PAID ?? 0);
-    const avgDays = paidCount > 0 && stats?.avg_days_to_pay ? Number(stats.avg_days_to_pay) : null;
+    // "Time to get paid" is the Invoices page tile: the same ledger function
+    // (issue date to paid date, averaged over paid invoices), so the two agree.
+    const paidCount = timing?.count ?? 0;
+    const avgDays = timing && timing.timed > 0 ? timing.avgDays : null;
     const customerRows = (data.customers ?? [])
       .map((c) => ({
         id: String(c.customer_id),
@@ -177,21 +193,19 @@ function WaitingCash({ aging, stats }: { aging: Q<AgingReport>; stats: InvoiceSt
               <dt className="fp-sr">Owed to you</dt>
               <dd className="fp-hero">{formatMoneyWhole(total)}</dd>
               <dd className="fp-hero__sub">owed on {plural(count, 'invoice')} by {plural(customers, 'customer')}</dd>
+              {basis && <dd className="fp-basis">{basis}</dd>}
             </div>
             <div>
               <dt>Past its due date</dt>
-              {/* When all of it is late, the figure already says how much: don't repeat it. */}
-              {pastDueCount === count ? (
-                <><dd className="fp-summary__value">All of it</dd><dd className="fp-summary__note">every invoice is past due</dd></>
-              ) : (
-                <><dd className="fp-summary__value">{formatMoneyWhole(pastDue)}</dd><dd className="fp-summary__note">{plural(pastDueCount, 'invoice')}, {pct(pastDue, total)}% of the total</dd></>
-              )}
+              {/* One fact, said once: the share that is late, then how many invoices (and the rand only when it differs from the total). */}
+              <dd className="fp-summary__value">{pct(pastDue, total)}%</dd>
+              <dd className="fp-summary__note">{pastDueCount} of {plural(count, 'invoice')}{pastDueCount === count ? '' : `, ${formatMoneyWhole(pastDue)}`}</dd>
             </div>
             {avgDays != null && (
               <div>
                 <dt>Time to get paid</dt>
                 <dd className="fp-summary__value">{formatDays(avgDays)}</dd>
-                <dd className="fp-summary__note">Average from issue to payment, {plural(paidCount, 'paid invoice')}</dd>
+                <dd className="fp-summary__note">Issue to payment, {plural(paidCount, 'paid invoice')}</dd>
               </div>
             )}
           </dl>
@@ -207,12 +221,13 @@ function WaitingCash({ aging, stats }: { aging: Q<AgingReport>; stats: InvoiceSt
           {customerRows.length > 0 && (
             <div className="fp-outcome__customers">
               <h3 className="fp-subhead">Who it is waiting on</h3>
-              <ul className="fp-rank fp-rank--aged" aria-label="Unpaid balance by customer, shaded by how late it is">
+              <ul className="fp-rank fp-rank--aged" aria-label="Unpaid balance by customer">
                 {shownCustomers.map((c) => (
                   <li key={c.id} className="fp-rank__row">
                     <span className="fp-rank__label">{c.name}</span>
-                    <span className="fp-rank__aged">
-                      <AgeingStrip buckets={c.buckets} scaleTo={maxCustomer} ariaLabel={`${c.name}: ${formatMoneyWhole(c.total)}, by how late it is`} />
+                    {/* One neutral mark per row (amount against the largest); lateness is the strip above. */}
+                    <span className="fp-rank__bar" aria-hidden="true">
+                      <span style={{ width: `${maxCustomer > 0 ? Math.max(1.5, (c.total / maxCustomer) * 100) : 0}%` }} />
                     </span>
                     <span className="fp-rank__value">{formatMoneyWhole(c.total)}</span>
                     <span className="fp-rank__meta">{plural(c.count, 'invoice')} · {pct(c.total, total)}%</span>
@@ -438,15 +453,16 @@ export default function CapitalPrelaunch() {
     queryKey: ['capital-eligible'],
     queryFn: () => fetchData('api/v1/capital/eligible/').catch(() => null),
   });
-  // The Invoices page's stats endpoint: "Time to get paid" uses its figure and definition.
-  const stats = useQuery<InvoiceStats | null>({
-    queryKey: ['invoice-stats'],
-    queryFn: () => fetchData('api/v1/invoices/stats/').catch(() => null),
-    staleTime: 5 * 60_000,
-  });
   // The cards appear together once their data is in, over a placeholder of about their
   // height, so nothing on the page moves when the responses land (no layout shift).
-  const loading = aging.isLoading || eligible.isLoading || stats.isLoading;
+  // The invoice list (shared cache with Insights and Reports) only to say when the
+  // company-scoped ageing figure differs from the list's open total.
+  const list = useQuery<Source<ListInvoice>>({
+    queryKey: ['insights-source', 'invoices'],
+    queryFn: () => fetchAllPages<ListInvoice>('api/v1/invoices/'),
+    staleTime: 5 * 60_000,
+  });
+  const loading = aging.isLoading || eligible.isLoading || list.isLoading;
   const unpaidCount = aging.data?.summary ? Number(aging.data.summary.total_invoice_count) : null;
 
   return (
@@ -463,7 +479,7 @@ export default function CapitalPrelaunch() {
         </div>
       ) : (
         <div className="fp-stack">
-          <WaitingCash aging={aging} stats={stats.data} />
+          <WaitingCash aging={aging} timing={list.data ? paidInvoiceTiming(list.data.rows) : null} listOpen={list.data ? openOf(list.data.rows) : null} />
           <HoldingBack eligible={eligible} unpaidCount={unpaidCount} />
           <HowItWorks />
         </div>

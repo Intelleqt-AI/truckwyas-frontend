@@ -66,7 +66,7 @@ export function ExpenseReport({ d, companyName }: { d: Ledger; companyName?: str
   return (
     <ReportFrame
       title="Expense report"
-      sub={`${periodText(period)} · By expense date, as captured`}
+      sub={`${periodText(period)} · as captured`}
       companyName={companyName}
       info={<Info title="Expense report" lines={[
         'Expenses by expense date. Approved expenses count in profit and cash; pending ones are shown apart.',
@@ -151,7 +151,8 @@ export function VatReport({ d, companyName, vatNumber }: { d: Ledger; companyNam
   return (
     <ReportFrame
       title="VAT report"
-      sub={`${periodText(period)} · Output VAT, ${basisText.toLowerCase()}`}
+      sub={`${periodText(period)} · output VAT`}
+      printTitle={`VAT report, ${basisText.toLowerCase()}`}
       companyName={companyName}
       info={<Info title="VAT report" lines={[
         'Invoice basis: VAT on issued invoices (not drafts or cancelled), by issue date.',

@@ -71,3 +71,11 @@
   .tw-rowact { min-height: 44px !important; min-width: 44px !important; }
   .tw-rowact-menu__item { min-height: 44px; }
 }
+
+/* OverflowMenu extras: leading icon and a check for two-state items. */
+.tw-rowact-menu__item:has(.tw-menu-icon),
+.tw-rowact-menu__item.is-checkable { flex-direction: row; align-items: center; gap: 10px; }
+.tw-menu-icon { display: inline-flex; flex-shrink: 0; color: var(--text-tertiary); }
+.tw-menu-check { display: inline-flex; width: 16px; height: 16px; margin-left: auto; flex-shrink: 0; color: var(--text-primary); }
+.is-checkable .tw-rowact-menu__label,
+.is-checkable > .tw-rowact-menu__label { flex: 1 1 auto; }

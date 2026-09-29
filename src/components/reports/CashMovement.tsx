@@ -83,7 +83,7 @@ export default function CashMovement({ d, companyName }: { d: Ledger; companyNam
   return (
     <ReportFrame
       title="Cash movement"
-      sub={`${periodText(period)} · Movement, excluding bank balance`}
+      sub={`${periodText(period)} · movement only`}
       companyName={companyName}
       info={<Info title="Cash movement" lines={[
         'Money in: every customer payment recorded, by payment date, including VAT.',
@@ -110,6 +110,7 @@ export default function CashMovement({ d, companyName }: { d: Ledger; companyNam
         stickyFirst={view !== 'book'}
         fit={view !== 'book'}
         pinLast={view !== 'book'}
+        stack={view === 'book' ? { date: 0, title: 2, ref: 1, plus: 3, minus: 4, balance: 5, balanceLabel: 'Running' } : undefined}
         footer={receipts.length > 0 ? (
           <Check>
             {Math.abs(totalIn - toPaidSum) < 0.005

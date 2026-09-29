@@ -10,6 +10,7 @@ import { formatMoney, formatMoneyWhole, formatPercent } from "@/lib/formatters";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { CircleAlert, ArrowUpRight, TrendingUp, TrendingDown, Truck, FileText } from "lucide-react";
 import { InfoTip } from "@/components/ui/InfoTip";
+import SectionHeader from "@/components/layout/SectionHeader";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { MicroBars, RevenueCostBars, PipelineBars, usePipeline } from "@/components/overview/today";
 import { presentSignal } from "@/components/overview/signals";
@@ -228,8 +229,8 @@ export default function Overview() {
   const quotesAll = useAllQuotes();
   const pipelineQuotes: any[] = quotesAll.data?.rows ?? allQuotes;
   const pipelineComplete = quotesAll.data ? quotesAll.data.complete : false;
-  const pipeline = usePipeline(pipelineQuotes);
   const allLoads: any[] = (ledger.data?.loads as any[] | undefined) ?? data?.loads ?? [];
+  const pipeline = usePipeline(pipelineQuotes, allLoads);
 
   useEffect(() => {
     document.title = "Home - TruckWys";
@@ -282,17 +283,17 @@ export default function Overview() {
 
   return (
     <div className="overview-typography ov-page">
-      <header className="tw-page-head">
-        <div className="tw-page-head__titles">
-          <h1 className="tw-title">Home</h1>
-          <p className="tw-subtitle">{today}</p>
-        </div>
-        <div className="tw-page-head__actions">
+      {/* The shared page head: on phones "New quote" stays on the title row
+          and the other two actions move into its "⋯" menu. */}
+      <SectionHeader
+        title="Home"
+        description={today}
+        actions={<>
           <button type="button" className="tw-btn" onClick={() => navigate("/finance/expenses")}>Add expense</button>
           <button type="button" className="tw-btn" onClick={() => navigate("/finance/invoices/new")}>Create invoice</button>
           <button type="button" className="tw-btn tw-btn--primary" onClick={() => navigate("/bookings/quotes/new")}>New quote</button>
-        </div>
-      </header>
+        </>}
+      />
 
       <div className="ov-notices">
         <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
@@ -416,7 +417,7 @@ export default function Overview() {
             <MicroBars values={heatmapData} ariaLabel={`Loads booked per day, last 28 days: ${loads28} in total`} />
           </div>
           <div className="td-kpi__meta">
-            {loadsReady && !loadsFailed && <span>{loads28} booked in 28 days</span>}
+            {loadsReady && !loadsFailed && <span>{loads28 === 0 ? "None booked in the last 28 days" : `${loads28} booked in the last 28 days`}</span>}
           </div>
         </section>
       </div>
@@ -584,7 +585,7 @@ export default function Overview() {
               <div className="tw-card__titles">
                 <h2 id="td-pipe-title" className="tw-card__title">
                   Quote pipeline
-                  <InfoTip align="end">Each stage counts quotes that reached it, by current status. Win rate is accepted as a share of sent.</InfoTip>
+                  <InfoTip align="end">Draft, Sent, Accepted and Declined are the Quotes board columns (a quote marked lost counts as Declined). On the road is the Orders tab's In transit count. Win rate is accepted as a share of every quote sent.</InfoTip>
                 </h2>
                 <p className="tw-card__sub">
                   {quotesAll.isLoading && loading ? "Quotes by stage"
@@ -605,10 +606,9 @@ export default function Overview() {
             ) : (
               <>
                 <PipelineBars stages={pipeline.stages} />
-                <dl className="td-stats">
-                  <div><dt>Awaiting reply</dt><dd>{pipeline.awaiting}</dd></div>
-                  <div><dt>Drafts</dt><dd>{pipeline.drafts}</dd></div>
+                <dl className="td-stats td-stats--two">
                   <div><dt>Win rate</dt><dd>{pipeline.winRate != null ? formatPercent(pipeline.winRate, 0) : "—"}</dd></div>
+                  <div><dt>Accepted of sent</dt><dd>{pipeline.sentEver > 0 ? `${pipeline.accepted} of ${pipeline.sentEver}` : "—"}</dd></div>
                 </dl>
               </>
             )}

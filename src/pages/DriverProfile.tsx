@@ -1,35 +1,31 @@
 import './fleet-detail.css';
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
 import {
-  AlertsPanel, DetailMessage, MiniStats, DetailSkeleton, Group, InfoTip, Kpi, KpiStrip, Panel, RecordHeader, Row, StatusChip,
-  StatusControl, Tag, dateText, monthsWithRevenue, daysUntil, expiryAlert, formatStatus, isNotFound, kmText, monthlySeries, num, plural,
-  randCents, randWhole, type AlertItem, type Tone,
+  DetailMessage, DetailSkeleton, Panel, RecordHeader, StatusChip, StatusControl, dateText, formatStatus, isNotFound, plural,
 } from '@/components/fleet-detail/parts';
-import { MonthlyBars } from '@/components/fleet-detail/MonthlyBars';
-import { StatusChip as UiStatusChip } from '@/components/ui/StatusChip';
-import { formatNumber, formatPercent } from '@/lib/formatters';
+import {
+  Avatar, ComplianceCard, FactsCard, LinkCard, LoadLink, NowLine, PerformanceCard,
+  dateToDo, daysSince, isDelivered, isOpenLoad, latest, perfFigures, performance, type ToDo,
+} from '@/components/fleet-detail/record';
 import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
 import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
+import { useLedger } from '@/components/reports/data';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 
 const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] as const;
 
-const STATUS_TONE: Record<string, Tone> = {
-  ACTIVE: 'success',
-  INACTIVE: 'neutral',
-  ON_LEAVE: 'warning',
-};
-
 /** Licence renewal reminder window, in days. */
 const LICENCE_SOON_DAYS = 60;
 
-/* One page per driver: identity and status, the money strip, revenue by
-   month and recent loads on the left, every stored field and real alerts on
-   the right. /fleet/drivers/:driverId and /fleet/drivers/:driverId/financial
-   both land here. */
+/* One page per driver, mirroring the vehicle page (round 4): initials and
+   name, what they are doing now, what they have driven (Performance, then
+   their loads with money), and in the rail what the owner acts on
+   (licence and medical countdowns), their truck, contact and record.
+   /fleet/drivers/:driverId and /:driverId/financial both land here. Figures
+   come from this driver's loads only (not the driver stats job). */
 export default function DriverProfile() {
   const { driverId } = useParams();
   const navigate = useNavigate();
@@ -55,6 +51,9 @@ export default function DriverProfile() {
     enabled: !!driverId,
   });
 
+  // The truck assigned to this driver (vehicle.driver), from the shared vehicles list.
+  const ledger = useLedger(['vehicles']);
+
   if (isError && !isNotFound(loadError)) return (
     <div style={{ display: 'grid', gap: 16 }}>
       <div>
@@ -63,9 +62,9 @@ export default function DriverProfile() {
       <LoadError what="this driver" error={loadError} busy={driverQuery.isFetching} onRetry={() => refetch()} />
     </div>
   );
-  // Wait for the loads too: they decide the layout (one column or a rail),
-  // so drawing before they land made the details rail jump.
-  if ((isLoading || loadsLoading) && !isError) return <DetailSkeleton crumb="Drivers" crumbTo="/fleet/drivers" />;
+  // Wait for the loads and the truck list too: they decide the cards, so
+  // drawing before they land would make the page jump.
+  if ((isLoading || loadsLoading || ledger.loading) && !isError) return <DetailSkeleton crumb="Drivers" crumbTo="/fleet/drivers" />;
   if (!driver) return (
     <DetailMessage
       title="Driver not found"
@@ -82,38 +81,77 @@ export default function DriverProfile() {
   const name = (firstName && lastName)
     ? `${firstName} ${lastName}`
     : firstName || driver.name || ud.name || ud.username || `Driver ${driver.id}`;
+  const did = Number(driverId);
+  const status = String(driver.status || '').toUpperCase();
+  const edit = () => navigate(`/fleet/drivers?edit=${did}`);
 
   const loads: any[] = Array.isArray(loadsData) ? loadsData : (loadsData?.results || []);
   const loadsTotal: number = loadsData?.count ?? loads.length;
   const partial = loadsTotal > loads.length;
-  const completedLoads = loads.filter((l: any) => l.status === 'DELIVERED' || l.status === 'INVOICED');
-  const totalRevenue = completedLoads.reduce((s: number, l: any) => s + num(l.total_amount), 0);
-  const totalTrips = loads.length;
-  const completedTrips = completedLoads.length;
-  const avgRevPerTrip = completedTrips > 0 ? totalRevenue / completedTrips : 0;
-  const totalDistance = completedLoads.reduce((s: number, l: any) => s + num(l.distance), 0);
-  const totalDistanceKm = loads.reduce((s: number, l: any) => s + num(l.distance), 0);
-  const bestTripAmount = loads.length > 0 ? Math.max(...loads.map((l: any) => num(l.total_amount))) : 0;
-  const months = monthlySeries(completedLoads);
-  const monthLabels = months.map(m => m.label);
+  const perf = performance(loads, null);
+  const deliveredCount = perf.delivered.length;
+  const thin = deliveredCount > 0 && deliveredCount < 3;
 
-  // The driver stats job fills revenue_generated / avg_revenue_per_trip; until
-  // it has run the API sends 0.00, so fall back to the loads on this page
-  // rather than show a false R 0.
-  const statsRevenue = Number(driver.revenue_generated) > 0;
-  const recordedRevenue = statsRevenue ? Number(driver.revenue_generated) : totalRevenue;
-  const recordedAvg = Number(driver.avg_revenue_per_trip) > 0 ? Number(driver.avg_revenue_per_trip) : avgRevPerTrip;
-  const revPerKm = totalDistanceKm > 0 ? totalRevenue / totalDistanceKm : 0;
-  const onTime = Number(driver.on_time_rate);
+  // On time, only where it can be measured: an actual delivery time against the planned date.
+  const timed = perf.delivered.filter((l: any) => l.actual_delivered_at && l.delivery_date);
+  const onTime = timed.filter((l: any) => new Date(l.actual_delivered_at).getTime() <= new Date(l.delivery_date).setHours(23, 59, 59, 999)).length;
 
-  const licenceDays = daysUntil(driver.license_expiry);
-  const licenceExpired = licenceDays !== null && licenceDays < 0;
-  const licenceSoon = licenceDays !== null && !licenceExpired && licenceDays <= LICENCE_SOON_DAYS;
+  // ---- Truck: assigned on the vehicle record, else the one on their open load.
+  const vehicles: any[] = (ledger.data?.vehicles as any[] | undefined) ?? [];
+  const truck = vehicles.find((v: any) => v.driver === did);
+  const openLoad = loads.filter(isOpenLoad).sort((a, b) => String(b.pickup_date || '').localeCompare(String(a.pickup_date || '')))[0];
+  const plateOf = (l: any) => (String(l?.vehicle_info || '').split(' - ').pop() || '').trim() || null;
 
-  const alerts = [
-    expiryAlert('licence', 'Licence', driver.license_expiry, LICENCE_SOON_DAYS),
-    expiryAlert('medical', 'Medical card', driver.medical_card_expiry, 30),
-  ].filter(Boolean) as AlertItem[];
+  // ---- Now
+  const lastDelivered = latest(loads.filter(isDelivered));
+  const lastWhen = lastDelivered ? dateText(lastDelivered.delivery_date || lastDelivered.pickup_date) : null;
+  const openOrders = <button type="button" className="fd-ghost" onClick={() => navigate('/bookings/orders')}>Open orders</button>;
+  const verb: Record<string, string> = { IN_TRANSIT: 'Driving', LOADING: 'Loading', ASSIGNED: 'Assigned to' };
+  let now: JSX.Element;
+  if (openLoad) {
+    const to = openLoad.delivery_city || openLoad.delivery_location;
+    const plate = plateOf(openLoad);
+    now = (
+      <NowLine flag={status !== 'ACTIVE' ? `Marked ${formatStatus(status).toLowerCase()}` : undefined} action={undefined}>
+        <strong>{verb[String(openLoad.status).toUpperCase()] ?? 'On'}</strong>
+        {plate ? <> {openLoad.vehicle ? <Link className="fd-inline-link" to={`/fleet/vehicles/${openLoad.vehicle}`}>{plate}</Link> : plate}</> : null}
+        {to ? <> to {to}</> : null}
+        {openLoad.customer_name ? <> for {openLoad.customer_name}</> : null}
+        {' · '}<LoadLink load={openLoad} />
+      </NowLine>
+    );
+  } else if (status === 'ON_LEAVE') {
+    now = <NowLine>On leave{lastWhen ? `, last load delivered ${lastWhen}` : ''}</NowLine>;
+  } else if (status === 'INACTIVE') {
+    now = <NowLine>Inactive{lastWhen ? `, last load delivered ${lastWhen}` : ''}</NowLine>;
+  } else if (lastDelivered) {
+    const idle = daysSince(lastDelivered.delivery_date || lastDelivered.pickup_date);
+    now = (
+      <NowLine action={openOrders}>
+        <strong>Free{idle !== null && idle > 0 ? ` for ${plural(idle, 'day')}` : ''}</strong>, last load delivered {lastWhen}
+        {lastDelivered.delivery_city ? ` in ${lastDelivered.delivery_city}` : ''}
+      </NowLine>
+    );
+  } else {
+    now = <NowLine action={openOrders}>Free, no loads yet</NowLine>;
+  }
+
+  // ---- Compliance
+  const todos = [
+    dateToDo('licence', 'Licence', driver.license_expiry, LICENCE_SOON_DAYS, { label: 'Add', onClick: edit, aria: 'Add licence expiry' }),
+    dateToDo('medical', 'Medical card', driver.medical_card_expiry, 30, { label: 'Add', onClick: edit, aria: 'Add medical card expiry' }),
+  ].filter(Boolean) as ToDo[];
+
+  // ---- Performance
+  const figures = perfFigures(perf, { revenueLabel: 'Revenue driven', thin });
+  if (timed.length > 0) figures.push({ label: 'On time', value: `${Math.round((onTime / timed.length) * 100)}%`, note: `${onTime} of ${timed.length} timed` });
+  const basis = <>
+    Delivered and invoiced loads this driver drove, counted in the month of delivery, over the last 12 months (the Reports definition).
+    {' '}Revenue per km uses loads with a distance. Days on a job count calendar days from pickup to delivery.
+    {' '}On time needs an actual delivery time{timed.length === 0 ? ', and none is recorded yet, so it is not shown' : ''}.
+    {partial ? ` Based on the latest ${loads.length} of ${loadsTotal} loads.` : ''}
+    {perf.older > 0 ? ` ${plural(perf.older, 'older delivered load')} fall outside the 12 months.` : ''}
+  </>;
 
   const setStatus = async (s: string) => {
     setUpdating(true);
@@ -124,10 +162,24 @@ export default function DriverProfile() {
     setUpdating(false);
   };
 
-  const hasCompleted = completedTrips > 0 || recordedRevenue > 0;
-  const wideLayout = !hasCompleted || loads.length < 6;
+  const meta = [
+    driver.license_number ? `Licence ${driver.license_number}` : '',
+    driver.experience_years ? `${plural(Number(driver.experience_years), 'year')} driving` : '',
+  ].filter(Boolean).join(' · ');
 
-  const emergency = [driver.emergency_contact, driver.emergency_phone].filter(Boolean).join(' · ');
+  const truckCard = truck ? (
+    <LinkCard title="Truck" className="fd-o-driver"
+      primary={<Link className="fd-inline-link" to={`/fleet/vehicles/${truck.id}`}>{truck.plate || `Vehicle ${truck.id}`}</Link>}
+      secondary={[truck.make, truck.model].filter(Boolean).join(' ') || 'Assigned to this driver'} />
+  ) : openLoad?.vehicle ? (
+    <LinkCard title="Truck" className="fd-o-driver"
+      primary={<Link className="fd-inline-link" to={`/fleet/vehicles/${openLoad.vehicle}`}>{plateOf(openLoad) || `Vehicle ${openLoad.vehicle}`}</Link>}
+      secondary={<>On {openLoad.load_number}, not assigned to them</>}
+      action={<button type="button" className="fd-ghost" onClick={edit}>Assign</button>} />
+  ) : (
+    <LinkCard title="Truck" className="fd-o-driver" primary={<span className="fd-muted">No truck assigned</span>}
+      action={<button type="button" className="fd-ghost" onClick={edit}>Assign</button>} />
+  );
 
   return (
     <div className="fleet-detail">
@@ -136,123 +188,63 @@ export default function DriverProfile() {
         crumbTo="/fleet/drivers"
         title={name}
         chip={<StatusChip status={driver.status} />}
-        meta={(driver.license_number || phone) ? <>
-          {driver.license_number && <span className="fd-mono">{driver.license_number}</span>}
-          {driver.license_number && phone && ' · '}
-          {phone}
-        </> : undefined}
-        actions={<StatusControl label="Set driver status" subject={name} options={DRIVER_STATUSES} current={driver.status} busy={updating} onPick={setStatus} />}
+        meta={meta || undefined}
+        actions={<>
+          <button type="button" className="fd-button fd-head-secondary" onClick={edit}>Edit driver</button>
+          <StatusControl label="Set driver status" subject={name} options={DRIVER_STATUSES} current={driver.status} busy={updating} onPick={setStatus} />
+        </>}
       />
 
-      {hasCompleted ? (
-      <KpiStrip label="Driver summary">
-        <Kpi
-          label="Revenue"
-          value={recordedRevenue > 0 ? randWhole(recordedRevenue) : null}
-          empty="No completed loads"
-          sub={recordedAvg > 0 ? <>{randWhole(recordedAvg)} per load</> : undefined}
-          info={statsRevenue
-            ? <>Recorded by the driver stats job across all their completed loads. The chart below uses the latest {loads.length} loads.</>
-            : <>Delivered and invoiced loads{partial ? `, latest ${loads.length} of ${loadsTotal}` : ''}.</>}
-        />
-        <Kpi
-          label="Loads completed"
-          value={formatNumber(completedTrips)}
-          sub={<>of {plural(totalTrips, 'load')}{partial ? ` (latest of ${loadsTotal})` : ''}</>}
-          info="Delivered or invoiced."
-        />
-        <Kpi
-          label="On time"
-          value={onTime ? formatPercent(onTime, 0) : null}
-          empty="Not tracked yet"
-          sub={onTime ? 'Of completed loads' : undefined}
-          info="Completed loads with an actual delivery time on or before the planned date. Needs actual delivery times to be recorded."
-        />
-      </KpiStrip>
-      ) : loads.length === 0 ? (
-        <section className="fd-panel fd-empty-line" aria-label="Driver summary">
-          <p className="fd-empty-line__text">No loads yet. Assign {firstName || name} to a load to track their work.</p>
-          <button type="button" className="fd-button" onClick={() => navigate('/bookings/orders')}>Open orders</button>
-        </section>
-      ) : driver.status && driver.status !== 'ACTIVE' ? (
-        // The loads table below already lists the work; say only what it cannot: the status disagrees.
-        <section className="fd-panel fd-empty-line" aria-label="Driver status">
-          <p className="fd-empty-line__text"><UiStatusChip tone="warning" size="sm" label={`Marked ${formatStatus(driver.status).toLowerCase()} · on an open load`} /></p>
-          <button type="button" className="fd-button" onClick={() => navigate('/bookings/orders')}>Open orders</button>
-        </section>
-      ) : null}
+      {now}
 
-      {/* Few loads: one column, with Details laid out across the width, so the
-          two columns never end hundreds of pixels apart. Otherwise the side
-          rail is sticky beside the longer main column. */}
-      <div className={`fd-body${wideLayout ? ' fd-body--wide' : ''}`}>
-        {(hasCompleted || loads.length > 0) && (
+      <div className="fd-record">
         <div className="fd-main">
-          {hasCompleted && monthsWithRevenue(months) >= 2 && (
-          <Panel
-            title="Revenue by month"
-            sub="Completed loads, last 12 months"
-            info={<>Delivered and invoiced loads, in the month of their delivery date (pickup or created date when missing).{partial ? ` Based on the latest ${loads.length} of ${loadsTotal} loads.` : ''}</>}
-            aside={completedTrips > 0 ? <span className="fd-aside-figure">{randWhole(months.reduce((s, m) => s + m.revenue, 0))}</span> : undefined}
-          >
-            {completedTrips > 0
-              ? <MonthlyBars data={months} caption="Completed-load revenue by month" />
-              : <p className="fd-empty">No completed loads yet.</p>}
-            <MiniStats items={[
-              { label: 'Trips this month', value: formatNumber(driver.trips_this_month ?? 0) },
-              { label: 'Total trips', value: formatNumber(driver.total_trips ?? totalTrips) },
-              { label: 'Total distance', value: Number(driver.total_distance) ? kmText(parseFloat(driver.total_distance)) : totalDistance > 0 ? kmText(totalDistance) : totalDistanceKm > 0 ? kmText(totalDistanceKm) : null },
-              { label: 'Revenue per km', value: revPerKm > 0 ? randCents(revPerKm) : null },
-              { label: 'Highest load', value: bestTripAmount > 0 ? randWhole(bestTripAmount) : null },
-            ]} />
-          </Panel>
-          )}
+          <PerformanceCard
+            className="fd-o-perf"
+            perf={perf}
+            figures={figures}
+            basis={basis}
+            thinLine={thin ? <>{plural(deliveredCount, 'load')} so far. Figures build as they drive.</> : undefined}
+            empty={deliveredCount === 0 ? {
+              text: loads.length > 0
+                ? <>{plural(loads.length, 'load')} on record, none delivered in the last 12 months.</>
+                : <>Assign {firstName || name} to a load to track their work.</>,
+              action: loads.length === 0 ? <button type="button" className="fd-ghost" onClick={() => navigate('/bookings/orders')}>Open orders</button> : undefined,
+            } : undefined}
+          />
 
           {loads.length > 0 && (
-          <Panel title="Recent loads" sub={plural(loadsTotal, 'load')} flush>
-            <LoadsTable loads={loads} />
-          </Panel>
+            <Panel title="Loads" sub={plural(loadsTotal, 'load')} flush className="fd-o-loads">
+              <LoadsTable loads={loads} />
+            </Panel>
           )}
         </div>
-        )}
 
         <aside ref={railRef} className="fd-side">
-          <AlertsPanel items={alerts} />
-
-          <Panel title="Details">
-            <div className="fd-groups">
-            <Group title="Contact" rows={[
-              { label: 'Phone', value: phone || null },
-              { label: 'Email', value: email || null },
-              { label: 'Address', value: ud.address || null },
-              { label: 'Emergency contact', value: emergency || null },
-            ]} />
-
-            <Group title="Licence" rows={[
-              { label: 'Licence number', value: driver.license_number, mono: true },
-              { label: 'Province', value: driver.license_state },
-              { label: 'Valid until', value: dateText(driver.license_expiry), tone: licenceExpired ? 'danger' : licenceSoon ? 'warning' : undefined },
-              { label: 'Medical card', value: dateText(driver.medical_card_expiry), derived: !driver.medical_card_expiry },
-            ]} />
-
-            <Group title="Employment" rows={[
-              { label: 'Hire date', value: dateText(driver.hire_date) },
-              { label: 'Experience', value: driver.experience_years ? plural(Number(driver.experience_years), 'year') : null },
-              { label: 'Vehicle', value: driver.assigned_vehicle, mono: true },
-            ]} />
-
-            <Group
-              title="Record"
-              extra={<InfoTip label="record">Violations and accidents are entered by hand. The efficiency score is rule-based: the average fuel score of the trucks this driver has driven. Ratings are not collected yet.</InfoTip>}
-              rows={[
-                { label: 'Violations', value: (driver.violation_count ?? 0).toString() },
-                { label: 'Accidents', value: (driver.accident_history ?? 0).toString() },
-                { label: 'Efficiency score', value: Number(driver.efficiency_score) ? `${driver.efficiency_score}` : null, note: <Tag>Rule-based</Tag> },
-                { label: 'Average rating', value: Number(driver.avg_rating) ? `${driver.avg_rating}` : null },
-              ]}
-            />
+          <ComplianceCard className="fd-o-todo" items={todos} />
+          {truckCard}
+          <FactsCard className="fd-o-contact" title="Contact" lead={
+            <div className="fd-person">
+              <Avatar name={name} />
+              <span className="fd-person__text">
+                <span className="fd-person__name">{name}</span>
+                <span className="fd-person__sub">{driver.hire_date ? `Driving for you since ${dateText(driver.hire_date)}` : 'Driver'}</span>
+              </span>
             </div>
-          </Panel>
+          } facts={[
+            { label: 'Phone', value: phone ? <a className="fd-inline-link" href={`tel:${phone.replace(/\s+/g, '')}`}>{phone}</a> : null, add: edit },
+            { label: 'Email', value: email ? <a className="fd-inline-link fd-break" href={`mailto:${email}`}>{email}</a> : null, add: edit },
+            { label: 'Address', value: ud.address || null },
+            { label: 'Emergency contact', value: [driver.emergency_contact, driver.emergency_phone].filter(Boolean).join(' · ') || null, add: edit },
+          ]} />
+          <FactsCard className="fd-o-facts" title="Driver" facts={[
+            { label: 'Licence number', value: driver.license_number, mono: true, add: edit },
+            { label: 'Province', value: driver.license_state },
+            { label: 'Hire date', value: dateText(driver.hire_date) },
+            { label: 'Experience', value: driver.experience_years ? plural(Number(driver.experience_years), 'year') : null },
+            { label: 'Violations', value: String(driver.violation_count ?? 0) },
+            { label: 'Accidents', value: String(driver.accident_history ?? 0) },
+          ]} />
         </aside>
       </div>
     </div>

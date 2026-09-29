@@ -14,11 +14,13 @@ import { wholeRand } from "@/components/finance/FinTile";
 import { KpiRow, KpiTile } from "@/components/ui/KpiTile";
 import { Toolbar, SearchInput } from "@/components/ui/Toolbar";
 import { Segmented } from "@/components/ui/Segmented";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
 import LoadError, { loadFailed } from "@/components/data/LoadError";
 import InvoiceSendPreview, { type InvoiceMessageKind } from "@/components/finance/InvoiceSendPreview";
 import { canSendReminder, invoiceBalance, isInvoiceOverdue } from "@/lib/invoiceStatus";
 import { rowLink } from "@/lib/rowLink";
+import { isIssued, paidInvoiceTiming, type Invoice as LedgerInvoice } from "@/components/reports/data";
 
 // External Fast Pay application link. The applied-state key is unchanged so
 // invoices already marked "Applied" stay marked.
@@ -228,7 +230,12 @@ export default function Invoices() {
     status === "All" ||
     (status === "OVERDUE" ? isInvoiceOverdue(inv) : inv.status?.toUpperCase() === status);
 
-  const filtered = allInvoices.filter((inv) => {
+  // Newest first by issue date (the date the list shows), then by number.
+  const byIssued = [...allInvoices].sort((a, b) =>
+    String(b.issue_date || b.created_at || "").localeCompare(String(a.issue_date || a.created_at || "")) ||
+    Number(b.id) - Number(a.id));
+
+  const filtered = byIssued.filter((inv) => {
     const matchStatus = statusMatches(inv, statusFilter);
     const invNumber = inv.invoice_number || inv.invoiceNumber || "";
     const custName = inv.customer_name || inv.customerName || "";
@@ -242,20 +249,32 @@ export default function Invoices() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Headline figures come from the stats endpoint, which covers every invoice
-  // (not just the page loaded below). Bases, from the API:
-  //   invoiced this month  total incl. VAT, by issue date since the 1st
-  //   collected this month paid amount of PAID invoices issued this month
+  // Headline figures are counted from the full invoice list with the Reports
+  // ledger rules (components/reports/data.ts), so they agree with the filter
+  // counts below and with Reports and Fast Pay. The stats endpoint is only a
+  // fallback when the list could not be loaded in full (it misses some paid
+  // invoices, e.g. INV-20260615-96400). Bases:
+  //   invoiced this month  issued invoices incl. VAT, by issue date since the 1st
+  //   collected this month paid amount of those invoices
   //   overdue              unpaid balance incl. VAT, due date passed
-  //   avg days to pay      issue date to paid date, all paid invoices
+  //   time to get paid     issue date to paid date, all paid invoices
   const now = new Date();
   const monthName = MONTH_NAMES[now.getMonth()];
   const byStatus = stats?.by_status ?? {};
   const draftCount: number = byStatus.DRAFT ?? 0;
-  const invoicedMtd: number = stats?.total_invoiced_mtd ?? 0;
-  const collectedMtd: number = stats?.total_collected_mtd ?? 0;
-  const monthActive = invoicedMtd > 0 || collectedMtd > 0;
   const truncatedList = totalInvoices > invoices.length;
+  const ymNowText = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const issuedThisMonth = invoices.filter(
+    (i) => isIssued(i as LedgerInvoice) && String(i.issue_date || "").slice(0, 7) === ymNowText,
+  );
+  const invoicedMtd: number = truncatedList
+    ? (stats?.total_invoiced_mtd ?? 0)
+    : issuedThisMonth.reduce((s, i) => s + (parseFloat(i.total_amount) || 0), 0);
+  const collectedMtd: number = truncatedList
+    ? (stats?.total_collected_mtd ?? 0)
+    : issuedThisMonth.reduce((s, i) => s + (parseFloat(i.paid_amount) || 0), 0);
+  const collectionRate = invoicedMtd > 0 ? collectedMtd / invoicedMtd : 0;
+  const monthActive = invoicedMtd > 0 || collectedMtd > 0;
   // Overdue tile: when every invoice is loaded, count them with the same
   // definition the filter uses so the two always agree. Only when the list is
   // partial (the API pages at 20) does it fall back to the server's figure.
@@ -265,8 +284,12 @@ export default function Invoices() {
   const overdueAmount: number = overdueFromList
     ? overdueList.reduce((sum, i) => sum + invoiceBalance(i), 0)
     : (stats?.overdue_amount ?? 0);
-  const paidCount: number = byStatus.PAID ?? 0;
-  const avgDays: number | null = paidCount > 0 && stats?.avg_days_to_pay ? stats.avg_days_to_pay : null;
+  // Time to get paid: the shared ledger definition (same count as "Paid").
+  const timing = paidInvoiceTiming(invoices);
+  const paidCount: number = truncatedList ? (byStatus.PAID ?? 0) : timing.count;
+  const avgDays: number | null = truncatedList
+    ? (paidCount > 0 && stats?.avg_days_to_pay ? stats.avg_days_to_pay : null)
+    : timing.avgDays;
   const truncated = truncatedList;
   // Drafts waiting to be sent: a decision (send them), counted from the list
   // when it is complete, otherwise from the server's status counts.
@@ -297,6 +320,13 @@ export default function Invoices() {
     const pct = ((invoicedMtd - invoicedLastMonth) / invoicedLastMonth) * 100;
     return `${pct >= 0 ? "+" : "−"}${formatPercent(Math.abs(pct), 0)} vs ${lastMonthName}`;
   })();
+
+  // Counts over the loaded list, with the same rules as the filter.
+  const statusOptions = STATUSES.map((st) => ({
+    value: st,
+    label: st === "All" ? "All" : formatStatus(st),
+    count: loading ? undefined : allInvoices.filter((inv) => statusMatches(inv, st)).length,
+  }));
 
   const showStatus = (s: string) => {
     setStatusFilter(s);
@@ -351,7 +381,7 @@ export default function Invoices() {
         <div className="tw-kpi-row fin-kpi-row" aria-busy="true" aria-label="Loading totals">
           {[0, 1, 2].map((i) => <div key={i} className="tw-kpi fin-skel-tile" aria-hidden="true" />)}
         </div>
-      ) : !stats ? (
+      ) : !stats && truncatedList ? (
         <div className="card fin-summary">
           <div className="fin-summary__text">
             <p className="fin-summary__title">Invoice totals are unavailable</p>
@@ -381,7 +411,7 @@ export default function Invoices() {
                 label="Collected"
                 aside={<InfoTip>{`Paid amount of invoices issued in ${monthName}. Covers all invoices.`}</InfoTip>}
                 figure={<span title={formatCurrency(collectedMtd)}>{wholeRand(collectedMtd)}</span>}
-                note={invoicedMtd > 0 ? `${Math.round((stats.collection_rate ?? 0) * 100)}% of ${monthName} invoiced` : `On ${monthName} invoices`}
+                note={invoicedMtd > 0 ? `${Math.round((truncatedList ? (stats?.collection_rate ?? 0) : collectionRate) * 100)}% of ${monthName} invoiced` : `On ${monthName} invoices`}
               />
           )}
 
@@ -405,9 +435,9 @@ export default function Invoices() {
           {avgDays != null && (
             <KpiTile
               label="Time to get paid"
-              aside={<InfoTip>Average from issue date to payment date, across all paid invoices.</InfoTip>}
+              aside={<InfoTip>Average days from issue date to the date the invoice was paid in full, across every paid invoice (the Paid filter below).</InfoTip>}
               figure={<>{formatNumber(avgDays, { maximumFractionDigits: 1 })}<span className="fin-tile__unit">days</span></>}
-              note={`Average, ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}`}
+              note={`${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}`}
             />
           )}
           {showDrafts && (
@@ -455,18 +485,31 @@ export default function Invoices() {
             setPage(1);
           }}
         />
-        <Segmented
-          label="Filter by status"
-          className="fin-seg"
-          value={statusFilter}
-          onChange={showStatus}
-          options={STATUSES.map((s) => ({
-            value: s,
-            label: s === "All" ? "All" : formatStatus(s),
-            // Counts over the loaded list, with the same rules as the filter.
-            count: loading ? undefined : allInvoices.filter((inv) => statusMatches(inv, s)).length,
-          }))}
-        />
+        {/* Five statuses: the segmented control on wide screens, a compact
+            menu beside the search on phones (no 5-option strip). */}
+        <span className="inv-status-seg">
+          <Segmented
+            label="Filter by status"
+            className="fin-seg"
+            value={statusFilter}
+            onChange={showStatus}
+            options={statusOptions}
+          />
+        </span>
+        <span className="inv-status-menu">
+          <Select value={statusFilter} onValueChange={showStatus}>
+            <SelectTrigger aria-label="Filter by status" className="inv-status-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
+              {statusOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}{o.count != null ? ` (${o.count})` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </span>
       </Toolbar>
 
       {/* Table: 10 per page, clickable */}
@@ -568,7 +611,13 @@ export default function Invoices() {
                           )}
                         </span>
                       </td>
-                      <td className="num m-amount">{formatCurrency(amount)}</td>
+                      <td className={`num m-amount${invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005 ? " fin-cell-2" : ""}`}>
+                        {formatCurrency(amount)}
+                        {/* Part-paid: what is still owed, under the invoice total. */}
+                        {invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005 && (
+                          <span className="fin-cell-sub">{formatCurrency(invoiceBalance(inv))} due</span>
+                        )}
+                      </td>
                       <td className="actions" onClick={(e) => e.stopPropagation()}>
                         <RowActions
                           label={`Invoice ${invNumber}`}

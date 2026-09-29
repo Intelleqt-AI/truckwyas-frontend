@@ -64,8 +64,6 @@
 .bk-card.qd-tools { padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-start; }
 .bk-card.qd-tools .bk-btn--quiet-danger { margin-left: auto; }
 .qd .bk-btn.qd-tools-edit { display: none; }
-/* Phone: the head keeps Change status and the primary on one line; Edit moves to the tools card. */
-@media (max-width: 600px) {
-  .qd .bk-btn.qd-head-edit { display: none; }
-  .qd .bk-btn.qd-tools-edit { display: inline-flex; }
-}
+/* Phone: the shared head keeps the primary on the title row and moves
+   Change status and Edit quote into its "⋯" menu (SectionHeader), so the
+   tools card no longer needs its own Edit copy. */

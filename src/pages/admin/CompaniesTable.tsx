@@ -133,7 +133,7 @@ const sectionTitleStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
   padding: '8px 12px', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 400,
-  fontFamily: 'var(--font-sans)', minHeight: 40, width: 240, maxWidth: '100%',
+  fontFamily: 'var(--font-sans)', height: 36, width: 240, maxWidth: '100%', boxSizing: 'border-box',
 };
 const selectStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
@@ -214,11 +214,11 @@ export function CompaniesTable() {
 
   return (
     <div className="card" style={cardStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+      <div className="adm-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <h2 style={sectionTitleStyle}>Companies {data ? `(${data.count})` : ''}</h2>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', minWidth: 0 }}>
+        <div className="adm-toolbar__controls" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', minWidth: 0 }}>
           <Select value={statusFilter || 'all'} onValueChange={v => setStatusFilter(v === 'all' ? '' : v)}>
-            <SelectTrigger aria-label="Filter by status" style={{ width: 'auto', minWidth: 160, minHeight: 40 }}>
+            <SelectTrigger className="adm-toolbar__select" aria-label="Filter by status" style={{ width: 'auto', minWidth: 160, height: 36, minHeight: 36 }}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -227,7 +227,7 @@ export function CompaniesTable() {
               ))}
             </SelectContent>
           </Select>
-          <input className="admin-control" aria-label="Search companies" style={inputStyle} placeholder="Company or owner email" value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="admin-control adm-toolbar__search" aria-label="Search companies" style={inputStyle} placeholder="Company or owner email" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
@@ -237,7 +237,7 @@ export function CompaniesTable() {
             <thead>
               <tr>
                 <th style={thStyle}>Company</th>
-                <th style={thStyle}>Status</th>
+                <th className="adm-col-status" style={thStyle}>Status</th>
                 <th className="adm-col-phone" style={thStyle}>Next billing</th>
                 <th className="num adm-col-phone" style={thStyle}>Users</th>
                 <th className="num adm-col-phone" style={thStyle}>Quotes</th>
@@ -268,12 +268,17 @@ export function CompaniesTable() {
                           c.owner_email.startsWith('deleted-') ? (
                             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No active user (account deleted)</div>
                           ) : (
-                            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{c.owner_email}</div>
+                            <div className="adm-owner" style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }} title={c.owner_email}>{c.owner_email}</div>
                           )
                         )}
+                        {/* Phones: the status column folds in here. */}
+                        <div className="adm-status-sub">{subscriptionStatusLabel(c.subscription_status)}</div>
                       </td>
-                      <td style={tdStyle}>
-                        <StatusChip tone={badgeTone(STATUS_BADGE_CLASS[c.subscription_status])} label={subscriptionStatusLabel(c.subscription_status)} size="sm" />
+                      <td className="adm-col-status" style={tdStyle}>
+                        {/* "No plan" is the resting state, not a status worth a chip. */}
+                        {c.subscription_status === 'none'
+                          ? <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{subscriptionStatusLabel(c.subscription_status)}</span>
+                          : <StatusChip tone={badgeTone(STATUS_BADGE_CLASS[c.subscription_status])} label={subscriptionStatusLabel(c.subscription_status)} size="sm" />}
                       </td>
                       <td className="adm-col-phone" style={{ ...tdStyle, color: c.next_billing_date ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{fmtDate(c.next_billing_date)}</td>
                       <td className="num adm-col-phone" style={tdStyle}>{c.user_count}</td>

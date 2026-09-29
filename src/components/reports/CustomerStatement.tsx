@@ -72,13 +72,17 @@ export default function CustomerStatement({ d, company }: { d: Ledger; company?:
 
   const now = ymNow();
   const sinceOptions = [{ id: '', label: 'All activity' }, ...[2, 5, 11].map(n => { const m = addMonths(now, -n); return { id: m, label: `From ${monthLabel(m)}` }; })];
-  const address = [cust?.billing_address || cust?.address, cust?.city].filter(Boolean).join(', ');
+  // The city only when the address does not already end with it ("…, Port Elizabeth").
+  const street = (cust?.billing_address || cust?.address || '').trim();
+  const city = (cust?.city || '').trim();
+  const address = [street, city && !street.toLowerCase().includes(city.toLowerCase()) ? city : ''].filter(Boolean).join(', ');
 
   return (
     <ReportFrame
       title="Customer statement"
-      sub={`${name} · ${since ? `From ${monthLabel(since)}` : 'All activity'}`}
-      printTitle={`Statement for ${name}`}
+      // Customer and period are the two menus beside it; the line says what is listed.
+      sub="Invoices and payments, oldest first"
+      printTitle={`Statement for ${name}, ${since ? `from ${monthLabel(since)}` : 'all activity'}`}
       companyName={company?.company_name}
       info={<Info title="Customer statement" lines={[
         'Issued invoices and recorded payments for one customer, oldest first, with the running balance. Amounts include VAT.',
@@ -126,12 +130,13 @@ export default function CustomerStatement({ d, company }: { d: Ledger; company?:
         stickyFirst={false}
         fit
         cue={null}
+        stack={{ date: 0, title: 1, ref: 2, plus: 4, minus: 5, balance: 6, balanceLabel: 'Balance' }}
         footer={ties
           ? <Check>Closing balance equals the open invoice balances for {name}.</Check>
           : <Check ok={false}>Closing balance differs from the open invoice balances for {name} ({money(openLedger)}).</Check>}
       />
       {/* Nothing due: no row of R 0,00 buckets. */}
-      {ageB.some(v => Math.abs(v) >= 0.005) && <StatementTable table={ageTable} caption="Amount due by age" stickyFirst={false} />}
+      {ageB.some(v => Math.abs(v) >= 0.005) && <StatementTable table={ageTable} caption="Amount due by age" stickyFirst={false} stack="pairs" />}
     </ReportFrame>
   );
 }

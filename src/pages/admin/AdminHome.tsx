@@ -21,6 +21,8 @@ const SUBSCRIPTION_ROWS: { key: string; label: string; hint: string }[] = [
   { key: 'none', label: 'No subscription', hint: 'Signed up, never started a plan' },
 ];
 
+const LINKED_TIP = 'Counts only records that belong to a real company (not the demo company, not deleted). Records saved without a company, such as seeded or superuser-created ones, are left out, so a company page can show more.';
+
 const taskLabel = (name: string) => {
   const t = name.replace(/_task$/, '').replace(/_/g, ' ').trim();
   return t.charAt(0).toUpperCase() + t.slice(1);
@@ -44,6 +46,13 @@ export default function AdminHome() {
     queryFn: () => fetchData('api/v1/admin/companies/?page=1&page_size=20'),
   });
 
+  // Every account on the platform (deleted ones hidden), same endpoint as the
+  // Users page; only the count is read.
+  const { data: usersPage } = useQuery({
+    queryKey: ['admin-users-count'],
+    queryFn: () => fetchData('api/v1/admin/users/?page=1&page_size=1'),
+  });
+
   if (isLoading) return <><TilesSkeleton count={4} /><BlockSkeleton height={280} label="Loading overview" /></>;
   if (isError || !overview) {
     return <div className="bk-notice"><p className="bk-notice__text">The platform overview could not be loaded.</p></div>;
@@ -64,26 +73,49 @@ export default function AdminHome() {
       .sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)))
       .slice(0, 5);
 
-  const companiesNote = total === 0 ? 'None yet'
-    : paying === 0 ? (noPlan === total ? 'None has started a plan' : 'None paying yet')
-    : `${paying} paying`;
+  // The subscription card says who pays; the tile states what it counts.
+  const companiesNote = total === 0 ? 'None yet' : 'Real companies only';
 
   return (
     <div className="admin-home">
       <KpiRow>
-        <KpiTile aria-label="Companies" label="Companies" figure={formatNumber(total)} note={companiesNote} onClick={() => navigate('/admin/companies')} />
-        {/* The overview endpoint counts users of real companies only: the demo
-            company (where most test users live) and deleted ones are left out,
-            which is why it can be far below a single company's user list. */}
+        <KpiTile
+          aria-label="Companies"
+          label="Companies"
+          aside={<InfoTip>Every company on the platform except the demo company and deleted ones.</InfoTip>}
+          figure={formatNumber(total)}
+          note={companiesNote}
+          onClick={() => navigate('/admin/companies')}
+        />
+        {/* What api/v1/admin/overview/ counts: users, quotes and loads whose
+            company FK points at a company that is not demo and not deleted.
+            Accounts and records created without a company (seeded staff,
+            drivers, superuser-created quotes) are not in those totals, which
+            is why they can be below one company's own lists. Users therefore
+            shows every account (admin users endpoint) with the linked count
+            as the note, and the Quotes/Orders labels say they are company-linked. */}
         <KpiTile
           aria-label="Users"
           label="Users"
-          figure={formatNumber(overview.total_users)}
-          note={overview.has_demo_company ? 'Real companies, demo excluded' : 'Across all companies'}
+          aside={<InfoTip>Every account on the platform, deleted accounts excluded. Only accounts linked to a company count toward that company.</InfoTip>}
+          figure={formatNumber(usersPage?.count ?? overview.total_users)}
+          note={usersPage ? `${formatNumber(overview.total_users)} linked to a company` : '\u00a0'}
           onClick={() => navigate('/admin/users')}
         />
-        <KpiTile aria-label="Quotes" label="Quotes" figure={formatNumber(overview.total_quotes)} note={overview.quotes_this_month ? `${overview.quotes_this_month} this month` : 'None this month'} />
-        <KpiTile aria-label="Orders" label="Orders" figure={formatNumber(overview.total_loads)} note={overview.loads_this_month ? `${overview.loads_this_month} this month` : 'None this month'} />
+        <KpiTile
+          aria-label="Company quotes"
+          label="Company quotes"
+          aside={<InfoTip>{LINKED_TIP}</InfoTip>}
+          figure={formatNumber(overview.total_quotes)}
+          note={overview.quotes_this_month ? `${formatNumber(overview.quotes_this_month)} this month` : 'None this month'}
+        />
+        <KpiTile
+          aria-label="Company orders"
+          label="Company orders"
+          aside={<InfoTip>{LINKED_TIP}</InfoTip>}
+          figure={formatNumber(overview.total_loads)}
+          note={overview.loads_this_month ? `${formatNumber(overview.loads_this_month)} this month` : 'None this month'}
+        />
         {/* A zero MRR is not a headline number (design principles §1): the tile is left out. */}
         {mrr > 0 && (
           <KpiTile
@@ -97,40 +129,43 @@ export default function AdminHome() {
       </KpiRow>
 
       <div className="admin-home-grid">
-        <section className="bk-card" aria-labelledby="ah-subs">
-          <div className="bk-card__head">
-            <h2 className="bk-card__title" id="ah-subs">Companies by subscription</h2>
-            <Link className="bk-link" style={{ fontSize: 13, color: 'var(--text-secondary)' }} to="/admin/companies">All companies</Link>
-          </div>
-          {paying === 0 && total > 0 && (
-            <p className="bk-help" style={{ marginBottom: 12 }}>
-              {noPlan === total
-                ? `All ${total} companies signed up without starting a plan, so none is active or suspended.`
-                : 'No company is paying yet.'}
-            </p>
-          )}
-          <div className="admin-dist" role="list">
-            {SUBSCRIPTION_ROWS.map(r => {
-              const n = byStatus[r.key] || 0;
-              return (
-                <div key={r.key} className="admin-dist__row" role="listitem" aria-label={`${r.label}: ${n}`}>
-                  <div className="admin-dist__label">
-                    <span>{r.label}</span>
-                    <span className="admin-dist__hint">{r.hint}</span>
-                  </div>
-                  <span className="admin-dist__track" aria-hidden="true"><span style={{ width: `${total ? (n / total) * 100 : 0}%` }} /></span>
-                  <span className={`admin-dist__n${n ? '' : ' is-zero'}`}>{n}</span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
+        {/* Two short status cards stacked beside the newest-companies list, so neither column runs long. */}
         <div className="admin-home-side">
+          <section className="bk-card" aria-labelledby="ah-subs">
+            <div className="bk-card__head">
+              <h2 className="bk-card__title" id="ah-subs">Companies by subscription</h2>
+              <Link className="bk-link bk-link--sm" to="/admin/companies">All companies</Link>
+            </div>
+            {total === 0 ? (
+              <p className="bk-help">No companies yet.</p>
+            ) : paying === 0 && noPlan === total ? (
+              <p className="admin-empty-line">
+                No companies on a paid plan yet.
+                <span className="admin-empty-line__sub">All {formatNumber(total)} signed up without starting a plan.</span>
+              </p>
+            ) : (
+              <div className="admin-dist" role="list">
+                {/* Only statuses that have companies; zero rows say nothing. */}
+                {SUBSCRIPTION_ROWS.filter(r => (byStatus[r.key] || 0) > 0).map(r => {
+                  const n = byStatus[r.key] || 0;
+                  return (
+                    <div key={r.key} className="admin-dist__row" role="listitem" aria-label={`${r.label}: ${n}`}>
+                      <div className="admin-dist__label">
+                        <span>{r.label}</span>
+                        <span className="admin-dist__hint">{r.hint}</span>
+                      </div>
+                      <span className="admin-dist__track" aria-hidden="true"><span style={{ width: `${total ? (n / total) * 100 : 0}%` }} /></span>
+                      <span className="admin-dist__n">{n}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
           <section className="bk-card" aria-labelledby="ah-jobs">
             <div className="bk-card__head">
               <h2 className="bk-card__title" id="ah-jobs">Scheduled jobs</h2>
-              <Link className="bk-link" style={{ fontSize: 13, color: 'var(--text-secondary)' }} to="/admin/health">Platform health</Link>
+              <Link className="bk-link bk-link--sm" to="/admin/health">Platform health</Link>
             </div>
             {!jobs ? (
               <div className="ops-skel" style={{ height: 40 }} />
@@ -150,21 +185,20 @@ export default function AdminHome() {
               </>
             )}
           </section>
-
-          <section className="bk-card" aria-labelledby="ah-new">
-            <div className="bk-card__head"><h2 className="bk-card__title" id="ah-new">Newest companies</h2></div>
-            {!companiesPage ? (
-              <div className="ops-skel" style={{ height: 80 }} />
-            ) : newest.length === 0 ? (
-              <p className="bk-help">No companies yet.</p>
-            ) : newest.map(c => (
-              <div key={c.id} className="bk-kv">
-                <span className="bk-kv__label" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }} title={c.owner_email || undefined}>{c.company_name}</span>
-                <span className="bk-kv__value" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{formatDate(c.created_at)}</span>
-              </div>
-            ))}
-          </section>
         </div>
+        <section className="bk-card" aria-labelledby="ah-new">
+          <div className="bk-card__head"><h2 className="bk-card__title" id="ah-new">Newest companies</h2></div>
+          {!companiesPage ? (
+            <div className="ops-skel" style={{ height: 80 }} />
+          ) : newest.length === 0 ? (
+            <p className="bk-help">No companies yet.</p>
+          ) : newest.map(c => (
+            <div key={c.id} className="bk-kv">
+              <span className="bk-kv__label" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }} title={c.owner_email || undefined}>{c.company_name}</span>
+              <span className="bk-kv__value" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{formatDate(c.created_at)}</span>
+            </div>
+          ))}
+        </section>
       </div>
     </div>
   );

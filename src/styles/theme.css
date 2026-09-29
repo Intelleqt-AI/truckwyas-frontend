@@ -381,8 +381,9 @@
 
   /* Emphasis tile (R3): calm like dark. A raised, faintly blue surface with
      the figure in accent ink; never a saturated slab. */
-  --emphasis-bg: #F4F7FE;
-  --emphasis-border: #D3E0FB;
+  /* R4: neutral card surface and border; only the figure carries accent ink. */
+  --emphasis-bg: var(--bg-surface);
+  --emphasis-border: var(--border-subtle);
   --emphasis-fg: #1D4ED8;
   --emphasis-fg-muted: #434A55;
   --emphasis-track: rgba(37, 99, 235, 0.14);
@@ -1157,18 +1158,24 @@ code, pre, kbd, samp, .tw-code {
   .bk-btn--sm,
   .fin-link,
   .viz-table-toggle,
-  .settings-control {
+  .settings-control:not(.settings-switch):not([role="switch"]) {
     /* Accessibility floor: must beat page-scoped compact sizing. */
     min-height: 44px !important;
     min-width: 44px !important;
   }
-  .settings-switch {
+  /* Switches, checkboxes and radios keep their drawn size on touch screens
+     (R4: never resize a visual control). Their 44px target is an invisible
+     ::after around them instead. Opt any other small control in with .tw-hit. */
+  .settings-switch,
+  .tw-hit {
     position: relative;
   }
-  .settings-switch::after {
+  .settings-switch::after,
+  .tw-hit::after {
     content: '';
     position: absolute;
-    inset: -10px -6px;
+    /* Grow to at least 44x44 around the control's centre. */
+    inset: min(0px, calc(50% - 22px));
   }
 }
 
@@ -1181,7 +1188,7 @@ code, pre, kbd, samp, .tw-code {
 /* Page head: bold tight title, one short grey line, actions on the right. */
 /* Phone rhythm: the shell's main padding and the head offset tighten together. */
 @media (max-width: 768px) {
-  :root, :root[data-theme] { --main-pad-top: 16px; --page-head-top: 16px; --head-to-tabs: 12px; --tabs-to-content: 16px; --head-to-content: 16px; --card-pad: 16px; --control-h: 44px; --field-h: 44px; }
+  :root, :root[data-theme] { --main-pad-top: 16px; --page-head-top: 16px; --head-to-tabs: 12px; --tabs-h: 44px; --tabs-to-content: 16px; --head-to-content: 16px; --card-pad: 16px; --control-h: 44px; --field-h: 44px; }
 }
 @media (pointer: coarse) {
   :root, :root[data-theme] { --control-h: 44px; --field-h: 44px; }

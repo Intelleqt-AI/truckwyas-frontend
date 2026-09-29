@@ -16,7 +16,8 @@ import { fetchAllPages } from '@/components/insights/findings';
 import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
 import { formatCurrency, formatMoneyWhole } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
-import { QuotesList } from './QuotesList';
+import { QuotesList, StatusFilter } from './QuotesList';
+import RowActions from '@/components/ui/RowActions';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
@@ -53,15 +54,13 @@ const plateOf = (info?: string) => {
 };
 // One column for who and what is on the job, so the table keeps Status and
 // Amount in view at laptop widths.
-// Loading or in transit with no vehicle is not a normal state: flag it calmly.
+// Loading or in transit with no vehicle is not a normal state: it is flagged
+// calmly as a short line under the status (the status itself is not repeated).
 const ON_THE_MOVE = ['LOADING', 'IN_TRANSIT'];
+const missingVehicle = (l: { vehicle_info?: string; vehicle?: number | null; status: string }) =>
+  !plateOf(l.vehicle_info) && l.vehicle == null && ON_THE_MOVE.includes(l.status);
 const assignedLabel = (l: { driver_name?: string; vehicle_info?: string; vehicle?: number | null; status: string }) => {
-  const plate = plateOf(l.vehicle_info);
-  const noVehicle = !plate && l.vehicle == null;
-  if (noVehicle && ON_THE_MOVE.includes(l.status)) {
-    return <StatusChip tone="warning" size="sm" label={`${l.status === 'IN_TRANSIT' ? 'In transit' : 'Loading'} · no vehicle assigned`} />;
-  }
-  const bits = [l.driver_name, plate].filter(Boolean);
+  const bits = [l.driver_name, plateOf(l.vehicle_info)].filter(Boolean);
   return bits.length ? bits.join(' · ') : <span className="bk-muted">Not assigned</span>;
 };
 
@@ -121,7 +120,9 @@ export default function LoadsList() {
   // Owned here (not inside QuotesList) so the search box + Board/List toggle
   // can render inline with the Quotes/Orders/History tabs.
   const [quoteSearch, setQuoteSearch] = useState('');
-  const [quoteView, setQuoteView] = useState<'board' | 'list'>('board');
+  // Phones open on the List: a sideways kanban shows two cards per column.
+  const [quoteView, setQuoteView] = useState<'board' | 'list'>(() =>
+    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches ? 'list' : 'board');
   const navigate = useNavigate();
   const location = useLocation();
   const urlSegment = location.pathname.split('/').pop();
@@ -129,8 +130,8 @@ export default function LoadsList() {
     ? (urlSegment as BookingTab)
     : 'orders';
 
-  const handleConvertToInvoice = async (load: Load, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleConvertToInvoice = async (load: Load, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setConvertingIds(prev => new Set(prev).add(load.id));
 
     try {
@@ -180,7 +181,7 @@ export default function LoadsList() {
     // Loading: the real table head with placeholder rows at the final row
     // height, so nothing moves when the orders arrive.
     <div className="bk-table-wrap" aria-busy="true" aria-label="Loading orders">
-      <table className={`table-heading-roles bk-table${showInvoiceAction ? ' bk-table--history' : ''}`}>
+      <table className={`table-heading-roles bk-table bk-table--loads${showInvoiceAction ? ' bk-table--history' : ''}`}>
         <thead>
           <tr>
             <th scope="col" className="bk-col-load">Load</th>
@@ -188,8 +189,8 @@ export default function LoadsList() {
             <th scope="col" className="bk-col-route">Route</th>
             <th scope="col" className="bk-col-opt">Driver and vehicle</th>
             <th scope="col">Status</th>
-            {showInvoiceAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Action</span></th>}
             <th scope="col" className="is-num">Amount</th>
+            {showInvoiceAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Actions</span></th>}
           </tr>
         </thead>
         <tbody><SkeletonRows rows={8} cols={showInvoiceAction ? 7 : 6} /></tbody>
@@ -197,7 +198,7 @@ export default function LoadsList() {
     </div>
   ) : (
     <div className="bk-table-wrap">
-      <table className={`table-heading-roles bk-table${showInvoiceAction ? ' bk-table--history' : ''}`}>
+      <table className={`table-heading-roles bk-table bk-table--loads${showInvoiceAction ? ' bk-table--history' : ''}`}>
         <thead>
           <tr>
             <th scope="col" className="bk-col-load">Load</th>
@@ -205,8 +206,8 @@ export default function LoadsList() {
             <th scope="col" className="bk-col-route">Route</th>
             <th scope="col" className="bk-col-opt">Driver and vehicle</th>
             <th scope="col">Status</th>
-            {showInvoiceAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Action</span></th>}
             <th scope="col" className="is-num">Amount</th>
+            {showInvoiceAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Actions</span></th>}
           </tr>
         </thead>
         <tbody>
@@ -218,31 +219,41 @@ export default function LoadsList() {
               onClick={() => navigate(`/bookings/${load.id}`)}
             >
               <td className="is-id bk-col-load">{load.load_number}</td>
-              <td className="is-primary is-truncate bk-col-customer" title={load.customer_name || ''}>{load.customer_name || '—'}</td>
+              <td className="is-primary is-truncate bk-col-customer" title={load.customer_name || ''}>
+                {load.customer_name || '—'}
+                {/* Phones: the load number rides under the customer (its column folds away). */}
+                <span className="bk-phone-sub" title={load.load_number}>{load.load_number}</span>
+              </td>
               <td className="is-truncate bk-col-route" title={`${load.pickup_location} to ${load.delivery_location}`}>
                 {routeText(load)}
               </td>
               <td className="is-truncate bk-col-opt bk-col-assign" title={[load.driver_name, load.vehicle_info].filter(Boolean).join(', ')}>
                 {assignedLabel(load)}
               </td>
-              <td>
+              <td className="bk-col-status">
                 <StatusChip status={load.status} size="sm" />
+                {missingVehicle(load) && <span className="bk-status-flag">No vehicle</span>}
               </td>
-              {showInvoiceAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
-                {load.status === 'DELIVERED' && (
-                  <button
-                    type="button"
-                    className="bk-btn bk-btn--quiet bk-btn--sm bk-row-action"
-                    onClick={(e) => handleConvertToInvoice(load, e)}
-                    disabled={convertingIds.has(load.id)}
-                  >
-                    {convertingIds.has(load.id) ? 'Creating…' : 'Create invoice'}
-                  </button>
-                )}
-              </td>}
               <td className="is-money">
                 {formatCurrency(parseFloat(load.total_amount || '0'))}
               </td>
+              {showInvoiceAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
+                {/* One quiet row menu (R4): no column of blue "Create invoice" links. */}
+                {load.status === 'DELIVERED' && (
+                  <RowActions
+                    label={load.load_number}
+                    items={[
+                      {
+                        label: convertingIds.has(load.id) ? 'Creating invoice…' : 'Create invoice',
+                        hint: 'Opens the new invoice',
+                        onSelect: () => handleConvertToInvoice(load),
+                        disabled: convertingIds.has(load.id),
+                      },
+                      { label: 'Open load', onSelect: () => navigate(`/bookings/${load.id}`) },
+                    ]}
+                  />
+                )}
+              </td>}
             </tr>
           ))}
         </tbody>
@@ -337,7 +348,7 @@ export default function LoadsList() {
         <div>
           {loading ? <TilesSkeleton count={3} /> : activeLoads.length > 0 ? summary([
             {
-              label: 'Waiting for a vehicle',
+              label: 'Need a vehicle',
               value: pendingCount,
               note: pendingCount > 0 ? 'Assign a vehicle' : 'All have a vehicle',
               tip: 'Pending orders with no vehicle assigned yet.',
@@ -348,7 +359,7 @@ export default function LoadsList() {
               return {
                 label: 'In transit',
                 value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length,
-                note: more ? `${more} more loading or assigned` : 'None loading or assigned',
+                note: more ? `${more} loading or assigned` : 'None loading or assigned',
                 tip: 'Orders with status In transit. Loading and assigned orders are counted in the note.',
               };
             })(),
@@ -374,7 +385,7 @@ export default function LoadsList() {
           <Toolbar
             meta={`${filteredOrders.length} ${filteredOrders.length === 1 ? 'order' : 'orders'}`}
             end={
-              <Segmented
+              <StatusFilter
                 label="Filter orders by status"
                 value={orderFilter}
                 onChange={setOrderFilter}
@@ -422,6 +433,7 @@ export default function LoadsList() {
           ])}
 
           <Toolbar
+            className="bk-hist-toolbar"
             meta={`${filteredHistory.length} ${filteredHistory.length === 1 ? 'record' : 'records'}`}
             end={
               <Segmented

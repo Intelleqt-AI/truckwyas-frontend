@@ -233,6 +233,18 @@ export const formatDateShort = (date: string | number | Date | null | undefined)
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 };
 
+/**
+ * "Sep" — the one short month form (never "Sept", which en-ZA/en-GB
+ * toLocaleString emits). Takes a date or a 0-based month index. Use this
+ * instead of toLocaleString(..., { month: 'short' }) for chart axes.
+ */
+export const formatMonthShort = (date: string | number | Date | null | undefined, isIndex = false): string => {
+  if (isIndex && typeof date === 'number') return MONTHS[((date % 12) + 12) % 12];
+  const d = toDate(date);
+  if (!d) return MISSING;
+  return MONTHS[d.getMonth()];
+};
+
 /** "Apr 2026". */
 export const formatMonth = (date: string | number | Date | null | undefined): string => {
   const d = toDate(date);
@@ -271,6 +283,8 @@ export const normaliseFigures = (text: string | null | undefined): string => {
     if (month < 1 || month > 12 || day < 1 || day > 31) return m;
     return `${day} ${MONTHS[month - 1]} ${y}`;
   });
+  // One short month form: "Sept" -> "Sep".
+  out = out.replace(/\bSept\b(?!ember)/g, 'Sep');
   // Money with an R prefix in en-US grouping: R 1,234 / R1,234.56 / R 12.50
   out = out.replace(/\bR\s?(\d{1,3}(?:,\d{3})+|\d+)(\.\d{1,2})?(?![\d,])/g, (_m, int: string, dec?: string) => {
     const n = Number(int.replace(/,/g, '') + (dec ?? ''));

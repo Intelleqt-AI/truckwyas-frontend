@@ -51,6 +51,16 @@ export const daysUntil = (v?: string | null) => {
 
 export const plural = (n: number, one: string, many = `${one}s`) => `${formatNumber(n)} ${n === 1 ? one : many}`;
 
+/** A truck's own payload in tonnes (vehicle.capacity is kg), else its type's
+ *  default (vehicle_type_capacity is tonnes). One source for the Vehicles
+ *  list and the vehicle page, so both print the same "26,6 t". */
+export const capacityTonnes = (v: any): number | null => {
+  const own = num(v?.capacity);
+  if (own > 0) return own / 1000;
+  const type = num(v?.vehicle_type_capacity);
+  return type > 0 ? type : null;
+};
+
 // ---------------------------------------------------------------- monthly
 
 export interface MonthPoint { key: string; label: string; short: string; revenue: number; loads: number }
@@ -192,6 +202,8 @@ export function StatusControl({ label, options, current, busy, onPick, subject }
 }) {
   return (
     <StatusMenu
+      // The record's one head action: it stays on the phone title row (R4).
+      triggerClassName="fd-status-trigger--primary"
       subject={subject || label.replace(/^Set /, '').replace(/ status$/, '')}
       current={current ?? ''}
       busy={busy}
@@ -367,7 +379,8 @@ export function expiryAlert(key: string, what: string, date: string | null | und
 // ------------------------------------------------------------------ states
 
 export function DetailSkeleton({ crumb, crumbTo }: { crumb?: string; crumbTo?: string } = {}) {
-  // The head renders straight away; only the content below waits.
+  // The head renders straight away; the body mirrors the record layout
+  // (Now line, main column, rail) so the page settles without a jump.
   return (
     <div className="fleet-detail" aria-busy="true" aria-label="Loading">
       {crumb && crumbTo ? (
@@ -378,20 +391,15 @@ export function DetailSkeleton({ crumb, crumbTo }: { crumb?: string; crumbTo?: s
           <div className="fd-skel" style={{ width: 200, height: 16, marginBottom: 32 }} />
         </>
       )}
-      <div className="fd-strip">
-        <KpiRow>
-          {[0, 1, 2].map((i) => (
-            <KpiTile key={i} label={<span className="fd-skel" style={{ display: 'block', width: 90, height: 14 }} />} figure={<span className="fd-skel" style={{ display: 'block', width: 140, height: 28 }} />} />
-          ))}
-        </KpiRow>
-      </div>
-      <div className="fd-body">
+      <div className="fd-now fd-now--skel"><span className="fd-skel" style={{ display: 'block', width: '40%', height: 16 }} /></div>
+      <div className="fd-record">
         <div className="fd-main">
-          <div className="fd-panel"><div className="fd-skel" style={{ height: 200 }} /></div>
-          <div className="fd-panel"><div className="fd-skel" style={{ height: 240 }} /></div>
+          <div className="fd-panel"><div className="fd-skel" style={{ height: 180 }} /></div>
+          <div className="fd-panel"><div className="fd-skel" style={{ height: 160 }} /></div>
         </div>
         <div className="fd-side">
-          <div className="fd-panel"><div className="fd-skel" style={{ height: 420 }} /></div>
+          <div className="fd-panel"><div className="fd-skel" style={{ height: 160 }} /></div>
+          <div className="fd-panel"><div className="fd-skel" style={{ height: 300 }} /></div>
         </div>
       </div>
     </div>

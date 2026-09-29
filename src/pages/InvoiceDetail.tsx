@@ -7,7 +7,6 @@ import { fetchData, postData } from "@/lib/Api";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import "./finance-brand.css";
 import "./table-heading-roles.css";
-import RowActions from "@/components/ui/RowActions";
 import { InfoTip } from "@/components/ui/InfoTip";
 import SectionHeader from "@/components/layout/SectionHeader";
 import { StatusChip } from "@/components/ui/StatusChip";
@@ -280,6 +279,23 @@ export default function InvoiceDetail() {
   // Part-paid: the document ends with "Paid to date" and "Balance due".
   const partPaid = showBalance && Math.abs(balance - total) > 0.005;
   const paidInDoc = partPaid ? (paidToDate ?? total - balance) : null;
+  // The charge lines. An invoice made from a load with no itemised lines
+  // shows that load as its one line, for the subtotal.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawLines: any[] = Array.isArray(invoice.line_items) ? invoice.line_items : [];
+  const itemised = rawLines.length > 0;
+  const lines: { description: string; note?: string; quantity: number; unit: number }[] = itemised
+    ? rawLines.map((item) => ({
+        description: item.description || item.item_description || '—',
+        quantity: num(item.quantity) || 1,
+        unit: num(item.unit_price ?? item.price),
+      }))
+    : [{
+        description: 'Transport',
+        note: invoice.load_number ? `${invoice.load_number}, not itemised` : 'One amount, not itemised',
+        quantity: 1,
+        unit: invoice.subtotal != null ? num(invoice.subtotal) : total - (vat ?? 0),
+      }];
   const terms = invoice.payment_terms ? String(invoice.payment_terms).replace(/^(?:NET)?\s*(\d+)$/i, '$1 days') : null;
   // The API may store the rate as a fraction (0.15) or a percentage (15).
   const vatRateText = taxRate != null ? (() => { const r = taxRate > 0 && taxRate <= 1 ? taxRate * 100 : taxRate; return formatPercent(r, Number.isInteger(Math.round(r * 100) / 100) ? 0 : 1); })() : null;
@@ -372,8 +388,9 @@ export default function InvoiceDetail() {
               {downloading ? 'Downloading…' : 'Download PDF'}
             </button>
           )}
-          {moreActions.length > 0 && <RowActions label={`Invoice ${invoice.invoice_number}`} items={moreActions} />}
         </>}
+        // Everything but the primary lives in the head's one "⋯" menu (all widths).
+        menuItems={moreActions}
       />
 
       {/* One invoice document (party, dates, lines, totals) and a sticky side
@@ -408,98 +425,62 @@ export default function InvoiceDetail() {
             )}
           </dl>
 
-          {invoice.line_items && invoice.line_items.length > 0 ? (
-            <div className="fin-doc__lines">
-              <div className="fin-doc__head">
-                <h3 className="fin-panel-title">Charges</h3>
-                <p className="fin-panel-desc">
-                  {invoice.line_items.length} {invoice.line_items.length === 1 ? 'line' : 'lines'}, excl. VAT
-                </p>
-              </div>
-              <div className="fin-table-scroll">
-                <table className="fin-table table-heading-roles">
-                  <thead>
-                    <tr>
-                      <th className="fin-cell-fill">Description</th>
-                      <th className="num">Quantity</th>
-                      <th className="num">Unit price</th>
-                      <th className="num">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoice.line_items.map((item: any, idx: number) => (
-                      <tr key={idx}>
-                        <td className="fin-strong fin-cell-fill"><div className="fin-truncate fin-truncate--fill" title={item.description || item.item_description || ''}>{item.description || item.item_description || '—'}</div></td>
-                        <td className="num">{item.quantity || 1}</td>
-                        <td className="num">{formatCurrency(item.unit_price || item.price || 0)}</td>
-                        <td className="num">{formatCurrency((item.quantity || 1) * (item.unit_price || item.price || 0))}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    {invoice.subtotal != null && (
-                      <tr className="fin-doc__rule">
-                        <td colSpan={3} className="num">Subtotal</td>
-                        <td className="num">{formatCurrency(num(invoice.subtotal))}</td>
-                      </tr>
-                    )}
-                    {num(invoice.discount) > 0 && (
-                      <tr>
-                        <td colSpan={3} className="num">Discount</td>
-                        <td className="num">−{formatCurrency(num(invoice.discount))}</td>
-                      </tr>
-                    )}
-                    {vat != null && (
-                      <tr>
-                        <td colSpan={3} className="num">VAT{vatRateText ? ` (${vatRateText})` : ''}</td>
-                        <td className="num">{formatCurrency(vat)}</td>
-                      </tr>
-                    )}
-                    <tr className={`fin-total-row${partPaid ? '' : ' fin-doc__grand'}`}>
-                      <td colSpan={3} className="num">{showBalance && !partPaid ? 'Total due' : 'Total'}</td>
-                      <td className="num">{formatCurrency(total)}</td>
-                    </tr>
-                    {partPaid && (
-                      <>
-                        <tr>
-                          <td colSpan={3} className="num">Paid to date</td>
-                          <td className="num">−{formatCurrency(paidInDoc ?? 0)}</td>
-                        </tr>
-                        <tr className="fin-total-row fin-doc__grand">
-                          <td colSpan={3} className="num">Balance due</td>
-                          <td className="num">{formatCurrency(balance)}</td>
-                        </tr>
-                      </>
-                    )}
-                  </tfoot>
-                </table>
-              </div>
+          {/* Charges: the itemised lines, or (an invoice charged as one amount
+              from its load) a single line that says so, then the totals, so
+              every invoice reads as a complete document. */}
+          <div className="fin-doc__lines">
+            <div className="fin-doc__head">
+              <h3 className="fin-panel-title">Charges</h3>
+              <p className="fin-panel-desc">
+                {itemised ? `${lines.length} ${lines.length === 1 ? 'line' : 'lines'}, excl. VAT` : 'One amount, excl. VAT'}
+              </p>
             </div>
-          ) : (
-            // One amount, no lines: the charges are a second row of facts in
-            // the same grid, not a half-empty list.
-            <div className="fin-doc__charges">
-              <h3 className="fin-sr">Charges</h3>
-              <dl className="fin-doc__facts fin-doc__facts--money">
-                {invoice.subtotal != null && (
-                  <div><dt>Subtotal, excl. VAT</dt><dd>{formatCurrency(num(invoice.subtotal))}</dd></div>
-                )}
-                {num(invoice.discount) > 0 && (
-                  <div><dt>Discount</dt><dd>−{formatCurrency(num(invoice.discount))}</dd></div>
-                )}
-                {vat != null && (
-                  <div><dt>VAT{vatRateText ? ` (${vatRateText})` : ''}</dt><dd>{formatCurrency(vat)}</dd></div>
-                )}
-                <div className={partPaid ? undefined : 'is-total'}><dt>{showBalance && !partPaid ? 'Total due' : 'Total, incl. VAT'}</dt><dd>{formatCurrency(total)}</dd></div>
-                {partPaid && (
-                  <>
-                    <div><dt>Paid to date</dt><dd>−{formatCurrency(paidInDoc ?? 0)}</dd></div>
-                    <div className="is-total"><dt>Balance due</dt><dd>{formatCurrency(balance)}</dd></div>
-                  </>
-                )}
-              </dl>
+            <div className="fin-table-scroll">
+              <table className="fin-table fin-doc__table table-heading-roles">
+                <thead>
+                  <tr>
+                    <th className="fin-cell-fill">Description</th>
+                    <th className="num m-hide">Quantity</th>
+                    <th className="num m-hide">Unit price</th>
+                    <th className="num">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="fin-strong fin-cell-fill">
+                        <div className="fin-doc__desc" title={item.description}>{item.description}</div>
+                        {item.note && <span className="fin-cell-sub">{item.note}</span>}
+                        {/* Phones: quantity and unit price under the description. */}
+                        {itemised && <span className="fin-cell-sub fin-mobile-only">{item.quantity} × {formatCurrency(item.unit)}</span>}
+                      </td>
+                      <td className="num m-hide">{item.quantity}</td>
+                      <td className="num m-hide">{formatCurrency(item.unit)}</td>
+                      <td className="num">{formatCurrency(item.quantity * item.unit)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
+            <dl className="fin-doc__totals">
+              {invoice.subtotal != null && (
+                <div><dt>Subtotal</dt><dd>{formatCurrency(num(invoice.subtotal))}</dd></div>
+              )}
+              {num(invoice.discount) > 0 && (
+                <div><dt>Discount</dt><dd>−{formatCurrency(num(invoice.discount))}</dd></div>
+              )}
+              {vat != null && (
+                <div><dt>VAT{vatRateText ? ` (${vatRateText})` : ''}</dt><dd>{formatCurrency(vat)}</dd></div>
+              )}
+              <div className={partPaid ? 'is-rule' : 'is-rule is-total'}><dt>{showBalance && !partPaid ? 'Total due' : 'Total, incl. VAT'}</dt><dd>{formatCurrency(total)}</dd></div>
+              {partPaid && (
+                <>
+                  <div><dt>Paid to date</dt><dd>−{formatCurrency(paidInDoc ?? 0)}</dd></div>
+                  <div className="is-total"><dt>Balance due</dt><dd>{formatCurrency(balance)}</dd></div>
+                </>
+              )}
+            </dl>
+          </div>
           {/* The system note "Auto-generated from Load …" only restates the load
               already named in the head, so it is not shown; real notes are. */}
           {invoice.notes && !/^auto-generated from load\b/i.test(String(invoice.notes).trim()) && (

@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import './confirm-dialog-brand.css';
 
 interface Props {
@@ -20,6 +21,8 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, true);
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
@@ -31,44 +34,51 @@ export function ConfirmModal({
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 2000,
-        background: 'rgba(0,0,0,0.65)',
+        background: 'var(--modal-backdrop, rgba(0,0,0,0.6))',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 24,
       }}
       onClick={onCancel}
     >
       <div
+        ref={dialogRef}
         className="dashboard-confirm-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-modal-title"
+        aria-describedby="confirm-modal-message"
         style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--confirm-radius, 4px)',
-          padding: 'var(--confirm-padding, 28px)',
-          maxWidth: 420,
+          borderRadius: 'var(--radius-dialog)',
+          padding: 24,
+          maxWidth: 440,
           width: '100%',
-          boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
+          boxShadow: 'none',
         }}
         onClick={e => e.stopPropagation()}
       >
-        <h2 className="dashboard-confirm-title" style={{ fontSize: 'var(--confirm-title-size, 15px)', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 var(--confirm-title-gap, 10px)' }}>
+        <h2 id="confirm-modal-title" className="dashboard-confirm-title" style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
           {title}
         </h2>
-        <div className="dashboard-confirm-message" style={{ fontSize: 'var(--confirm-body-size, 13px)', color: 'var(--text-secondary)', lineHeight: 'var(--confirm-body-line, 1.6)', marginBottom: 24 }}>
+        <div id="confirm-modal-message" className="dashboard-confirm-message" style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: '20px', marginBottom: 24 }}>
           {message}
         </div>
-        <div className="dashboard-confirm-actions" style={{ display: 'flex', gap: 'var(--confirm-actions-gap, 10px)', justifyContent: 'flex-end' }}>
+        <div className="dashboard-confirm-actions" style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <button
             className="dashboard-confirm-button"
             onClick={onCancel}
             style={{
-              padding: 'var(--confirm-button-padding, 8px 18px)',
+              padding: '8px 16px',
+              minHeight: 'var(--confirm-btn-h, 40px)',
               background: 'transparent',
-              border: '1px solid var(--confirm-control-border, var(--border-subtle))',
-              color: 'var(--text-secondary)',
-              borderRadius: 'var(--confirm-button-radius, 2px)',
-              fontSize: 'var(--confirm-button-size, 11px)',
-              fontFamily: 'var(--confirm-button-font, var(--font-mono))',
-              letterSpacing: 'var(--confirm-button-tracking, 0.06em)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-primary)',
+              borderRadius: 'var(--radius-control)',
+              fontSize: 14,
+              lineHeight: '20px',
+              fontWeight: 500,
+              fontFamily: 'var(--font-sans)',
               cursor: 'pointer',
             }}
           >
@@ -79,15 +89,16 @@ export function ConfirmModal({
             data-danger={danger || undefined}
             onClick={() => { onConfirm(); onCancel(); }}
             style={{
-              padding: 'var(--confirm-button-padding, 8px 18px)',
-              background: danger ? 'var(--confirm-danger-surface, var(--status-danger))' : 'var(--accent-primary)',
-              border: 'none',
-              color: danger ? 'var(--confirm-danger-text, #fff)' : 'var(--confirm-on-accent, #fff)',
-              borderRadius: 'var(--confirm-button-radius, 2px)',
-              fontSize: 'var(--confirm-button-size, 11px)',
-              fontFamily: 'var(--confirm-button-font, var(--font-mono))',
-              fontWeight: 'var(--confirm-button-weight, 600)',
-              letterSpacing: 'var(--confirm-button-tracking, 0.06em)',
+              padding: '8px 16px',
+              minHeight: 'var(--confirm-btn-h, 40px)',
+              background: danger ? 'var(--confirm-danger-surface)' : 'var(--accent-primary)',
+              border: danger ? '1px solid var(--confirm-danger-text)' : '1px solid transparent',
+              color: danger ? 'var(--confirm-danger-text)' : 'var(--btn-action-color, #fff)',
+              borderRadius: 'var(--radius-control)',
+              fontSize: 14,
+              lineHeight: '20px',
+              fontFamily: 'var(--font-sans)',
+              fontWeight: 500,
               cursor: 'pointer',
             }}
           >

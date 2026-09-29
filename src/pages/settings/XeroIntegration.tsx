@@ -1,7 +1,7 @@
+import { StatusChip } from '@/components/ui/StatusChip';
+import { formatDateTime } from '@/lib/formatters';
+import { BlockSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import useFetch from "@/hooks/useFetch";
 import { usePost } from "@/hooks/usePost";
 import { fetchData } from "@/lib/Api";
@@ -9,6 +9,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
+import { SettingsShell } from "./SettingsShell";
+import {
+  SettingsPageHeader,
+  settingsCardStyle,
+  settingsCardHeaderStyle,
+  settingsCardTitleStyle,
+  settingsCardBodyStyle,
+  settingsDangerButtonStyle,
+  settingsBadgeStyle,
+} from "./settingsUi";
 import {
   CheckCircle2,
   XCircle,
@@ -165,216 +175,201 @@ export default function XeroIntegration() {
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Never";
-    return new Date(dateString).toLocaleString("en-ZA", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateTime(dateString);
   };
+
+  const primaryBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 };
+  const metaRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, lineHeight: '20px', flexWrap: 'wrap' };
+  const iconMuted: React.CSSProperties = { width: 16, height: 16, color: 'var(--text-tertiary)', flexShrink: 0 };
+  const divider: React.CSSProperties = { borderTop: '1px solid var(--border-subtle)', paddingTop: 24, marginTop: 24 };
 
   if (isLoading) {
     return (
-      <div className="p-6">
-        <Loader fullScreen />
-      </div>
+      <SettingsShell activeId="integrations">
+        {/* Head first; only the content waits. */}
+        <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
+          <SettingsPageHeader
+            title="Xero integration"
+            description="Connect your Xero account to automatically sync invoices and payments"
+          />
+          <BlockSkeleton height={200} label="Loading Xero connection" />
+        </div>
+      </SettingsShell>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="font-semibold text-foreground" style={{ fontSize: 22, lineHeight: '28px' }}>
-          Xero integration
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Connect your Xero account to automatically sync invoices and payments
-        </p>
-      </div>
+    <SettingsShell activeId="integrations">
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
+      <SettingsPageHeader
+        title="Xero integration"
+        description="Connect your Xero account to automatically sync invoices and payments"
+      />
 
-      {/* Connection Status Card */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600 }}>Connection status</CardTitle>
-            {connection?.is_connected ? (
-              <Badge className="bg-success text-white hover:bg-success">
-                <CheckCircle2 className="w-3 h-3 mr-1" />
-                Connected
-              </Badge>
-            ) : (
-              <Badge
-                variant="secondary"
-                className="bg-muted text-muted-foreground"
-              >
-                <XCircle className="w-3 h-3 mr-1" />
-                Not connected
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      {/* Connection status */}
+      <section style={settingsCardStyle} aria-labelledby="xero-status-title">
+        <div style={{ ...settingsCardHeaderStyle, justifyContent: 'space-between' }}>
+          <h2 id="xero-status-title" style={settingsCardTitleStyle}>Connection status</h2>
+          {connection?.is_connected ? (
+            <StatusChip status="CONNECTED" />
+          ) : (
+            <StatusChip status="DISCONNECTED" />
+          )}
+        </div>
+        <div style={settingsCardBodyStyle}>
           {connection?.is_connected ? (
             <>
-              {/* Connected Info */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 text-sm">
-                  <Building2 className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Organization:</span>
-                  <span className="font-medium text-foreground">
+              <div style={{ display: 'grid', gap: 12 }}>
+                <div style={metaRow}>
+                  <Building2 aria-hidden="true" style={iconMuted} />
+                  <span style={{ color: 'var(--text-secondary)' }}>Organisation:</span>
+                  <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
                     {connection.tenant_name || "Unknown"}
                   </span>
                 </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Connected since:</span>
-                  <span className="font-medium text-foreground">
+                <div style={metaRow}>
+                  <Clock aria-hidden="true" style={iconMuted} />
+                  <span style={{ color: 'var(--text-secondary)' }}>Connected since:</span>
+                  <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
                     {formatDate(connection.connected_since)}
                   </span>
                 </div>
               </div>
 
-              {/* Sync Controls */}
-              <div className="border-t pt-6">
-                <h3 className="text-sm font-medium text-foreground mb-4">
+              <div style={divider}>
+                <h3 style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', margin: '0 0 12px' }}>
                   Sync data
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Invoice Sync */}
-                  <div className="space-y-2">
-                    <Button
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                  <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>
+                    <button
+                      type="button"
+                      className="btn-action settings-control"
                       onClick={handleSyncInvoices}
                       disabled={isSyncing === "invoices" || isDemo}
                       title={isDemo ? "Not available in the demo" : undefined}
-                      className="w-full"
+                      style={{ ...primaryBtn, width: '100%' }}
                     >
-                      <RefreshCw
-                        className={`w-4 h-4 mr-2 ${
-                          isSyncing === "invoices" ? "animate-spin" : ""
-                        }`}
-                      />
+                      <RefreshCw aria-hidden="true" className={isSyncing === "invoices" ? "animate-spin" : undefined} style={{ width: 16, height: 16 }} />
                       Sync invoices
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
+                    </button>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
                       Last synced: {formatDate(connection.last_invoice_sync)}
                     </p>
                   </div>
-
-                  {/* Payment Sync */}
-                  <div className="space-y-2">
-                    <Button
+                  <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>
+                    <button
+                      type="button"
+                      className="btn-action settings-control"
                       onClick={handleSyncPayments}
                       disabled={isSyncing === "payments" || isDemo}
                       title={isDemo ? "Not available in the demo" : undefined}
-                      className="w-full"
+                      style={{ ...primaryBtn, width: '100%' }}
                     >
-                      <RefreshCw
-                        className={`w-4 h-4 mr-2 ${
-                          isSyncing === "payments" ? "animate-spin" : ""
-                        }`}
-                      />
+                      <RefreshCw aria-hidden="true" className={isSyncing === "payments" ? "animate-spin" : undefined} style={{ width: 16, height: 16 }} />
                       Sync payments
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
+                    </button>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
                       Last synced: {formatDate(connection.last_payment_sync)}
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Disconnect Button */}
-              <div className="border-t pt-6">
-                <Button
+              <div style={divider}>
+                <button
+                  type="button"
+                  className="settings-control"
                   onClick={handleDisconnect}
                   disabled={isDemo}
                   title={isDemo ? "Not available in the demo" : undefined}
-                  variant="destructive"
-                  className=""
+                  style={{ ...settingsDangerButtonStyle, opacity: isDemo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : 'pointer' }}
                 >
-                  <LogOut className="w-4 h-4 mr-2" />
+                  <LogOut aria-hidden="true" style={{ width: 16, height: 16 }} />
                   Disconnect from Xero
-                </Button>
+                </button>
               </div>
             </>
           ) : (
-            <>
-              {/* Not Connected State */}
-              <div className="text-center py-6">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  <Building2 className="w-8 h-8 text-primary" />
-                </div>
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  Connect to Xero
-                </h3>
-                <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                  Link your Xero account to automatically sync invoices and
-                  payments between TruckWys and Xero.
-                </p>
-                {connection?.configured === false && (
-                  <p className="text-xs text-muted-foreground mb-4 max-w-md mx-auto">
-                    Xero isn't configured on this server yet. Add your Xero app's
-                    client ID and secret to the backend environment to enable the
-                    connection.
-                  </p>
-                )}
-                <Button
-                  onClick={handleConnect}
-                  disabled={connection?.configured === false || isDemo}
-                  title={isDemo ? "Not available in the demo" : undefined}
-                  className=""
-                >
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Connect to Xero
-                </Button>
+            <div style={{ textAlign: 'center', padding: '16px 0' }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: '50%', margin: '0 auto 16px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'var(--accent-dim)', color: 'var(--accent-primary)',
+              }}>
+                <Building2 aria-hidden="true" style={{ width: 24, height: 24 }} />
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Sync Log */}
-      {connection?.is_connected && syncLogs && syncLogs.length > 0 && (
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600 }}>Recent sync activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {syncLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="flex items-center justify-between py-3 border-b last:border-0"
-                >
-                  <div className="flex items-center gap-3">
-                    {log.status === "success" ? (
-                      <CheckCircle2 className="w-5 h-5 text-success" />
-                    ) : (
-                      <XCircle className="w-5 h-5 text-destructive" />
-                    )}
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {log.sync_type === "invoice"
-                          ? "Invoice sync"
-                          : "Payment sync"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {log.status === "success"
-                          ? `${log.records_synced} records synced`
-                          : log.error_message || "Sync failed"}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {formatDate(log.timestamp)}
-                  </span>
-                </div>
-              ))}
+              <h3 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+                Connect to Xero
+              </h3>
+              <p style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', margin: '0 auto 16px', maxWidth: 440 }}>
+                Link your Xero account to automatically sync invoices and
+                payments between TruckWys and Xero.
+              </p>
+              {connection?.configured === false && (
+                <p style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', margin: '0 auto 16px', maxWidth: 440 }}>
+                  Xero isn't configured on this server yet. Add your Xero app's
+                  client ID and secret to the backend environment to enable the
+                  connection.
+                </p>
+              )}
+              <button
+                type="button"
+                className="btn-action settings-control"
+                onClick={handleConnect}
+                disabled={connection?.configured === false || isDemo}
+                title={isDemo ? "Not available in the demo" : undefined}
+                style={primaryBtn}
+              >
+                Connect to Xero
+              </button>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
+      </section>
+
+      {/* Sync log */}
+      {connection?.is_connected && syncLogs && syncLogs.length > 0 && (
+        <section style={settingsCardStyle} aria-labelledby="xero-log-title">
+          <div style={settingsCardHeaderStyle}>
+            <h2 id="xero-log-title" style={settingsCardTitleStyle}>Recent sync activity</h2>
+          </div>
+          <ul style={{ listStyle: 'none', margin: 0, padding: '4px 0' }}>
+            {syncLogs.map((log, i) => (
+              <li
+                key={log.id}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+                  padding: '12px var(--card-pad, 20px)',
+                  borderBottom: i < syncLogs.length - 1 ? '1px solid var(--border-row)' : 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                  {log.status === "success" ? (
+                    <CheckCircle2 aria-hidden="true" style={{ width: 20, height: 20, flexShrink: 0, color: 'var(--status-success-text)' }} />
+                  ) : (
+                    <XCircle aria-hidden="true" style={{ width: 20, height: 20, flexShrink: 0, color: 'var(--status-danger-text)' }} />
+                  )}
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                      {log.sync_type === "invoice" ? "Invoice sync" : "Payment sync"}
+                    </p>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: '20px', color: log.status === "success" ? 'var(--text-tertiary)' : 'var(--status-danger-text)' }}>
+                      {log.status === "success"
+                        ? `${log.records_synced} records synced`
+                        : log.error_message || "Sync failed"}
+                    </p>
+                  </div>
+                </div>
+                <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
+                  {formatDate(log.timestamp)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
+    </SettingsShell>
   );
 }

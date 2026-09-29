@@ -1,30 +1,33 @@
 import '@/pages/settings/settings-brand.css';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState, useEffect } from "react";
 import { fetchData, postData, deleteData, patchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
+import { settingsBadgeStyle, settingsCardStyle, settingsInputStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
+import { formatDate, formatDateTime } from '@/lib/formatters';
+import RowActions from '@/components/ui/RowActions';
+import { StatusChip } from '@/components/ui/StatusChip';
 
-const cardStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 8,
-  marginBottom: 16,
-  padding: 24,
+const cardStyle: React.CSSProperties = { ...settingsCardStyle, padding: 'var(--card-pad, 20px)' };
+
+const secondaryBtnStyle = settingsSecondaryButtonStyle;
+
+/** "e2c0 ···· d12e" from whatever identifier the API returns; never the whole key. */
+const maskKey = (k: { prefix?: string; key?: string }) => {
+  const full = String((k as any).key || '');
+  if (full.length >= 12) return `${full.slice(0, 4)} ···· ${full.slice(-4)}`;
+  if (k.prefix) return `${k.prefix} ····`;
+  return 'Key hidden';
 };
 
-const secondaryBtnStyle: React.CSSProperties = {
-  background: 'none', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-secondary)', padding: '8px 12px', minHeight: 40,
-  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-  borderRadius: 6,
-};
+const integrationInputStyle: React.CSSProperties = { ...settingsInputStyle, marginBottom: 8 };
 
-const integrationInputStyle: React.CSSProperties = {
-  width: '100%', marginBottom: 8, padding: '8px 12px', minHeight: 40,
-  background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-  borderRadius: 6, color: 'var(--text-primary)',
-  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px',
+/** Nested surface inside an integration card (status summary, inline forms). */
+const nestedBoxStyle: React.CSSProperties = {
+  padding: 16, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
+  borderRadius: 'var(--radius-nested)',
 };
 
 const sectionTitleStyle: React.CSSProperties = {
@@ -38,6 +41,12 @@ const sectionTitleStyle: React.CSSProperties = {
   fontWeight: 600,
   marginBottom: 16,
 };
+
+/** Connection state as text + dot, never colour alone. Not connected is a
+ *  neutral state, not an error. */
+function ConnectionPill({ connected }: { connected: boolean }) {
+  return <StatusChip status={connected ? 'CONNECTED' : 'DISCONNECTED'} />;
+}
 
 interface XeroStatus {
   connected: boolean;
@@ -172,7 +181,7 @@ export function IntegrationsSettings() {
       setShowCartrackForm(false);
       loadCartrackStatus();
     } catch (err: any) {
-      toast.error(err?.message || 'Could not connect to Cartrack — check your credentials and base URL');
+      toast.error(err?.message || 'Could not connect to Cartrack. Check your credentials and base URL.');
     } finally {
       setConnectingCartrack(false);
     }
@@ -198,12 +207,12 @@ export function IntegrationsSettings() {
       });
       const matched = result?.sync?.matched ?? 0;
       const total = result?.sync?.total ?? 0;
-      toast.success(`CtrlFleet connected — matched ${matched} of ${total} vehicles by plate`);
+      toast.success(`CtrlFleet connected. Matched ${matched} of ${total} vehicles by plate`);
       setCtrlfleetApiKey('');
       setShowCtrlfleetForm(false);
       loadCtrlfleetStatus();
     } catch (err: any) {
-      toast.error(err?.message || 'Could not connect to CtrlFleet — check your API key');
+      toast.error(err?.message || 'Could not connect to CtrlFleet. Check your API key.');
     } finally {
       setConnectingCtrlfleet(false);
     }
@@ -431,21 +440,14 @@ export function IntegrationsSettings() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>
-          Integrations
-        </h2>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-          Connect TruckWys to your existing tools
-        </div>
-      </div>
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
+      <SettingsPageHeader title="Integrations" description="Connect TruckWys to your existing tools" />
 
       {/* Xero Integration Card */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <div style={{
-            width: 48, height: 48, borderRadius: 4,
+            width: 48, height: 48, borderRadius: 'var(--radius-nested)',
             background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'hidden',
@@ -453,31 +455,27 @@ export function IntegrationsSettings() {
             <img src="/Xero_logo.jpg" alt="Xero" style={{ width: 48, height: 48, objectFit: 'contain' }} />
           </div>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 2 }}>
+            <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 2 }}>
               Xero
-            </h3>
+            </h2>
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
               Sync invoices and payments with Xero accounting
             </div>
           </div>
-          <div style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: xeroStatus?.connected ? 'var(--status-success)' : 'var(--status-danger)',
-          }} />
+          <ConnectionPill connected={!!xeroStatus?.connected} />
         </div>
 
         {loadingXero ? (
-          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><Loader size={20} /></div>
+          <div style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : xeroStatus?.connected ? (
           <>
             <div style={{
-              padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
-              borderRadius: 6, marginBottom: 12, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
+              ...nestedBoxStyle, marginBottom: 16, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
             }}>
-              <strong style={{ color: 'var(--text-primary)' }}>Connected:</strong> {xeroStatus.tenant_name || 'Xero Account'}
+              <strong style={{ color: 'var(--text-primary)' }}>Connected:</strong> {xeroStatus.tenant_name || 'Xero account'}
               {xeroStatus.last_sync && (
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>
-                  Last sync: {new Date(xeroStatus.last_sync).toLocaleString()}
+                  Last sync: {formatDateTime(xeroStatus.last_sync)}
                 </div>
               )}
             </div>
@@ -486,8 +484,8 @@ export function IntegrationsSettings() {
                 onClick={handleSyncInvoices}
                 disabled={syncingInvoices || isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
-                className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 6 }}
+                className="settings-control"
+                style={{ ...secondaryBtnStyle, cursor: 'pointer' }}
               >
                 {syncingInvoices ? 'Syncing…' : 'Sync invoices'}
               </button>
@@ -495,8 +493,8 @@ export function IntegrationsSettings() {
                 onClick={handleSyncPayments}
                 disabled={syncingPayments || isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
-                className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 6 }}
+                className="settings-control"
+                style={{ ...secondaryBtnStyle, cursor: 'pointer' }}
               >
                 {syncingPayments ? 'Syncing…' : 'Sync payments'}
               </button>
@@ -518,8 +516,8 @@ export function IntegrationsSettings() {
             onClick={handleXeroConnect}
             disabled={isDemo}
             title={isDemo ? 'Not available in the demo' : undefined}
-            className="btn-action settings-control"
-            style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            className="settings-control"
+            style={{ ...secondaryBtnStyle, cursor: 'pointer', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
           >
             Connect Xero
           </button>
@@ -530,7 +528,7 @@ export function IntegrationsSettings() {
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <div style={{
-            width: 48, height: 48, borderRadius: 4,
+            width: 48, height: 48, borderRadius: 'var(--radius-nested)',
             background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'hidden',
@@ -538,37 +536,31 @@ export function IntegrationsSettings() {
             <img src="/cartract-logo.png" alt="Cartrack" style={{ width: 48, height: 48, objectFit: 'contain' }} />
           </div>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 2 }}>
+            <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 2 }}>
               Cartrack
-            </h3>
+            </h2>
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
               Live vehicle location, speed and ignition status
             </div>
           </div>
-          <div style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: cartrackStatus?.connected ? 'var(--status-success)' : 'var(--status-danger)',
-          }} />
+          <ConnectionPill connected={!!cartrackStatus?.connected} />
         </div>
 
         {loadingCartrack ? (
-          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><Loader size={20} /></div>
+          <div style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : cartrackStatus?.connected ? (
           <div style={{
-            padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
-            borderRadius: 6, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
+            ...nestedBoxStyle, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
           }}>
             <strong style={{ color: 'var(--text-primary)' }}>Connected:</strong> {cartrackStatus.base_url}
             {cartrackStatus.last_status_sync && (
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>
-                Last vehicle status sync: {new Date(cartrackStatus.last_status_sync).toLocaleString()}
+                Last vehicle status sync: {formatDateTime(cartrackStatus.last_status_sync)}
               </div>
             )}
           </div>
         ) : showCartrackForm ? (
-          <div style={{
-            padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4,
-          }}>
+          <div style={nestedBoxStyle}>
             <input
               value={cartrackUsername}
               onChange={(e) => setCartrackUsername(e.target.value)}
@@ -589,10 +581,10 @@ export function IntegrationsSettings() {
               onChange={(e) => setCartrackBaseUrl(e.target.value)}
               placeholder="https://fleetapi-za.cartrack.com"
               className="settings-control"
-              style={{ ...integrationInputStyle, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+              style={integrationInputStyle}
             />
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 12 }}>
-              Region-specific — get your base URL and credentials from Fleetweb &gt; Settings &gt; API Settings.
+              Region-specific. Get your base URL and credentials from Fleetweb &gt; Settings &gt; API Settings.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
@@ -600,7 +592,7 @@ export function IntegrationsSettings() {
                 disabled={connectingCartrack || isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
                 className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 6 }}
+                style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)' }}
               >
                 {connectingCartrack ? 'Connecting…' : 'Connect'}
               </button>
@@ -614,8 +606,8 @@ export function IntegrationsSettings() {
             onClick={() => setShowCartrackForm(true)}
             disabled={isDemo}
             title={isDemo ? 'Not available in the demo' : undefined}
-            className="btn-action settings-control"
-            style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            className="settings-control"
+            style={{ ...secondaryBtnStyle, cursor: 'pointer', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
           >
             Connect Cartrack
           </button>
@@ -626,7 +618,7 @@ export function IntegrationsSettings() {
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <div style={{
-            width: 48, height: 48, borderRadius: 4,
+            width: 48, height: 48, borderRadius: 'var(--radius-nested)',
             background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'hidden',
@@ -634,26 +626,22 @@ export function IntegrationsSettings() {
             <img src="/cntrfleet-logo.png" alt="CtrlFleet" style={{ width: 48, height: 48, objectFit: 'contain' }} />
           </div>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 2 }}>
+            <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 2 }}>
               CtrlFleet
-            </h3>
+            </h2>
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
               Live vehicle location and points of interest
             </div>
           </div>
-          <div style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: ctrlfleetStatus?.connected ? 'var(--status-success)' : 'var(--status-danger)',
-          }} />
+          <ConnectionPill connected={!!ctrlfleetStatus?.connected} />
         </div>
 
         {loadingCtrlfleet ? (
-          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><Loader size={20} /></div>
+          <div style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : ctrlfleetStatus?.connected ? (
           <>
             <div style={{
-              padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
-              borderRadius: 6, marginBottom: 12, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
+              ...nestedBoxStyle, marginBottom: 16, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
             }}>
               <strong style={{ color: 'var(--text-primary)' }}>Connected</strong>
               {typeof ctrlfleetStatus.matched_vehicles === 'number' && (
@@ -663,7 +651,7 @@ export function IntegrationsSettings() {
               )}
               {ctrlfleetStatus.last_vehicle_sync && (
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 2 }}>
-                  Last vehicle sync: {new Date(ctrlfleetStatus.last_vehicle_sync).toLocaleString()}
+                  Last vehicle sync: {formatDateTime(ctrlfleetStatus.last_vehicle_sync)}
                 </div>
               )}
             </div>
@@ -681,8 +669,8 @@ export function IntegrationsSettings() {
                 }}
                 disabled={isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
-                className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 6 }}
+                className="settings-control"
+                style={{ ...secondaryBtnStyle, cursor: 'pointer' }}
               >
                 Re-sync vehicles
               </button>
@@ -728,33 +716,33 @@ export function IntegrationsSettings() {
 
             {showCtrlfleetVehicles && (
               <div style={{
-                marginTop: 12, border: '1px solid var(--border-subtle)', borderRadius: 4,
+                marginTop: 16, border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)',
                 maxHeight: 320, overflowY: 'auto',
               }}>
                 {loadingCtrlfleetVehicles ? (
-                  <div style={{ padding: 12, display: 'flex', justifyContent: 'center' }}><Loader size={18} /></div>
+                  <div style={{ padding: 16, display: 'flex', justifyContent: 'center' }}><Loader size={18} /></div>
                 ) : ctrlfleetVehicles.length === 0 ? (
-                  <div style={{ padding: 12, fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>No vehicles returned by CtrlFleet.</div>
+                  <div style={{ padding: 16, fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>No vehicles returned by CtrlFleet.</div>
                 ) : (
                   ctrlfleetVehicles.map((cf, idx) => {
                     const unlinkedOptions = truckwysVehicles.filter((v) => !v.ctrlfleet_vehicle_code);
                     return (
                       <div key={cf.vehicle_code || idx} style={{
-                        padding: '10px 12px', borderTop: idx === 0 ? 'none' : '1px solid var(--border-subtle)',
-                        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                        padding: '12px 16px', borderTop: idx === 0 ? 'none' : '1px solid var(--border-row)',
+                        display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
                       }}>
                         <div style={{ flex: '1 1 160px', minWidth: 140 }}>
-                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)' }}>
-                            {cf.licence_number || '(no plate)'}
+                          <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
+                            {cf.licence_number || 'No plate'}
                           </div>
-                          <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
                             {cf.vehicle_code}{cf.type ? ` · ${cf.type}` : ''}
                           </div>
                         </div>
                         {cf.matched_vehicle_id ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{
-                              fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-success)',
+                              fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-success-text)',
                             }}>
                               Linked → {cf.matched_vehicle_plate}
                             </span>
@@ -764,10 +752,7 @@ export function IntegrationsSettings() {
                               title={isDemo ? 'Not available in the demo' : undefined}
                               className="settings-control"
                               style={{
-                                background: 'none', border: '1px solid var(--border-subtle)',
-                                color: 'var(--text-tertiary)', padding: '4px 8px',
-                                fontFamily: 'var(--font-sans)', fontSize: 12, lineHeight: '16px', fontWeight: 500,
-                                borderRadius: 4,
+                                ...secondaryBtnStyle,
                                 cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                               }}
                             >
@@ -776,29 +761,24 @@ export function IntegrationsSettings() {
                           </div>
                         ) : (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <select
-                              value={linkSelections[cf.vehicle_code] || ''}
-                              onChange={(e) => setLinkSelections({ ...linkSelections, [cf.vehicle_code]: e.target.value })}
-                              className="settings-control"
-                              aria-label="Link to vehicle"
-                              style={{
-                                padding: '8px 12px', minHeight: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                                borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px',
-                              }}
-                            >
-                              <option value="">Link to vehicle…</option>
-                              {unlinkedOptions.map((v) => (
-                                <option key={v.id} value={v.id}>
-                                  {v.plate} {v.make ? `— ${v.make} ${v.model}` : ''}
-                                </option>
-                              ))}
-                            </select>
+                            <Select value={linkSelections[cf.vehicle_code] || undefined} onValueChange={(v) => setLinkSelections({ ...linkSelections, [cf.vehicle_code]: v })}>
+                              <SelectTrigger aria-label="Link to vehicle" style={{ minWidth: 200, minHeight: 40 }}>
+                                <SelectValue placeholder="Link to vehicle…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {unlinkedOptions.map((v) => (
+                                  <SelectItem key={v.id} value={String(v.id)}>
+                                    {v.plate}{v.make ? `, ${v.make} ${v.model}` : ''}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <button
                               onClick={() => handleLinkVehicle(cf.vehicle_code)}
                               disabled={linkingCode === cf.vehicle_code || isDemo}
                               title={isDemo ? 'Not available in the demo' : undefined}
-                              className="btn-action settings-control"
-                              style={{ borderRadius: 6 }}
+                              className="settings-control"
+                              style={{ ...secondaryBtnStyle, cursor: 'pointer' }}
                             >
                               {linkingCode === cf.vehicle_code ? '…' : 'Link'}
                             </button>
@@ -812,16 +792,14 @@ export function IntegrationsSettings() {
             )}
           </>
         ) : showCtrlfleetForm ? (
-          <div style={{
-            padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4,
-          }}>
+          <div style={nestedBoxStyle}>
             <input
               value={ctrlfleetApiKey}
               onChange={(e) => setCtrlfleetApiKey(e.target.value)}
               type="password"
               placeholder="CtrlFleet API key"
               className="settings-control"
-              style={{ ...integrationInputStyle, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+              style={integrationInputStyle}
             />
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 12 }}>
               Get your API key from your CtrlFleet account. Connecting matches your vehicles to CtrlFleet's by licence plate.
@@ -832,7 +810,7 @@ export function IntegrationsSettings() {
                 disabled={connectingCtrlfleet || isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
                 className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 6 }}
+                style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)' }}
               >
                 {connectingCtrlfleet ? 'Connecting…' : 'Connect'}
               </button>
@@ -846,8 +824,8 @@ export function IntegrationsSettings() {
             onClick={() => setShowCtrlfleetForm(true)}
             disabled={isDemo}
             title={isDemo ? 'Not available in the demo' : undefined}
-            className="btn-action settings-control"
-            style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            className="settings-control"
+            style={{ ...secondaryBtnStyle, cursor: 'pointer', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
           >
             Connect CtrlFleet
           </button>
@@ -857,27 +835,24 @@ export function IntegrationsSettings() {
       {/* Partner API Keys Card */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={sectionTitleStyle}>Partner API keys</h3>
+          <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Partner API keys</h2>
           <button
             onClick={() => setShowAddKey(!showAddKey)}
             disabled={isDemo}
             title={isDemo ? 'Not available in the demo' : undefined}
-            className="btn-action settings-control"
-            style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            className="settings-control"
+            style={{ ...secondaryBtnStyle, cursor: 'pointer', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
           >
             New key
           </button>
         </div>
 
         {showAddKey && (
-          <div style={{
-            padding: 12, marginBottom: 12, background: 'var(--bg-deep)',
-            border: '1px solid var(--border-subtle)', borderRadius: 4,
-          }}>
+          <div style={{ ...nestedBoxStyle, marginBottom: 16 }}>
             <input
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
-              placeholder="Key name (e.g., Production Server)"
+              placeholder="Key name (e.g. Production server)"
               className="settings-control"
               style={integrationInputStyle}
             />
@@ -887,7 +862,7 @@ export function IntegrationsSettings() {
                 disabled={isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
                 className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 6 }}
+                style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)' }}
               >
                 Generate
               </button>
@@ -899,38 +874,38 @@ export function IntegrationsSettings() {
         )}
 
         {loadingKeys ? (
-          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
+          // One key row's height: the list usually holds at least one key.
+          <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : apiKeys.length === 0 ? (
-          <div style={{ padding: 20, textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+          <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
             No API keys yet. Generate one to enable programmatic access.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {apiKeys.map((key) => (
               <div key={key.id} style={{
-                padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
-                borderRadius: 4, display: 'flex', alignItems: 'center', gap: 12,
+                ...nestedBoxStyle, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
               }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>
                     {key.name}
                   </div>
-                  <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                    {key.prefix}... • Created {new Date(key.created_at).toLocaleDateString()}
-                    {key.last_used && ` • Last used ${new Date(key.last_used).toLocaleDateString()}`}
+                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+                    {/* Monospace only for code: URLs and key material. Event names, plates and dates stay sans. */}
+                    {/* Never the whole key: a masked start and end when the API sends it, else "Key hidden". */}
+                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{maskKey(key)}</span> · Created {formatDate(key.created_at)}
+                    {(key.last_used || (key as any).last_used_at) && ` · Last used ${formatDate(key.last_used || (key as any).last_used_at)}`}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleRevokeKey(key.id)}
-                  disabled={isDemo}
-                  title={isDemo ? 'Not available in the demo' : undefined}
-                  className="settings-control"
-                  style={{
-                    ...secondaryBtnStyle, border: '1px solid var(--status-danger)', color: 'var(--status-danger)',
-                    cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                  }}>
-                  Revoke
-                </button>
+                <RowActions
+                  label={key.name}
+                  items={[{
+                    label: 'Revoke',
+                    danger: true,
+                    disabled: isDemo,
+                    onSelect: () => { if (window.confirm(`Revoke the API key "${key.name}"? Systems using it will stop working immediately.`)) handleRevokeKey(key.id); },
+                  }]}
+                />
               </div>
             ))}
           </div>
@@ -940,36 +915,33 @@ export function IntegrationsSettings() {
       {/* Webhook Manager Card */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={sectionTitleStyle}>Webhooks</h3>
+          <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Webhooks</h2>
           <button
             onClick={() => setShowAddWebhook(!showAddWebhook)}
             disabled={isDemo}
             title={isDemo ? 'Not available in the demo' : undefined}
-            className="btn-action settings-control"
-            style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            className="settings-control"
+            style={{ ...secondaryBtnStyle, cursor: 'pointer', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
           >
             Add webhook
           </button>
         </div>
 
         {showAddWebhook && (
-          <div style={{
-            padding: 12, marginBottom: 12, background: 'var(--bg-deep)',
-            border: '1px solid var(--border-subtle)', borderRadius: 4,
-          }}>
+          <div style={{ ...nestedBoxStyle, marginBottom: 16 }}>
             <input
               value={newWebhookUrl}
               onChange={(e) => setNewWebhookUrl(e.target.value)}
               placeholder="https://your-app.com/webhooks/truckwys"
               className="settings-control"
-              style={{ ...integrationInputStyle, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+              style={integrationInputStyle}
             />
             <div style={{ marginBottom: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)' }}>
               Select events
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
               {EVENT_OPTIONS.map((evt) => (
-                <label key={evt} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                <label key={evt} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={selectedEvents.includes(evt)}
@@ -991,7 +963,7 @@ export function IntegrationsSettings() {
                 disabled={isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
                 className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 6 }}
+                style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)' }}
               >
                 Create
               </button>
@@ -1003,55 +975,44 @@ export function IntegrationsSettings() {
         )}
 
         {loadingWebhooks ? (
-          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
+          <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : webhooks.length === 0 ? (
-          <div style={{ padding: 20, textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+          <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
             No webhooks configured. Add one to receive real-time event notifications.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {webhooks.map((webhook) => (
               <div key={webhook.id} style={{
-                padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
-                borderRadius: 4, display: 'flex', alignItems: 'center', gap: 12,
+                ...nestedBoxStyle, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
               }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginBottom: 4 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', marginBottom: 4, overflowWrap: 'anywhere' }}>
                     {webhook.url}
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {webhook.events.map((evt) => (
                       <span key={evt} style={{
-                        fontSize: 11, lineHeight: '16px', fontFamily: 'var(--font-mono)', padding: '2px 6px',
-                        background: 'var(--bg-surface)', color: 'var(--text-tertiary)', borderRadius: 4,
+                        fontSize: 13, lineHeight: '20px', padding: '0 8px',
+                        background: 'var(--bg-surface)', color: 'var(--text-tertiary)', borderRadius: 'var(--radius-chip)',
                       }}>
                         {evt}
                       </span>
                     ))}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleTestWebhook(webhook.id)}
-                  disabled={isDemo}
-                  title={isDemo ? 'Not available in the demo' : undefined}
-                  className="settings-control"
-                  style={{
-                    ...secondaryBtnStyle, border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)',
-                    cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                  }}>
-                  Test
-                </button>
-                <button
-                  onClick={() => handleDeleteWebhook(webhook.id)}
-                  disabled={isDemo}
-                  title={isDemo ? 'Not available in the demo' : undefined}
-                  className="settings-control"
-                  style={{
-                    ...secondaryBtnStyle, border: '1px solid var(--status-danger)', color: 'var(--status-danger)',
-                    cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                  }}>
-                  Delete
-                </button>
+                <RowActions
+                  label={webhook.url}
+                  items={[
+                    { label: 'Send test', onSelect: () => handleTestWebhook(webhook.id), disabled: isDemo },
+                    {
+                      label: 'Delete',
+                      danger: true,
+                      disabled: isDemo,
+                      onSelect: () => { if (window.confirm(`Delete the webhook to ${webhook.url}? It will stop receiving events.`)) handleDeleteWebhook(webhook.id); },
+                    },
+                  ]}
+                />
               </div>
             ))}
           </div>
@@ -1062,28 +1023,28 @@ export function IntegrationsSettings() {
       {generatedKey && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--modal-backdrop, rgba(0,0,0,0.6))', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
           zIndex: 1000,
         }} onClick={() => setGeneratedKey(null)}>
           <div style={{
             background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-            borderRadius: 12, padding: 24, maxWidth: 500,
+            borderRadius: 'var(--radius-dialog)', padding: 'var(--card-pad, 20px)', maxWidth: 500, width: '100%', boxSizing: 'border-box',
           }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 8 }}>
               API key generated
             </h2>
             <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 16 }}>
-              Copy this key now — it will only be shown once:
+              Copy this key now. It will only be shown once.
             </div>
             <div style={{
               padding: 16, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
-              borderRadius: 6, fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)',
+              borderRadius: 'var(--radius-nested)', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)',
               wordBreak: 'break-all', marginBottom: 16,
             }}>
               {generatedKey}
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={() => { copyToClipboard(generatedKey); setGeneratedKey(null); }} className="btn-action settings-control" style={{ minHeight: 40, borderRadius: 6 }}>
+              <button onClick={() => { copyToClipboard(generatedKey); setGeneratedKey(null); }} className="btn-action settings-control" style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)' }}>
                 Copy and close
               </button>
               <button className="settings-control" onClick={() => setGeneratedKey(null)} style={{ ...secondaryBtnStyle, cursor: 'pointer' }}>

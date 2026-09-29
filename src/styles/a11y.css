@@ -1,0 +1,51 @@
+/* Keyboard access primitives (v3 behaviour fix 5). Tokens only. */
+
+/* Skip link: first focusable element in the app shell, visible only on focus. */
+.tw-skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 3000;
+  padding: 8px 14px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--text-primary);
+  color: var(--bg-surface);
+  font: 500 14px/20px var(--font-sans);
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform 0.12s;
+}
+.tw-skip-link:focus,
+.tw-skip-link:focus-visible {
+  transform: none;
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+/* The skip target is focused programmatically; it needs no ring of its own. */
+#main-content:focus { outline: none; }
+
+/* Table rows that open a record: reachable with Tab, opened with Enter. */
+tr[data-row-link] { cursor: pointer; }
+tr[data-row-link]:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+/* Visible focus on selects and date fields (these previously set outline: none). */
+.tw-select-trigger:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+select:focus-visible,
+input[type="date"]:focus-visible,
+input[type="datetime-local"]:focus-visible,
+input[type="month"]:focus-visible,
+input[type="time"]:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+.tw-date-field:focus-within {
+  border-color: var(--accent-primary) !important;
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}

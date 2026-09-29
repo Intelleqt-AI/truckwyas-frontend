@@ -1,0 +1,118 @@
+/* Separate KPI tiles for the operational pages (Fleet, Bookings, Customers,
+   Admin). Same shape as the Today tiles (overview-typography.css .td-kpi):
+   each figure is its own card with a short label, a big figure and one short
+   sub-line. At most four per row; two per row on narrow screens. */
+.ops-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--card-gap, 16px);
+  margin-bottom: var(--section-gap, 24px);
+}
+.ops-tiles--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ops-tiles--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.ops-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 128px;
+  padding: 18px 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card, 16px);
+  box-shadow: none;
+}
+.ops-tile__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  margin: 0;
+  font: 500 13px/20px var(--font-sans);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text-secondary);
+}
+.ops-tile__value {
+  margin-top: 12px;
+  font: 600 var(--text-figure, 32px)/38px var(--font-sans);
+  letter-spacing: var(--tracking-figure, -0.03em);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.ops-tile__value.is-attention { color: var(--status-warning-text); }
+.ops-tile__of {
+  margin-left: 6px;
+  font: 400 14px/20px var(--font-sans);
+  letter-spacing: normal;
+  color: var(--text-tertiary);
+}
+.ops-tile__sub {
+  margin-top: auto;
+  padding-top: 8px;
+  font: 500 12px/16px var(--font-sans);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+@media (max-width: 1280px) {
+  .ops-tiles--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .ops-tiles,
+  .ops-tiles--4,
+  .ops-tiles--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+  /* An odd last tile takes the full row rather than leaving a hole. */
+  .ops-tiles > .ops-tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .ops-tile { min-height: 0; padding: 14px; }
+  .ops-tile__value { margin-top: 8px; font-size: 22px; line-height: 28px; letter-spacing: -0.02em; }
+  .ops-tile__of { font-size: 13px; margin-left: 4px; }
+}
+
+/* A tile that opens the section it summarises. Hover is a surface tint. */
+.ops-tile--link { cursor: pointer; transition: background-color 0.12s; }
+.ops-tile--link:hover { background: var(--bg-surface-hover); }
+.ops-tile--link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
+/* "of 20" after a KpiTile figure (<KpiTile figure={<>12<span className="tw-kpi__of"> of 20</span></>} />). */
+.tw-kpi__of {
+  font: 400 14px/20px var(--font-sans);
+  letter-spacing: normal;
+  color: var(--text-tertiary);
+}
+
+/* Space between a page's KPI row and the toolbar or table below it. */
+.fleet-kpis, .bk-kpis, .ops-kpis { margin-bottom: var(--section-gap, 24px); }
+@media (max-width: 767px) {
+  .fleet-kpis, .bk-kpis, .ops-kpis { margin-bottom: 16px; }
+}
+
+/* Content skeletons (components/fleet-detail/ContentSkeleton.tsx). The page
+   head is never replaced; only the waiting content shows these. */
+.ops-skel { display: block; height: 12px; border-radius: 4px; background: var(--bg-surface-hover); animation: skeleton-pulse 1.5s ease-in-out infinite; }
+.ops-skel-table { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card, 12px); overflow: hidden; }
+.ops-skel-table--bare { border: 0; border-radius: 0; background: transparent; }
+.ops-skel-table--bare .ops-skel-row--head { display: none; }
+.ops-skel-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 16px; align-items: center; height: 48px; padding: 0 24px; border-bottom: 1px solid var(--border-row); }
+.ops-skel-row:last-child { border-bottom: none; }
+.ops-skel-row--head { height: 44px; border-bottom-color: var(--border-subtle); }
+.ops-skel-row--head .ops-skel { height: 10px; }
+.ops-skel-tiles { display: grid; gap: var(--card-gap, 16px); margin-bottom: var(--section-gap, 24px); }
+.ops-skel-tile { display: flex; flex-direction: column; min-height: 96px; padding: 18px 20px; box-sizing: border-box; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card, 12px); }
+.ops-skel-block { border-radius: var(--radius-card, 12px); border: 1px solid var(--border-subtle); background: var(--bg-surface); position: relative; overflow: hidden; }
+.ops-skel-block::after { content: ''; position: absolute; inset: 24px; border-radius: 6px; background: var(--bg-surface-hover); animation: skeleton-pulse 1.5s ease-in-out infinite; }
+@media (max-width: 720px) { .ops-skel-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+@media (prefers-reduced-motion: reduce) { .ops-skel, .ops-skel-block::after { animation: none; } }
+
+
+/* R4 phone: tile labels and notes wrap (never an ellipsis) on list pages. */
+@media (max-width: 767px) {
+  .bk-kpis .tw-kpi__label, .bk-kpis .tw-kpi__note { white-space: normal; overflow: visible; text-overflow: clip; }
+}

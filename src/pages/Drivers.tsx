@@ -1,18 +1,36 @@
 import './fleet-vehicles-brand.css';
+import { fetchAllPages } from '@/components/insights/findings';
+import { formatDate, formatMoneyWhole } from '@/lib/formatters';
+import { SkeletonRows } from '@/components/fleet-detail/ContentSkeleton';
+import { localDateISO } from '@/lib/dates';
+import StaleDataNotice from '@/components/data/StaleDataNotice';
 import './table-heading-roles.css';
-import { UserRound as EmptyDriversIcon } from 'lucide-react';
+import { Plus, UserRound as EmptyDriversIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { LiveBadge } from "@/components/LiveBadge";
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
+import SectionHeader, { FLEET_TABS } from '@/components/layout/SectionHeader';
 import { useAuth } from '@/lib/AuthContext';
+import RowActions from '@/components/ui/RowActions';
+import { InfoTip } from '@/components/ui/InfoTip';
+import './ops-tiles.css';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { Segmented } from '@/components/ui/Segmented';
+import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { rowLink } from '@/lib/rowLink';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import { fleetMenuItems, useFleetPhoneHead } from '@/components/fleet-detail/fleetHead';
+import { DELIVERED, useLedger } from '@/components/reports/data';
+import { isOpenLoad } from '@/lib/staleWork';
 
 interface Driver {
   id: number;
@@ -21,7 +39,7 @@ interface Driver {
   last_name?: string;
   status: string;
   total_trips?: number;
-  revenue_generated?: number;
+  revenue_generated?: number | string; // API sends a decimal string
   efficiency_score?: number;
   phone?: string;
   license_number?: string;
@@ -54,14 +72,21 @@ interface LeaderboardEntry {
   rank: number;
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  ACTIVE: 'var(--accent-primary)',
-  INACTIVE: 'var(--text-tertiary)',
-  ON_LEAVE: 'var(--status-warning)',
-};
+// total_trips is the all-time count of delivered or invoiced loads
+// (DriverSerializer.get_total_trips), so it is not labelled "MTD".
+const NUMERIC_COLUMNS = new Set(['Completed loads', 'Revenue']);
+// Column priority: Name and Status always show; the rest drop as the card narrows.
+const DRIVER_COL_CLASS: Record<string, string> = { Licence: 'fleet-col-opt', 'Licence expires': 'fleet-col-phone', 'Completed loads': 'fleet-col-phone', Efficiency: 'fleet-col-opt2' };
 
-const formatZAR = (v: number) =>
-  'R ' + (v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const DAY_MS = 24 * 60 * 60 * 1000;
+const formatDay = (iso?: string) =>
+  iso ? formatDate(iso) : '—';
+
+// The API sends amounts as decimal strings; coerce before formatting.
+const formatZAR = (v: number | string | null | undefined) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? formatMoneyWhole(n) : '—';
+};
 
 // Sentence-case a status token for display: "ON_LEAVE" → "On leave".
 const formatStatus = (s?: string) =>
@@ -76,12 +101,14 @@ const getDriverName = (d: Driver) => {
 
 export default function Drivers() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user: authUser } = useAuth();
   // Shared public demo account — creation/edit/delete controls are fixed off,
   // viewing/filtering/search stay fully live.
   const isDemo = !!authUser?.is_demo;
   const [statusFilter, setStatusFilter] = useState('All');
+  const phoneHead = useFleetPhoneHead();
+  // Every load (the History ledger), for the Completed loads tile.
+  const ledger = useLedger(['loads']);
   const [search, setSearch] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -93,9 +120,12 @@ export default function Drivers() {
   const [addForm, setAddForm] = useState({
     first_name: '', last_name: '', email: '', phone: '',
     license_number: '', license_expiry: '', license_state: 'GP',
-    hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE',
+    hire_date: localDateISO(), status: 'ACTIVE',
   });
   const [editDriver, setEditDriver] = useState<Driver | null>(null);
+  // Slide-outs: focus moves in, Tab stays inside, focus returns on close.
+  useFocusTrap(latestModal, showAddForm);
+  useFocusTrap(latestModal, !!editDriver);
   const [editForm, setEditForm] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
   const [confirmOpts, setConfirmOpts] = useState<{
@@ -113,7 +143,7 @@ export default function Drivers() {
     return () => clearTimeout(searchTimer.current);
   }, [search]);
 
-  const { data, isLoading: loading, refetch } = useQuery({
+  const driversQuery = useQuery({
     queryKey: ['drivers-page', debouncedSearch],
     queryFn: async () => {
       const q = debouncedSearch;
@@ -121,10 +151,10 @@ export default function Drivers() {
         ? `api/v1/drivers/?search=${encodeURIComponent(q)}`
         : 'api/v1/drivers/';
       const [driversData, overviewData, leaderboardData, vehicleData] = await Promise.all([
-        fetchData(driversUrl),
+        fetchAllPages<any>(driversUrl).then(r => r.rows),
         fetchData('api/v1/drivers/overview/').catch(() => null),
         fetchData('api/v1/drivers/leaderboard/').catch(() => null),
-        fetchData('api/v1/vehicles/').catch(() => null),
+        fetchAllPages<any>('api/v1/vehicles/').then(r => r.rows).catch(() => null),
       ]);
 
       const vehicleList = Array.isArray(vehicleData) ? vehicleData : (vehicleData?.results || []);
@@ -135,7 +165,7 @@ export default function Drivers() {
         model: v.model,
         driver_id: v.driver ?? null,
       }));
-      const driverList = Array.isArray(driversData) ? driversData : (driversData?.results || []);
+      const driverList: any[] = driversData;
 
       // Parse leaderboard data
       const lbData = Array.isArray(leaderboardData) ? leaderboardData : (leaderboardData?.data || []);
@@ -173,7 +203,7 @@ export default function Drivers() {
           return parseFloat(c?.value) || 0;
         };
         overview = {
-          total_drivers: findVal('total') || driversData?.count || driverList.length,
+          total_drivers: findVal('total') || driverList.length,
           active_drivers: findVal('active') || driverList.filter((d: any) => d.status === 'ACTIVE').length,
           avg_revenue_per_driver: findVal('revenue') || findVal('avg') || 0,
         };
@@ -190,8 +220,51 @@ export default function Drivers() {
       return { drivers, vehicles, overview, leaderboard: leaderboardEntries };
     },
   });
+  const { data, refetch, dataUpdatedAt, isRefetchError } = driversQuery;
+  // Failed (or failing and retrying) with nothing to show: say so, never "No drivers yet".
+  const failed = loadFailed(driversQuery);
+  const loading = driversQuery.isLoading && !failed;
 
   const drivers: Driver[] = data?.drivers ?? [];
+
+  // Opens the Edit panel for one driver (row menu, or ?edit=<id> from the driver page).
+  const openEdit = (d: Driver) => {
+    setEditDriver(d);
+    const dUd: any = d.user_details || {};
+    setEditForm({
+      first_name: d.first_name || '',
+      last_name: d.last_name || '',
+      email: dUd.email || '',
+      phone: dUd.phone || '',
+      address: dUd.address || '',
+      license_number: d.license_number || '',
+      license_expiry: d.license_expiry || '',
+      medical_card_expiry: d.medical_card_expiry || '',
+      hire_date: d.hire_date || '',
+      status: d.status || 'ACTIVE',
+      license_state: d.license_state || 'GP',
+      emergency_contact: d.emergency_contact || d.emergency_phone || '',
+      vehicle: vehicles.find(v => v.driver_id === d.id)?.id?.toString() ?? '',
+    });
+  };
+
+  // The driver page's "Add" and "Assign" rows land here with ?edit=<id>:
+  // open that driver's Edit panel, and go back to their page when it closes.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [returnTo, setReturnTo] = useState<string | null>(null);
+  useEffect(() => {
+    const want = Number(searchParams.get('edit'));
+    if (!want || !data) return;
+    const d = drivers.find(x => x.id === want);
+    const next = new URLSearchParams(searchParams); next.delete('edit');
+    setSearchParams(next, { replace: true });
+    if (d && !isDemo) { openEdit(d); setReturnTo(`/fleet/drivers/${d.id}`); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, data]);
+  useEffect(() => {
+    if (!editDriver && returnTo) { const to = returnTo; setReturnTo(null); navigate(to); }
+  }, [editDriver, returnTo, navigate]);
+
   const vehicles: { id: number; plate: string; make?: string; model?: string; driver_id?: number | null }[] = data?.vehicles ?? [];
   const overview: DriverOverview | null = data?.overview ?? null;
 
@@ -199,141 +272,161 @@ export default function Drivers() {
 
   const filtered = drivers.filter(d => statusFilter === 'All' || d.status === statusFilter);
 
-  const rankColor = (rank: number) => {
-    if (rank === 1) return 'var(--accent-primary)';
-    if (rank === 2) return 'var(--status-warning)';
-    return 'var(--text-secondary)';
-  };
-
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    background: 'transparent', border: 'none',
-    borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
-    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-    fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal',
-    fontWeight: active ? 500 : 400,
-    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
-    transition: 'all 0.2s ease',
-    whiteSpace: 'nowrap',
-  });
-
-  if (loading) return <Loader fullScreen />;
+  // Summary figures: availability, work done, and the next compliance date.
+  const activeCount = overview?.active_drivers ?? drivers.filter(d => d.status === 'ACTIVE').length;
+  const inactiveCount = drivers.filter(d => d.status === 'INACTIVE').length;
+  const onLeaveCount = drivers.filter(d => d.status === 'ON_LEAVE').length;
+  // Completed loads from the same load ledger as History, so the tile can say
+  // how many delivered loads carry no driver (History 16 = 12 + 4). Falls back
+  // to the drivers' own trip counts if the ledger cannot be read.
+  const ledgerDelivered = ledger.data ? ledger.data.loads.filter((l: any) => DELIVERED.has(String(l.status || '').toUpperCase())) : null;
+  const noDriverLoads = ledgerDelivered ? ledgerDelivered.filter((l: any) => l.driver == null).length : 0;
+  const completedLoads = ledgerDelivered ? ledgerDelivered.length - noDriverLoads : drivers.reduce((sum, d) => sum + (Number(d.total_trips) || 0), 0);
+  // Drivers not active who still hold an open order (the same load ledger,
+  // no new request): one quiet flag in their Status cell (R7).
+  const openLoadByDriver = new Map<number, any>();
+  for (const row of ledger.data?.loads ?? []) {
+    // The load list returns the driver id; the shared ledger type omits it.
+    const l = row as typeof row & { driver?: number | null };
+    if (l.driver != null && isOpenLoad(l as any) && !openLoadByDriver.has(Number(l.driver))) openLoadByDriver.set(Number(l.driver), l);
+  }
+  const now = Date.now();
+  const withExpiry = drivers.filter(d => d.license_expiry).map(d => ({ d, t: new Date(d.license_expiry as string).getTime() }));
+  const expired = withExpiry.filter(x => x.t < now);
+  const nextRenewal = withExpiry.filter(x => x.t >= now).sort((a, b) => a.t - b.t)[0];
+  // Renewals due in the next 90 days: a count the owner can act on (a date is not a KPI).
+  const renewSoon = withExpiry.filter(x => x.t >= now && x.t - now <= 90 * DAY_MS).length;
+  // Score and revenue columns only appear once the driver stats job has
+  // produced them; a column of dashes answers nothing.
+  const hasEfficiency = drivers.some(d => (d.efficiency_score || 0) > 0);
+  const hasRevenue = drivers.some(d => Number(d.revenue_generated) > 0);
+  const colCount = 6 + (hasEfficiency ? 1 : 0) + (hasRevenue ? 1 : 0);
+  const availabilityNote = [
+    inactiveCount ? `${inactiveCount} inactive` : '',
+    onLeaveCount ? `${onLeaveCount} on leave` : '',
+  ].filter(Boolean).join(', ');
 
   return (
     <div className="fleet-page">
-      {/* Page header */}
-      <div className="fleet-header-row" style={{ marginBottom: 24, alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal', textTransform: 'none', marginBottom: 4 }}>Fleet</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <h1 className="fleet-page-title">Fleet</h1>
-            <LiveBadge />
-          </div>
-        </div>
-        <button data-fleet-control
-          className="btn-action"
-          onClick={() => setShowAddForm(true)}
-          disabled={isDemo}
-          title={isDemo ? 'Fixed in demo mode' : undefined}
-          style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-        >+ Add driver</button>
-      </div>
+      <SectionHeader
+        eyebrow="Fleet"
+        title="Fleet"
+        tabs={FLEET_TABS}
+        menuItems={fleetMenuItems({ phone: phoneHead, openActivity: () => navigate('/fleet/heatmap'), openImport: () => navigate('/fleet/vehicles?import=1'), importLabel: 'Vehicles: import from Excel', importDisabled: isDemo })}
+        actions={
+          <button data-fleet-control
+            className="btn-action"
+            onClick={() => setShowAddForm(true)}
+            disabled={isDemo}
+            title={isDemo ? 'Fixed in demo mode' : undefined}
+            style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+          ><Plus size={16} aria-hidden="true" /> Add driver</button>
+        }
+      />
+      <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
 
-      {/* Tabs */}
-      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 24, display: 'flex', overflowX: 'auto' }}>
-        <button style={tabStyle(false)} onClick={() => navigate('/fleet/vehicles')}>Vehicles</button>
-        <button style={tabStyle(true)}>Drivers</button>
-      </div>
+      {/* Driver summary: separate tiles, same geometry as Vehicles so
+          switching tabs never moves the page. Hidden when there are no drivers. */}
+      {!failed && (loading || drivers.length > 0) && (
+        <KpiRow className="fleet-kpis">
+          <KpiTile
+            aria-label="Active drivers"
+            label="Active drivers"
+            figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : <>{activeCount}<span className="tw-kpi__of"> of {overview?.total_drivers ?? drivers.length}</span></>}
+            note={loading ? 'Loading' : availabilityNote ? availabilityNote.replace(/^./, c => c.toUpperCase()) : 'Everyone is active'}
+          />
+          <KpiTile
+            aria-label="Completed loads"
+            label="Completed loads"
+            aside={<InfoTip>Loads delivered or invoiced with a driver recorded, all time. {ledgerDelivered ? `History counts ${ledgerDelivered.length} delivered loads; ${noDriverLoads ? `${noDriverLoads} of them have no driver recorded, so they are not here.` : 'every one has a driver.'}` : 'Delivered loads with no driver are not counted here.'}</InfoTip>}
+            figure={loading || ledger.loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : completedLoads}
+            note={loading || ledger.loading ? 'Loading' : ledgerDelivered && noDriverLoads ? `${noDriverLoads} of ${ledgerDelivered.length} had no driver` : 'All time'}
+          />
+          {(() => {
+            const hasExpired = expired.length > 0;
+            const note = loading ? 'Loading'
+              : hasExpired ? `${expired.slice(0, 2).map(x => getDriverName(x.d)).join(', ')}${expired.length > 2 ? ` and ${expired.length - 2} more` : ''}`
+              : nextRenewal ? `Next: ${getDriverName(nextRenewal.d)}, in ${Math.ceil((nextRenewal.t - now) / DAY_MS)} days`
+              : 'No expiry dates recorded';
+            // Never a big zero: with nothing due in 90 days the tile names the
+            // next renewal instead, and with no dates at all it is left out.
+            if (!loading && !hasExpired && renewSoon === 0) {
+              if (!nextRenewal) return null;
+              const days = Math.ceil((nextRenewal.t - now) / DAY_MS);
+              return (
+                <KpiTile
+                  aria-label="Next licence renewal"
+                  label="Next licence renewal"
+                  figure={<>{days}<span className="tw-kpi__of"> days</span></>}
+                  note={`${getDriverName(nextRenewal.d)}, ${formatDate(new Date(nextRenewal.t))}`}
+                />
+              );
+            }
+            return (
+              <KpiTile
+                aria-label={hasExpired ? 'Expired licences' : 'Licence renewals'}
+                label={hasExpired ? 'Expired licences' : 'Renewals in 90 days'}
+                figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : hasExpired ? expired.length : renewSoon}
+                note={note}
+                tone={hasExpired ? 'danger' : 'neutral'}
+              />
+            );
+          })()}
+        </KpiRow>
+      )}
 
-      {/* KPI strip */}
-      <div className="fleet-summary fleet-summary--3">
-        {[
-          { label: 'Total drivers', value: overview?.total_drivers ?? drivers.length, color: 'var(--text-primary)' },
-          { label: 'Active', value: overview?.active_drivers ?? drivers.filter(d => d.status === 'ACTIVE').length, color: 'var(--accent-primary)' },
-          { label: 'Avg revenue per driver', value: formatZAR(overview?.avg_revenue_per_driver ?? 0), color: 'var(--text-primary)' },
-        ].map(k => (
-          <div key={k.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{k.label}</span></div>
-            <div className="metric-value" style={{ fontSize: 28, color: k.color }}>{k.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Search + Status Filter Toolbar */}
-      <div className="fleet-toolbar">
-        <input data-fleet-control
-          type="text"
+      {/* Search + status filter toolbar */}
+      <Toolbar className="fleet-toolbar" end={
+        <Segmented
+          label="Driver status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={['All', 'ACTIVE', 'INACTIVE', 'ON_LEAVE'].map(status => ({
+            value: status,
+            label: status === 'All' ? 'All' : formatStatus(status),
+          }))}
+        />
+      }>
+        <SearchInput
           aria-label="Search drivers"
-          placeholder="Search name, license, username..."
+          placeholder="Search name, licence or username"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{
-            width: 280,
-            maxWidth: '100%',
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
-            color: 'var(--text-primary)',
-            padding: '8px 12px',
-            borderRadius: 6,
-            lineHeight: '20px',
-            fontFamily: 'var(--font-sans)',
-          }}
         />
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {['All', 'ACTIVE', 'INACTIVE', 'ON_LEAVE'].map(status => {
-            const isActive = statusFilter === status;
-            return (
-              <button data-fleet-control
-                key={status}
-                aria-pressed={isActive}
-                onClick={() => setStatusFilter(status)}
-                style={{
-                  background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
-                  color: isActive ? 'var(--btn-action-color)' : 'var(--text-secondary)',
-                  padding: '8px 12px',
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: 14,
-                  lineHeight: '20px',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  letterSpacing: 'normal',
-                  fontWeight: isActive ? 500 : 400,
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {status === 'All' ? 'All' : formatStatus(status)}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      </Toolbar>
 
       {/* Table */}
-      <div className="card fleet-table-region" role="region" aria-label="Drivers table" tabIndex={0} style={{ padding: 0, overflowX: 'auto', minWidth: 0, maxWidth: '100%' }}>
-        <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
+      {failed ? (
+        <LoadError
+          what="drivers"
+          error={driversQuery.error ?? driversQuery.failureReason}
+          busy={driversQuery.isFetching}
+          onRetry={() => refetch()}
+        />
+      ) : (
+      <div className="card fleet-table-region" role="region" aria-label="Drivers table" tabIndex={0}>
+        <table className="table-heading-roles fleet-table">
           <thead>
             <tr>
-              {['Name', 'License', 'Status', 'Trips MTD', 'Revenue generated', 'Performance', ''].map(h => (
-                <th key={h} style={{
-                  padding: '12px 16px', textAlign: 'left',
-                  borderBottom: '1px solid var(--border-subtle)',
-                }}>{h}</th>
+              {['Name', 'Licence', 'Licence expires', 'Status', 'Completed loads', ...(hasRevenue ? ['Revenue'] : []), ...(hasEfficiency ? ['Efficiency'] : []), ''].map(h => (
+                <th key={h || 'actions'} className={[NUMERIC_COLUMNS.has(h) || h === 'Efficiency' ? 'is-numeric' : '', DRIVER_COL_CLASS[h] ?? ''].filter(Boolean).join(' ') || undefined}>
+                  {h || <span className="sr-only">Actions</span>}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {loading ? (
+              <SkeletonRows rows={10} cols={colCount} />
+            ) : filtered.length === 0 ? (
               drivers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: 0 }}>
-                    <div style={{ padding: '48px var(--fleet-card-inset)', textAlign: 'center' }}>
-                      <div style={{ marginBottom: 16, opacity: 0.3 }}><EmptyDriversIcon size={40} aria-hidden="true" /></div>
-                      <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-                        No drivers yet
-                      </div>
-                      <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 20 }}>
-                        Get started by adding your first driver to your team
-                      </div>
+                  <td colSpan={colCount} className="fleet-table__state-cell">
+                    <div className="fleet-empty">
+                      <div className="fleet-empty__icon"><EmptyDriversIcon size={40} aria-hidden="true" /></div>
+                      <h2 className="fleet-empty__title">No drivers yet</h2>
+                      <p className="fleet-empty__text">Add a driver so you can assign them to loads.</p>
+                      <div className="fleet-empty__actions">
                       <button data-fleet-control
                         onClick={() => setShowAddForm(true)}
                         className="btn-action"
@@ -343,125 +436,90 @@ export default function Drivers() {
                       >
                         Add driver
                       </button>
+                      </div>
                     </div>
                   </td>
                 </tr>
               ) : (
-                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40, fontSize: 13 }}>No drivers match your filters</td></tr>
+                <tr><td colSpan={colCount} className="fleet-table__no-match">No drivers match your filters</td></tr>
               )
-            ) : filtered.map((d, idx) => {
-              const statusDotColor = d.status === 'ACTIVE' ? 'var(--status-success)' : d.status === 'ON_LEAVE' ? 'var(--status-warning)' : 'var(--text-tertiary)';
+            ) : filtered.map((d) => {
               const efficiencyScore = d.efficiency_score || 0;
+              const expiryT = d.license_expiry ? new Date(d.license_expiry).getTime() : null;
+              const isExpired = expiryT != null && expiryT < now;
+              // The driver stats job fills revenue_generated; until it runs the API
+              // sends 0.00 even for drivers with completed loads, so a zero is
+              // shown as missing rather than as a real R 0.
+              const revenue = Number(d.revenue_generated) || 0;
 
               return (
                 <tr
                   key={d.id}
-                  style={{ cursor: 'pointer', borderBottom: idx < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}
+                  className="is-clickable"
+                  {...rowLink(() => navigate(`/fleet/drivers/${d.id}`))}
                   onClick={() => navigate(`/fleet/drivers/${d.id}`)}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        background: statusDotColor,
-                        flexShrink: 0
-                      }} />
-                      {getDriverName(d)}
-                    </div>
+                  <td className="is-primary" style={{ fontWeight: 500 }}>
+                    {getDriverName(d)}
                   </td>
-                  <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                    {d.license_number || '—'}
+                  <td className="fleet-col-opt">
+                    <span className="fleet-table__id">{d.license_number || '—'}</span>
                   </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <span style={{
-                      display: 'inline-block', whiteSpace: 'nowrap',
-                      fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px',
-                      color: STATUS_COLOR[d.status] || 'var(--text-secondary)',
-                    }}>
-                      {formatStatus(d.status)}
-                    </span>
+                  <td className="fleet-col-phone" style={{ color: isExpired ? 'var(--status-danger-text)' : undefined }}>
+                    {formatDay(d.license_expiry)}{isExpired ? ', expired' : ''}
                   </td>
-                  <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                    {d.total_trips ?? 0}
-                  </td>
-                  <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                    {d.revenue_generated ? formatZAR(d.revenue_generated) : '—'}
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    {efficiencyScore > 0 ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ flex: 1, maxWidth: 120, height: 6, background: 'var(--bg-surface-hover)', borderRadius: 3, overflow: 'hidden' }}>
-                          <div style={{
-                            width: `${Math.min(efficiencyScore, 100)}%`,
-                            height: '100%',
-                            background: 'var(--accent-primary)',
-                            borderRadius: 3,
-                            transition: 'width 0.3s ease'
-                          }} />
-                        </div>
-                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)', fontWeight: 600, minWidth: 32, textAlign: 'right' }}>
-                          {efficiencyScore}
-                        </span>
-                      </div>
-                    ) : (
-                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>—</span>
+                  <td>
+                    <StatusChip status={d.status} size="sm" />
+                    {d.status !== 'ACTIVE' && openLoadByDriver.has(d.id) && (
+                      <span className="fleet-table__sub" title={openLoadByDriver.get(d.id)?.load_number || undefined}>On an open order</span>
                     )}
                   </td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <button data-fleet-control
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditDriver(d);
-                          const dUd: any = d.user_details || {};
-                          setEditForm({
-                            first_name: d.first_name || '',
-                            last_name: d.last_name || '',
-                            email: dUd.email || '',
-                            phone: dUd.phone || '',
-                            address: dUd.address || '',
-                            license_number: d.license_number || '',
-                            license_expiry: d.license_expiry || '',
-                            medical_card_expiry: d.medical_card_expiry || '',
-                            hire_date: d.hire_date || '',
-                            status: d.status || 'ACTIVE',
-                            license_state: d.license_state || 'GP',
-                            emergency_contact: d.emergency_contact || d.emergency_phone || '',
-                            vehicle: vehicles.find(v => v.driver_id === d.id)?.id?.toString() ?? '',
-                          });
-                        }}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
-                      >Edit</button>
-                      <button data-fleet-control
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmOpts({
-                            title: 'Delete driver',
-                            message: `Remove ${getDriverName(d)} from your team? This cannot be undone.`,
-                            confirmLabel: 'Delete',
-                            danger: true,
-                            onConfirm: async () => {
-                              try {
-                                await deleteData({ url: `api/v1/drivers/${d.id}/` });
-                                toast.success('Driver deleted');
-                                refetch();
-                              } catch (err: any) {
-                                toast.error(err?.message || 'Failed to delete driver');
-                              }
-                            },
-                          });
-                        }}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
-                      >Delete</button>
-                    </div>
+                  <td className="is-numeric fleet-col-phone">
+                    {d.total_trips ?? 0}
+                  </td>
+                  {hasRevenue && (
+                    <td className="is-numeric" style={{ color: revenue ? 'var(--text-primary)' : undefined }}>
+                      {revenue ? formatZAR(revenue) : '—'}
+                    </td>
+                  )}
+                  {hasEfficiency && (
+                    <td className="is-numeric fleet-col-opt2">{efficiencyScore > 0 ? efficiencyScore : '—'}</td>
+                  )}
+                  <td className="fleet-table__actions">
+                    <RowActions
+                      label={getDriverName(d)}
+                      items={[
+                        {
+                          label: 'Edit',
+                          disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined,
+                          onSelect: () => {
+                            openEdit(d);
+                          },
+                        },
+                        {
+                          label: 'Delete',
+                          danger: true,
+                          disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined,
+                          onSelect: () => {
+                            setConfirmOpts({
+                              title: 'Delete driver',
+                              message: `Remove ${getDriverName(d)} from your team? This cannot be undone.`,
+                              confirmLabel: 'Delete',
+                              danger: true,
+                              onConfirm: async () => {
+                                try {
+                                  await deleteData({ url: `api/v1/drivers/${d.id}/` });
+                                  toast.success('Driver deleted');
+                                  refetch();
+                                } catch (err: any) {
+                                  toast.error(err?.message || 'Failed to delete driver');
+                                }
+                              },
+                            });
+                          },
+                        },
+                      ]}
+                    />
                   </td>
                 </tr>
               );
@@ -469,28 +527,29 @@ export default function Drivers() {
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Add Driver Slide-out */}
       {showAddForm && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setShowAddForm(false)} />
-          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+          <div role="dialog" aria-modal="true" aria-label="Add driver" style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Add Driver</div>
+              <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Add driver</h2>
               <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {/* Required fields first (Name through License Province), optional
                 fields (Phone, Email, Status) after. */}
             {[
-              { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan', required: true },
-              { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter', required: true },
-              { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001', required: true },
-              { key: 'license_expiry', label: 'License Expiry', type: 'date', required: true },
-              { key: 'hire_date', label: 'Hire Date', type: 'date', required: true },
+              { key: 'first_name', label: 'First name', placeholder: 'e.g. Riaan', required: true },
+              { key: 'last_name', label: 'Last name', placeholder: 'e.g. Venter', required: true },
+              { key: 'license_number', label: 'Licence number', placeholder: 'e.g. DRV-2024-001', required: true },
+              { key: 'license_expiry', label: 'Licence expiry', type: 'date', required: true },
+              { key: 'hire_date', label: 'Hire date', type: 'date', required: true },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text)' }}> *</span>}
                 </label>
                 {f.type === 'date' ? (
                   <DatePicker
@@ -503,17 +562,17 @@ export default function Drivers() {
                     placeholder={f.placeholder}
                     value={(addForm as any)[f.key]}
                     onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 'var(--radius-control, 8px)', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
                   />
                 )}
               </div>
             ))}
             {[
-              { key: 'license_state', label: 'License Province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'], required: true },
+              { key: 'license_state', label: 'Licence province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'], required: true },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text)' }}> *</span>}
                 </label>
                 <Select value={(addForm as any)[f.key]} onValueChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}>
                   <SelectTrigger>
@@ -530,7 +589,7 @@ export default function Drivers() {
               { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
                   {f.label}
                 </label>
                 <input
@@ -538,7 +597,7 @@ export default function Drivers() {
                   placeholder={f.placeholder}
                   value={(addForm as any)[f.key]}
                   onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 'var(--radius-control, 8px)', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
                 />
               </div>
             ))}
@@ -546,7 +605,7 @@ export default function Drivers() {
               { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
                   {f.label}
                 </label>
                 <Select value={(addForm as any)[f.key]} onValueChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}>
@@ -593,19 +652,19 @@ export default function Drivers() {
                       status: addForm.status,
                     }});
                     setShowAddForm(false);
-                    setAddForm({ first_name: '', last_name: '', email: '', phone: '', license_number: '', license_expiry: '', license_state: 'GP', hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE' });
+                    setAddForm({ first_name: '', last_name: '', email: '', phone: '', license_number: '', license_expiry: '', license_state: 'GP', hire_date: localDateISO(), status: 'ACTIVE' });
                     // Refresh
                     refetch();
                   } catch (e: any) { toast.error(e?.message || 'Failed to create driver'); }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : canCreate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canCreate ? 1 : 0.5 }}
+                style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: 'var(--radius-control, 8px)', cursor: saving ? 'wait' : canCreate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canCreate ? 1 : 0.5 }}
               >
                 {saving ? 'Saving…' : 'Create driver'}
               </button>
               <button
                 onClick={() => setShowAddForm(false)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+                style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-control, 8px)', cursor: 'pointer' }}
               >
                 Cancel
               </button>
@@ -620,28 +679,28 @@ export default function Drivers() {
       {editDriver && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditDriver(null)} />
-          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+          <div role="dialog" aria-modal="true" aria-label="Edit driver" style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Driver</div>
+              <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit driver</h2>
               <button onClick={() => setEditDriver(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {error && (
-              <div style={{ padding: 12, background: 'var(--status-danger)', color: 'var(--bg-deep)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
+              <div style={{ padding: 12, background: 'var(--status-danger-bg)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-control, 8px)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
                 {error}
               </div>
             )}
             {/* Required fields first (Name through Hire Date, then License
                 Province), optional fields after. */}
             {[
-              { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan', required: true },
-              { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter', required: true },
-              { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001', required: true },
-              { key: 'license_expiry', label: 'License Expiry', type: 'date', required: true },
-              { key: 'hire_date', label: 'Hire Date', type: 'date', required: true },
+              { key: 'first_name', label: 'First name', placeholder: 'e.g. Riaan', required: true },
+              { key: 'last_name', label: 'Last name', placeholder: 'e.g. Venter', required: true },
+              { key: 'license_number', label: 'Licence number', placeholder: 'e.g. DRV-2024-001', required: true },
+              { key: 'license_expiry', label: 'Licence expiry', type: 'date', required: true },
+              { key: 'hire_date', label: 'Hire date', type: 'date', required: true },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text)' }}> *</span>}
                 </label>
                 {f.type === 'date' ? (
                   <DatePicker
@@ -654,17 +713,17 @@ export default function Drivers() {
                     placeholder={f.placeholder}
                     value={(editForm as any)[f.key] ?? ''}
                     onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 'var(--radius-control, 8px)', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
                   />
                 )}
               </div>
             ))}
             {[
-              { key: 'license_state', label: 'License Province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'], required: true },
+              { key: 'license_state', label: 'Licence province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'], required: true },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text)' }}> *</span>}
                 </label>
                 <Select value={(editForm as any)[f.key]} onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}>
                   <SelectTrigger>
@@ -680,11 +739,11 @@ export default function Drivers() {
               { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
               { key: 'phone', label: 'Phone', placeholder: 'e.g. 082 123 4567' },
               { key: 'address', label: 'Address', placeholder: 'e.g. 12 Main Street, Cape Town' },
-              { key: 'medical_card_expiry', label: 'Medical Card Expiry', type: 'date' },
-              { key: 'emergency_contact', label: 'Emergency Contact', placeholder: 'e.g. Jane Doe or 082 123 4567' },
+              { key: 'medical_card_expiry', label: 'Medical card expiry', type: 'date' },
+              { key: 'emergency_contact', label: 'Emergency contact', placeholder: 'e.g. Jane Doe or 082 123 4567' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
                   {f.label}
                 </label>
                 {f.type === 'date' ? (
@@ -698,7 +757,7 @@ export default function Drivers() {
                     placeholder={f.placeholder}
                     value={(editForm as any)[f.key] ?? ''}
                     onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 'var(--radius-control, 8px)', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
                   />
                 )}
               </div>
@@ -707,7 +766,7 @@ export default function Drivers() {
               { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
                   {f.label}
                 </label>
                 <Select value={(editForm as any)[f.key]} onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}>
@@ -721,15 +780,15 @@ export default function Drivers() {
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Vehicle</label>
+              <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>Assigned vehicle</label>
               <Select value={editForm.vehicle ?? ''} onValueChange={val => setEditForm((prev: any) => ({ ...prev, vehicle: val }))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="— No vehicle assigned —" />
+                  <SelectValue placeholder="No vehicle assigned" />
                 </SelectTrigger>
                 <SelectContent>
                   {vehicles.map(v => (
                     <SelectItem key={v.id} value={String(v.id)}>
-                      {v.plate}{v.make || v.model ? ` — ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
+                      {v.plate}{v.make || v.model ? ` · ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -777,13 +836,13 @@ export default function Drivers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : canUpdate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canUpdate ? 1 : 0.5 }}
+                style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: 'var(--radius-control, 8px)', cursor: saving ? 'wait' : canUpdate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canUpdate ? 1 : 0.5 }}
               >
                 {saving ? 'Saving…' : 'Update driver'}
               </button>
               <button
                 onClick={() => setEditDriver(null)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+                style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-control, 8px)', cursor: 'pointer' }}
               >
                 Cancel
               </button>

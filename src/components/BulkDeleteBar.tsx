@@ -3,8 +3,8 @@ import { postData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 
-/** The app's secondary button: sans-serif, 14px, 6px rounded corners, 40px
- *  minimum height — matches the Heatmap/Reset buttons the rest of the pages
+/** The app's secondary button: sans-serif, 14px, the shared control corner
+ *  radius, 40px minimum height — matches the buttons the rest of the pages
  *  already use. Defined once here because the import and delete controls were
  *  each re-inventing it slightly differently, and the 0-vertical-padding
  *  version sat visibly short beside a primary button. */
@@ -17,7 +17,7 @@ export const secondaryButtonStyle: React.CSSProperties = {
   border: '1px solid var(--border-subtle)',
   color: 'var(--text-secondary)',
   padding: '8px 14px',
-  borderRadius: 6,
+  borderRadius: 'var(--radius-control)',
   minHeight: 40,
   cursor: 'pointer',
 };
@@ -64,7 +64,7 @@ export function BulkDeleteBar({ entity, selected, onClear, onDeleted }: Props) {
       if (blocked.length > 0) {
         // Name them: "3 couldn't be deleted" with no reason is the kind of
         // message that sends someone to support.
-        const shown = blocked.slice(0, 3).map(b => `${b.name} — ${b.reason}`).join('; ');
+        const shown = blocked.slice(0, 3).map(b => `${b.name} (${b.reason})`).join('; ');
         const more = blocked.length > 3 ? ` and ${blocked.length - 3} more` : '';
         toast.error(`Kept ${blocked.length}: ${shown}${more}`);
       }
@@ -80,10 +80,10 @@ export function BulkDeleteBar({ entity, selected, onClear, onDeleted }: Props) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-      padding: '10px 16px', marginBottom: 12, borderRadius: 4,
+      padding: '8px 16px', marginBottom: 16, borderRadius: 'var(--radius-card)',
       background: 'var(--bg-surface-hover)', border: '1px solid var(--border-subtle)',
     }}>
-      <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
+      <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>
         {selected.length} selected
       </span>
 
@@ -93,21 +93,20 @@ export function BulkDeleteBar({ entity, selected, onClear, onDeleted }: Props) {
             onClick={() => setConfirming(true)}
             style={{
               ...secondaryButtonStyle,
-              borderColor: 'var(--status-danger-text, var(--status-danger))',
-              color: 'var(--status-danger-text, var(--status-danger))',
+              borderColor: 'var(--status-danger-text, var(--status-danger))', color: 'var(--status-danger-text, var(--status-danger))',
             }}
           >Delete</button>
           <button
             onClick={onClear}
             style={{
               ...secondaryButtonStyle, border: 'none',
-              color: 'var(--text-tertiary)', padding: '8px 4px',
+              color: 'var(--text-secondary)', padding: '8px 4px',
             }}
           >Clear selection</button>
         </>
       ) : (
         <>
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
             Delete {selected.length} {noun}? This cannot be undone.
           </span>
           <button
@@ -115,8 +114,9 @@ export function BulkDeleteBar({ entity, selected, onClear, onDeleted }: Props) {
             disabled={busy}
             style={{
               ...secondaryButtonStyle,
-              background: 'var(--status-danger)', borderColor: 'var(--status-danger)',
-              color: '#fff', cursor: busy ? 'wait' : 'pointer', minWidth: 96,
+              // AA in both themes: deep red + light text (light), pale red + dark text (dark).
+              background: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger-text, var(--status-danger))',
+              color: 'var(--bg-deep)', cursor: busy ? 'wait' : 'pointer', minWidth: 96,
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             }}
           >{busy ? <Loader size={12} color="currentColor" /> : 'Yes, delete'}</button>
@@ -143,9 +143,10 @@ export function RowCheckbox({ checked, onChange, title }: {
       type="checkbox"
       checked={checked}
       title={title}
+      aria-label={title || 'Select row'}
       onClick={e => e.stopPropagation()}
       onChange={e => { e.stopPropagation(); onChange(e.target.checked); }}
-      style={{ width: 14, height: 14, cursor: 'pointer', accentColor: 'var(--accent-primary)' }}
+      style={{ width: 16, height: 16, margin: 0, verticalAlign: 'middle', cursor: 'pointer', accentColor: 'var(--accent-primary)' }}
     />
   );
 }

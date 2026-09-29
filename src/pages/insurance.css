@@ -1,0 +1,52 @@
+.insurance-page { font-family: var(--font-sans); }
+
+/* One compact card across the content width: what is coming, then what
+   works today. No fixed height, so it ends where its content ends. */
+.insurance-card {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+  gap: 24px 32px;
+  padding: var(--card-pad, 20px);
+  border-radius: var(--radius-card, 12px);
+  box-shadow: none;
+}
+.insurance-card__title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.insurance-card__side { padding-left: 32px; border-left: 1px solid var(--border-row, var(--border-subtle)); display: flex; flex-direction: column; align-items: flex-start; }
+.insurance-card__description {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-secondary);
+}
+.insurance-card__action { margin-top: 16px; text-decoration: none; }
+.insurance-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.insurance-list li { display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 20px; color: var(--text-primary); }
+.insurance-list b { display: block; font-weight: 500; }
+.insurance-list__text { display: block; margin-top: 2px; font-size: 13px; line-height: 20px; color: var(--text-secondary); }
+.insurance-list__icon { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-nested, 8px); background: var(--bg-deep, var(--bg-surface-hover)); color: var(--text-secondary); }
+
+@media (max-width: 1100px) {
+  .insurance-list { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .insurance-list li { flex-direction: row; align-items: flex-start; gap: 12px; }
+}
+@media (max-width: 720px) {
+  .insurance-card { grid-template-columns: minmax(0, 1fr); }
+  .insurance-card__side { padding: 20px 0 0; border-left: 0; border-top: 1px solid var(--border-row, var(--border-subtle)); }
+}
+@media (max-width: 520px) {
+  .insurance-card { padding: 16px; }
+  .insurance-card__action { min-height: 44px; display: inline-flex; align-items: center; }
+}

@@ -1,4 +1,6 @@
 import '@/pages/table-heading-roles.css';
+import { formatDistance } from '@/lib/formatters';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import '@/pages/settings/settings-brand.css';
 import { useState, useEffect } from "react";
 import { fetchData, deleteData } from "@/lib/Api";
@@ -9,6 +11,9 @@ import { EditVehicleDrawer } from "@/components/EditVehicleDrawer";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
+import RowActions from "@/components/ui/RowActions";
+import { settingsCardStyle, settingsCardTitleStyle, settingsInputStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
+import { StatusChip } from '@/components/ui/StatusChip';
 
 interface Vehicle {
   id: number;
@@ -34,10 +39,10 @@ interface Vehicle {
 
 const STATUS_COLOR: Record<string, string> = {
   AVAILABLE: 'var(--accent-primary)',
-  MAINTENANCE: 'var(--status-warning)',
+  MAINTENANCE: 'var(--status-warning-text)',
   IN_USE: 'var(--accent-primary)',
   IN_TRANSIT: 'var(--accent-primary)',
-  OUT_OF_SERVICE: 'var(--status-danger)',
+  OUT_OF_SERVICE: 'var(--status-danger-text)',
 };
 
 // Presentation-only labels for known status payload values — unknown strings
@@ -54,18 +59,8 @@ const statusLabel = (s: string) =>
 const statusColor = (s: string) =>
   Object.prototype.hasOwnProperty.call(STATUS_COLOR, s) ? STATUS_COLOR[s] : 'var(--text-secondary)';
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 8,
-};
+const sectionStyle: React.CSSProperties = { ...settingsCardStyle, marginBottom: 0 };
 
-const rowActionStyle: React.CSSProperties = {
-  background: 'none', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-secondary)', padding: '8px 12px',
-  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-  borderRadius: 6, minHeight: 40,
-};
 
 export function VehiclesDirectory() {
   const { user: authUser } = useAuth();
@@ -106,33 +101,25 @@ export function VehiclesDirectory() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Vehicles</h2>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Fleet vehicle directory</div>
-      </div>
+    <div className="settings-wide" style={{ minWidth: 0 }}>
+      <SettingsPageHeader title="Vehicles" description="Fleet vehicle directory" />
 
       <div style={sectionStyle}>
         <div style={{
-          padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)',
+          padding: '12px var(--card-pad, 20px)', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)', gap: 12, flexWrap: 'wrap',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-            Vehicles ({vehicles.length})
-          </span>
-          <div style={{ display: 'flex', gap: 12 }}>
+          <h2 style={settingsCardTitleStyle}>
+            Vehicles <span style={{ fontWeight: 400, color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>({vehicles.length})</span>
+          </h2>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <input
               className="settings-control"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search…"
               aria-label="Search vehicles"
-              style={{
-                background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)',
-                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px',
-                minHeight: 40, width: 180,
-              }}
+              style={{ ...settingsInputStyle, width: 180, maxWidth: '100%' }}
             />
             <button
               className="settings-control"
@@ -142,7 +129,7 @@ export function VehiclesDirectory() {
               style={{
                 ...secondaryButtonStyle,
                 fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-                letterSpacing: 'normal', borderRadius: 6, minHeight: 40, padding: '8px 12px',
+                letterSpacing: 'normal', borderRadius: 'var(--radius-control)', minHeight: 40, padding: '8px 12px',
                 cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
               }}
             >Import</button>
@@ -151,7 +138,7 @@ export function VehiclesDirectory() {
               onClick={() => setShowAddDrawer(true)}
               disabled={isDemo}
               title={isDemo ? 'Not available in the demo' : undefined}
-              style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+              style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
             >Add vehicle</button>
           </div>
         </div>
@@ -164,13 +151,13 @@ export function VehiclesDirectory() {
         />
 
         {loading ? (
-          <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
+          <TableSkeleton rows={6} cols={4} label="Loading vehicles" />
         ) : (
           <div className="settings-scroll-region" role="region" aria-label="Vehicles" tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+          <table className="table-heading-roles settings-table settings-table--pin-actions">
             <thead>
               <tr>
-                <th style={{ padding: '10px 0 10px 16px', width: 32, borderBottom: '1px solid var(--border-subtle)' }}>
+                <th style={{ width: 32, }}>
                   {filtered.length > 0 && (
                     <RowCheckbox
                       title="Select everything shown"
@@ -180,10 +167,7 @@ export function VehiclesDirectory() {
                   )}
                 </th>
                 {['Plate', 'Make and model', 'Type', 'Status', 'Driver', 'Last service', ''].map(h => (
-                  <th key={h} style={{
-                    padding: '10px 20px', textAlign: 'left' as const,
-                    borderBottom: '1px solid var(--border-subtle)',
-                  }}>{h}</th>
+                  <th key={h || 'actions'} scope="col" style={{ textAlign: (h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
@@ -192,16 +176,16 @@ export function VehiclesDirectory() {
                 <tr><td colSpan={8} style={{ textAlign: 'center' as const, padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No vehicles found</td></tr>
               ) : filtered.map((v, i) => (
                 <tr key={v.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                  <td style={{ padding: '12px 0 12px 16px', width: 32 }}>
+                  <td style={{ width: 32 }}>
                     <RowCheckbox checked={selected.includes(v.id)} onChange={on => toggleOne(v.id, on)} />
                   </td>
-                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', fontWeight: 400, color: 'var(--text-primary)' }}>
+                  <td style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 14, lineHeight: '20px', fontWeight: 400, color: 'var(--text-primary)' }}>
                     {v.plate || '—'}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                  <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {[v.make, v.model].filter(Boolean).join(' ') || '—'}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                  <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {v.vehicle_type_name || v.vehicle_type || '—'}
                     {v.vehicle_type_capacity != null && (
                       <span style={{ marginLeft: 6, color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums' }}>
@@ -209,54 +193,35 @@ export function VehiclesDirectory() {
                       </span>
                     )}
                   </td>
-                  <td style={{ padding: '12px 20px' }}>
-                    <span style={{
-                      fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-                      color: statusColor(v.status),
-                    }}>{statusLabel(v.status)}</span>
+                  <td>
+                    <StatusChip status={v.status} label={statusLabel(v.status)} size="sm" />
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                  <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {v.driver_name || '—'}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+                  <td style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
                     {(() => {
                       if (v.service_interval_km && v.last_service_mileage && v.mileage) {
                         const nextAt = parseFloat(String(v.last_service_mileage)) + Number(v.service_interval_km);
                         const remaining = nextAt - parseFloat(String(v.mileage));
                         return remaining > 0
-                          ? `${Math.round(remaining).toLocaleString('en-ZA')} km left`
+                          ? `${formatDistance(remaining)} left`
                           : 'Overdue';
                       }
                       if (v.last_service_mileage) {
-                        return `At ${parseFloat(String(v.last_service_mileage)).toLocaleString('en-ZA')} km`;
+                        return `At ${formatDistance(parseFloat(String(v.last_service_mileage)))}`;
                       }
                       return v.last_maintenance_date || '—';
                     })()}
                   </td>
-                  <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <button
-                        className="settings-control"
-                        onClick={() => setEditVehicle(v)}
-                        disabled={isDemo}
-                        title={isDemo ? 'Not available in the demo' : undefined}
-                        style={{
-                          ...rowActionStyle,
-                          cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                        }}
-                      >Edit</button>
-                      <button
-                        className="settings-control"
-                        onClick={() => setDeleteTarget({ id: v.id, name: v.plate || `Vehicle ${v.id}` })}
-                        disabled={isDemo}
-                        title={isDemo ? 'Not available in the demo' : undefined}
-                        style={{
-                          ...rowActionStyle,
-                          border: '1px solid var(--status-danger)', color: 'var(--status-danger)',
-                          cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                        }}
-                      >Delete</button>
-                    </div>
+                  <td style={{ textAlign: 'right' as const }}>
+                    <RowActions
+                      label={v.plate || `Vehicle ${v.id}`}
+                      items={[
+                        { label: 'Edit', onSelect: () => setEditVehicle(v), disabled: isDemo },
+                        { label: 'Delete', danger: true, onSelect: () => setDeleteTarget({ id: v.id, name: v.plate || `Vehicle ${v.id}` }), disabled: isDemo },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

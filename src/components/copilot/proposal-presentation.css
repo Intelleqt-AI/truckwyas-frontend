@@ -1,53 +1,46 @@
-/* Embedded proposal preview: retain its fields/actions and adopt desktop roles only.
-   Below 768px the --cpp-* variables are unset so the inline fallbacks reproduce the
-   previous presentation exactly. */
-@media (min-width: 768px) {
-  .copilot-proposal {
-    --cpp-chip-display: inline-flex;
-    --cpp-font: var(--font-sans);
-    --cpp-body-size: 14px;
-    --cpp-support-size: 13px;
-    --cpp-section-size: 16px;
-    --cpp-section-line: 24px;
-    --cpp-line: 20px;
-    --cpp-tracking: normal;
-    --cpp-case: none;
-    --cpp-label-weight: 500;
-    --cpp-card-radius: 8px;
-    --cpp-card-inset: 24px;
-    --cpp-badge-inset: 4px 8px;
-    --cpp-badge-radius: 4px;
-    --cpp-space: 12px;
-    --cpp-error-gap: 6px;
-    --cpp-callout-inset: 12px;
-    --cpp-label-inset: 8px 16px 8px 0;
-    --cpp-value-inset: 8px 0;
-    --cpp-change-gap: 0 8px;
-    --cpp-label-wrap: normal;
-    --cpp-on-accent: var(--btn-action-color);
-    --cpp-success: var(--status-success-text, var(--status-success));
-    --cpp-warning: var(--status-warning-text, var(--status-warning));
-    --cpp-danger: var(--status-danger-text, var(--status-danger));
-    font: 400 14px/20px var(--font-sans);
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-  .copilot-proposal .copilot-proposal-title {
-    min-width: 0;
-    font: 600 16px/24px var(--font-sans);
-    letter-spacing: normal;
-    text-transform: none;
-  }
-  .copilot-proposal .btn-action {
-    min-height: 40px;
-    border-radius: 6px;
-    padding: 8px 16px;
-    font: 500 14px/20px var(--font-sans);
-    letter-spacing: normal;
-    text-transform: none;
-  }
-  .copilot-proposal .btn-action:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 3px;
-  }
+/* AI-drafted change (proposal) inside a Copilot answer: a nested card on the
+   v3 tokens. Pending proposals get a slightly stronger edge, never an accent. */
+.copilot-proposal {
+  width: 100%;
+  min-width: 0;
+  padding: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  font: 400 14px/20px var(--font-sans);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.copilot-proposal.is-pending { border-color: var(--border-default); }
+.copilot-proposal__head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.copilot-proposal-title { font: 600 var(--text-subhead)/22px var(--font-sans); color: var(--text-primary); }
+.copilot-proposal__warning {
+  margin-bottom: 12px; padding: 8px 12px;
+  font: 400 13px/20px var(--font-sans);
+  color: var(--status-warning-text);
+  background: var(--status-warning-bg);
+  border-radius: var(--radius-nested);
+}
+.copilot-proposal__analysis {
+  margin-bottom: 12px; padding: 12px;
+  font: 400 13px/20px var(--font-sans);
+  color: var(--text-secondary);
+  background: var(--bg-raised);
+  border-radius: var(--radius-nested);
+}
+.copilot-proposal__label { margin-bottom: 4px; font: 500 var(--text-label)/16px var(--font-sans); color: var(--text-tertiary); }
+.copilot-proposal__fields { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+.copilot-proposal__fields th,
+.copilot-proposal__fields td { padding: 8px 0; border-top: 1px solid var(--border-row); vertical-align: top; text-align: left; }
+.copilot-proposal__fields tr:first-child th,
+.copilot-proposal__fields tr:first-child td { border-top: 0; }
+.copilot-proposal__fields th { width: 1%; min-width: 96px; padding-right: 16px; font: 500 13px/20px var(--font-sans); color: var(--text-tertiary); }
+.copilot-proposal__fields td { font: 400 14px/20px var(--font-sans); color: var(--text-primary); white-space: pre-wrap; }
+.copilot-proposal__old { text-decoration: line-through; color: var(--text-tertiary); }
+.copilot-proposal__arrow { margin: 0 8px; color: var(--text-tertiary); }
+.copilot-proposal__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.copilot-proposal__status { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.copilot-proposal__error { margin-top: 8px; font: 400 13px/20px var(--font-sans); color: var(--status-danger-text); }
+@media (max-width: 768px) {
+  .copilot-proposal__fields th { min-width: 80px; }
 }

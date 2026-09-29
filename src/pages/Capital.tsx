@@ -1,31 +1,31 @@
 import './capital-typography.css';
+import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import './table-heading-roles.css';
+import './finance-brand.css';
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/formatters";
 import { fetchData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { LiveBadge } from "@/components/LiveBadge";
-import { Loader } from "@/components/Loader";
+import SectionHeader from "@/components/layout/SectionHeader";
+import CapitalPrelaunch from "@/components/capital/CapitalPrelaunch";
 
-const RISK_BAND_COLOR: Record<string, string> = {
-  LOW: "var(--status-success)",
-  MEDIUM: "var(--status-warning)",
-  HIGH: "var(--status-danger)",
-  CRITICAL: "var(--status-danger)",
-  NEW: "var(--text-tertiary)",
+const RISK_BAND_TONE: Record<string, string> = {
+  LOW: "success",
+  MEDIUM: "warning",
+  HIGH: "danger",
+  CRITICAL: "danger",
+  NEW: "neutral",
 };
 
-const MC_URL =
-  "https://getstarted.merchantcapital.co.za?actiontype=C_C&channel=Part_Trad&who=IA_SP";
-
-
-const MC_STORAGE_KEY = "mc_applied_invoice_ids";
+// External Fast Pay application link. The applied-state key is unchanged so
+// invoices already marked "Applied" stay marked.
+const FAST_PAY_STORAGE_KEY = "mc_applied_invoice_ids";
 
 function loadAppliedIds(): Set<string> {
   try {
-    return new Set(JSON.parse(localStorage.getItem(MC_STORAGE_KEY) || "[]"));
+    return new Set(JSON.parse(localStorage.getItem(FAST_PAY_STORAGE_KEY) || "[]"));
   } catch {
     return new Set();
   }
@@ -33,11 +33,20 @@ function loadAppliedIds(): Set<string> {
 
 function saveAppliedId(id: string, current: Set<string>): Set<string> {
   const next = new Set(current).add(id);
-  localStorage.setItem(MC_STORAGE_KEY, JSON.stringify([...next]));
+  localStorage.setItem(FAST_PAY_STORAGE_KEY, JSON.stringify([...next]));
   return next;
 }
 
+/**
+ * Fast Pay has no funding partner yet (CAPITAL_LAUNCHED = false), so the page
+ * renders the pre-launch view: no facility, limit or availability is shown.
+ * Launching is the one-line flag flip; the launched view below is unchanged.
+ */
 export default function Capital() {
+  return CAPITAL_LAUNCHED ? <CapitalLaunched /> : <CapitalPrelaunch />;
+}
+
+function CapitalLaunched() {
   const navigate = useNavigate();
   const [showIneligible, setShowIneligible] = useState(false);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
@@ -58,7 +67,7 @@ export default function Capital() {
     },
   });
 
-  // Eligible invoices — shared cache with Invoices + InvoiceDetail pages
+  // Eligible invoices: shared cache with Invoices + InvoiceDetail pages
   const { data: eligibleData } = useQuery({
     queryKey: ["capital-eligible"],
     queryFn: () => fetchData("api/v1/capital/eligible/").catch(() => null),
@@ -86,401 +95,244 @@ export default function Capital() {
 
   useAutoRefresh(refetch);
 
+  // The head renders at once; only the content waits, as a skeleton.
   if (loading) {
-    return <Loader fullScreen />;
+    return (
+      <div className="capital-typography fin-page">
+        <SectionHeader
+          title="Fast Pay"
+          description="Get paid early on eligible invoices. Each advance is repaid when your customer pays."
+        />
+        <div aria-busy="true" aria-label="Loading" style={{ display: 'grid', gap: 'var(--card-gap, 16px)' }}>
+          <div style={{ height: 160, borderRadius: 'var(--radius-card)', background: 'var(--bg-surface-hover)' }} />
+          <div style={{ height: 240, borderRadius: 'var(--radius-card)', background: 'var(--bg-surface-hover)' }} />
+        </div>
+      </div>
+    );
   }
 
-  return (
-    <div className="capital-typography">
-      <div style={{ marginBottom: 24 }}>
-        <div
-          style={{
-            fontSize: 13,
-            lineHeight: "20px",
-            fontFamily: "var(--font-sans)",
-            color: "var(--text-tertiary)",
-            letterSpacing: "normal",
-            textTransform: "none",
-            marginBottom: 4,
-          }}>
-          Capital
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <h1
-            style={{
-              fontSize: 22,
-              lineHeight: "28px",
-              fontFamily: "var(--font-sans)",
-              margin: 0,
-              fontWeight: 600,
-              color: "var(--text-primary)",
-            }}>
-            Fast Pay facility
-          </h1>
-          <LiveBadge />
-        </div>
-      </div>
+  const utilTone = utilization > 90 ? "danger" : utilization > 75 ? "warning" : "";
 
-      {/* Merchant Capital partnership banner */}
-      <div
-        className="card"
-        style={{
-          padding: "16px 20px",
-          marginBottom: 24,
-          borderLeft: "3px solid var(--accent-primary)",
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 16,
-        }}>
-        <div>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--text-primary)",
-              marginBottom: 4,
-            }}>
-            Fast Pay powered by Merchant Capital
-          </div>
-          <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)" }}>
-            Get paid faster on your eligible invoices. Apply via our trusted
-            lending partner — approval in minutes.
-          </div>
-        </div>
-      </div>
+  return (
+    <div className="capital-typography fin-page">
+      <SectionHeader
+        title="Fast Pay"
+        description="Get paid early on eligible invoices. Each advance is repaid when your customer pays."
+      />
 
       {/* Facility overview */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 16,
-          marginBottom: 24,
-        }}>
+      <div className="fin-kpis">
         {[
           {
             label: "Available capital",
-            value: formatCurrency(available),
-            sub: `of ${formatCurrency(facilityLimit)} limit`,
-            color: "var(--status-success)",
+            value: facility ? formatCurrency(available) : "—",
+            sub: facility ? `of ${formatCurrency(facilityLimit)} limit` : "No facility set up",
           },
           {
             label: "In use",
-            value: formatCurrency(outstanding),
-            sub: `${utilization}% utilization`,
-            color: "var(--status-warning)",
+            value: facility ? formatCurrency(outstanding) : "—",
+            sub: facility ? `${utilization}% utilisation` : "No facility set up",
+            tone: facility && utilTone ? `fin-text-${utilTone}` : "",
           },
           {
             label: "Eligible invoices",
-            value: eligibleInvoices.length,
-            sub: "ready for fast pay",
-            color: "var(--accent-primary)",
+            value: String(eligibleInvoices.length),
+            sub: "Ready for Fast Pay",
           },
           {
             label: "Eligible value",
             value: formatCurrency(eligibleTotal),
-            sub: "total available",
-            color: "var(--text-primary)",
+            sub: "Total invoice value",
           },
         ].map((m) => (
-          <div key={m.label} className="card metric-card">
-            <div className="card-header">
-              <span className="card-title">{m.label}</span>
-            </div>
-            <div
-              className="metric-value"
-              style={{ color: m.color }}>
-              {m.value}
-            </div>
-            <div
-              style={{
-                fontSize: 13,
-                lineHeight: "20px",
-                color: "var(--text-tertiary)",
-                marginTop: 4,
-              }}>
-              {m.sub}
-            </div>
+          <div key={m.label} className="card fin-kpi">
+            <span className="fin-kpi__label">{m.label}</span>
+            <span className={`fin-kpi__value ${m.tone ?? ""}`}>{m.value}</span>
+            <span className="fin-kpi__sub">{m.sub}</span>
           </div>
         ))}
       </div>
 
-      {/* Facility utilization bar */}
-      <div className="card" style={{ padding: "14px 20px", marginBottom: 24 }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 8,
-            fontSize: 13,
-            lineHeight: "20px",
-            fontFamily: "var(--font-sans)",
-          }}>
-          <span style={{ color: "var(--text-tertiary)" }}>Facility meter</span>
-          <span
-            style={{
-              color:
-                utilization > 75
-                  ? "var(--status-warning)"
-                  : "var(--status-success)",
-            }}>
-            {utilization}% used
-          </span>
-        </div>
-        <div
-          style={{
-            background: "var(--bg-surface)",
-            borderRadius: 2,
-            height: 12,
-            width: "100%",
-            overflow: "hidden",
-            position: "relative",
-          }}>
+      {/* Facility utilisation meter */}
+      {facility && (
+        <section className="card fin-section" aria-labelledby="facility-meter">
+          <div className="fin-card-head" style={{ marginBottom: 12 }}>
+            <h2 id="facility-meter" className="fin-h2">Facility usage</h2>
+            <span className={utilTone ? `fin-text-${utilTone}` : ""} style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+              {utilization}% used
+            </span>
+          </div>
           <div
-            style={{
-              width: `${utilization}%`,
-              height: "100%",
-              background:
-                utilization > 90
-                  ? "var(--status-danger)"
-                  : utilization > 75
-                    ? "var(--status-warning)"
-                    : "var(--accent-primary)",
-              borderRadius: 2,
-              transition: "width 0.3s",
-            }}
-          />
-        </div>
-        <div
-          className="capital-facility-values"
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginTop: 8,
-            fontSize: 13,
-            lineHeight: "20px",
-            fontFamily: "var(--font-sans)",
-            color: "var(--text-tertiary)",
-          }}>
-          <div>
-            <div style={{ color: "var(--status-danger)", fontWeight: 500 }}>
-              Outstanding
-            </div>
-            <div>{formatCurrency(outstanding)}</div>
+            className="fin-meter"
+            role="meter"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={utilization}
+            aria-label="Facility used"
+            style={{ height: 12 }}>
+            <div
+              className="fin-meter__fill"
+              style={{
+                width: `${Math.min(utilization, 100)}%`,
+                background:
+                  utilization > 90
+                    ? "var(--status-danger)"
+                    : utilization > 75
+                      ? "var(--status-warning)"
+                      : "var(--accent-primary)",
+                transition: "width 0.3s",
+              }}
+            />
           </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>
-              Limit
+          <dl
+            className="capital-facility-values"
+            style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16, margin: "12px 0 0", fontSize: 13, lineHeight: "20px" }}>
+            <div>
+              <dt style={{ color: "var(--text-tertiary)" }}>Outstanding</dt>
+              <dd style={{ margin: 0, color: "var(--text-primary)", fontWeight: 500 }}>{formatCurrency(outstanding)}</dd>
             </div>
-            <div>{formatCurrency(facilityLimit)}</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ color: "var(--status-success)", fontWeight: 500 }}>
-              Available
+            <div style={{ textAlign: "center" }}>
+              <dt style={{ color: "var(--text-tertiary)" }}>Limit</dt>
+              <dd style={{ margin: 0, color: "var(--text-primary)", fontWeight: 500 }}>{formatCurrency(facilityLimit)}</dd>
             </div>
-            <div>{formatCurrency(available)}</div>
-          </div>
-        </div>
-      </div>
+            <div style={{ textAlign: "right" }}>
+              <dt style={{ color: "var(--text-tertiary)" }}>Available</dt>
+              <dd style={{ margin: 0, color: "var(--text-primary)", fontWeight: 500 }}>{formatCurrency(available)}</dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
       {/* Eligible invoices */}
-      <div className="card table-card">
-        <div className="card-header" style={{ marginBottom: 16 }}>
-          <h2 className="card-title" style={{ margin: 0 }}>Fast Pay now — eligible invoices</h2>
-          <span
-            style={{
-              fontSize: 13,
-              lineHeight: "20px",
-              color: "var(--text-tertiary)",
-              fontFamily: "var(--font-sans)",
-              fontVariantNumeric: "tabular-nums",
-            }}>
-            {eligibleInvoices.length} invoices · {formatCurrency(eligibleTotal)}{" "}
-            available
+      <section className="card fin-table-card fin-section" aria-labelledby="eligible-title">
+        <div className="fin-table-card__head">
+          <h2 id="eligible-title" className="fin-h2">Eligible invoices</h2>
+          <span className="fin-support" style={{ fontVariantNumeric: "tabular-nums" }}>
+            {eligibleInvoices.length} {eligibleInvoices.length === 1 ? "invoice" : "invoices"} · {formatCurrency(eligibleTotal)}
           </span>
         </div>
         {eligibleInvoices.length === 0 ? (
-          <div
-            style={{
-              textAlign: "center",
-              padding: "40px 0",
-              color: "var(--text-tertiary)",
-              fontSize: 13,
-            }}>
-            No eligible invoices. Complete deliveries with POD to unlock Fast
-            Pay.
+          <div className="fin-empty fin-empty--compact">
+            No eligible invoices. Complete deliveries with POD to unlock Fast Pay.
           </div>
         ) : (
-          <table className="data-table table-heading-roles">
-            <thead>
-              <tr>
-                <th>Invoice #</th>
-                <th>Customer</th>
-                <th>AI risk</th>
-                <th>Amount</th>
-                <th>Fundable</th>
-                <th className="text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {eligibleInvoices.map((inv) => {
-                const amount = Number(
-                  inv.total_amount || inv.amount || inv.invoice_amount || 0,
-                );
-                const riskPct = inv.customer_risk_pct;
-                const riskBand: string = inv.customer_risk_band || "NEW";
-                const blocked = !!inv.risk_blocked;
-                const fundable = Number(inv.fundable_amount_zar ?? amount);
-                const riskColor = RISK_BAND_COLOR[riskBand] || "var(--text-tertiary)";
-                return (
-                  <tr key={inv.id}>
-                    <td className="mono">
-                      {inv.invoice_number || inv.invoiceNumber}
-                    </td>
-                    <td>
-                      {inv.customer || inv.customer_name || inv.customerName}
-                    </td>
-                    <td>
-                      {riskPct === null || riskPct === undefined ? (
-                        <span style={{ color: "var(--text-tertiary)", fontSize: 13, lineHeight: "20px" }}>—</span>
-                      ) : (
-                        <button
-                          onClick={() => inv.customer_id && navigate(`/customers/${inv.customer_id}/risk`)}
-                          title="Open AI risk profile"
-                          style={{
-                            fontFamily: "var(--font-sans)",
-                            fontSize: 13,
-                            lineHeight: "20px",
-                            fontWeight: 700,
-                            color: riskColor,
-                            background: "none",
-                            border: `1px solid ${riskColor}`,
-                            borderRadius: 999,
-                            padding: "2px 10px",
-                            cursor: "pointer",
-                            whiteSpace: "nowrap",
-                          }}>
-                          {riskPct}%{riskBand === "NEW" ? " · New" : ""}
-                        </button>
-                      )}
-                    </td>
-                    <td className="mono capital-amount">{formatCurrency(amount)}</td>
-                    <td className="mono capital-amount" style={{ color: fundable < amount ? "var(--status-warning)" : undefined }}>
-                      {formatCurrency(fundable)}
-                    </td>
-                    <td className="text-left">
-                      {blocked ? (
-                        <span
-                          title={`Customer risk ${riskPct}% — above the 70% fast-pay limit`}
-                          style={{
-                            fontSize: 13,
-                            lineHeight: "20px",
-                            padding: "4px 12px",
-                            background: "none",
-                            color: "var(--status-danger)",
-                            border: "1px solid var(--status-danger)",
-                            borderRadius: 4,
-                            fontFamily: "var(--font-sans)",
-                            fontWeight: 500,
-                            display: "inline-block",
-                            whiteSpace: "nowrap",
-                            opacity: 0.85,
-                          }}>
-                          High risk
-                        </span>
-                      ) : (
-                        <a
-                          href={MC_URL}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn-action"
-                          onClick={() =>
-                            setAppliedIds((prev) =>
-                              saveAppliedId(String(inv.id), prev),
-                            )
-                          }
-                          style={{
-                            fontSize: 14,
-                            lineHeight: "20px",
-                            padding: "4px 12px",
-                            background: appliedIds.has(String(inv.id))
-                              ? "var(--status-success)"
-                              : "var(--accent-primary)",
-                            color: "var(--btn-action-color)",
-                            border: "none",
-                            borderRadius: 2,
-                            fontFamily: "var(--font-sans)",
-                            fontWeight: 600,
-                            textDecoration: "none",
-                            display: "inline-block",
-                            whiteSpace: "nowrap",
-                          }}>
-                          {appliedIds.has(String(inv.id)) ? "Applied ✓" : "Apply"}
-                        </a>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Ineligible invoices — collapsible */}
-      {ineligibleInvoices.length > 0 && (
-        <div className="card table-card" style={{ marginTop: 16 }}>
-          <div
-            className="card-header"
-            style={{ marginBottom: showIneligible ? 16 : 0, cursor: "pointer" }}
-            onClick={() => setShowIneligible((v) => !v)}>
-            <h2 className="card-title" style={{ margin: 0 }}>
-              Not eligible ({ineligibleInvoices.length})
-            </h2>
-            <span
-              style={{
-                fontSize: 13,
-                lineHeight: "20px",
-                color: "var(--text-tertiary)",
-                fontFamily: "var(--font-sans)",
-                userSelect: "none",
-              }}>
-              {showIneligible ? "▲ Hide" : "▼ Show reasons"}
-            </span>
-          </div>
-          {showIneligible && (
-            <table className="data-table table-heading-roles">
+          <div className="fin-table-scroll">
+            <table className="fin-table table-heading-roles">
               <thead>
                 <tr>
                   <th>Invoice #</th>
                   <th>Customer</th>
-                  <th>Amount</th>
-                  <th>Reason</th>
+                  <th>AI risk</th>
+                  <th className="num">Amount</th>
+                  <th className="num">Fundable</th>
+                  <th className="actions">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {ineligibleInvoices.map((inv) => (
-                  <tr key={inv.id}>
-                    <td className="mono">{inv.invoice_number}</td>
-                    <td>{inv.customer}</td>
-                    <td className="mono capital-amount">{formatCurrency(inv.amount)}</td>
-                    <td
-                      style={{
-                        color: "var(--status-danger)",
-                        fontFamily: "var(--font-sans)",
-                        fontSize: 13,
-                        lineHeight: "20px",
-                      }}>
-                      {inv.reason}
-                    </td>
-                  </tr>
-                ))}
+                {eligibleInvoices.map((inv) => {
+                  const amount = Number(
+                    inv.total_amount || inv.amount || inv.invoice_amount || 0,
+                  );
+                  const riskPct = inv.customer_risk_pct;
+                  const riskBand: string = inv.customer_risk_band || "NEW";
+                  const blocked = !!inv.risk_blocked;
+                  const fundable = Number(inv.fundable_amount_zar ?? amount);
+                  const riskTone = RISK_BAND_TONE[riskBand] || "neutral";
+                  const applied = appliedIds.has(String(inv.id));
+                  return (
+                    <tr key={inv.id}>
+                      <td>
+                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>{inv.invoice_number || inv.invoiceNumber}</span>
+                      </td>
+                      <td className="fin-strong">
+                        {inv.customer || inv.customer_name || inv.customerName}
+                      </td>
+                      <td>
+                        {riskPct === null || riskPct === undefined ? (
+                          <span className="fin-text-muted">—</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className={`fin-chip fin-chip--outline${riskTone === "neutral" ? "" : ` fin-chip--${riskTone}`}`}
+                            onClick={() => inv.customer_id && navigate(`/customers/${inv.customer_id}/risk`)}
+                            title="Open AI risk profile"
+                            style={{ fontVariantNumeric: "tabular-nums" }}>
+                            {riskPct}%{riskBand === "NEW" ? " · New" : ""}
+                          </button>
+                        )}
+                      </td>
+                      <td className="num capital-amount">{formatCurrency(amount)}</td>
+                      <td className={`num capital-amount ${fundable < amount ? "fin-text-warning" : ""}`}>
+                        {formatCurrency(fundable)}
+                      </td>
+                      <td className="actions">
+                        {blocked ? (
+                          <span
+                            className="fin-chip fin-chip--danger"
+                            title={`Customer risk ${riskPct}%, above the 70% Fast Pay limit`}>
+                            High risk
+                          </span>
+                        ) : applied ? (
+                          <span className="fin-chip fin-chip--success" title="Your earlier application is on record">Applied</span>
+                        ) : (
+                          <button type="button" className="btn-action fin-btn-secondary"
+                            disabled={!CAPITAL_LAUNCHED} title={CAPITAL_LAUNCHED ? undefined : CAPITAL_COMING_SOON}>
+                            {CAPITAL_LAUNCHED ? "Apply" : "Coming soon"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
+          </div>
+        )}
+      </section>
+
+      {/* Ineligible invoices, collapsible */}
+      {ineligibleInvoices.length > 0 && (
+        <section className="card fin-table-card" aria-labelledby="ineligible-title">
+          <div className="fin-table-card__head" style={{ paddingBottom: showIneligible ? 12 : 20 }}>
+            <h2 id="ineligible-title" className="fin-h2" style={{ color: "var(--text-secondary)" }}>
+              Not eligible ({ineligibleInvoices.length})
+            </h2>
+            <button
+              type="button"
+              className="btn-action fin-btn-secondary"
+              aria-expanded={showIneligible}
+              aria-controls="ineligible-table"
+              onClick={() => setShowIneligible((v) => !v)}>
+              {showIneligible ? "Hide reasons" : "Show reasons"}
+            </button>
+          </div>
+          {showIneligible && (
+            <div className="fin-table-scroll" id="ineligible-table">
+              <table className="fin-table table-heading-roles">
+                <thead>
+                  <tr>
+                    <th>Invoice #</th>
+                    <th>Customer</th>
+                    <th className="num">Amount</th>
+                    <th>Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ineligibleInvoices.map((inv) => (
+                    <tr key={inv.id}>
+                      <td>
+                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>{inv.invoice_number}</span>
+                      </td>
+                      <td className="fin-strong">{inv.customer}</td>
+                      <td className="num capital-amount">{formatCurrency(inv.amount)}</td>
+                      <td>{inv.reason}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-        </div>
+        </section>
       )}
     </div>
   );

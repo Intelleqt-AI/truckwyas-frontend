@@ -1,37 +1,29 @@
-/* Shared confirmation presentation. Existing action/cancellation handlers are unchanged. */
-@media (min-width: 768px) {
-  .os-app-shell .dashboard-confirm-dialog {
-    --confirm-radius: 12px; --confirm-padding: 24px;
-    --confirm-title-size: 16px; --confirm-title-gap: 12px;
-    --confirm-body-size: 14px; --confirm-body-line: 20px;
-    --confirm-actions-gap: 12px;
-    --confirm-button-padding: 8px 16px; --confirm-button-radius: 6px;
-    --confirm-button-size: 14px; --confirm-button-font: var(--font-sans);
-    --confirm-button-tracking: normal; --confirm-button-weight: 500;
-    --confirm-on-accent: var(--btn-action-color);
-    --confirm-control-border: #68717D;
-    --confirm-danger-surface: #321919; --confirm-danger-text: #FCA5A5;
-    max-height: calc(100dvh - 48px); overflow-y: auto;
-    font: 400 14px/20px var(--font-sans);
-  }
-  [data-theme="light"] .os-app-shell:not([data-theme]) .dashboard-confirm-dialog,
-  .os-app-shell[data-theme="light"] .dashboard-confirm-dialog {
-    --confirm-control-border: #6B7280;
-    --confirm-danger-surface: #FEF2F2; --confirm-danger-text: #B91C1C;
-  }
-  .os-app-shell .dashboard-confirm-title { font: 600 16px/24px var(--font-sans); letter-spacing: normal; }
-  .os-app-shell .dashboard-confirm-message { font-weight: 400; overflow-wrap: anywhere; }
-  .os-app-shell .dashboard-confirm-actions { flex-wrap: wrap; }
-  .os-app-shell .dashboard-confirm-button {
-    min-height: 40px; font: 500 14px/20px var(--font-sans); text-transform: none;
-    display: inline-flex; align-items: center; justify-content: center;
-  }
-  .os-app-shell .dashboard-confirm-primary {
-    min-width: 96px;
-    border-radius: var(--confirm-button-radius, 6px);
-    font-weight: var(--confirm-button-weight, 500);
-    letter-spacing: var(--confirm-button-tracking, normal);
-  }
-  .os-app-shell .dashboard-confirm-button[data-danger] { box-shadow: inset 0 0 0 1px var(--confirm-danger-text); }
-  .os-app-shell .dashboard-confirm-button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+/* Shared confirmation presentation (design principles v2: 16px dialog radius,
+   24px padding, one border and no shadow, 40px sans controls). Geometry lives
+   inline in ConfirmModal.tsx; this file holds the theme-dependent danger
+   colours, hover tints and focus rings. Action handlers are unchanged. */
+.dashboard-confirm-dialog {
+  --confirm-danger-surface: #321919;
+  --confirm-danger-text: #FCA5A5;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  font: 400 14px/20px var(--font-sans);
+}
+[data-theme="light"] .dashboard-confirm-dialog {
+  --confirm-danger-surface: #FEF2F2;
+  --confirm-danger-text: #B91C1C;
+}
+.dashboard-confirm-message { overflow-wrap: anywhere; }
+.dashboard-confirm-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  text-transform: none; letter-spacing: normal;
+  transition: background-color 0.15s, opacity 0.15s;
+}
+.dashboard-confirm-button:not(.dashboard-confirm-primary):hover { background: var(--surface-tint-hover) !important; }
+.dashboard-confirm-primary:hover { opacity: 0.9; }
+.dashboard-confirm-button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+/* Touch and phones (R7): both actions are 44px targets. The height is a
+   variable because the geometry is inline in ConfirmModal.tsx. */
+@media (max-width: 767px), (pointer: coarse) {
+  .dashboard-confirm-dialog { --confirm-btn-h: 44px; }
 }

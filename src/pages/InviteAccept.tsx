@@ -1,3 +1,4 @@
+import "./auth-brand.css";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchData, postData } from "@/lib/Api";
@@ -69,7 +70,7 @@ export function InviteAccept() {
       localStorage.setItem('token', result.token);
       localStorage.setItem('user', JSON.stringify(result.user));
 
-      toast.success('Welcome to Truckwys!');
+      toast.success('Welcome to TruckWys!');
       navigate('/');
     } catch (err: any) {
       toast.error(err?.message || 'Failed to accept invite');
@@ -85,108 +86,112 @@ export function InviteAccept() {
       alignItems: 'center',
       justifyContent: 'center',
       background: 'var(--bg-deep)',
-      padding: 20,
+      padding: 16,
+      boxSizing: 'border-box',
     }}>
       <div style={{
         width: '100%',
         maxWidth: 440,
         background: 'var(--bg-surface)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--card-radius)',
-        padding: 40,
+        borderRadius: 'var(--radius-card)',
+        padding: 24,
+        boxSizing: 'border-box',
       }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 40 }}>
-            <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Loading invite...</div>
+          <div style={{ textAlign: 'center', padding: 24 }}>
+            <div role="status" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>Loading invite…</div>
           </div>
         ) : error ? (
           <>
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+              <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
                 Invalid invite
-              </div>
-              <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              </h1>
+              <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: '20px' }}>
                 {error}
               </div>
             </div>
             <button
               onClick={() => navigate('/login')}
               className="btn-action"
-              style={{ width: '100%' }}
+              style={{ width: '100%', borderRadius: 'var(--radius-control)' }}
             >
               Go to login
             </button>
           </>
         ) : (
           <>
-            <div style={{ textAlign: 'center', marginBottom: 28 }}>
-              <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
                 Join {inviteDetails?.company_name}
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+              </h1>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 16 }}>
                 <strong style={{ color: 'var(--text-primary)' }}>{inviteDetails?.inviter_name}</strong> has invited you to join their team
               </div>
               {inviteDetails?.role && (
                 <span style={{
                   display: 'inline-block',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 10,
-                  textTransform: 'uppercase' as const,
-                  letterSpacing: '0.08em',
-                  padding: '4px 10px',
-                  border: '1px solid var(--accent-primary)',
-                  color: 'var(--accent-primary)',
-                  borderRadius: 2,
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 13,
+                  lineHeight: '20px',
+                  fontWeight: 500,
+                  padding: '2px 8px',
+                  border: '1px solid currentColor',
+                  color: 'var(--text-primary)',
+                  borderRadius: 'var(--radius-chip)',
                 }}>
-                  {inviteDetails.role} Role
+                  {/* Presentation only — the role enum is shown in sentence case. */}
+                  {inviteDetails.role.charAt(0).toUpperCase() + inviteDetails.role.slice(1).toLowerCase()} role
                 </span>
               )}
             </div>
 
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: 16 }}>
-                <label style={{
+                <label htmlFor="invite-email" style={{
                   display: 'block',
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
-                  textTransform: 'uppercase' as const,
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-tertiary)',
-                  marginBottom: 8,
+                  fontSize: 13,
+                  lineHeight: '20px',
+                  fontWeight: 500,
+                  fontFamily: 'var(--font-sans)',
+                  color: 'var(--text-primary)',
+                  marginBottom: 6,
                 }}>
                   Email
                 </label>
-                <input
+                <input id="invite-email" className="tw-auth-control"
                   type="email"
                   value={inviteDetails?.email || ''}
                   disabled
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
+                    padding: '8px 12px',
+                    minHeight: 40,
+                    boxSizing: 'border-box',
                     background: 'var(--bg-deep)',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: 2,
+                    borderRadius: 'var(--radius-control)',
                     color: 'var(--text-tertiary)',
-                    fontSize: 13,
-                    outline: 'none',
+                    fontSize: 14,
+                    lineHeight: '20px',
                   }}
                 />
               </div>
 
               <div style={{ marginBottom: 16 }}>
-                <label style={{
+                <label htmlFor="invite-full-name" style={{
                   display: 'block',
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
-                  textTransform: 'uppercase' as const,
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-tertiary)',
-                  marginBottom: 8,
+                  fontSize: 13,
+                  lineHeight: '20px',
+                  fontWeight: 500,
+                  fontFamily: 'var(--font-sans)',
+                  color: 'var(--text-primary)',
+                  marginBottom: 6,
                 }}>
-                  Full Name
+                  Full name
                 </label>
-                <input
+                <input className="tw-auth-control" id="invite-full-name"
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -194,73 +199,79 @@ export function InviteAccept() {
                   autoFocus
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
+                    padding: '8px 12px',
+                    minHeight: 40,
+                    boxSizing: 'border-box',
                     background: 'var(--input-bg)',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: 2,
+                    borderRadius: 'var(--radius-control)',
                     color: 'var(--text-primary)',
-                    fontSize: 13,
-                    outline: 'none',
+                    fontSize: 14,
+                    lineHeight: '20px',
                   }}
                 />
               </div>
 
               <div style={{ marginBottom: 16 }}>
-                <label style={{
+                <label htmlFor="invite-password" style={{
                   display: 'block',
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
-                  textTransform: 'uppercase' as const,
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-tertiary)',
-                  marginBottom: 8,
+                  fontSize: 13,
+                  lineHeight: '20px',
+                  fontWeight: 500,
+                  fontFamily: 'var(--font-sans)',
+                  color: 'var(--text-primary)',
+                  marginBottom: 6,
                 }}>
                   Password
                 </label>
-                <input
+                <input className="tw-auth-control" id="invite-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Min. 8 characters"
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
+                    padding: '8px 12px',
+                    minHeight: 40,
+                    boxSizing: 'border-box',
                     background: 'var(--input-bg)',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: 2,
+                    borderRadius: 'var(--radius-control)',
                     color: 'var(--text-primary)',
-                    fontSize: 13,
-                    outline: 'none',
+                    fontSize: 14,
+                    lineHeight: '20px',
                   }}
                 />
               </div>
 
               <div style={{ marginBottom: 24 }}>
-                <label style={{
+                <label htmlFor="invite-confirm-password" style={{
                   display: 'block',
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
-                  textTransform: 'uppercase' as const,
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-tertiary)',
-                  marginBottom: 8,
+                  fontSize: 13,
+                  lineHeight: '20px',
+                  fontWeight: 500,
+                  fontFamily: 'var(--font-sans)',
+                  color: 'var(--text-primary)',
+                  marginBottom: 6,
                 }}>
-                  Confirm Password
+                  Confirm password
                 </label>
-                <input
+                <input className="tw-auth-control" id="invite-confirm-password"
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Re-enter password"
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
+                    padding: '8px 12px',
+                    minHeight: 40,
+                    boxSizing: 'border-box',
                     background: 'var(--input-bg)',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: 2,
+                    borderRadius: 'var(--radius-control)',
                     color: 'var(--text-primary)',
-                    fontSize: 13,
-                    outline: 'none',
+                    fontSize: 14,
+                    lineHeight: '20px',
                   }}
                 />
               </div>
@@ -269,15 +280,15 @@ export function InviteAccept() {
                 type="submit"
                 disabled={submitting}
                 className="btn-action"
-                style={{ width: '100%', marginBottom: 16 }}
+                style={{ width: '100%', marginBottom: 16, borderRadius: 'var(--radius-control)' }}
               >
-                {submitting ? 'Creating account...' : 'Accept invite'}
+                {submitting ? 'Creating account…' : 'Accept invite'}
               </button>
             </form>
 
-            <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)' }}>
+            <div style={{ textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
               Already have an account?{' '}
-              <a href="/login" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>
+              <a href="/login" style={{ color: 'var(--link)', textDecoration: 'none' }}>
                 Log in
               </a>
             </div>

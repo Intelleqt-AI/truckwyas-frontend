@@ -3,22 +3,22 @@ import '@/pages/admin/admin-brand.css';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { Loader } from '@/components/Loader';
+import { formatDate } from '@/lib/formatters';
 
 // Platform-wide view of which companies have connected each third-party
 // integration — a quick "who's on Xero / CtrlFleet" for support, not a
 // per-company detail view.
 
-const cardStyle: React.CSSProperties = { padding: 24 };
+const cardStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16,
 };
-const thStyle: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)' };
+const thStyle: React.CSSProperties = { textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
-  padding: '12px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 
-const fmt = (dateStr?: string | null) =>
-  dateStr ? new Date(dateStr).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+const fmt = (dateStr?: string | null) => (dateStr ? formatDate(dateStr) : 'Not recorded');
 
 interface ConnectedCompany {
   id: string | number;
@@ -45,7 +45,7 @@ function IntegrationTable({ title, count, companies, dateKey }: {
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>No companies connected.</div>
       ) : (
         <div className="admin-scroll-region" role="region" aria-label={`${title} connected companies`} tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Company</th>
@@ -77,9 +77,18 @@ export default function IntegrationsPanel() {
     <div className="card" style={cardStyle}>
       <h2 style={sectionTitleStyle}>Integrations</h2>
       {isLoading ? (
-        <Loader size={24} />
+        // Same shape as the usual result (two integrations, one line each),
+        // so the stacked page below does not move when it arrives (R6).
+        <div aria-busy="true" aria-label="Loading integrations" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 24 }}>
+          {['Xero', 'CtrlFleet'].map(t => (
+            <div key={t}>
+              <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 8 }}>{t}</div>
+              <div style={{ height: 20, display: 'flex', alignItems: 'center' }}><span className="ops-skel" style={{ display: 'inline-block', width: '60%', height: 12 }} /></div>
+            </div>
+          ))}
+        </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 24 }}>
           <IntegrationTable
             title="Xero"
             count={data?.xero_connected_count ?? 0}

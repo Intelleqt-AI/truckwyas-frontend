@@ -39,6 +39,8 @@ const DASHBOARD_CALENDAR_CLASSES = {
 
 // Formats tried in order when parsing typed input
 const PARSE_FORMATS = ['dd/MM/yyyy', 'dd-MM-yyyy', 'yyyy-MM-dd', 'd/M/yyyy', 'dd/MM/yy']
+// A typed value is complete when it has a four-digit year.
+const COMPLETE_DATE = /^(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}-\d{1,2}-\d{1,2})$/
 
 function tryParse(raw: string): Date | null {
   for (const fmt of PARSE_FORMATS) {
@@ -73,7 +75,11 @@ export function DatePicker({ dashboard = false, id, value, onChange, placeholder
       onChange('')
       return
     }
-    const d = tryParse(raw)
+    // Commit a typed date only once it is complete (four-digit year). Parsing
+    // each keystroke read "06/10/2" as 2002 and rewrote the field mid-typing.
+    // A two-digit year ("06/10/26") is accepted when the field loses focus.
+    if (!COMPLETE_DATE.test(raw.trim())) return
+    const d = tryParse(raw.trim())
     if (d && (!maxDate || d <= maxDate)) {
       onChange(format(d, 'yyyy-MM-dd'))
       setMonth(d)
@@ -81,6 +87,14 @@ export function DatePicker({ dashboard = false, id, value, onChange, placeholder
   }
 
   const handleBlur = () => {
+    const typed = inputVal.trim() ? tryParse(inputVal.trim()) : null
+    if (typed && (!maxDate || typed <= maxDate)) {
+      const iso = format(typed, 'yyyy-MM-dd')
+      if (iso !== value) onChange(iso)
+      setInputVal(format(typed, 'dd/MM/yyyy'))
+      setMonth(typed)
+      return
+    }
     if (value) {
       const d = parse(value, 'yyyy-MM-dd', new Date())
       if (isValid(d)) {
@@ -105,14 +119,15 @@ export function DatePicker({ dashboard = false, id, value, onChange, placeholder
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <div
-        className={dashboard ? "dashboard-date-picker" : undefined}
+        className={dashboard ? "dashboard-date-picker" : "tw-date-field"}
         style={{
           display: 'flex',
           alignItems: 'center',
           width: '100%',
-          background: 'var(--bg-surface)',
-          border: dashboard ? '1px solid var(--date-picker-control-border)' : '1px solid var(--border-subtle)',
-          borderRadius: dashboard ? 6 : 2,
+          background: 'var(--input-bg)',
+          border: dashboard ? '1px solid var(--date-picker-control-border)' : '1px solid var(--border-control)',
+          borderRadius: 'var(--radius-control)',
+          minHeight: 40,
           ...style,
         }}
       >
@@ -129,9 +144,11 @@ export function DatePicker({ dashboard = false, id, value, onChange, placeholder
             background: 'transparent',
             border: 'none',
             color: inputVal ? 'var(--text-primary)' : 'var(--text-tertiary)',
-            padding: dashboard ? '8px 12px' : '10px 12px',
-            fontSize: dashboard ? 'var(--date-picker-input-font)' : 12,
-            fontFamily: dashboard ? 'var(--font-sans)' : 'var(--font-mono)',
+            padding: '8px 12px',
+            lineHeight: '20px',
+            /* Dates are body content, not identifiers: sans 14, both variants. */
+            fontSize: dashboard ? 'var(--date-picker-input-font)' : 14,
+            fontFamily: 'var(--font-sans)',
             outline: 'none',
             minWidth: 0,
             width: '100%',
@@ -146,7 +163,8 @@ export function DatePicker({ dashboard = false, id, value, onChange, placeholder
               background: 'none',
               border: 'none',
               borderLeft: '1px solid var(--border-subtle)',
-              padding: dashboard ? 8 : '10px 10px',
+              borderRadius: 0,
+              padding: dashboard ? 8 : '8px 12px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -154,7 +172,7 @@ export function DatePicker({ dashboard = false, id, value, onChange, placeholder
               flexShrink: 0,
             }}
           >
-            <CalendarIcon size={dashboard ? 20 : 13} />
+            <CalendarIcon size={16} />
           </button>
         </PopoverTrigger>
       </div>
@@ -163,10 +181,10 @@ export function DatePicker({ dashboard = false, id, value, onChange, placeholder
         className={dashboard ? "dashboard-date-popover" : "w-auto p-0"}
         align="start"
         style={{
-          background: 'var(--bg-surface)',
-          border: dashboard ? '1px solid var(--border-active)' : '1px solid var(--border-subtle)',
-          borderRadius: dashboard ? 8 : 4,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+          background: 'var(--bg-overlay)',
+          border: '1px solid var(--border-overlay)',
+          borderRadius: 'var(--radius-card)',
+          boxShadow: 'var(--shadow-pop)',
           color: 'var(--text-primary)',
         }}
       >

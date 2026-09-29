@@ -1,19 +1,49 @@
-import "@/components/ui/dashboard-kpi.css";
+import { CAPITAL_LAUNCHED } from '@/lib/features';
+import StaleDataNotice from '@/components/data/StaleDataNotice';
+import '@/components/data/stale-data-notice.css';
 import './overview-typography.css';
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchData } from "@/lib/Api";
-import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { formatMoney, formatMoneyWhole, formatPercent } from "@/lib/formatters";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { LiveBadge } from "@/components/LiveBadge";
-import { Loader } from "@/components/Loader";
-import { DashboardMetricIcon } from "@/components/ui/DashboardMetricIcon";
+import { CircleAlert, ArrowUpRight, TrendingUp, TrendingDown, Truck, FileText } from "lucide-react";
+import { InfoTip } from "@/components/ui/InfoTip";
+import SectionHeader from "@/components/layout/SectionHeader";
+import { StatusChip } from "@/components/ui/StatusChip";
+import { MicroBars, RevenueCostBars, PipelineBars, usePipeline, boardStage } from "@/components/overview/today";
+import { presentSignal, staleSignal, idleSignal, isInTransitSignal, isIdleVehiclesSignal, idleVehiclesUrl } from "@/components/overview/signals";
+import { isOpenLoad, staleWork } from "@/lib/staleWork";
+import { useAllQuotes, useAllVehicles, useHomeLedger } from "@/components/overview/ledger";
 
 // Fetches + derives all dashboard data. Lives in the queryFn so the result is
 // cached by TanStack Query (keyed below) and survives navigation — revisiting
 // the page no longer refires these 8 requests until the cache goes stale.
+// Home fires its GETs together with the full ledgers; a throttled (429) or
+// dropped request is retried twice with a short back-off before the page says
+// a figure couldn't load. GET only; the same endpoints as before.
+async function getWithRetry(path: string, attempts = 3): Promise<any> {
+  for (let i = 0; ; i++) {
+    try {
+      return await fetchData(path);
+    } catch (err: any) {
+      const status = err?.status ?? err?.response?.status;
+      const transient = status == null || status === 429 || status >= 500;
+      if (!transient || i >= attempts - 1) throw err;
+      await new Promise((r) => setTimeout(r, 1200 * (i + 1)));
+    }
+  }
+}
+
 async function loadOverview() {
+  // Each source may fail on its own; record which ones did so the page can
+  // say so instead of presenting an empty fallback as a real zero.
+  const failedSources: string[] = [];
+  const track = <T,>(label: string, fallback: T) => (err: unknown): T => {
+    failedSources.push(label);
+    return fallback;
+  };
   const [
     finance,
     insightsData,
@@ -25,22 +55,24 @@ async function loadOverview() {
     fleetData,
     eligibleData,
   ] = await Promise.all([
-    fetchData("api/v1/dashboard/finance/").catch(() => null),
-    fetchData("api/v1/dashboard/signals/").catch(() =>
-      fetchData("api/v1/dashboard/insights/").catch(() => []),
+    getWithRetry("api/v1/dashboard/finance/").catch(track("revenue and margin", null)),
+    getWithRetry("api/v1/dashboard/signals/").catch(() =>
+      getWithRetry("api/v1/dashboard/insights/").catch(track("alerts", [])),
     ),
-    fetchData("api/v1/advances/").catch(() => []),
-    fetchData("api/v1/quotes/?limit=5").catch(() => []),
-    fetchData("api/v1/loads/").catch(() => []),
-    fetchData("api/v1/activity/").catch(() => []),
-    fetchData("api/v1/vehicles/").catch(() => []),
-    fetchData("api/v1/fleet/overview/").catch(() => null),
+    getWithRetry("api/v1/advances/").catch(track("advances", [])),
+    getWithRetry("api/v1/quotes/?limit=5").catch(track("recent quotes", [])),
+    getWithRetry("api/v1/loads/").catch(track("loads", [])),
+    getWithRetry("api/v1/activity/").catch(track("recent activity", [])),
+    getWithRetry("api/v1/vehicles/").catch(track("vehicles", [])),
+    getWithRetry("api/v1/fleet/overview/").catch(track("fleet utilisation", null)),
     // Invoices that qualify for a fast-pay advance but don't have one
-    // requested yet — this is the actionable "Capital" opportunity today,
-    // since the Capital page's "Apply" button routes to an external lender
-    // (Merchant Capital) and never creates an internal AdvanceRequest.
-    fetchData("api/v1/capital/eligible/").catch(() => null),
+    // requested yet: the actionable Capital opportunity on this page.
+    getWithRetry("api/v1/capital/eligible/").catch(track("capital eligibility", null)),
   ]);
+
+  if (failedSources.length >= 9) {
+    throw new Error("Overview data is unavailable");
+  }
 
   const insightsArr = Array.isArray(insightsData)
     ? insightsData
@@ -48,8 +80,13 @@ async function loadOverview() {
   const insights = insightsArr.map((s: any) => ({
     category: s.category || s.type || "Update",
     title: s.title || "",
-    body: s.body || s.message || "",
+    // The backend appends invented loss estimates (e.g. "Estimated revenue
+    // loss: R 72,000/day") with no basis. Drop them until the backend stops.
+    body: String(s.body || s.message || "")
+      .replace(/\s*Estimated revenue loss:[^.]*\.?/gi, "")
+      .trim(),
     action: s.action || "VIEW",
+    actionUrl: typeof s.action_url === "string" && s.action_url.startsWith("/") ? s.action_url : null,
     severity: s.severity || "low",
     type: s.type || "INFO",
   }));
@@ -65,6 +102,7 @@ async function loadOverview() {
 
   const quotes = quotesData?.results || quotesData || [];
   const recentQuotes = quotes.slice(0, 5);
+  const quotesTotal: number | undefined = quotesData?.count;
 
   const loads = loadsData?.results || loadsData || [];
   // "Active" = anywhere in the open lifecycle (PENDING/ASSIGNED/LOADING/
@@ -77,9 +115,13 @@ async function loadOverview() {
     (l: any) => !TERMINAL_LOAD_STATUSES.includes(l.status),
   ).length;
   const recentLoads = loads.slice(0, 5);
+  const loadsTotal: number | undefined = loadsData?.count;
 
   const vehicles = vehiclesData?.results || vehiclesData || [];
-  const totalVehicles = vehicles.length;
+  // The list is paginated: use the server count, and only derive "available"
+  // from the rows when the page holds the whole fleet.
+  const totalVehicles: number = typeof vehiclesData?.count === "number" ? vehiclesData.count : vehicles.length;
+  const vehiclesComplete = vehicles.length >= totalVehicles;
   const activeVehicles =
     fleetData?.active_vehicles ??
     vehicles.filter(
@@ -107,6 +149,7 @@ async function loadOverview() {
     : activityData?.results || [];
 
   return {
+    failedSources,
     financeData: finance,
     insights,
     advances,
@@ -117,1000 +160,506 @@ async function loadOverview() {
     totalVehicles,
     activeVehicles,
     availableVehicles,
+    vehiclesComplete,
     activity,
     heatmapData,
+    // Full lists already fetched above, kept for the charts (no new requests).
+    quotes,
+    quotesTotal,
+    loads,
+    loadsTotal,
+    vehicles,
   };
 }
 
-const CARD_MENUS: Record<string, { label: string; route: string }[]> = {
-  revenue: [
-    { label: "View revenue report", route: "/finance/reports" },
-    { label: "View all invoices",   route: "/finance/invoices" },
-    { label: "New invoice",         route: "/finance/invoices/new" },
-  ],
-  margin: [
-    { label: "View finance reports", route: "/finance/reports" },
-    { label: "View expenses",        route: "/finance/expenses" },
-  ],
-  outstanding: [
-    { label: "View outstanding invoices", route: "/finance/invoices?status=OVERDUE" },
-    { label: "View all invoices",         route: "/finance/invoices" },
-    { label: "Request capital advance",   route: "/capital" },
-  ],
-};
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 // Sentence-case a raw status token for display: "IN_TRANSIT" → "In transit".
 const titleCase = (s?: string) =>
   s ? s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()) : "—";
 
+// Presentation-only helpers.
+const shortPlace = (s?: string) =>
+  (s || "").split(" ").slice(0, 2).join(" ").replace(/[,\s]+$/, "") || "—";
+const isFastPaySignal = (i: any) => /fast\s*pay|advance/i.test(`${i.title} ${i.body}`);
+const wholeRand = (v: number) => formatMoneyWhole(v);
+
+function Delta({ value, unit, period }: { value: number; unit: "%" | "pts"; period: string }) {
+  const up = value > 0;
+  const flat = value === 0;
+  const sign = up ? "+" : value < 0 ? "−" : "";
+  const shown = unit === "%" ? `${sign}${formatPercent(Math.abs(value))}` : `${sign}${formatPercent(Math.abs(value)).replace("%", "")}\u00A0pts`;
+  const Glyph = up ? TrendingUp : TrendingDown;
+  return (
+    <span className={`tw-delta ${flat ? "" : up ? "is-up" : "is-down"}`}>
+      {!flat && <Glyph size={14} strokeWidth={2} aria-hidden="true" />}
+      <span>{shown}</span>
+      <span className="tw-delta__period">{period}</span>
+    </span>
+  );
+}
+
+
 export default function Overview() {
   const navigate = useNavigate();
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [recentTab, setRecentTab] = useState<"quotes" | "loads">("quotes");
 
-  useEffect(() => {
-    if (!openMenu) return;
-    const close = () => setOpenMenu(null);
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [openMenu]);
-
-  const { data, isLoading: loading, refetch } = useQuery({
+  const { data, isLoading: loading, refetch, dataUpdatedAt, isRefetchError, isError } = useQuery({
     queryKey: ["overview-dashboard"],
     queryFn: loadOverview,
   });
 
   // Cached data drives the view; defaults keep the first render safe.
   const financeData = data?.financeData ?? null;
-  const insights = data?.insights ?? [];
-  const advances = data?.advances ?? [];
-  // Advances actually in TruckWys's own request pipeline — REQUESTED
-  // (submitted, not yet scored) or SCORING (risk engine actively evaluating
-  // it). In practice this is usually 0: the Capital page's "Apply" button
-  // routes to an external lender (Merchant Capital) rather than creating an
-  // AdvanceRequest, so it's added to the eligible-invoice count below rather
-  // than shown alone.
-  const pendingAdvancesCount = advances.filter(
-    (a: any) => a.status === "REQUESTED" || a.status === "SCORING",
-  ).length;
-  // Invoices that qualify for an advance but don't have one requested yet —
-  // the backend excludes invoices with an active request from this list, so
-  // it's disjoint from pendingAdvancesCount and safe to add.
-  const eligibleInvoicesCount = data?.eligibleInvoicesCount ?? 0;
-  const advancesActionableCount = pendingAdvancesCount + eligibleInvoicesCount;
+  const failed = data?.failedSources ?? [];
+  // Fast Pay is not live: its signals (advance amounts, fees, payout times)
+  // describe money that is not available, so they are not shown.
+  const signals = (data?.insights ?? []).filter((i: any) => CAPITAL_LAUNCHED || !isFastPaySignal(i));
   const recentQuotes = data?.recentQuotes ?? [];
+  const allQuotes: any[] = data?.quotes ?? [];
+  const quotesTotal: number | undefined = data?.quotesTotal;
   const recentLoads = data?.recentLoads ?? [];
-  const activeLoadsCount = data?.activeLoadsCount ?? 0;
   const totalVehicles = data?.totalVehicles ?? 0;
-  const activeVehicles = data?.activeVehicles ?? 0;
   const availableVehicles = data?.availableVehicles ?? 0;
-  const activity = data?.activity ?? [];
-  const heatmapData = data?.heatmapData ?? [];
-  const activityLoading = loading;
+  // Money, loads and quotes come from the full ledgers the Reports use, so
+  // Home agrees with Cash, P&L and Debtors (see components/overview/ledger.ts).
+  const ledger = useHomeLedger();
+  const money = ledger.money;
+  const moneyLoading = ledger.loading;
+  const moneyFailed = ledger.error;
+  const quotesAll = useAllQuotes();
+  const pipelineQuotes: any[] = quotesAll.data?.rows ?? allQuotes;
+  const pipelineComplete = quotesAll.data ? quotesAll.data.complete : false;
+  const allLoads: any[] = (ledger.data?.loads as any[] | undefined) ?? data?.loads ?? [];
+  const pipeline = usePipeline(pipelineQuotes, allLoads);
+  // Needs you: stale open loads come from the shared rule (src/lib/staleWork.ts),
+  // the same count as Orders and Findings; the backend's "N loads in transit"
+  // signal is replaced by that row. Everything else is the backend's signals.
+  // Wait for the full loads ledger so the count never changes after paint.
+  // The idle-vehicles row is computed here from every vehicle and load (the
+  // Vehicles page's own sources and rule), never from the backend's plate list.
+  const allVehicles = useAllVehicles();
+  const vehiclesSettled = !!allVehicles.data || (allVehicles.isError && !allVehicles.isFetching);
+  const needsLoading = loading || (!ledger.data && !ledger.error) || !vehiclesSettled;
+  const stale = !needsLoading && allLoads.length ? staleSignal(allLoads) : null;
+  const idle = !needsLoading && allVehicles.data && ledger.data ? idleSignal(allVehicles.data.rows, allLoads) : null;
+  const needs: { row: ReturnType<typeof presentSignal>; actionUrl: string | null; severity: string }[] = [
+    ...(stale ? [{ row: stale, actionUrl: stale.actionUrl, severity: "medium" }] : []),
+    ...signals
+      .filter((i: any) => !(stale && isInTransitSignal(i)))
+      // Idle row: ours when the full fleet loaded (dropped if none are idle);
+      // else the backend's count only, without its plate list.
+      .flatMap((i: any) => {
+        if (!isIdleVehiclesSignal(i)) return [{ row: presentSignal(i, allLoads), actionUrl: i.actionUrl as string | null, severity: String(i.severity || "low") }];
+        if (allVehicles.data && ledger.data) return idle ? [{ row: idle as ReturnType<typeof presentSignal>, actionUrl: idle.actionUrl, severity: String(i.severity || "low") }] : [];
+        return [{ row: { ...presentSignal(i, allLoads), detail: "" }, actionUrl: idleVehiclesUrl, severity: String(i.severity || "low") }];
+      }),
+  ];
 
   useEffect(() => {
-    document.title = "Overview - TruckWys";
-
-    // Real-time clock update
-    const clockInterval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(clockInterval);
+    document.title = "Home - TruckWys";
   }, []);
 
   useAutoRefresh(refetch);
 
-  const timeAgo = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return "just now";
-    if (m < 60) return `${m}m ago`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
-    return `${Math.floor(h / 24)}d ago`;
-  };
+  const today = (() => {
+    // Built from parts so every browser shows "Monday, 28 Sep 2026" (no "Sept").
+    const parts = new Intl.DateTimeFormat("en-ZA", {
+      timeZone: "Africa/Johannesburg", weekday: "long", year: "numeric", month: "numeric", day: "numeric",
+    }).formatToParts(new Date());
+    const get = (t: string) => parts.find((p) => p.type === t)?.value || "";
+    return `${get("weekday")}, ${Number(get("day"))} ${MONTHS_SHORT[Number(get("month")) - 1] || ""} ${get("year")}`;
+  })();
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("en-ZA", {
-      timeZone: "Africa/Johannesburg",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
+  // ---- Derived presentation values ----
+  const monthLabel = (ym: string) => MONTHS_SHORT[Number(ym.slice(5, 7)) - 1] || ym;
+  const trend = money?.months ?? [];
+  const spanText = trend.length ? `${monthLabel(trend[0].ym)} ${trend[0].ym.slice(0, 4)} to ${monthLabel(trend[trend.length - 1].ym)} ${trend[trend.length - 1].ym.slice(0, 4)}` : "";
+  const vehiclesFailed = failed.includes("vehicles") && !data?.totalVehicles;
+  const outstanding = money?.owed ?? 0;
+  const overdue = money?.pastDue ?? 0;
+  const pastShare = outstanding > 0 ? Math.min(Math.max(overdue, 0), outstanding) / outstanding : 0;
+  const receivedChange = money && money.receivedPrior != null && money.receivedPrior > 0.005
+    ? ((money.received - money.receivedPrior) / money.receivedPrior) * 100 : null;
+  const marginChange = money && money.margin != null && money.marginPrior != null ? money.margin - money.marginPrior : null;
+  // Net after pending costs: revenue excl. VAT less approved and pending costs (Margin tab "With pending costs").
+  const afterPending = money ? money.revenueExcl - money.costs - money.pending : 0;
+  const marginDeltaText = marginChange != null && money && money.pending > 0.005
+    ? `${marginChange >= 0 ? "Up" : "Down"} ${formatPercent(Math.abs(marginChange)).replace("%", "")} pts vs the prior 12 months` : "";
+
+  // Active loads and the 28-day bars use every load (all pages), not page 1.
+  // R7: "active" means open AND current. Open loads past their delivery date
+  // or open more than 30 days (src/lib/staleWork.ts) are "left open": they
+  // are counted beside the figure, never in it (the Needs you row lists them).
+  // Wait for the full ledger so the figure never changes after paint.
+  const loadsReady = !!ledger.data || !!ledger.error;
+  const openLoads = allLoads.filter((l: any) => isOpenLoad(l));
+  const notClosedCount = openLoads.filter((l: any) => staleWork(l)).length;
+  const activeLoadsCount = openLoads.length - notClosedCount;
+  const heatmapData: number[] = (() => {
+    const out = new Array(28).fill(0);
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    allLoads.forEach((load: any) => {
+      const at = load.created_at || load.pickup_date;
+      if (!at) return;
+      const daysAgo = Math.floor((now - new Date(at).getTime()) / dayMs);
+      if (daysAgo >= 0 && daysAgo < 28) out[27 - daysAgo]++;
     });
-  };
+    return out;
+  })();
+  const loads28 = heatmapData.reduce((a, b) => a + b, 0);
+  const loadsFailed = failed.includes("loads") && !ledger.data;
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString("en-ZA", {
-      timeZone: "Africa/Johannesburg",
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const getHeatClass = (count: number) => {
-    if (count === 0) return "";
-    const max = Math.max(...heatmapData, 1);
-    const ratio = count / max;
-    if (ratio >= 0.75) return "heat-high";
-    if (ratio >= 0.5) return "heat-med";
-    if (ratio > 0) return "heat-low";
-    return "";
-  };
+  const skeleton = <span className="ov-skel" aria-label="Loading" />;
+  const unavailable = !moneyLoading && !money;
 
   return (
-    <div
-      className="overview-typography"
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        // "dense": the default (sparse) packing advances a one-way cursor —
-        // once a 2-wide card (e.g. Recent Bookings) can't fit in a single
-        // leftover column, the algorithm moves on and never backfills that
-        // gap with a later, smaller card. Dense packing fills those gaps
-        // instead — the actual cause of the empty column-3 strip between
-        // Fleet Utilization and Recent Activity. Doesn't affect DOM/reading
-        // order, only visual position.
-        gridAutoFlow: "dense",
-        gap: 16,
-        alignContent: "start",
-      }}>
-      {/* Command bar — compact clock + actionable live pulse */}
-      <div
-          className="card"
-          style={{
-            gridColumn: "span 3",
-            padding: "12px 20px",
-            background: "var(--bg-surface)",
-          }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 16,
-              flexWrap: "wrap",
-            }}>
-            {/* Compact date / time */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div>
-                <div
-                  style={{
-                    fontSize: 13, lineHeight: "20px",
-                    fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                    color: "var(--text-tertiary)",
-                    letterSpacing: "normal",
-                    textTransform: "none",
-                  }}>
-                  {formatDate(currentTime)}
-                </div>
-                <div
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 600,
-                    color: "var(--text-primary)",
-                    fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                    marginTop: 1,
-                  }}>
-                  {formatTime(currentTime)}{" "}
-                  <span
-                    style={{
-                      fontSize: 13, lineHeight: "20px",
-                      color: "var(--text-tertiary)",
-                      marginLeft: 4,
-                    }}>
-                    SAST
-                  </span>
-                </div>
-              </div>
-              <LiveBadge />
-            </div>
+    <div className="overview-typography ov-page">
+      {/* The shared page head: on phones "New quote" stays on the title row
+          and the other two actions move into its "⋯" menu. */}
+      <SectionHeader
+        title="Home"
+        description={today}
+        actions={<>
+          <button type="button" className="tw-btn" onClick={() => navigate("/finance/expenses")}>Add expense</button>
+          <button type="button" className="tw-btn" onClick={() => navigate("/finance/invoices/new")}>Create invoice</button>
+          <button type="button" className="tw-btn tw-btn--primary" onClick={() => navigate("/bookings/quotes/new")}>New quote</button>
+        </>}
+      />
 
-            {/* Actionable pulse — clickable */}
-            <div style={{ display: "flex", gap: 26, alignItems: "center" }}>
-              {(
-                [
-                  {
-                    label: "Active loads",
-                    value: String(activeLoadsCount),
-                    route: "/bookings",
-                    warn: false,
-                  },
-                  {
-                    label: "Active vehicles",
-                    value: `${activeVehicles}/${totalVehicles}`,
-                    route: "/fleet",
-                    warn: false,
-                  },
-                  {
-                    label: "Advances pending",
-                    value: String(advancesActionableCount),
-                    route: "/capital",
-                    warn: advancesActionableCount > 0,
-                  },
-                ] as const
-              ).map((s) => (
-                <div
-                  key={s.label}
-                  onClick={() => navigate(s.route)}
-                  style={{ cursor: "pointer", textAlign: "right" }}>
-                  <div
-                    style={{
-                      fontSize: 13, lineHeight: "20px",
-                      fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                      color: "var(--text-tertiary)",
-                      textTransform: "none",
-                      letterSpacing: "normal",
-                      marginBottom: 2,
-                    }}>
-                    {s.label}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 17,
-                      fontWeight: 700,
-                      fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                      color: s.warn
-                        ? "var(--status-warning)"
-                        : "var(--text-primary)",
-                    }}>
-                    {s.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions — moved up from the bottom of the page so the most
-            common next steps are reachable without scrolling past every
-            chart/table first. A slim horizontal bar (not a 2x2 box) keeps it
-            from eating much vertical space up here. */}
-        <div
-          className="card"
-          style={{
-            gridColumn: "span 3",
-            padding: "14px 20px",
-          }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-              flexWrap: "wrap",
-            }}>
-            <span className="card-title" style={{ marginRight: 4 }}>
-              Quick actions
-            </span>
-            <button
-              onClick={() => navigate("/bookings/quotes/new")}
-              className="btn-action"
-              style={{
-                padding: "8px 16px",
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-              }}>
-              New quote
-            </button>
-            <button
-              onClick={() => navigate("/finance/invoices/new")}
-              className="btn-action"
-              style={{
-                padding: "8px 16px",
-              }}>
-              Create invoice
-            </button>
-            <button
-              onClick={() => navigate("/capital")}
-              className="btn-action"
-              style={{
-                padding: "8px 16px",
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-              }}>
-              Request advance
-            </button>
-            <button
-              onClick={() => navigate("/finance/expenses")}
-              className="btn-action"
-              style={{
-                padding: "8px 16px",
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-              }}>
-              Add expense
-            </button>
-            <button
-              onClick={() => navigate("/finance/reports")}
-              className="btn-action"
-              style={{
-                padding: "8px 16px",
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-              }}>
-              View reports
+      <div className="ov-notices">
+        <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
+        {isError && !data && (
+          <div className="stale-data-notice" role="alert">
+            <span>The overview couldn't be loaded.</span>
+            <button type="button" className="stale-data-notice__retry" onClick={() => refetch()}>
+              Try again
             </button>
           </div>
-        </div>
+        )}
+        {!isRefetchError && failed.length > 0 && (
+          <div className="stale-data-notice" role="status">
+            <span>Some figures couldn't load: {failed.join(", ")}.</span>
+            <button type="button" className="stale-data-notice__retry" onClick={() => refetch()}>
+              Try again
+            </button>
+          </div>
+        )}
+        {moneyFailed && (
+          <div className="stale-data-notice" role="status">
+            <span>Invoices, payments or expenses couldn&rsquo;t load, so money figures are not shown.</span>
+            <button type="button" className="stale-data-notice__retry" onClick={() => ledger.retry()}>
+              Try again
+            </button>
+          </div>
+        )}
+        {money && money.partial.length > 0 && (
+          <div className="stale-data-notice" role="status">
+            <span>Figures use the {money.partial.join(", ")} that loaded.</span>
+          </div>
+        )}
+      </div>
 
-        {/* Metric cards */}
-        <div className="card metric-card dashboard-kpi-card">
-          <div className="card-header dashboard-kpi-label">
-            <span className="card-title dashboard-kpi-label"><span className="dashboard-metric-label-content"><DashboardMetricIcon kind="money" /><span className="dashboard-metric-label-text">
-              {loading ? "Loading..." : "Total revenue"}
-            </span></span></span>
-            <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                className="card-action"
-                onClick={() => setOpenMenu(openMenu === "revenue" ? null : "revenue")}>
-                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
-              </svg>
-              {openMenu === "revenue" && (
-                <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 200, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
-                  {CARD_MENUS.revenue.map(item => (
-                    <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
-                      style={{ padding: "9px 14px", fontSize: 13, lineHeight: "20px", fontFamily: "var(--font-sans)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
-                      onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
-                      {item.label}
-                    </div>
-                  ))}
-                </div>
-              )}
+      {/* KPI tiles: label, big figure, one line. Money figures reconcile with Reports. */}
+      <div className="td-kpis">
+        {/* Emphasis tile: the money that needs chasing (= Debtors report, owed now). */}
+        <section className="td-kpi td-kpi--emphasis" aria-label="Owed to you">
+          <div className="td-kpi__head">
+            <h2 className="td-kpi__label">
+              Owed to you
+              <InfoTip>
+                Balance on sent invoices not yet paid, incl. VAT, the same figure as the Debtors report. Past due means after the invoice due date.
+                {financeData && outstanding > 0 && financeData.dso > 0 ? ` Customers take ${Math.round(financeData.dso)} days to pay, on average.` : ""}
+              </InfoTip>
+            </h2>
+          </div>
+          <div className="td-kpi__body">
+            <div className="td-kpi__value" title={money ? formatMoney(outstanding) : undefined}>
+              {moneyLoading ? skeleton : money ? wholeRand(outstanding) : "—"}
             </div>
-          </div>
-          <div className="metric-value dashboard-kpi-value">
-            {loading ? "..." : formatCurrency(financeData?.total_revenue || 0)}
-          </div>
-          {typeof financeData?.revenue_change_pct === "number" ? (
-            <div
-              className={`dashboard-kpi-context metric-delta ${financeData.revenue_change_pct >= 0 ? "delta-up" : "delta-down"}`}>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3">
-                <polyline
-                  points={
-                    financeData.revenue_change_pct >= 0
-                      ? "18 15 12 9 6 15"
-                      : "6 9 12 15 18 9"
-                  }
-                />
-              </svg>
-              <span>
-                {financeData.revenue_change_pct >= 0 ? "+" : ""}
-                {financeData.revenue_change_pct}% vs prev 30d
-              </span>
-            </div>
-          ) : (
-            <div className="metric-delta delta-neutral dashboard-kpi-context">
-              <span>last 30 days</span>
-            </div>
-          )}
-        </div>
-
-        <div className="card metric-card dashboard-kpi-card">
-          <div className="card-header dashboard-kpi-label">
-            <span className="card-title dashboard-kpi-label"><span className="dashboard-metric-label-content"><DashboardMetricIcon kind="percent" /><span className="dashboard-metric-label-text">
-              {loading ? "Loading..." : "Net margin"}
-            </span></span></span>
-            <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                className="card-action"
-                onClick={() => setOpenMenu(openMenu === "margin" ? null : "margin")}>
-                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
-              </svg>
-              {openMenu === "margin" && (
-                <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 200, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
-                  {CARD_MENUS.margin.map(item => (
-                    <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
-                      style={{ padding: "9px 14px", fontSize: 13, lineHeight: "20px", fontFamily: "var(--font-sans)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
-                      onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
-                      {item.label}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-          <div
-            className="metric-value dashboard-kpi-value"
-            style={{ color: "var(--accent-primary)" }}>
-            {loading
-              ? "..."
-              : formatPercent(financeData?.net_margin_percent || 0)}
-          </div>
-          {typeof financeData?.margin_change_pts === "number" ? (
-            <div
-              className={`dashboard-kpi-context metric-delta ${financeData.margin_change_pts >= 0 ? "delta-up" : "delta-down"}`}>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3">
-                <polyline
-                  points={
-                    financeData.margin_change_pts >= 0
-                      ? "18 15 12 9 6 15"
-                      : "6 9 12 15 18 9"
-                  }
-                />
-              </svg>
-              <span>
-                {financeData.margin_change_pts >= 0 ? "+" : ""}
-                {financeData.margin_change_pts} pts vs prev 30d
-              </span>
-            </div>
-          ) : (
-            <div className="metric-delta delta-neutral dashboard-kpi-context">
-              <span>last 30 days</span>
-            </div>
-          )}
-        </div>
-
-        <div className="card metric-card dashboard-kpi-card">
-          <div className="card-header dashboard-kpi-label">
-            <span className="card-title dashboard-kpi-label"><span className="dashboard-metric-label-content"><DashboardMetricIcon kind="overdue" /><span className="dashboard-metric-label-text">
-              {loading ? "Loading..." : "Outstanding"}
-            </span></span></span>
-            <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                className="card-action"
-                onClick={() => setOpenMenu(openMenu === "outstanding" ? null : "outstanding")}>
-                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
-              </svg>
-              {openMenu === "outstanding" && (
-                <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 220, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
-                  {CARD_MENUS.outstanding.map(item => (
-                    <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
-                      style={{ padding: "9px 14px", fontSize: 13, lineHeight: "20px", fontFamily: "var(--font-sans)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
-                      onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
-                      {item.label}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-          <div
-            className="metric-value dashboard-kpi-value"
-            style={{ color: "var(--status-warning)" }}>
-            {loading
-              ? "..."
-              : formatCurrency(financeData?.outstanding_invoices_total || 0)}
-          </div>
-          <div className="metric-delta delta-neutral dashboard-kpi-context">
-            <span>
-              DSO: {loading ? "—" : Math.round(financeData?.dso || 0)} days
-            </span>
-          </div>
-        </div>
-
-        {/* Chart card */}
-        <div className="card chart-card">
-          <div className="card-header">
-            <span className="card-title">
-              Revenue vs fuel cost (last 30 days)
-            </span>
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                fontSize: 13, lineHeight: "20px",
-                color: "var(--text-secondary)",
-              }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span
-                  style={{
-                    width: 20,
-                    height: 2,
-                    background: "var(--accent-primary)",
-                    display: "inline-block",
-                    borderRadius: 1,
-                  }}
-                />
-                Revenue
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span
-                  style={{
-                    width: 20,
-                    height: 2,
-                    background: "var(--status-danger)",
-                    display: "inline-block",
-                    borderRadius: 1,
-                  }}
-                />
-                Fuel cost
-              </span>
-            </div>
-          </div>
-          {(() => {
-            const trend = financeData?.monthly_trend || [];
-            const rev =
-              trend.length > 0 ? trend.map((m: any) => m.revenue / 1000) : [0];
-            const fuel =
-              trend.length > 0 ? trend.map((m: any) => m.expenses / 1000) : [0];
-            const maxV = Math.max(...rev, ...fuel, 1) * 1.1;
-            const pts = (arr: number[]) =>
-              arr
-                .map(
-                  (v, i) =>
-                    `${(i / Math.max(arr.length - 1, 1)) * 100},${100 - (v / maxV) * 100}`,
-                )
-                .join(" ");
-            const labels = trend.map((m: any) => m.month?.slice(5) || "");
-            return (
-              <>
-                <svg
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                  style={{
-                    width: "100%",
-                    height: 120,
-                    display: "block",
-                    marginTop: 8,
-                  }}>
-                  <defs>
-                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop
-                        offset="0%"
-                        stopColor="var(--accent-primary)"
-                        stopOpacity="0.15"
-                      />
-                      <stop
-                        offset="100%"
-                        stopColor="var(--accent-primary)"
-                        stopOpacity="0"
-                      />
-                    </linearGradient>
-                  </defs>
-                  <polygon
-                    points={`0,100 ${pts(rev)} 100,100`}
-                    fill="url(#revGrad)"
-                  />
-                  <polyline
-                    points={pts(rev)}
-                    fill="none"
-                    stroke="var(--accent-primary)"
-                    strokeWidth="1.5"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  <polyline
-                    points={pts(fuel)}
-                    fill="none"
-                    stroke="var(--status-danger)"
-                    strokeWidth="1.2"
-                    strokeDasharray="3,2"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </svg>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginTop: 4,
-                    fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                    fontSize: 13, lineHeight: "20px",
-                    color: "var(--text-tertiary)",
-                  }}>
-                  {labels.slice(-4).map((l: string, i: number) => (
-                    <span key={i}>{l}</span>
-                  ))}
-                </div>
-              </>
-            );
-          })()}
-          <div
-            style={{
-              display: "flex",
-              gap: 20,
-              marginTop: 8,
-              fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-              fontSize: 13, lineHeight: "20px",
-            }}>
-            <span>
-              Net margin{" "}
-              <span style={{ color: "var(--accent-primary)" }}>
-                {financeData?.net_margin_percent != null
-                  ? `${(financeData.net_margin_percent || 0).toFixed(1)}%`
-                  : "—"}
-              </span>
-            </span>
-            <span>
-              Fuel/Rev ratio{" "}
-              <span style={{ color: "var(--status-warning)" }}>
-                {financeData?.monthly_trend?.length > 0
-                  ? `${Math.round(((financeData.monthly_trend.at(-1)?.expenses || 0) / Math.max(financeData.monthly_trend.at(-1)?.revenue || 1, 1)) * 100)}%`
-                  : "—"}
-              </span>
-            </span>
-            <span>
-              Trend{" "}
-              <span style={{ color: "var(--status-success)" }}>
-                ↑ improving
-              </span>
-            </span>
-          </div>
-        </div>
-
-        {/* Utilization card */}
-        <div className="card utilization-card">
-          <div className="card-header">
-            <span className="card-title">Fleet utilization (last 28 days)</span>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-end",
-              marginBottom: 12,
-            }}>
-            <div>
-              <div
-                style={{
-                  fontSize: 24,
-                  fontWeight: 500,
-                  color: "var(--text-primary)",
-                }}>
-                {totalVehicles > 0
-                  ? `${Math.round((activeVehicles / totalVehicles) * 100)}%`
-                  : "—"}
+            {money && pastShare > 0 && pastShare < 1 && (
+              <div className="td-kpi__strip" role="img" aria-label={`${Math.round(pastShare * 100)}% of what you are owed is past due`}>
+                <span style={{ width: `${pastShare * 100}%` }} />
               </div>
-              <div
-                style={{
-                  fontSize: 13, lineHeight: "20px",
-                  color: "var(--text-secondary)",
-                  marginTop: 2,
-                }}>
-                {activeVehicles} of {totalVehicles} vehicles active
-              </div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)" }}>
-                Active loads
-              </div>
-              <div
-                style={{
-                  fontSize: 18,
-                  fontWeight: 600,
-                  color: "var(--accent-primary)",
-                  fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                }}>
-                {activeLoadsCount}
-              </div>
-            </div>
-          </div>
-          <div className="heatmap-grid">
-            {(heatmapData.length > 0 ? heatmapData : new Array(28).fill(0)).map(
-              (count, i) => (
-                <div
-                  key={i}
-                  className={`heat-cell ${getHeatClass(count)}`}
-                  title={`${count} load${count !== 1 ? "s" : ""}`}
-                />
-              ),
             )}
           </div>
-          <div
-            style={{
-              marginTop: 12,
-              fontSize: 13, lineHeight: "20px",
-              color: "var(--text-tertiary)",
-            }}>
-            {data
-              ? `${availableVehicles} vehicle${availableVehicles !== 1 ? "s" : ""} available`
-              : "Loading..."}
+          <div className="td-kpi__meta">
+            {money ? (
+              outstanding <= 0 ? <span>Nothing outstanding</span>
+                : <span>{overdue >= outstanding - 0.005 ? "All past due" : overdue > 0 ? `${wholeRand(overdue)} past due` : "None past due"}</span>
+            ) : unavailable ? <span>Unavailable</span> : null}
           </div>
-        </div>
+        </section>
 
-        {/* Recent quotes */}
-        <div className="card table-card">
-          <div className="card-header">
-            <span className="card-title">Recent quotes</span>
-            <button
-              onClick={() => navigate("/bookings/quotes")}
-              style={{
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-                padding: "4px 8px",
-                fontSize: 13, lineHeight: "20px",
-                borderRadius: 2,
-                cursor: "pointer",
-              }}>
-              View all
-            </button>
+        <section className="td-kpi" aria-label="Revenue received, last 12 months">
+          <div className="td-kpi__head">
+            <h2 className="td-kpi__label">
+              <span>Revenue<span className="td-hide-sm"> received</span>, 12 months</span>
+              <InfoTip>Money received from customers in the last 12 months, incl. VAT, by payment date: the Cash report&rsquo;s money in for the same period.</InfoTip>
+            </h2>
           </div>
-          {loading ? (
-            <div style={{ padding: 40, display: "flex", justifyContent: "center" }}>
-              <Loader size={24} />
+          <div className="td-kpi__body">
+            <div className="td-kpi__value" title={money ? formatMoney(money.received) : undefined}>
+              {moneyLoading ? skeleton : money ? wholeRand(money.received) : "—"}
             </div>
-          ) : recentQuotes.length > 0 ? (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Quote #</th>
-                  <th>Customer</th>
-                  <th>Route</th>
-                  <th>Total</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentQuotes.map((quote: any) => (
-                  <tr
-                    key={quote.id}
-                    style={{ cursor: "pointer" }}
-                    onClick={() => navigate(`/bookings/quotes/${quote.id}`)}>
-                    <td className="mono">{quote.quote_number}</td>
-                    <td>{quote.customer_name}</td>
-                    <td
-                      style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: "20px" }}>
-                      {quote.pickup_location?.split(" ").slice(0, 2).join(" ")}{" "}
-                      →{" "}
-                      {quote.delivery_location
-                        ?.split(" ")
-                        .slice(0, 2)
-                        .join(" ")}
-                    </td>
-                    <td
-                      style={{
-                        color: "var(--accent-primary)",
-                        fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                      }}>
-                      {formatCurrency(parseFloat(quote.total_amount || "0"))}
-                    </td>
-                    <td>
-                      <span
-                        style={{
-                          fontFamily: "var(--font-sans)",
-                          fontSize: 13, lineHeight: "20px",
-                          color:
-                            quote.status === "ACCEPTED"
-                              ? "var(--status-success)"
-                              : quote.status === "SENT"
-                                ? "var(--status-warning)"
-                                : "var(--text-tertiary)",
-                          padding: "2px 6px",
-                          background: "var(--bg-surface-hover)",
-                          borderRadius: 4,
-                          display: "inline-block",
-                          whiteSpace: "nowrap",
-                        }}>
-                        {titleCase(quote.status)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          </div>
+          <div className="td-kpi__meta">
+            {money ? (
+              receivedChange != null
+                ? <><span>Incl. VAT · </span><Delta value={Math.round(receivedChange * 10) / 10} unit="%" period="vs prior 12 months" /></>
+                : <span>Paid, incl. VAT</span>
+            ) : unavailable ? <span>Unavailable</span> : null}
+          </div>
+        </section>
+
+        <section className="td-kpi" aria-label="Net margin, last 12 months">
+          <div className="td-kpi__head">
+            <h2 className="td-kpi__label">
+              <span><span className="td-hide-sm">Net margin</span><span className="td-show-sm">Margin</span>, 12 months</span>
+              <InfoTip>Revenue received excl. VAT, minus approved expenses, as a share of that revenue. The same figure as the Profit and loss report, cash basis, last 12 months. Pending expenses are not deducted{money && money.pending > 0.005 ? `: ${money.pendingCount} (${wholeRand(money.pending)}) are waiting for approval, and approving them leaves ${wholeRand(afterPending)}` : ""}.{marginDeltaText ? ` ${marginDeltaText}.` : ""}</InfoTip>
+            </h2>
+          </div>
+          <div className="td-kpi__body">
+            <div className="td-kpi__value">
+              {moneyLoading ? skeleton : money && money.margin != null ? formatPercent(money.margin) : "—"}
+            </div>
+            {/* The figure it becomes, read with the note under it: "−R 60 698 · if the R 87 129 pending is approved". */}
+            {money && money.margin != null && money.pending > 0.005 && (
+              <span className={`td-kpi__alt td-hide-sm${afterPending < 0 ? " is-loss" : ""}`}>{wholeRand(afterPending)}</span>
+            )}
+          </div>
+          <div className="td-kpi__meta">
+            {money ? (
+              money.margin == null ? <span>No revenue yet</span>
+                // R6: pending costs change the answer, so the tile says what it becomes (the Margin tab's rule).
+                : money.pending > 0.005 ? (
+                  <span className="td-kpi__if">
+                    <span className={`td-show-sm${afterPending < 0 ? " is-loss" : ""}`}>{wholeRand(afterPending)} </span>if <span className="td-hide-sm">the </span>{wholeRand(money.pending)} pending is approved
+                  </span>
+                )
+                : marginChange != null ? <Delta value={Math.round(marginChange * 10) / 10} unit="pts" period="vs prior 12 months" />
+                  : <span>Excl. VAT, cash basis</span>
+            ) : unavailable ? <span>Unavailable</span> : null}
+          </div>
+        </section>
+
+        <section className="td-kpi" aria-label="Active loads">
+          <div className="td-kpi__head">
+            <h2 className="td-kpi__label">
+              Active loads
+              <InfoTip align="end">
+                Open loads that are on schedule: not past their delivery date and open 30 days or less. Loads past that are counted as left open, never as active; Needs you lists them. Bars show loads booked per day, last 28 days.
+                {!loading && !vehiclesFailed && totalVehicles > 0 && data?.vehiclesComplete && ` ${availableVehicles} of ${totalVehicles} trucks are available now.`}
+              </InfoTip>
+            </h2>
+            <Link to="/bookings/orders" className="td-kpi__go" aria-label="Open orders"><ArrowUpRight size={16} strokeWidth={1.75} /></Link>
+          </div>
+          <div className="td-kpi__body">
+            <div className="td-kpi__value">{!loadsReady ? skeleton : loadsFailed ? "—" : activeLoadsCount}</div>
+            <MicroBars values={heatmapData} ariaLabel={`Loads booked per day, last 28 days: ${loads28} in total`} />
+          </div>
+          <div className="td-kpi__meta">
+            {/* "0 · 11 left open": the stale loads are said beside the figure,
+                not in it. Phones keep the short form so the note never clips. */}
+            {loadsReady && !loadsFailed && (notClosedCount > 0
+              ? <span>{notClosedCount} left open<span className="td-hide-sm"> · {loads28 === 0 ? "none" : loads28} booked in 28 days</span></span>
+              : <span>{loads28 === 0 ? "None booked" : `${loads28} booked`} in<span className="td-hide-sm"> the last</span> 28 days</span>)}
+          </div>
+        </section>
+      </div>
+
+      {/* Two independent columns so a tall card never leaves a gap beside a short one (§11.7). */}
+      <div className="td-grid">
+        <div className="td-col td-col--main">
+        <section className="tw-card td-chart-card" aria-labelledby="td-chart-title">
+          <div className="tw-card__head">
+            <div className="tw-card__titles">
+              <h2 id="td-chart-title" className="tw-card__title">
+                Revenue vs costs
+                <InfoTip>
+                  Revenue: money received in the month, excl. VAT (cash basis, as in the Profit and loss report). Costs: approved expenses dated in the month.
+                  {money?.trimmed ? ` ${money.trimmed}` : ""}
+                </InfoTip>
+              </h2>
+              <p className="tw-card__sub">
+                {trend.length ? `Excl. VAT, cash basis, ${spanText}` : "Excl. VAT, cash basis"}
+              </p>
+            </div>
+            <div className="td-legend" aria-hidden="true">
+              <span><i className="td-legend__rev" />Revenue</span>
+              <span><i className="td-legend__cost" />Costs</span>
+            </div>
+          </div>
+          {moneyLoading ? (
+            <div className="ov-skel-block" />
+          ) : !money || trend.length === 0 || trend.every((m) => m.revenue === 0 && m.costs === 0) ? (
+            <p className="td-empty">{money ? "No money in or out in the last 12 months." : moneyFailed ? "Figures couldn't load." : "No monthly figures yet."}</p>
           ) : (
-            <div
-              style={{
-                padding: 40,
-                textAlign: "center",
-                color: "var(--text-tertiary)",
-              }}>
-              No recent quotes
-            </div>
+            <RevenueCostBars
+              months={trend.map((m) => ({
+                label: monthLabel(m.ym),
+                full: `${monthLabel(m.ym)} ${m.ym.slice(0, 4)}`,
+                revenue: m.revenue,
+                costs: m.costs,
+              }))}
+            />
           )}
-        </div>
+        </section>
 
-        {/* Recent bookings */}
-        <div className="card table-card">
-          <div className="card-header">
-            <span className="card-title">Recent bookings</span>
-            <button
-              onClick={() => navigate("/bookings")}
-              style={{
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-                padding: "4px 8px",
-                fontSize: 13, lineHeight: "20px",
-                borderRadius: 2,
-                cursor: "pointer",
-              }}>
-              View all
-            </button>
+        <section className="tw-card tw-card--flush td-recent" aria-labelledby="td-recent-title">
+          <div className="tw-card__head td-recent__head">
+            <div className="tw-card__titles">
+              <h2 id="td-recent-title" className="tw-card__title">Latest work</h2>
+              <p className="tw-card__sub">Five most recent</p>
+            </div>
+            <div className="td-recent__tools">
+              <div className="tw-seg" role="tablist" aria-label="Show">
+                <button type="button" role="tab" aria-selected={recentTab === "quotes"} className={`tw-seg__opt${recentTab === "quotes" ? " is-active" : ""}`} onClick={() => setRecentTab("quotes")}>Quotes</button>
+                <button type="button" role="tab" aria-selected={recentTab === "loads"} className={`tw-seg__opt${recentTab === "loads" ? " is-active" : ""}`} onClick={() => setRecentTab("loads")}>Loads</button>
+              </div>
+              <Link to={recentTab === "quotes" ? "/bookings/quotes" : "/bookings"} className="tw-btn tw-btn--ghost">View all</Link>
+            </div>
           </div>
           {loading ? (
-            <div style={{ padding: 40, display: "flex", justifyContent: "center" }}>
-              <Loader size={24} />
-            </div>
+            <div className="ov-skel-block ov-skel-block--short td-recent__skel" />
+          ) : recentTab === "quotes" ? (
+            recentQuotes.length > 0 ? (
+              <div className="ov-table-wrap">
+                <table className="ov-table td-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Quote</th>
+                      <th scope="col" className="td-hide-sm">Customer</th>
+                      <th scope="col" className="td-hide-sm">Route</th>
+                      <th scope="col" className="num">Total</th>
+                      <th scope="col">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentQuotes.map((quote: any) => (
+                      <tr key={quote.id} onClick={() => navigate(`/bookings/quotes/${quote.id}`)}>
+                        <td><Link className="ov-id" to={`/bookings/quotes/${quote.id}`} onClick={(e) => e.stopPropagation()}>{quote.quote_number}</Link><div className="td-sub">{quote.customer_name || "—"}</div></td>
+                        <td className="td-ellipsis td-hide-sm">{quote.customer_name || "—"}</td>
+                        <td className="ov-muted td-hide-sm">{shortPlace(quote.pickup_location)} to {shortPlace(quote.delivery_location)}</td>
+                        <td className="num">{wholeRand(parseFloat(quote.total_amount || "0"))}</td>
+                        <td><StatusChip status={boardStage(quote) === 'EXPIRED' ? 'EXPIRED' : quote.status} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="td-empty td-recent__empty">{failed.includes("recent quotes") ? "Quotes couldn't load." : "No quotes yet."}</p>
+            )
           ) : recentLoads.length > 0 ? (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Load #</th>
-                  <th>Customer</th>
-                  <th>Route</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentLoads.map((load: any) => (
-                  <tr
-                    key={load.id}
-                    style={{ cursor: "pointer" }}
-                    onClick={() => navigate(`/bookings/${load.id}`)}>
-                    <td className="mono">
-                      {load.load_number || `LD-${load.id}`}
-                    </td>
-                    <td>
-                      {load.customer_name || load.customer?.company_name || "—"}
-                    </td>
-                    <td
-                      style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: "20px" }}>
-                      {(load.pickup_location || load.origin || "")
-                        .split(" ")
-                        .slice(0, 2)
-                        .join(" ") || "—"}{" "}
-                      →{" "}
-                      {(load.delivery_location || load.destination || "")
-                        .split(" ")
-                        .slice(0, 2)
-                        .join(" ") || "—"}
-                    </td>
-                    <td>
-                      <span
-                        style={{
-                          fontFamily: "var(--font-sans)",
-                          fontSize: 13, lineHeight: "20px",
-                          color:
-                            load.status === "DELIVERED"
-                              ? "var(--status-success)"
-                              : load.status === "IN_TRANSIT"
-                                ? "var(--accent-primary)"
-                                : "var(--text-tertiary)",
-                          padding: "2px 6px",
-                          background: "var(--bg-surface-hover)",
-                          borderRadius: 4,
-                          display: "inline-block",
-                          whiteSpace: "nowrap",
-                        }}>
-                        {titleCase(load.status)}
-                      </span>
-                    </td>
+            <div className="ov-table-wrap">
+              <table className="ov-table td-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Load</th>
+                    <th scope="col" className="td-hide-sm">Customer</th>
+                    <th scope="col" className="td-hide-sm">Route</th>
+                    <th scope="col">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div
-              style={{
-                padding: 40,
-                textAlign: "center",
-                color: "var(--text-tertiary)",
-              }}>
-              No recent bookings
+                </thead>
+                <tbody>
+                  {recentLoads.map((load: any) => (
+                    <tr key={load.id} onClick={() => navigate(`/bookings/${load.id}`)}>
+                      <td><Link className="ov-id" to={`/bookings/${load.id}`} onClick={(e) => e.stopPropagation()}>{load.load_number || `LD-${load.id}`}</Link><div className="td-sub">{load.customer_name || load.customer?.company_name || "—"}</div></td>
+                      <td className="td-ellipsis td-hide-sm">{load.customer_name || load.customer?.company_name || "—"}</td>
+                      <td className="ov-muted td-hide-sm">
+                        {shortPlace(load.pickup_location || load.origin)} to {shortPlace(load.delivery_location || load.destination)}
+                      </td>
+                      <td><StatusChip status={load.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+          ) : (
+            <p className="td-empty td-recent__empty">{failed.includes("loads") ? "Loads couldn't load." : "No loads yet."}</p>
           )}
+        </section>
         </div>
 
-        {/* Recent activity */}
-        <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>
-            Recent activity
+        <div className="td-col td-side">
+        <section className="tw-card td-needs" aria-labelledby="td-needs-title">
+          <div className="tw-card__head">
+            <div className="tw-card__titles">
+              <h2 id="td-needs-title" className="tw-card__title">Needs you</h2>
+              <p className="tw-card__sub">Invoices, quotes and fleet</p>
+            </div>
+            {!needsLoading && needs.length > 0 && <span className="tw-chip">{needs.length}</span>}
           </div>
-          {activityLoading ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
-              <Loader size={20} />
-            </div>
-          ) : activity.length === 0 ? (
-            <div
-              style={{
-                color: "var(--text-secondary)",
-                fontSize: 13,
-                padding: "16px 0",
-              }}>
-              No recent activity
-            </div>
+          {needsLoading ? (
+            <div className="ov-skel-block ov-skel-block--short" />
+          ) : needs.length > 0 ? (
+            <ul className="td-needs__list">
+              {needs.slice(0, 5).map(({ row, actionUrl, severity }, idx: number) => {
+                const Icon = row.kind === "invoice" ? FileText : row.kind === "fleet" ? Truck : CircleAlert;
+                return (
+                  <li key={idx} className="td-needs__row">
+                    <Icon className="td-needs__icon" size={16} strokeWidth={1.75} aria-hidden="true" />
+                    <div className="td-needs__text">
+                      {row.amount ? (
+                        <div className="td-needs__line">
+                          <div className="td-needs__title">{row.title}<span className="ov-sr-only"> owes</span></div>
+                          <span className="td-needs__amount">{row.amount}</span>
+                        </div>
+                      ) : <div className="td-needs__title">{row.title}</div>}
+                      {row.detail && <div className="td-needs__body" title={row.detailTitle || row.detail}>{row.detail}</div>}
+                    </div>
+                    {row.actionLabel && actionUrl && (
+                      <Link to={actionUrl} className="tw-btn tw-btn--sm td-needs__action" aria-label={`${row.actionLabel}: ${row.title}`}>{row.actionLabel}</Link>
+                    )}
+                    <span className="ov-sr-only">{titleCase(severity)} priority</span>
+                  </li>
+                );
+              })}
+            </ul>
           ) : (
-            <div>
-              {activity.slice(0, 8).map((e: any) => (
-                <div
-                  key={e.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "10px 0",
-                    borderBottom: "1px solid var(--border-row)",
-                  }}>
-                  <div style={{ fontSize: 13, color: "var(--text-primary)" }}>
-                    {e.title}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 13, lineHeight: "20px",
-                      color: "var(--text-tertiary)",
-                      whiteSpace: "nowrap",
-                      marginLeft: 16,
-                    }}>
-                    {timeAgo(e.created_at)}
-                  </div>
-                </div>
-              ))}
+            <div className="td-empty">
+              <p>Nothing needs you right now.</p>
+              <button type="button" className="tw-btn" onClick={() => navigate("/copilot")}>Ask Copilot</button>
             </div>
           )}
-        </div>
+        </section>
 
-      {/* Agent Activity Stream — a regular grid card now, not a separate
-          full-height rail: that layout reserved a fixed-width column that
-          stayed mostly blank whenever there were only a couple of insights,
-          leaving a large empty strip down the right side of the page. As a
-          grid card it's only as tall as its own content. */}
-      <div className="card" style={{ padding: 0, background: "var(--bg-sidebar)" }}>
-        <div className="agent-header">
-          <div className="live-dot" />
-          Agent activity stream
-        </div>
-        <div className="agent-feed">
-          {loading ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
-              <Loader size={20} />
+          <section className="tw-card td-pipe-card" aria-labelledby="td-pipe-title">
+            <div className="tw-card__head">
+              <div className="tw-card__titles">
+                <h2 id="td-pipe-title" className="tw-card__title">
+                  Quote pipeline
+                  <InfoTip align="end">Draft, Sent, Accepted, Declined and Expired are the Quotes board columns (a quote marked lost counts as Declined; a draft or sent quote past its valid-until date is Expired and not counted as live). On the road counts in-transit loads still on schedule; in-transit loads past their delivery date are said under that row as left open. Win rate is accepted as a share of every quote sent{pipeline.sentEver > 0 ? `: ${pipeline.accepted} of ${pipeline.sentEver}` : ""}.</InfoTip>
+                </h2>
+                <p className="tw-card__sub">
+                  {quotesAll.isLoading && loading ? "Quotes by stage"
+                    : pipelineComplete ? `All ${pipelineQuotes.length} quotes`
+                      : quotesTotal != null && quotesTotal > pipelineQuotes.length ? `Latest ${pipelineQuotes.length} of ${quotesTotal} quotes`
+                        : `All ${pipelineQuotes.length} quotes`}
+                </p>
+              </div>
+              <Link to="/bookings/quotes" className="td-kpi__go" aria-label="Open quotes"><ArrowUpRight size={16} strokeWidth={1.75} /></Link>
             </div>
-          ) : insights.length > 0 ? (
-            insights.slice(0, 5).map((insight: any, idx: number) => (
-              <div key={idx} className="feed-item">
-                <div className="feed-meta">
-                  <span
-                    style={{
-                      color:
-                        insight.priority === "high"
-                          ? "var(--accent-primary)"
-                          : "inherit",
-                    }}>
-                    {insight.category || "Insight"}
-                  </span>
-                  <span>{insight.time_ago || "Now"}</span>
-                </div>
-                <div className="feed-content">
-                  <span className="highlight-text">
-                    {insight.title || insight.message}
-                  </span>
-                  {insight.description && ` ${insight.description}`}
-                </div>
+            {loading && quotesAll.isLoading ? (
+              <div className="ov-skel-block ov-skel-block--short" />
+            ) : pipelineQuotes.length === 0 ? (
+              <div className="td-empty">
+                <p>{failed.includes("recent quotes") ? "Quotes couldn't load." : "No quotes yet."}</p>
+                <button type="button" className="tw-btn" onClick={() => navigate("/bookings/quotes/new")}>New quote</button>
               </div>
-            ))
-          ) : (
-            // Honest empty state — the old fallback rendered hardcoded FAKE
-            // activity (Truck 42, INV-2024-09, LogiCorp, TRK-892) that looked
-            // live but matched no real record, so clicking "Ask Copilot" about it
-            // returned "no such record". Show nothing invented instead.
-            <div className="feed-item">
-              <div className="feed-meta">
-                <span>Agent</span>
-                <span>—</span>
-              </div>
-              <div className="feed-content">
-                No agent activity yet. As your quotes, invoices and fleet data grow,
-                insights will appear here.{" "}
-                <button
-                  className="btn-action"
-                  style={{ marginTop: 10 }}
-                  onClick={() => navigate("/copilot")}>
-                  Ask Copilot
-                </button>
-              </div>
-            </div>
-          )}
+            ) : (
+              <>
+                <PipelineBars stages={pipeline.stages} />
+                {/* One fact once: the rate. The counts behind it ("6 of 9") are in the card's tip. */}
+                <dl className="td-stats td-stats--one">
+                  <div><dt>Win rate</dt><dd>{pipeline.winRate != null ? formatPercent(pipeline.winRate, 0) : "—"}</dd></div>
+                </dl>
+              </>
+            )}
+          </section>
+
         </div>
       </div>
     </div>

@@ -1,4 +1,6 @@
 import '@/pages/settings/settings-brand.css';
+import { formatDateTime, formatMoney, formatMonth, formatNumber } from '@/lib/formatters';
+import { InfoTip } from '@/components/ui/InfoTip';
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData, postData } from "@/lib/Api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -6,6 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader } from '@/components/Loader';
 import { toast } from '@/lib/toast';
 import { useAuth } from '@/lib/AuthContext';
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from './settingsUi';
 
 const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 const resolveLogoUrl = (url?: string) => {
@@ -14,56 +17,45 @@ const resolveLogoUrl = (url?: string) => {
   return `${apiBase}/${url.replace(/^\//, '')}`;
 };
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 8,
-  marginBottom: 16,
-};
+const sectionStyle = settingsCardStyle;
+const sectionHeaderStyle = settingsCardHeaderStyle;
+const sectionTitleStyle = settingsCardTitleStyle;
+const labelStyle = settingsLabelStyle;
+const inputStyle = settingsInputStyle;
+const helpTextStyle = settingsHelpStyle;
 
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: '16px 20px 12px',
-  borderBottom: '1px solid var(--border-subtle)',
-};
+const bodyStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
+// A label with a tip: on touch screens it keeps 14px above the control, so
+// the tip's 44px target never sits under the select (R7, settings-brand.css).
+const labelTipStyle: React.CSSProperties = { ...settingsLabelStyle, display: 'flex', alignItems: 'center', gap: 4, marginBottom: 'var(--cs-tip-gap, 6px)' };
 
-const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  lineHeight: '24px',
-  fontWeight: 600,
-  color: 'var(--text-primary)',
-  margin: 0,
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 13,
-  lineHeight: '20px',
-  fontWeight: 500,
-  color: 'var(--text-primary)',
-  marginBottom: 6,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  background: 'var(--input-bg)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 6,
-  padding: '8px 12px',
-  minHeight: 40,
-  color: 'var(--text-primary)',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 14,
-  lineHeight: '20px',
-};
-
-const helpTextStyle: React.CSSProperties = {
-  fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 6,
-};
-
-const grid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 };
-const grid3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 };
+/* A decimal field in the ZA format ("10,00", "29,11"). The form keeps the
+   API's own value (dot decimal, full precision) so an untouched field saves
+   exactly what was loaded; only while typing does the field hold the text
+   the user typed, accepted with a comma or a dot. */
+const toRaw = (text: string) => text.replace(/[\s\u00A0\u202F]/g, '').replace(',', '.');
+function DecimalInput({ id, value, onChange, placeholder, decimals = 2 }: {
+  id: string; value: string; onChange: (raw: string) => void; placeholder?: string; decimals?: number;
+}) {
+  const [text, setText] = useState<string | null>(null);
+  const n = parseFloat(value);
+  const shown = text ?? (value === '' || Number.isNaN(n) ? value : formatNumber(n, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }));
+  return (
+    <input
+      id={id}
+      className="settings-control"
+      style={inputStyle}
+      type="text"
+      inputMode="decimal"
+      autoComplete="off"
+      placeholder={placeholder}
+      value={shown}
+      onFocus={() => setText(shown)}
+      onChange={e => { setText(e.target.value); onChange(toRaw(e.target.value)); }}
+      onBlur={() => setText(null)}
+    />
+  );
+}
 
 export function CompanySettings() {
   const { user: authUser } = useAuth();
@@ -82,6 +74,8 @@ export function CompanySettings() {
     cross_border_crossings_per_year: '',
     fuel_zone: 'INLAND',
     fuel_price_per_litre: '', fuel_price_petrol: '', fuel_price_electric: '', fuel_price_hybrid: '',
+    bank_name: '', bank_account_holder: '', bank_account_number: '', bank_branch_code: '',
+    bank_account_type: '', payment_reference_hint: '',
   });
   const [logoUrl, setLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -170,6 +164,12 @@ export function CompanySettings() {
           fuel_price_petrol: d.fuel_price_petrol != null ? String(d.fuel_price_petrol) : '',
           fuel_price_electric: d.fuel_price_electric != null ? String(d.fuel_price_electric) : '',
           fuel_price_hybrid: d.fuel_price_hybrid != null ? String(d.fuel_price_hybrid) : '',
+          bank_name: d.bank_name || '',
+          bank_account_holder: d.bank_account_holder || '',
+          bank_account_number: d.bank_account_number || '',
+          bank_branch_code: d.bank_branch_code || '',
+          bank_account_type: d.bank_account_type || '',
+          payment_reference_hint: d.payment_reference_hint || '',
         });
         // Only show a real uploaded logo, not the backend's default placeholder
         if (d.logo_url && !d.logo_url.endsWith('/brand/logo.svg')) setLogoUrl(d.logo_url);
@@ -243,6 +243,22 @@ export function CompanySettings() {
       toast.error('Border crossings per year must be between 1 and 5000');
       return;
     }
+    // Banking details: spaces/hyphens are fine (the server strips them), but
+    // what's left must be digits. Blank clears the field.
+    const accountDigits = form.bank_account_number.replace(/[\s-]/g, '');
+    if (accountDigits && !/^\d{6,20}$/.test(accountDigits)) {
+      toast.error('Account number must be 6–20 digits');
+      return;
+    }
+    const branchDigits = form.bank_branch_code.replace(/[\s-]/g, '');
+    if (branchDigits && !/^\d{4,10}$/.test(branchDigits)) {
+      toast.error('Branch code must be 4–10 digits');
+      return;
+    }
+    if (!!form.bank_name.trim() !== !!accountDigits) {
+      toast.error('Enter both a bank name and an account number, or leave both blank');
+      return;
+    }
     setSaving(true);
     try {
       await patchData({ url: '/api/v1/company/profile/', data: {
@@ -267,6 +283,12 @@ export function CompanySettings() {
         fuel_price_petrol: form.fuel_price_petrol ? parseFloat(form.fuel_price_petrol) : null,
         fuel_price_electric: form.fuel_price_electric ? parseFloat(form.fuel_price_electric) : null,
         fuel_price_hybrid: form.fuel_price_hybrid ? parseFloat(form.fuel_price_hybrid) : null,
+        bank_name: form.bank_name.trim() || null,
+        bank_account_holder: form.bank_account_holder.trim() || null,
+        bank_account_number: accountDigits || null,
+        bank_branch_code: branchDigits || null,
+        bank_account_type: form.bank_account_type || null,
+        payment_reference_hint: form.payment_reference_hint.trim() || null,
       } });
       // The quote builder reads these defaults through the shared
       // ["company-profile"] query, which has a 5 minute staleTime — so without
@@ -283,69 +305,61 @@ export function CompanySettings() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Company details</h2>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Your business information and branding</div>
-      </div>
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
+      <SettingsPageHeader title="Company details" description="Your business information and branding" />
 
-      {/* Company Logo */}
+      {/* Business info, with the logo as its first row (R8: no one-line card). */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Company logo</h3></div>
-        <div style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 20 }}>
-          <div style={{
-            width: 96, height: 96, flexShrink: 0,
-            border: '1px solid var(--border-subtle)', borderRadius: 4,
-            background: 'var(--input-bg)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-          }}>
-            {logoUrl ? (
-              <img src={resolveLogoUrl(logoUrl)} alt="Company logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-            ) : (
-              <span style={{ ...labelStyle, marginBottom: 0, textAlign: 'center' }}>No logo</span>
-            )}
-          </div>
-          <div>
-            <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', marginBottom: 4 }}>
-              This logo appears on quotes and invoices sent to your customers.
+        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Business information</h2></div>
+        <div style={bodyStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', paddingBottom: 20, marginBottom: 20, borderBottom: '1px solid var(--border-subtle)' }}>
+            <div style={{
+              width: 72, height: 72, flexShrink: 0,
+              border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)',
+              background: 'var(--input-bg)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+            }}>
+              {logoUrl ? (
+                <img src={resolveLogoUrl(logoUrl)} alt="Company logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+              ) : (
+                <span style={{ ...labelStyle, marginBottom: 0, textAlign: 'center' }}>No logo</span>
+              )}
             </div>
-            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 12 }}>
-              PNG, JPG, GIF or WebP · max 2MB
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              onChange={handleLogoSelect}
-              disabled={isDemo}
-              style={{ display: 'none' }}
-            />
-            <button
-              className="btn-action settings-control"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingLogo || isDemo}
-              title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ minHeight: 40, borderRadius: 6, opacity: isDemo ? 0.5 : uploadingLogo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
-            >
-              {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace logo' : 'Upload logo'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Business Info */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Business information</h3></div>
-        <div style={{ padding: 20 }}>
-          <div style={{ ...grid2, marginBottom: 16 }}>
-            <div>
-              <label style={labelStyle}>Company name</label>
-              <input className="settings-control" style={inputStyle} value={form.company_name} onChange={e => set('company_name', e.target.value)} />
+            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+              <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>Logo</div>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+                Shown on the quotes and invoices you send.<br />PNG, JPG, GIF or WebP, up to 2 MB
+              </div>
             </div>
             <div>
-              <label style={labelStyle}>Industry</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                onChange={handleLogoSelect}
+                disabled={isDemo}
+                style={{ display: 'none' }}
+              />
+              <button
+                className="settings-control"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingLogo || isDemo}
+                title={isDemo ? 'Fixed in demo mode' : undefined}
+                style={{ ...settingsSecondaryButtonStyle, opacity: isDemo ? 0.5 : uploadingLogo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : 'pointer' }}
+              >
+                {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace logo' : 'Upload logo'}
+              </button>
+            </div>
+          </div>
+          <div className="cs-grid cs-grid--2" style={{ marginBottom: 16 }}>
+            <div>
+              <label htmlFor="company-company-name" style={labelStyle}>Company name</label>
+              <input id="company-company-name" className="settings-control" style={inputStyle} value={form.company_name} onChange={e => set('company_name', e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="company-industry" style={labelStyle}>Industry</label>
               <Select value={form.industry} onValueChange={val => set('industry', val)}>
-                <SelectTrigger>
+                <SelectTrigger style={inputStyle} className="cs-select" id="company-industry">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -359,23 +373,23 @@ export function CompanySettings() {
               </Select>
             </div>
           </div>
-          <div style={{ ...grid2, marginBottom: 16 }}>
+          <div className="cs-grid cs-grid--2" style={{ marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>Registration number</label>
-              <input className="settings-control" style={inputStyle} value={form.registration_number} onChange={e => set('registration_number', e.target.value)} placeholder="YYYY/XXXXXX/XX" />
+              <label htmlFor="company-registration-number" style={labelStyle}>Registration number</label>
+              <input id="company-registration-number" className="settings-control" style={inputStyle} value={form.registration_number} onChange={e => set('registration_number', e.target.value)} placeholder="YYYY/XXXXXX/XX" />
             </div>
             <div>
-              <label style={labelStyle}>VAT number</label>
-              <input className="settings-control" style={inputStyle} value={form.vat_number} onChange={e => set('vat_number', e.target.value)} placeholder="4XXXXXXXXX" />
+              <label htmlFor="company-vat-number" style={labelStyle}>VAT number</label>
+              <input id="company-vat-number" className="settings-control" style={inputStyle} value={form.vat_number} onChange={e => set('vat_number', e.target.value)} placeholder="4XXXXXXXXX" />
             </div>
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Website</label>
-            <input className="settings-control" style={inputStyle} value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://" />
+            <label htmlFor="company-website" style={labelStyle}>Website</label>
+            <input id="company-website" className="settings-control" style={inputStyle} value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://" />
           </div>
           <div>
-            <label style={labelStyle}>Description</label>
-            <textarea
+            <label htmlFor="company-description" style={labelStyle}>Description</label>
+            <textarea id="company-description"
               className="settings-control"
               style={{ ...inputStyle, minHeight: 72, resize: 'vertical' as const }}
               value={form.description}
@@ -387,21 +401,21 @@ export function CompanySettings() {
 
       {/* Address */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Business address</h3></div>
-        <div style={{ padding: 20 }}>
+        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Business address</h2></div>
+        <div style={bodyStyle}>
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Street address</label>
-            <input className="settings-control" style={inputStyle} value={form.street} onChange={e => set('street', e.target.value)} />
+            <label htmlFor="company-street-address" style={labelStyle}>Street address</label>
+            <input id="company-street-address" className="settings-control" style={inputStyle} value={form.street} onChange={e => set('street', e.target.value)} />
           </div>
-          <div style={{ ...grid3, marginBottom: 16 }}>
+          <div className="cs-grid cs-grid--3" style={{ marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>City</label>
-              <input className="settings-control" style={inputStyle} value={form.city} onChange={e => set('city', e.target.value)} />
+              <label htmlFor="company-city" style={labelStyle}>City</label>
+              <input id="company-city" className="settings-control" style={inputStyle} value={form.city} onChange={e => set('city', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Province</label>
+              <label htmlFor="company-province" style={labelStyle}>Province</label>
               <Select value={form.province} onValueChange={val => set('province', val)}>
-                <SelectTrigger>
+                <SelectTrigger style={inputStyle} className="cs-select" id="company-province">
                   <SelectValue placeholder="Select province" />
                 </SelectTrigger>
                 <SelectContent>
@@ -418,8 +432,8 @@ export function CompanySettings() {
               </Select>
             </div>
             <div>
-              <label style={labelStyle}>Postal code</label>
-              <input className="settings-control" style={inputStyle} value={form.postal_code} onChange={e => set('postal_code', e.target.value)} />
+              <label htmlFor="company-postal-code" style={labelStyle}>Postal code</label>
+              <input id="company-postal-code" className="settings-control" style={inputStyle} value={form.postal_code} onChange={e => set('postal_code', e.target.value)} />
             </div>
           </div>
         </div>
@@ -427,33 +441,85 @@ export function CompanySettings() {
 
       {/* Contact */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Contact details</h3></div>
-        <div style={{ padding: 20 }}>
-          <div style={{ ...grid3 }}>
+        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Contact details</h2></div>
+        <div style={bodyStyle}>
+          <div className="cs-grid cs-grid--3">
             <div>
-              <label style={labelStyle}>Phone</label>
-              <input className="settings-control" style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
+              <label htmlFor="company-phone" style={labelStyle}>Phone</label>
+              <input id="company-phone" className="settings-control" style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Business email</label>
-              <input className="settings-control" style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+              <label htmlFor="company-business-email" style={labelStyle}>Business email</label>
+              <input id="company-business-email" className="settings-control" style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Support email</label>
-              <input className="settings-control" style={inputStyle} type="email" value={form.support_email} onChange={e => set('support_email', e.target.value)} />
+              <label htmlFor="company-support-email" style={labelStyle}>Support email</label>
+              <input id="company-support-email" className="settings-control" style={inputStyle} type="email" value={form.support_email} onChange={e => set('support_email', e.target.value)} />
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Banking details */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <h2 style={sectionTitleStyle}>Banking details</h2>
+          <InfoTip label="Where banking details appear">Shown in a "How to pay" section on the invoices you send (PDF, invoice email and online invoice) once a bank name and account number are filled in. Until then, invoices ask customers to contact you for banking details.</InfoTip>
+        </div>
+        <div style={bodyStyle}>
+          <div className="cs-grid cs-grid--2" style={{ marginBottom: 16 }}>
+            <div>
+              <label htmlFor="company-bank-name" style={labelStyle}>Bank name</label>
+              <input id="company-bank-name" className="settings-control" style={inputStyle} value={form.bank_name} onChange={e => set('bank_name', e.target.value)} placeholder="e.g. FNB" maxLength={100} />
+            </div>
+            <div>
+              <label htmlFor="company-bank-holder" style={labelStyle}>Account holder</label>
+              <input id="company-bank-holder" className="settings-control" style={inputStyle} value={form.bank_account_holder} onChange={e => set('bank_account_holder', e.target.value)} placeholder={form.company_name || 'Registered account name'} maxLength={200} />
+              <div style={helpTextStyle}>Blank uses your company name.</div>
+            </div>
+          </div>
+          <div className="cs-grid cs-grid--3" style={{ marginBottom: 16 }}>
+            <div>
+              <label htmlFor="company-bank-account" style={labelStyle}>Account number</label>
+              <input id="company-bank-account" className="settings-control" style={inputStyle} inputMode="numeric" autoComplete="off" value={form.bank_account_number} onChange={e => set('bank_account_number', e.target.value)} placeholder="Digits only" maxLength={30} />
+              <div style={helpTextStyle}>6–20 digits.</div>
+            </div>
+            <div>
+              <label htmlFor="company-bank-branch" style={labelStyle}>Branch code</label>
+              <input id="company-bank-branch" className="settings-control" style={inputStyle} inputMode="numeric" autoComplete="off" value={form.bank_branch_code} onChange={e => set('bank_branch_code', e.target.value)} placeholder="e.g. 250655" maxLength={14} />
+              <div style={helpTextStyle}>Universal code, 4–10 digits.</div>
+            </div>
+            <div>
+              <label style={labelStyle} id="company-bank-type">Account type</label>
+              <Select value={form.bank_account_type || 'none'} onValueChange={val => set('bank_account_type', val === 'none' ? '' : val)}>
+                <SelectTrigger style={inputStyle} className="cs-select" aria-labelledby="company-bank-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not specified</SelectItem>
+                  <SelectItem value="CHEQUE">Cheque / current</SelectItem>
+                  <SelectItem value="SAVINGS">Savings</SelectItem>
+                  <SelectItem value="TRANSMISSION">Transmission</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="company-bank-ref" style={labelStyle}>Payment reference wording (optional)</label>
+            <input id="company-bank-ref" className="settings-control" style={inputStyle} value={form.payment_reference_hint} onChange={e => set('payment_reference_hint', e.target.value)} placeholder="Please use the invoice number as your payment reference." maxLength={200} />
+            <div style={helpTextStyle}>Replaces the default wording on invoices.</div>
           </div>
         </div>
       </div>
 
       {/* Quote Defaults */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Quote defaults</h3></div>
-        <div style={{ padding: 20 }}>
-          <div style={grid2}>
+        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Quote defaults</h2></div>
+        <div style={bodyStyle}>
+          <div className="cs-grid cs-grid--2">
             <div>
-              <label style={labelStyle}>Default quote validity (days)</label>
-              <input
+              <label htmlFor="company-default-quote-validity-days" style={labelStyle}>Quote valid for (days)</label>
+              <input id="company-default-quote-validity-days"
                 className="settings-control"
                 style={inputStyle}
                 type="number"
@@ -462,14 +528,15 @@ export function CompanySettings() {
                 value={form.default_quote_validity_days}
                 onChange={e => set('default_quote_validity_days', e.target.value)}
               />
-              <div style={helpTextStyle}>
-                New quotes will default to expire this many days after creation. Can be overridden per quote.
-              </div>
+              <div style={helpTextStyle}>Each quote can change it.</div>
             </div>
             <div>
-              <label style={labelStyle}>Cross-border routes</label>
+              <label htmlFor="company-cross-border-routes" style={labelTipStyle}>
+                Cross-border routes
+                <InfoTip label="About cross-border routes">Whether your fleet is set up to run loads into neighbouring countries. When set to No, any quote whose route actually crosses a border is refused rather than priced.</InfoTip>
+              </label>
               <Select value={form.allow_cross_border} onValueChange={val => set('allow_cross_border', val)}>
-                <SelectTrigger>
+                <SelectTrigger style={inputStyle} className="cs-select" id="company-cross-border-routes">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -477,55 +544,30 @@ export function CompanySettings() {
                   <SelectItem value="no">No</SelectItem>
                 </SelectContent>
               </Select>
-              <div style={helpTextStyle}>
-                Whether your fleet is set up to run loads that cross into neighbouring
-                countries. When set to "No", any quote whose route actually crosses a
-                border is refused rather than priced.
-              </div>
+              <div style={helpTextStyle}>Choose No to refuse quotes that cross a border.</div>
             </div>
           </div>
 
-          <div style={{ ...grid2, marginTop: 16 }}>
+          <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
             <div>
-              <label style={labelStyle}>Default base rate (R/km)</label>
-              <input
-                className="settings-control"
-                style={inputStyle}
-                type="number"
-                min={0}
-                step={0.01}
-                placeholder="e.g. 33.00"
-                value={form.default_base_rate_per_km}
-                onChange={e => set('default_base_rate_per_km', e.target.value)}
-              />
-              <div style={helpTextStyle}>
-                Used when the vehicle type on a quote has no rate of its own
-                (Settings &gt; Vehicle types). A type's own rate always wins.
-              </div>
+              <label htmlFor="company-default-base-rate-r-km" style={labelTipStyle}>
+                Base rate (R/km)
+                <InfoTip label="About the base rate">Used when the vehicle type on a quote has no rate of its own (Settings, Vehicle types). A type's own rate always wins.</InfoTip>
+              </label>
+              <DecimalInput id="company-default-base-rate-r-km" placeholder="e.g. 33,00" value={form.default_base_rate_per_km} onChange={v => set('default_base_rate_per_km', v)} />
+              <div style={helpTextStyle}>When a vehicle type has no rate.</div>
             </div>
             <div>
-              <label style={labelStyle}>Default toll rate (R/km)</label>
-              <input
-                className="settings-control"
-                style={inputStyle}
-                type="number"
-                min={0}
-                step={0.001}
-                placeholder="e.g. 0.50"
-                value={form.default_toll_rate_per_km}
-                onChange={e => set('default_toll_rate_per_km', e.target.value)}
-              />
-              <div style={helpTextStyle}>
-                Fallback only &mdash; used when the routing service can't itemise the
-                toll plazas on a route.
-              </div>
+              <label htmlFor="company-default-toll-rate-r-km" style={labelStyle}>Toll rate (R/km)</label>
+              <DecimalInput id="company-default-toll-rate-r-km" placeholder="e.g. 0,50" value={form.default_toll_rate_per_km} onChange={v => set('default_toll_rate_per_km', v)} />
+              <div style={helpTextStyle}>Only when tolls can't be itemised.</div>
             </div>
           </div>
 
-          <div style={{ ...grid2, marginTop: 16 }}>
+          <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
             <div>
-              <label style={labelStyle}>Default SLA (hours)</label>
-              <input
+              <label htmlFor="company-default-sla-hours" style={labelStyle}>Delivery promise (hours)</label>
+              <input id="company-default-sla-hours"
                 className="settings-control"
                 style={inputStyle}
                 type="number"
@@ -535,13 +577,14 @@ export function CompanySettings() {
                 value={form.default_sla_hours}
                 onChange={e => set('default_sla_hours', e.target.value)}
               />
-              <div style={helpTextStyle}>
-                Delivery time promised on a new quote. Can be overridden per quote.
-              </div>
+              <div style={helpTextStyle}>Each quote can change it.</div>
             </div>
             <div>
-              <label style={labelStyle}>Border crossings per year</label>
-              <input
+              <label htmlFor="company-border-crossings-per-year" style={labelTipStyle}>
+                Border crossings per year
+                <InfoTip label="About border crossings">Count each leg separately: a return trip is two. A C-BRTA permit is bought for a year, so a quote charges its share of one crossing: the more you cross, the less each load carries.</InfoTip>
+              </label>
+              <input id="company-border-crossings-per-year"
                 className="settings-control"
                 style={inputStyle}
                 type="number"
@@ -551,11 +594,7 @@ export function CompanySettings() {
                 value={form.cross_border_crossings_per_year}
                 onChange={e => set('cross_border_crossings_per_year', e.target.value)}
               />
-              <div style={helpTextStyle}>
-                Count each leg separately &mdash; a return trip is two. A C-BRTA permit is
-                bought for a year, so a quote charges its share of one crossing: the more
-                you cross, the less each load carries.
-              </div>
+              <div style={helpTextStyle}>Spreads the permit cost over loads.</div>
             </div>
           </div>
         </div>
@@ -563,173 +602,110 @@ export function CompanySettings() {
 
       {/* Fuel Price Defaults */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Fuel price defaults</h3></div>
-        <div style={{ padding: 20 }}>
-          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
-            Used as the default price when a vehicle type of that fuel type doesn't have
-            its own fuel price set (Settings &gt; Vehicle types). Diesel already falls back
-            to the live national price if left blank; the other three have no such feed,
-            so they stay unset until you add one.
-          </div>
+        <div style={{ ...sectionHeaderStyle, justifyContent: 'space-between' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <h2 style={sectionTitleStyle}>Fuel prices</h2>
+            <InfoTip label="About fuel prices">Used when a vehicle type has no fuel price of its own (Settings, Vehicle types). Diesel falls back to the live national price if left blank; the other three have no live feed, so they stay unset until you add one.</InfoTip>
+          </span>
+          <button
+            type="button"
+            onClick={() => loadLivePrice(true)}
+            disabled={fetchingLivePrice}
+            className="settings-control"
+            style={{ ...settingsSecondaryButtonStyle, cursor: fetchingLivePrice ? 'wait' : 'pointer' }}
+          >
+            {fetchingLivePrice
+              ? <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 112 }}><Loader size={12} color="currentColor" /></span>
+              : 'Fetch live prices'}
+          </button>
+        </div>
+        <div style={bodyStyle}>
           <div style={{ marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>Fuel pricing zone</label>
+              <label htmlFor="company-fuel-pricing-zone" style={labelTipStyle}>
+                Fuel pricing zone
+                <InfoTip label="About fuel zones">Diesel is gazetted at two prices: it lands at the coastal ports and costs more inland once the transport differential is added, about {formatMoney(0.87)}/L at the moment. Changing the zone fetches its current price and updates Diesel below.</InfoTip>
+              </label>
               <Select
                 value={form.fuel_zone}
                 onValueChange={val => { set('fuel_zone', val); loadLivePrice(true, val, true); }}
                 disabled={fetchingLivePrice}
               >
-                <SelectTrigger>
+                <SelectTrigger style={inputStyle} className="cs-select" id="company-fuel-pricing-zone">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="INLAND">Inland &mdash; Gauteng and the interior</SelectItem>
-                  <SelectItem value="COASTAL">Coastal &mdash; Cape Town, Durban, Gqeberha, East London</SelectItem>
+                  <SelectItem value="INLAND">Inland: Gauteng and the interior</SelectItem>
+                  <SelectItem value="COASTAL">Coastal: Cape Town, Durban, Gqeberha, East London</SelectItem>
                 </SelectContent>
               </Select>
-              <div style={helpTextStyle}>
-                Diesel is gazetted at two prices: it arrives at the coastal ports and costs
-                more inland once the transport differential is added &mdash; about R0.87/L
-                at the moment. Changing this fetches the current price for the zone and
-                updates Diesel below.
-              </div>
+              <div style={helpTextStyle}>Changing it updates Diesel below.</div>
             </div>
           </div>
-          <div style={grid2}>
+          <div className="cs-grid cs-grid--2">
             <div>
-              <label style={labelStyle}>Diesel (R/L)</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  style={inputStyle}
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  placeholder="e.g. 23.50"
-                  value={form.fuel_price_per_litre}
-                  onChange={e => set('fuel_price_per_litre', e.target.value)}
-                />
-                <button
-                  onClick={() => loadLivePrice(true)}
-                  disabled={fetchingLivePrice}
-                  className="settings-control"
-                  style={{
-                    flexShrink: 0, background: 'none', border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-secondary)', padding: '0 12px', minHeight: 40,
-                    fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-                    borderRadius: 6, cursor: fetchingLivePrice ? 'wait' : 'pointer',
-                  }}
-                >
-                  {fetchingLivePrice
-                    ? <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 62 }}>
-                        <Loader size={12} color="currentColor" />
-                      </span>
-                    : 'Fetch now'}
-                </button>
-              </div>
+              <label htmlFor="company-diesel-r-l" style={labelStyle}>Diesel (R/L)</label>
+              <DecimalInput id="company-diesel-r-l" placeholder="e.g. 23,50" value={form.fuel_price_per_litre} onChange={v => set('fuel_price_per_litre', v)} />
               {livePrice?.success !== false && (livePrice?.inland_price != null || livePrice?.stale_warning) && (
-                <div style={{ fontSize: 13, lineHeight: '20px', color: livePrice.is_stale ? 'var(--status-warning)' : 'var(--text-tertiary)', marginTop: 6 }}>
+                <div className="cs-live" style={{ color: livePrice.is_stale ? 'var(--status-warning-text)' : 'var(--text-tertiary)' }}
+                  title={[livePrice.last_updated && `For ${new Date(livePrice.last_updated).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}`, livePrice.last_checked_at && `checked ${formatDateTime(livePrice.last_checked_at)}`, livePrice.stale_warning].filter(Boolean).join(' · ')}>
                   {livePrice.inland_price != null ? (
                     <>
-                      Live national price: R{Number(livePrice.inland_price).toFixed(2)}/L
-                      {livePrice.last_updated && ` · for ${new Date(livePrice.last_updated).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}`}
-                      {livePrice.last_checked_at && ` · checked ${new Date(livePrice.last_checked_at).toLocaleString('en-ZA')}`}
-                      {livePrice.stale_warning && ` · ${livePrice.stale_warning}`}
+                      Live: {formatMoney(Number(livePrice.inland_price))}/L
+                      {livePrice.last_updated && `, ${formatMonth(livePrice.last_updated)}`}
+                      {livePrice.stale_warning && ', may be out of date'}
                     </>
                   ) : (
                     <>
                       {livePrice.stale_warning}
-                      {livePrice.last_checked_at && ` (checked ${new Date(livePrice.last_checked_at).toLocaleString('en-ZA')})`}
+                      {livePrice.last_checked_at && ` (checked ${formatDateTime(livePrice.last_checked_at)})`}
                     </>
                   )}
                 </div>
               )}
             </div>
             <div>
-              <label style={labelStyle}>Petrol (R/L)</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  style={inputStyle}
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  placeholder="Not set"
-                  value={form.fuel_price_petrol}
-                  onChange={e => set('fuel_price_petrol', e.target.value)}
-                />
-                <button
-                  onClick={() => loadLivePrice(true)}
-                  disabled={fetchingLivePrice}
-                  className="settings-control"
-                  style={{
-                    flexShrink: 0, background: 'none', border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-secondary)', padding: '0 12px', minHeight: 40,
-                    fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-                    borderRadius: 6, cursor: fetchingLivePrice ? 'wait' : 'pointer',
-                  }}
-                >
-                  {fetchingLivePrice
-                    ? <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 62 }}>
-                        <Loader size={12} color="currentColor" />
-                      </span>
-                    : 'Fetch now'}
-                </button>
-              </div>
+              <label htmlFor="company-petrol-r-l" style={labelStyle}>Petrol (R/L)</label>
+              <DecimalInput id="company-petrol-r-l" placeholder="Not set" value={form.fuel_price_petrol} onChange={v => set('fuel_price_petrol', v)} />
               {livePrice?.success !== false && (livePrice?.petrol_95 != null || livePrice?.stale_warning) && (
-                <div style={{ fontSize: 13, lineHeight: '20px', color: livePrice.is_stale ? 'var(--status-warning)' : 'var(--text-tertiary)', marginTop: 6 }}>
+                <div className="cs-live" style={{ color: livePrice.is_stale ? 'var(--status-warning-text)' : 'var(--text-tertiary)' }}
+                  title={[livePrice.last_updated && `For ${new Date(livePrice.last_updated).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}`, livePrice.last_checked_at && `checked ${formatDateTime(livePrice.last_checked_at)}`].filter(Boolean).join(' · ')}>
                   {livePrice.petrol_95 != null ? (
                     <>
-                      Live national price (95 unleaded): R{Number(livePrice.petrol_95).toFixed(2)}/L
-                      {livePrice.last_updated && ` · for ${new Date(livePrice.last_updated).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}`}
-                      {livePrice.last_checked_at && ` · checked ${new Date(livePrice.last_checked_at).toLocaleString('en-ZA')}`}
+                      Live (95 unleaded): {formatMoney(Number(livePrice.petrol_95))}/L
                     </>
                   ) : (
                     <>
                       {livePrice.stale_warning}
-                      {livePrice.last_checked_at && ` (checked ${new Date(livePrice.last_checked_at).toLocaleString('en-ZA')})`}
+                      {livePrice.last_checked_at && ` (checked ${formatDateTime(livePrice.last_checked_at)})`}
                     </>
                   )}
                 </div>
               )}
             </div>
           </div>
-          <div style={{ ...grid2, marginTop: 16 }}>
+          <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
             <div>
-              <label style={labelStyle}>Electric (R/kWh)</label>
-              <input
-                className="settings-control"
-                style={inputStyle}
-                type="number"
-                min={0}
-                step={0.01}
-                placeholder="Not set"
-                value={form.fuel_price_electric}
-                onChange={e => set('fuel_price_electric', e.target.value)}
-              />
+              <label htmlFor="company-electric-r-kwh" style={labelStyle}>Electric (R/kWh)</label>
+              <DecimalInput id="company-electric-r-kwh" placeholder="Not set" value={form.fuel_price_electric} onChange={v => set('fuel_price_electric', v)} />
             </div>
             <div>
-              <label style={labelStyle}>Hybrid (R/L)</label>
-              <input
-                className="settings-control"
-                style={inputStyle}
-                type="number"
-                min={0}
-                step={0.01}
-                placeholder="Not set"
-                value={form.fuel_price_hybrid}
-                onChange={e => set('fuel_price_hybrid', e.target.value)}
-              />
+              <label htmlFor="company-hybrid-r-l" style={labelStyle}>Hybrid (R/L)</label>
+              <DecimalInput id="company-hybrid-r-l" placeholder="Not set" value={form.fuel_price_hybrid} onChange={v => set('fuel_price_hybrid', v)} />
             </div>
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      {/* Sticky save bar: Save is in view on every part of this long form. */}
+      <div className="cs-savebar">
+        <span className="cs-savebar__note">{saved ? 'Saved. New quotes use these settings.' : 'Changes apply to new quotes and invoices.'}</span>
         <button
           className="btn-action settings-control"
           onClick={handleSave}
           disabled={saving || isDemo}
           title={isDemo ? 'Fixed in demo mode' : undefined}
-          style={{ minHeight: 40, borderRadius: 6, opacity: isDemo ? 0.5 : saving ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+          style={{ opacity: isDemo ? 0.5 : saving ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
         >
           {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
         </button>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
+import './map/map.css';
 import type { Map as LeafletMap, Marker, Polyline } from 'leaflet';
 
 type LeafletModule = typeof import('leaflet');
@@ -76,21 +77,52 @@ async function fetchRoute(
   return [[from.lat, from.lon], [to.lat, to.lon]];
 }
 
-function dotIcon(L: LeafletModule, color: string) {
+// Marker icons. Colours come from theme tokens via classes in map/map.css,
+// so a live theme switch restyles them without redrawing.
+type PinKind = 'pickup' | 'delivery';
+
+function pinIcon(L: LeafletModule, kind: PinKind) {
+  if (kind === 'pickup') {
+    // Filled accent circle with a white centre.
+    return L.divIcon({
+      className: '',
+      html: '<span class="tw-pin"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" class="f-accent s-casing" stroke-width="2"/><circle cx="10" cy="10" r="3.2" class="f-white"/></svg></span>',
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
+      tooltipAnchor: [0, -8],
+    });
+  }
+  // Drop-off: an ink map pin whose tip sits on the point.
   return L.divIcon({
     className: '',
-    html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 6],
+    html: '<span class="tw-pin"><svg width="24" height="30" viewBox="0 0 24 30" aria-hidden="true"><path class="f-ink s-casing" stroke-width="1.5" d="M12 1.5C6.2 1.5 1.5 6.1 1.5 11.8c0 7.3 8.9 15.6 9.9 16.5a.9.9 0 0 0 1.2 0c1-.9 9.9-9.2 9.9-16.5C22.5 6.1 17.8 1.5 12 1.5z"/><rect x="8.6" y="8.4" width="6.8" height="6.8" rx="1.4" class="f-casing"/></svg></span>',
+    iconSize: [24, 30],
+    iconAnchor: [12, 29],
+    tooltipAnchor: [0, -26],
+  });
+}
+
+function tempIcon(L: LeafletModule) {
+  return L.divIcon({ className: '', html: '<div class="tw-pin-temp"></div>', iconSize: [12, 12], iconAnchor: [6, 6] });
+}
+
+function vehicleIcon(L: LeafletModule) {
+  return L.divIcon({
+    className: '',
+    html: '<div class="tw-pin-vehicle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 18V6a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg></div>',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    tooltipAnchor: [0, -10],
   });
 }
 
 function numberedIcon(L: LeafletModule, n: number) {
   return L.divIcon({
     className: '',
-    html: `<div style="width:18px;height:18px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;font-family:monospace;">${n}</div>`,
+    html: `<div class="tw-pin-num">${n}</div>`,
     iconSize: [18, 18],
     iconAnchor: [9, 9],
+    tooltipAnchor: [0, -7],
   });
 }
 
@@ -133,6 +165,7 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
   const pickupMarkerRef = useRef<Marker | null>(null);
   const deliveryMarkerRef = useRef<Marker | null>(null);
   const routeLineRef = useRef<Polyline | null>(null);
+  const routeCasingRef = useRef<Polyline | null>(null);
   const stopMarkersRef = useRef<Marker[]>([]);
   const tempMarkerRef = useRef<Marker | null>(null);
   const vehicleMarkerRef = useRef<Marker | null>(null);
@@ -162,6 +195,8 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 18,
         attribution: '© <a href="https://openstreetmap.org">OSM</a>',
+        // Base-layer class: map.css darkens only this layer in dark theme.
+        className: 'tw-map-base',
       }).addTo(map);
 
       L.control.attribution({ prefix: false, position: 'bottomright' }).addTo(map);
@@ -177,7 +212,7 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
         const lng = Math.round(e.latlng.lng * 1e6) / 1e6;
         // Instant feedback: drop a temp pin right away, reverse-geocode in the background.
         tempMarkerRef.current?.remove();
-        tempMarkerRef.current = L.marker([lat, lng], { icon: dotIcon(L, '#6b7280') }).addTo(map);
+        tempMarkerRef.current = L.marker([lat, lng], { icon: tempIcon(L) }).addTo(map);
         reverseGeocode(lat, lng).then((label) => {
           tempMarkerRef.current?.remove();
           tempMarkerRef.current = null;
@@ -222,7 +257,7 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
     if (!currentLocation) return;
 
     vehicleMarkerRef.current = L.marker([currentLocation.lat, currentLocation.lon], {
-      icon: dotIcon(L, '#2563eb'),
+      icon: vehicleIcon(L),
     }).bindTooltip(currentLocationLabel || 'Current location', { direction: 'top' }).addTo(map);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, currentLocation?.lat, currentLocation?.lon, currentLocationLabel]);
@@ -239,6 +274,8 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
       pickupMarkerRef.current?.remove(); pickupMarkerRef.current = null;
       deliveryMarkerRef.current?.remove(); deliveryMarkerRef.current = null;
       routeLineRef.current?.remove(); routeLineRef.current = null;
+      routeCasingRef.current?.remove(); routeCasingRef.current = null;
+      map.getContainer().classList.remove('tw-map--estimated');
       stopMarkersRef.current.forEach((m) => m.remove());
       stopMarkersRef.current = [];
     };
@@ -257,27 +294,52 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
     const drawLine = (points: [number, number][], dashed = false) => {
       if (cancelled || points.length < 2) return;
       const [start, end] = [points[0], points[points.length - 1]];
-      pickupMarkerRef.current = L.marker(start, { icon: dotIcon(L, '#16a34a') })
-        .bindTooltip(`Pickup: ${pickup || 'Collection'}`, { direction: 'top' }).addTo(map);
-      deliveryMarkerRef.current = L.marker(end, { icon: dotIcon(L, '#dc2626') })
-        .bindTooltip(`Delivery: ${delivery || 'Delivery'}`, { direction: 'top' }).addTo(map);
+      // Line first, pins after, so the pins sit above it. Solid = the exact
+      // route (accent, 4px on a 7px casing that reads on any tile); dashed =
+      // an estimated route, same semantics as before, now accent dashes on a
+      // soft casing (≥ 3:1 on light and dark tiles) with an "Estimated route"
+      // chip (map.css, .tw-map--estimated) so a booked load doesn't look broken.
+      routeCasingRef.current = L.polyline(points, dashed
+        ? { className: 'tw-route-casing tw-route-casing--preview', color: '#ffffff', weight: 7, opacity: 0.75, interactive: false }
+        : { className: 'tw-route-casing', color: '#ffffff', weight: 7, opacity: 0.9, interactive: false }).addTo(map);
       routeLineRef.current = L.polyline(points, dashed
-        ? { color: '#94a3b8', weight: 2, opacity: 0.8, dashArray: '6 6' }
-        : { color: '#1d4ed8', weight: 3, opacity: 0.85 }).addTo(map);
+        ? { className: 'tw-route--preview', color: '#2563EB', weight: 4, opacity: 1, dashArray: '8 7', lineCap: 'round' }
+        : { className: 'tw-route', color: '#2563EB', weight: 4, opacity: 1 }).addTo(map);
+      map.getContainer().classList.toggle('tw-map--estimated', dashed);
+      pickupMarkerRef.current = L.marker(start, { icon: pinIcon(L, 'pickup') })
+        .bindTooltip(`Pickup: ${pickup || 'Collection'}`, { direction: 'top' }).addTo(map);
+      deliveryMarkerRef.current = L.marker(end, { icon: pinIcon(L, 'delivery') })
+        .bindTooltip(`Delivery: ${delivery || 'Delivery'}`, { direction: 'top' }).addTo(map);
       // Only re-fit the view when the endpoints change. Swapping to an alternate
       // route keeps the same start/end, so we leave the viewport put — avoids the
       // zoom "blink" on every route selection.
       const fitKey = `${start.join()}|${end.join()}`;
       if (fittedKeyRef.current !== fitKey) {
-        map.fitBounds(L.latLngBounds(points), { padding: [40, 40] });
+        // Fit padding clears the overlaid controls (R8): the zoom buttons on
+        // the left (32px, 44px on touch), the expand button on the right, the
+        // 30px drop-off pin above its point, and the attribution chip (and the
+        // "Estimated route" chip, bottom left) below. The chip's top sits
+        // 30px above the bottom edge, so a dashed fit keeps 48px: a pin
+        // (20px circle) near the bottom-left clears it (R10).
+        // Quarter-step zoom for this fit only, so a long route fills the map
+        // instead of snapping a whole level out; capped for short routes.
+        const box = map.getContainer().getBoundingClientRect();
+        const zc = map.getContainer().querySelector('.leaflet-control-zoom')?.getBoundingClientRect();
+        const eb = map.getContainer().parentElement?.querySelector(':scope > .tw-map-btn')?.getBoundingClientRect();
+        const left = zc && zc.width ? Math.ceil(zc.right - box.left) + 14 : 40;
+        const right = eb && eb.width ? Math.ceil(box.right - eb.left) + 14 : 40;
+        const snap = map.options.zoomSnap;
+        map.options.zoomSnap = 0.25;
+        map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [left, 36], paddingBottomRight: [right, dashed ? 48 : 24], maxZoom: 12 });
+        map.options.zoomSnap = snap;
         fittedKeyRef.current = fitKey;
       }
     };
 
-    const drawSingle = (point: [number, number], color: string, tooltip: string, zoom = 9) => {
+    const drawSingle = (point: [number, number], kind: PinKind, tooltip: string, zoom = 9) => {
       if (cancelled) return;
-      const marker = L.marker(point, { icon: dotIcon(L, color) }).bindTooltip(tooltip, { direction: 'top' }).addTo(map);
-      if (color === '#16a34a') pickupMarkerRef.current = marker; else deliveryMarkerRef.current = marker;
+      const marker = L.marker(point, { icon: pinIcon(L, kind) }).bindTooltip(tooltip, { direction: 'top' }).addTo(map);
+      if (kind === 'pickup') pickupMarkerRef.current = marker; else deliveryMarkerRef.current = marker;
       const fitKey = `single:${point.join()}`;
       if (fittedKeyRef.current !== fitKey) {
         map.setView(point, zoom);
@@ -300,8 +362,8 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
       fetchRoute(pickupCoords, deliveryCoords).then((points) => { if (!cancelled) drawLine(points, true); });
       return () => { cancelled = true; };
     }
-    if (pickupCoords) { drawSingle([pickupCoords.lat, pickupCoords.lon], '#16a34a', `Pickup: ${pickup || 'Collection'}`); return () => { cancelled = true; }; }
-    if (deliveryCoords) { drawSingle([deliveryCoords.lat, deliveryCoords.lon], '#dc2626', `Delivery: ${delivery || 'Delivery'}`); return () => { cancelled = true; }; }
+    if (pickupCoords) { drawSingle([pickupCoords.lat, pickupCoords.lon], 'pickup', `Pickup: ${pickup || 'Collection'}`); return () => { cancelled = true; }; }
+    if (deliveryCoords) { drawSingle([deliveryCoords.lat, deliveryCoords.lon], 'delivery', `Delivery: ${delivery || 'Delivery'}`); return () => { cancelled = true; }; }
 
     // Last resort: no coords supplied at all, only free text — geocode it ourselves.
     if (!pickup && !delivery) return () => { cancelled = true; };
@@ -326,9 +388,9 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
           const points = await fetchRoute(pc, dc);
           if (!cancelled) drawLine(points, true);
         } else if (pc) {
-          drawSingle([pc.lat, pc.lon], '#16a34a', `Pickup: ${pickup}`);
+          drawSingle([pc.lat, pc.lon], 'pickup', `Pickup: ${pickup}`);
         } else if (dc) {
-          drawSingle([dc.lat, dc.lon], '#dc2626', `Delivery: ${delivery}`);
+          drawSingle([dc.lat, dc.lon], 'delivery', `Delivery: ${delivery}`);
         }
       })();
     }, 500);
@@ -343,12 +405,8 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
   return (
     <div
       ref={mapDivRef}
-      style={{
-        width: '100%',
-        height,
-        overflow: 'hidden',
-        border: '1px solid #e5e7eb',
-      }}
+      className="tw-map tw-map--osm"
+      style={{ width: '100%', height }}
     />
   );
 }

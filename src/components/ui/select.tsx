@@ -15,19 +15,21 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     className={cn("tw-select-trigger", className)}
     style={{
-      display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
       width: "100%",
-      background: "var(--bg-surface)",
-      border: "1px solid var(--border-subtle)",
+      background: "var(--input-bg, var(--bg-surface))",
+      border: "1px solid var(--border-control)",
       color: "var(--text-primary)",
-      padding: "10px 12px",
-      borderRadius: 2,
-      fontSize: 12,
-      fontFamily: "var(--font-mono)",
+      padding: "0 12px",
+      // Form fields are --field-h (40); inside .tw-toolbar and page-head
+      // actions --select-h resolves to --control-h (36). R3 rhythm.
+      minHeight: "var(--select-h, var(--field-h, 40px))",
+      borderRadius: "var(--radius-control)",
+      fontSize: 14,
+      lineHeight: "20px",
+      fontFamily: "var(--font-sans)",
       cursor: "pointer",
-      outline: "none",
       boxSizing: "border-box" as const,
       gap: 8,
       ...style,
@@ -35,7 +37,7 @@ const SelectTrigger = React.forwardRef<
     {...props}
   >
     {children}
-    <ChevronDown size={13} className="tw-select-chevron" style={{ opacity: 0.5, flexShrink: 0, transition: "transform 0.15s" }} />
+    <ChevronDown size={13} className="tw-select-chevron" style={{ color: "var(--text-tertiary)", flexShrink: 0, transition: "transform 0.15s" }} />
   </SelectPrimitive.Trigger>
 ))
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName
@@ -51,10 +53,11 @@ const SelectContent = React.forwardRef<
       position={position}
       sideOffset={4}
       style={{
-        background: "var(--bg-surface)",
-        border: "1px solid var(--border-subtle)",
-        borderRadius: 4,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+        background: "var(--bg-overlay)",
+        border: "1px solid var(--border-overlay)",
+        /* Overlay elevation: one step above the card (border + pop shadow). */
+        boxShadow: "var(--shadow-pop)",
+        borderRadius: "var(--radius-control)",
         zIndex: 9999,
         minWidth: "var(--radix-select-trigger-width)",
         maxHeight: 280,
@@ -81,10 +84,12 @@ const SelectItem = React.forwardRef<
       display: "flex",
       alignItems: "center",
       padding: "8px 10px 8px 28px",
-      fontSize: 12,
-      fontFamily: "var(--font-mono)",
+      minHeight: 36,
+      fontSize: 14,
+      lineHeight: "20px",
+      fontFamily: "var(--font-sans)",
       color: "var(--text-primary)",
-      borderRadius: 2,
+      borderRadius: "var(--radius-chip)",
       cursor: "pointer",
       outline: "none",
       position: "relative",
@@ -111,11 +116,12 @@ const SelectLabel = React.forwardRef<
     className={cn(className)}
     style={{
       padding: "6px 10px",
-      fontSize: 10,
-      fontFamily: "var(--font-mono)",
+      fontSize: 13,
+      lineHeight: "20px",
+      fontWeight: 500,
+      fontFamily: "var(--font-sans)",
       color: "var(--text-tertiary)",
-      letterSpacing: "0.08em",
-      textTransform: "uppercase" as const,
+      letterSpacing: "normal",
     }}
     {...props}
   />

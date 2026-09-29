@@ -1,5 +1,5 @@
 import '@/pages/table-heading-roles.css';
-import { formatDate, formatMoney, formatMoneyWhole } from '@/lib/formatters';
+import { formatDate, formatMoney, formatMoneyWhole, formatPercent } from '@/lib/formatters';
 import '@/pages/settings/settings-brand.css';
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -104,6 +104,9 @@ const PLAN_FEATURES = [
   'API and integrations',
   'Priority support',
 ];
+
+/** Server take rate ("0.25") in the house format ("0,25%"). */
+const formatRate = (pct?: string | number | null) => formatPercent(pct, 2);
 
 const formatRand = (amount?: string | number | null) => {
   const n = Number(amount ?? 0);
@@ -385,11 +388,11 @@ export function BillingSettings() {
   const showLoading = loading || confirming;
 
   return (
-    <div style={{ maxWidth: 960 }}>
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
       <SettingsPageHeader title="Billing" description="Manage your subscription and payment history" />
 
       {confirming && (
-        <div style={{ ...sectionStyle, padding: '16px 24px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ ...sectionStyle, padding: '16px var(--card-pad, 20px)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 16, height: 16, border: '2px solid var(--accent-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Activating your subscription…</span>
         </div>
@@ -397,7 +400,7 @@ export function BillingSettings() {
 
       {showLoading && !confirming && (
         <div style={sectionStyle}>
-          <div style={{ padding: 24 }}>
+          <div style={{ padding: 'var(--card-pad, 20px)' }}>
             <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', marginBottom: 12, width: '60%' }} />
             <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', width: '40%' }} />
           </div>
@@ -407,7 +410,7 @@ export function BillingSettings() {
       {!showLoading && (
         <div style={sectionStyle}>
           <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Plan</h2></div>
-          <div style={{ padding: 24 }}>
+          <div style={{ padding: 'var(--card-pad, 20px)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -461,7 +464,7 @@ export function BillingSettings() {
                     disabled={cancelling || isDemo}
                     title={isDemo ? 'Fixed in demo mode' : undefined}
                     className="btn-action settings-control"
-                    style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                    style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
                   >
                     {cancelling ? 'Restoring…' : 'Keep subscription'}
                   </button>
@@ -486,12 +489,13 @@ export function BillingSettings() {
                       disabled={subscribing || isDemo}
                       title={isDemo ? 'Fixed in demo mode' : undefined}
                       className="btn-action settings-control"
-                      style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                      style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
                     >
                       {subscribing ? 'Redirecting…' : isSuspended ? `Reactivate for ${formatRand(subscribeAmount)}/month` : `Subscribe for ${formatRand(subscribeAmount)}/month`}
                     </button>
+                    {/* The fee is stated once, here, beside the price it adds to. */}
                     <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' as const }}>
-                      + {flatPlan?.take_rate_pct}% of every delivered load
+                      + {formatRate(flatPlan?.take_rate_pct)} of each delivered load's value
                     </span>
                   </div>
                 )}
@@ -504,7 +508,7 @@ export function BillingSettings() {
                 background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)',
                 borderRadius: 'var(--radius-nested)', fontSize: 14, lineHeight: '20px', color: 'var(--status-danger-text)',
               }}>
-                <strong>Your account is suspended.</strong> You can still view existing data and manage
+                <span style={{ fontWeight: 600 }}>Your account is suspended.</span> You can still view existing data and manage
                 drivers/vehicles, but can't create quotes or invoices until you update your payment method.
               </div>
             )}
@@ -575,25 +579,11 @@ export function BillingSettings() {
 
             {isPaid && (
               <div style={{ marginTop: 16, fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                Every delivered load is also charged {billingStatus?.flat_plan?.take_rate_pct}% of its invoice value
+                Every delivered load is also charged {formatRate(billingStatus?.flat_plan?.take_rate_pct)} of its invoice value
                 automatically to this card, on top of the monthly fee. See Billing history below for every charge taken.
               </div>
             )}
 
-            {!isPaid && subStatus !== 'cancelled' && !isSuspended && (
-              <div style={{
-                marginTop: 16, padding: 16,
-                background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
-              }}>
-                <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Subscribe to TruckWys</strong>
-                <br />
-                Unlimited loads, invoices and reports:
-                one flat fee of {formatRand(flatPlan?.amount)}/month, whatever your fleet size,{' '}
-                <strong>plus {flatPlan?.take_rate_pct}% of every delivered load's value</strong>, charged
-                automatically to the same card the moment each load is delivered.
-              </div>
-            )}
           </div>
         </div>
       )}

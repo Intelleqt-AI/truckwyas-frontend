@@ -327,6 +327,20 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     [draftQ, sentQ, acceptedQ, declinedQ]
   );
   const totalQuotesCount = COLUMNS.reduce((sum, col) => sum + flattenColumn(columnQueries[col]).count, 0);
+  // A sent quote whose answer was recorded as lost belongs with the declined
+  // ones: the board shows it there (with "Marked lost"), and both column
+  // counts and totals move with it, so the board never says "Declined 0"
+  // while a lost quote sits under Sent. Only loaded cards can move.
+  const isMarkedLost = (q: any) => q.outcome === 'rejected' && String(q.status).toUpperCase() === 'SENT';
+  const movedLost = flattenColumn(sentQ).items.filter(isMarkedLost);
+  const movedLostTotal = movedLost.reduce((n: number, q: any) => n + (parseFloat(q.total_amount || '0') || 0), 0);
+  const boardColumn = (col: string) => {
+    const f = flattenColumn(columnQueries[col as keyof typeof columnQueries]);
+    if (!movedLost.length) return f;
+    if (col === 'SENT') return { ...f, items: f.items.filter((q: any) => !isMarkedLost(q)), count: Math.max(0, f.count - movedLost.length), totalAmount: f.totalAmount - movedLostTotal };
+    if (col === 'DECLINED') return { ...f, items: [...f.items, ...movedLost], count: f.count + movedLost.length, totalAmount: f.totalAmount + movedLostTotal };
+    return f;
+  };
   // A failed column must never read as "No quotes" (and its 0 must not be counted).
   const failedColumns = COLUMNS.filter(col => loadFailed(columnQueries[col]));
   const retryFailedColumns = () => failedColumns.forEach(col => columnQueries[col].refetch());
@@ -387,7 +401,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   // that card's column, not just a bare column id.
   const columnOfQuoteId: Record<string, string> = {};
   COLUMNS.forEach(col => {
-    flattenColumn(columnQueries[col]).items.forEach((q: any) => { columnOfQuoteId[String(q.id)] = col; });
+    boardColumn(col).items.forEach((q: any) => { columnOfQuoteId[String(q.id)] = col; });
   });
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -532,7 +546,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
             <div className="bk-kanban">
               {COLUMNS.map(col => {
-                const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading: colLoading, isFetchingNextPage, fetchNextPage } = flattenColumn(columnQueries[col]);
+                const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading: colLoading, isFetchingNextPage, fetchNextPage } = boardColumn(col);
                 const colFailed = failedColumns.includes(col);
                 const isLoading = colLoading && !colFailed;
                 return (

@@ -101,12 +101,12 @@ export function VehiclesDirectory() {
   };
 
   return (
-    <div style={{ maxWidth: 960 }}>
+    <div className="settings-wide" style={{ minWidth: 0 }}>
       <SettingsPageHeader title="Vehicles" description="Fleet vehicle directory" />
 
       <div style={sectionStyle}>
         <div style={{
-          padding: '12px 24px', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)', gap: 12, flexWrap: 'wrap',
+          padding: '12px var(--card-pad, 20px)', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)', gap: 12, flexWrap: 'wrap',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <h2 style={settingsCardTitleStyle}>

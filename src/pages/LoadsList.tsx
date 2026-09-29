@@ -11,7 +11,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Package, Plus } from 'lucide-react';
 import SectionHeader, { type SectionTab } from '@/components/layout/SectionHeader';
 import { useQuery } from '@tanstack/react-query';
-import { fetchData, postData } from '@/lib/Api';
+import { postData } from '@/lib/Api';
+import { fetchAllPages } from '@/components/insights/findings';
+import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
 import { formatCurrency, formatMoneyWhole } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { QuotesList } from './QuotesList';
@@ -32,6 +34,10 @@ interface Load {
   pickup_date?: string;
   customer_name?: string;
   quote_number?: string;
+  pickup_city?: string;
+  delivery_city?: string;
+  vehicle?: number | null;
+  driver?: number | null;
 }
 
 // Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
@@ -47,10 +53,21 @@ const plateOf = (info?: string) => {
 };
 // One column for who and what is on the job, so the table keeps Status and
 // Amount in view at laptop widths.
-const assignedLabel = (l: { driver_name?: string; vehicle_info?: string }) => {
-  const bits = [l.driver_name, plateOf(l.vehicle_info)].filter(Boolean);
+// Loading or in transit with no vehicle is not a normal state: flag it calmly.
+const ON_THE_MOVE = ['LOADING', 'IN_TRANSIT'];
+const assignedLabel = (l: { driver_name?: string; vehicle_info?: string; vehicle?: number | null; status: string }) => {
+  const plate = plateOf(l.vehicle_info);
+  const noVehicle = !plate && l.vehicle == null;
+  if (noVehicle && ON_THE_MOVE.includes(l.status)) {
+    return <StatusChip tone="warning" size="sm" label={`${l.status === 'IN_TRANSIT' ? 'In transit' : 'Loading'} · no vehicle assigned`} />;
+  }
+  const bits = [l.driver_name, plate].filter(Boolean);
   return bits.length ? bits.join(' · ') : <span className="bk-muted">Not assigned</span>;
 };
+
+// Cities read as a route; the full addresses stay in the tooltip.
+const placeOf = (loc?: string, city?: string) => String(loc || '').split(',')[0].trim() || (city || '').trim() || '—';
+const routeText = (l: Load) => `${placeOf(l.pickup_location, l.pickup_city)} → ${placeOf(l.delivery_location, l.delivery_city)}`;
 
 type BookingTab = 'quotes' | 'orders' | 'history';
 
@@ -79,7 +96,9 @@ const TAB_DESCRIPTIONS: Record<BookingTab, string> = {
 export default function LoadsList() {
   const loadsQuery = useQuery({
     queryKey: ["loads-list"],
-    queryFn: () => fetchData('/api/v1/loads/'),
+    // Every page (the endpoint returns 20 at a time), so the tiles and the
+    // History list count every load, not the latest 20.
+    queryFn: () => fetchAllPages<Load>('api/v1/loads/').then(r => r.rows),
     // Give the backend enough time to wake from a cold start (Render free tier ~20-30s).
     // Retry up to 4 times with increasing delays: 3s, 6s, 9s, 12s.
     retry: (failureCount, error: any) => {
@@ -92,12 +111,13 @@ export default function LoadsList() {
   // Failed (or failing and retrying) with nothing to show: say so straight away.
   const failed = loadFailed(loadsQuery);
   const loading = loadsQuery.isLoading && !failed;
-  const loads = (data?.results || data || []) as Load[];
+  const loads: Load[] = data ?? [];
   const error = failed ? 'Failed to load bookings' : null;
   const [convertingIds, setConvertingIds] = useState<Set<number>>(new Set());
   const [orderFilter, setOrderFilter] = useState('All');
   const [historyFilter, setHistoryFilter] = useState('All');
   const [historySearch, setHistorySearch] = useState('');
+  const [orderSearch, setOrderSearch] = useState('');
   // Owned here (not inside QuotesList) so the search box + Board/List toggle
   // can render inline with the Quotes/Orders/History tabs.
   const [quoteSearch, setQuoteSearch] = useState('');
@@ -139,7 +159,13 @@ export default function LoadsList() {
   const activeLoads = loads.filter(l => ACTIVE_STATUSES.includes(l.status));
   const historyLoads = loads.filter(l => HISTORY_STATUSES.includes(l.status));
 
-  const filteredOrders = activeLoads.filter(l => orderFilter === 'All' || l.status === orderFilter);
+  const matchesText = (l: Load, q: string) => {
+    if (!q) return true;
+    const t = q.toLowerCase();
+    return [l.customer_name, l.load_number, l.pickup_location, l.delivery_location, l.pickup_city, l.delivery_city, l.driver_name, l.vehicle_info]
+      .some(v => (v || '').toLowerCase().includes(t));
+  };
+  const filteredOrders = activeLoads.filter(l => (orderFilter === 'All' || l.status === orderFilter) && matchesText(l, orderSearch));
   const filteredHistory = historyLoads.filter(l => {
     const matchStatus = historyFilter === 'All' || l.status === historyFilter;
     const matchSearch = !historySearch || 
@@ -162,8 +188,8 @@ export default function LoadsList() {
             <th scope="col" className="bk-col-route">Route</th>
             <th scope="col" className="bk-col-opt">Driver and vehicle</th>
             <th scope="col">Status</th>
+            {showInvoiceAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Action</span></th>}
             <th scope="col" className="is-num">Amount</th>
-            {showInvoiceAction && <th scope="col" className="is-num"><span className="sr-only">Action</span></th>}
           </tr>
         </thead>
         <tbody><SkeletonRows rows={8} cols={showInvoiceAction ? 7 : 6} /></tbody>
@@ -179,8 +205,8 @@ export default function LoadsList() {
             <th scope="col" className="bk-col-route">Route</th>
             <th scope="col" className="bk-col-opt">Driver and vehicle</th>
             <th scope="col">Status</th>
+            {showInvoiceAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Action</span></th>}
             <th scope="col" className="is-num">Amount</th>
-            {showInvoiceAction && <th scope="col" className="is-num"><span className="sr-only">Action</span></th>}
           </tr>
         </thead>
         <tbody>
@@ -194,22 +220,19 @@ export default function LoadsList() {
               <td className="is-id bk-col-load">{load.load_number}</td>
               <td className="is-primary is-truncate bk-col-customer" title={load.customer_name || ''}>{load.customer_name || '—'}</td>
               <td className="is-truncate bk-col-route" title={`${load.pickup_location} to ${load.delivery_location}`}>
-                {load.pickup_location} → {load.delivery_location}
+                {routeText(load)}
               </td>
-              <td className="is-truncate bk-col-opt" title={[load.driver_name, load.vehicle_info].filter(Boolean).join(', ')}>
+              <td className="is-truncate bk-col-opt bk-col-assign" title={[load.driver_name, load.vehicle_info].filter(Boolean).join(', ')}>
                 {assignedLabel(load)}
               </td>
               <td>
                 <StatusChip status={load.status} size="sm" />
               </td>
-              <td className="is-money">
-                {formatCurrency(parseFloat(load.total_amount || '0'))}
-              </td>
-              {showInvoiceAction && <td className="is-num" onClick={(e) => e.stopPropagation()}>
+              {showInvoiceAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
                 {load.status === 'DELIVERED' && (
                   <button
                     type="button"
-                    className="bk-btn bk-btn--secondary bk-btn--sm"
+                    className="bk-btn bk-btn--quiet bk-btn--sm bk-row-action"
                     onClick={(e) => handleConvertToInvoice(load, e)}
                     disabled={convertingIds.has(load.id)}
                   >
@@ -217,6 +240,9 @@ export default function LoadsList() {
                   </button>
                 )}
               </td>}
+              <td className="is-money">
+                {formatCurrency(parseFloat(load.total_amount || '0'))}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -317,12 +343,15 @@ export default function LoadsList() {
               tip: 'Pending orders with no vehicle assigned yet.',
               attention: pendingCount > 0,
             },
-            {
-              label: 'On the road',
-              value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length,
-              note: `${activeLoads.filter(l => l.status === 'LOADING').length} loading, ${activeLoads.filter(l => l.status === 'ASSIGNED').length} assigned`,
-              tip: 'Orders with status In transit.',
-            },
+            (() => {
+              const more = activeLoads.filter(l => l.status === 'LOADING' || l.status === 'ASSIGNED').length;
+              return {
+                label: 'In transit',
+                value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length,
+                note: more ? `${more} more loading or assigned` : 'None loading or assigned',
+                tip: 'Orders with status In transit. Loading and assigned orders are counted in the note.',
+              };
+            })(),
             (() => {
               const total = activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0);
               return {
@@ -342,15 +371,24 @@ export default function LoadsList() {
             </div>
           )}
 
-          <div className="bk-toolbar">
-            <Segmented
-              label="Filter orders by status"
-              value={orderFilter}
-              onChange={setOrderFilter}
-              options={['All', 'PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'].map(status => ({ value: status, label: status === 'All' ? 'All' : formatStatus(status) }))}
+          <Toolbar
+            meta={`${filteredOrders.length} ${filteredOrders.length === 1 ? 'order' : 'orders'}`}
+            end={
+              <Segmented
+                label="Filter orders by status"
+                value={orderFilter}
+                onChange={setOrderFilter}
+                options={['All', 'PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'].map(status => ({ value: status, label: status === 'All' ? 'All' : formatStatus(status) }))}
+              />
+            }
+          >
+            <SearchInput
+              aria-label="Search orders"
+              placeholder="Search customer, load or route"
+              value={orderSearch}
+              onChange={e => setOrderSearch(e.target.value)}
             />
-            <span className="bk-toolbar__end">{filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}</span>
-          </div>
+          </Toolbar>
 
           {renderTable(filteredOrders, false, activeLoads.length === 0 ? 'Nothing in progress right now.' : 'No orders match this filter.')}
         </div>
@@ -383,23 +421,24 @@ export default function LoadsList() {
             })(),
           ])}
 
-          <div className="bk-toolbar">
-            <input
-              type="search"
-              className="bk-search"
+          <Toolbar
+            meta={`${filteredHistory.length} ${filteredHistory.length === 1 ? 'record' : 'records'}`}
+            end={
+              <Segmented
+                label="Filter history by status"
+                value={historyFilter}
+                onChange={setHistoryFilter}
+                options={['All', 'DELIVERED', 'INVOICED', 'CANCELLED'].map(status => ({ value: status, label: status === 'All' ? 'All' : formatStatus(status) }))}
+              />
+            }
+          >
+            <SearchInput
               aria-label="Search history"
               placeholder="Search customer, load or route"
               value={historySearch}
               onChange={e => setHistorySearch(e.target.value)}
             />
-            <Segmented
-              label="Filter history by status"
-              value={historyFilter}
-              onChange={setHistoryFilter}
-              options={['All', 'DELIVERED', 'INVOICED', 'CANCELLED'].map(status => ({ value: status, label: status === 'All' ? 'All' : formatStatus(status) }))}
-            />
-            <span className="bk-toolbar__end">{filteredHistory.length} {filteredHistory.length === 1 ? 'record' : 'records'}</span>
-          </div>
+          </Toolbar>
 
           {renderTable(filteredHistory, true, historyLoads.length === 0 ? 'No delivered, invoiced or cancelled loads yet.' : 'No loads match your search or filter.')}
         </div>

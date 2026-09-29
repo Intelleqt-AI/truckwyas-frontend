@@ -56,7 +56,7 @@
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 20px;
-  min-height: 40px;
+  min-height: var(--control-h, 36px);
   border-radius: var(--radius-control, 8px);
   text-transform: none;
   letter-spacing: normal;
@@ -243,7 +243,7 @@
   .fleet-page { --fleet-input-font: 16px; --fleet-card-inset: 16px; }
   .fleet-page .fleet-summary > .card { padding: 16px; }
   .fleet-page button[data-fleet-control],
-  .fleet-page input[data-fleet-control] { min-height: 48px; }
+  .fleet-page input[data-fleet-control] { min-height: var(--control-h, 44px); }
 }
 @media (max-width: 480px) {
   .fleet-page .fleet-summary--4,
@@ -303,26 +303,6 @@
 .fleet-page .fleet-header-secondary:hover:not(:disabled) { background: var(--bg-surface-hover); }
 .fleet-page .fleet-header-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Fleet status (FleetDashboard.tsx): trucks grouped by what they are doing,
-   renewals and drivers in a side column. */
-.fleet-page .fs-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: var(--card-gap, 16px); align-items: start; }
-.fleet-page .fs-side { display: flex; flex-direction: column; gap: var(--card-gap, 16px); min-width: 0; }
-.fleet-page .fs-group + .fs-group { margin-top: 20px; }
-.fleet-page .fs-group__title { margin: 0 0 4px; font: 500 13px/20px var(--font-sans); color: var(--text-secondary); letter-spacing: normal; text-transform: none; }
-.fleet-page .fs-group__count { margin-left: 4px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
-.fleet-page .fs-list { list-style: none; margin: 0; padding: 0; }
-.fleet-page .fs-list li + li { border-top: 1px solid var(--border-row); }
-.fleet-page .fs-row { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; align-items: baseline; padding: 10px 8px; margin: 0 -8px; border-radius: var(--radius-nested, 8px); color: inherit; text-decoration: none; }
-.fleet-page .fs-row:hover { background: var(--bg-surface-hover); }
-.fleet-page .fs-row:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 0; }
-.fleet-page .fs-row--stack { grid-template-columns: minmax(0, 1fr); gap: 2px; }
-.fleet-page .fs-row__id { font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fleet-page .fs-row__note { font: 400 14px/20px var(--font-sans); color: var(--text-secondary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fleet-page .fs-row--stack .fs-row__note { white-space: normal; font-size: 13px; }
-.fleet-page .fs-row__note.is-danger { color: var(--status-danger-text); }
-@media (max-width: 1100px) { .fleet-page .fs-grid { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 520px) { .fleet-page .fs-row { grid-template-columns: minmax(0, 1fr); gap: 2px; } .fleet-page .fs-row__note { white-space: normal; } }
-
 /* Heatmap page when pickup times are not captured: weekday bars beside routes. */
 .fleet-page .fleet-heatmap-grid--2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .fleet-page .fleet-routes--1 { grid-template-columns: minmax(0, 1fr); }
@@ -355,5 +335,72 @@
    desktop-only tools (Excel import, heatmap link) step aside. */
 @media (max-width: 720px) {
   .fleet-page .section-header__actions .fleet-header-secondary { display: none; }
-  .fleet-page .section-header__actions button[data-fleet-control] { min-height: 40px; }
+  .fleet-page .section-header__actions button[data-fleet-control] { min-height: var(--control-h, 44px); }
+}
+
+/* ---- Round 3: Vehicles absorbs Fleet status ---- */
+/* Status tiles are the list filter. The chosen tile gets a calm ring, not a fill. */
+.fleet-page .fleet-kpis--filter .tw-kpi--link.is-selected { border-color: var(--border-active, var(--text-primary)); box-shadow: inset 0 0 0 1px var(--border-active, var(--text-primary)); }
+/* Toolbar: search left, filter state and count right. */
+.fleet-page .fleet-toolbar__count { display: inline-flex; align-items: center; gap: 12px; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fleet-page .fleet-toolbar__clear { background: none; border: 0; padding: 0; font: 500 13px/20px var(--font-sans); color: var(--accent-primary); cursor: pointer; }
+.fleet-page .fleet-toolbar__clear:hover { text-decoration: underline; }
+.fleet-page .fleet-toolbar__clear:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
+/* Sub-lines (type, destination, renewals) sit under the cell's first line. */
+.fleet-page .fleet-table .fleet-table__sub { color: var(--text-tertiary); font-size: 13px; line-height: 18px; overflow: hidden; text-overflow: ellipsis; }
+.fleet-page .fleet-table .fleet-table__sub--warn { color: var(--status-warning-text); }
+.fleet-page .fleet-table td .tw-status + .fleet-table__sub { margin-top: 2px; }
+.fleet-page .fleet-table .fleet-col-truck { max-width: 30ch; }
+.fleet-page .fleet-table .fleet-col-doing { max-width: 34ch; overflow: hidden; text-overflow: ellipsis; }
+.fleet-page .fleet-table .fleet-col-doing .tw-status { max-width: 100%; }
+.fleet-page .fleet-th-tip { display: inline-flex; align-items: center; gap: 4px; }
+/* Health: a 0-100 meter so the number has a scale; below 60 is labelled Low. */
+.fleet-page .fleet-health { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.fleet-page .fleet-health__track { display: inline-block; width: 40px; height: 4px; border-radius: 2px; background: var(--border-subtle); overflow: hidden; }
+.fleet-page .fleet-health__fill { display: block; height: 100%; border-radius: 2px; background: var(--text-tertiary); }
+.fleet-page .fleet-health__fill.is-low { background: var(--status-warning-dot); }
+.fleet-page .fleet-health__n { min-width: 2ch; text-align: right; }
+.fleet-page .fleet-health__low { font: 500 12px/16px var(--font-sans); color: var(--status-warning-text); }
+/* The status chip only rides under the registration when the Status column is hidden. */
+.fleet-page .fleet-table .fleet-only-narrow { display: none; }
+@container (max-width: 600px) {
+  .fleet-page .fleet-table .fleet-col-status { display: none; }
+  .fleet-page .fleet-table .fleet-only-narrow { display: block; margin-top: 4px; }
+}
+/* Head actions are head controls (R3): 36px, 44 on touch. The shell's
+   .btn-action floor (40/48) is overridden inside the fleet head only. */
+.os-app-shell .fleet-page .section-header__actions .btn-action,
+.os-app-shell .fleet-page .section-header__actions button[data-fleet-control] { min-height: var(--control-h, 36px); height: var(--control-h, 36px); padding-top: 0; padding-bottom: 0; }
+.fleet-page .tw-toolbar.fleet-toolbar { justify-content: flex-start; gap: 8px 12px; }
+
+/* ---- Round 3: Activity (was "Activity heatmap") ---- */
+.fleet-page { --fleet-card-inset: var(--card-pad, 20px); }
+.fleet-page .fleet-activity { display: flex; flex-direction: column; gap: var(--card-gap, 16px); }
+.fleet-page .fleet-activity > .tw-kpi-row { margin: 0; }
+.fleet-page .fleet-activity .ops-kpis { margin-bottom: 0; }
+/* The two cards share one height; the weekday rows spread to fill it. */
+.fleet-page .fleet-heatmap-grid--2 { align-items: stretch; }
+.fleet-page .fleet-heatmap-grid--2 > .fleet-panel { display: flex; flex-direction: column; }
+.fleet-page .fleet-heatmap-grid--2 .fleet-days { flex: 1; justify-content: space-between; gap: 8px; }
+.fleet-page .fleet-panel__title { display: inline-flex; align-items: center; gap: 6px; }
+.fleet-page .fleet-panel__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.fleet-page .fleet-panel__head .fleet-panel__title { margin: 0; }
+/* Ranked bars are neutral; only the top item carries the accent. */
+.fleet-page .fleet-route__fill { background: var(--text-tertiary); opacity: 0.55; }
+.fleet-page .fleet-route__fill.is-top { background: var(--accent-primary); opacity: 1; }
+.fleet-page .fleet-route:last-child { margin-bottom: 0; }
+/* Pickups by month: one column per month, count above, compact money below. */
+.fleet-page .fleet-months__bars { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(var(--months, 12), minmax(0, 1fr)); gap: 8px; align-items: end; }
+.fleet-page .fleet-months__col { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.fleet-page .fleet-months__count { font: 500 13px/16px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.fleet-page .fleet-months__track { position: relative; display: block; width: 100%; max-width: 56px; height: 120px; border-radius: 4px; background: var(--bg-surface-hover); overflow: hidden; }
+.fleet-page .fleet-months__fill { position: absolute; left: 0; right: 0; bottom: 0; display: block; background: var(--text-tertiary); opacity: 0.55; border-radius: 4px 4px 0 0; }
+.fleet-page .fleet-months__fill.is-top { background: var(--accent-primary); opacity: 1; }
+.fleet-page .fleet-months__label { font: 400 12px/16px var(--font-sans); color: var(--text-secondary); }
+.fleet-page .fleet-months__money { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+@media (max-width: 767px) {
+  .fleet-page .fleet-months__bars { gap: 4px; }
+  .fleet-page .fleet-months__track { height: 88px; }
+  .fleet-page .fleet-months__money { display: none; }
+  .fleet-page .fleet-route__figures { gap: 8px; }
 }

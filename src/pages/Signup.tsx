@@ -1,4 +1,5 @@
 import "./auth-brand.css";
+import { formatMoneyWhole, formatPercent } from "@/lib/formatters";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Check } from "lucide-react";
@@ -9,13 +10,13 @@ import { MobileAuthLayout } from "@/components/MobileAuthLayout";
 // Kept in sync with core/services/paystack.py (MONTHLY_FEE / MONTHLY_FEE_ITEM_NAME)
 // and settings.DELIVERY_FEE_PCT — server-enforced, this is just the up-front
 // disclosure so nobody discovers the price for the first time on step 3.
-const MONTHLY_FEE = "4,499";
-const TAKE_RATE_PCT = "0.25";
+const MONTHLY_FEE = formatMoneyWhole(4499); // "R 4 499"
+const TAKE_RATE = formatPercent(0.25, 2); // "0,25%"
 
 const SIGNUP_STEPS = [
   { label: "Create your account", detail: "Name, email and password, just below" },
   { label: "Verify your email", detail: "We send a 6-digit code, valid for 10 minutes" },
-  { label: "Add a card & pay", detail: `R${MONTHLY_FEE}/month, charged via Paystack. Your fleet goes live the moment it clears` },
+  { label: "Add card and pay", detail: `${MONTHLY_FEE}/month, charged via Paystack. Your fleet goes live the moment it clears` },
 ];
 
 // Same list BillingSettings.tsx shows for an active subscription — kept
@@ -159,7 +160,7 @@ const Signup = () => {
         {/* Full Name */}
         <div>
           <label htmlFor="name" style={labelStyle}>Full name</label>
-          <input className="tw-auth-control" id="name" name="name" type="text" placeholder="John Doe" required value={formData.name} onChange={handleChange}
+          <input className="tw-auth-control" id="name" name="name" type="text" placeholder="Your full name" required value={formData.name} onChange={handleChange}
             style={{ ...inputStyle, borderColor: validationErrors.name ? 'var(--status-danger)' : 'var(--border-subtle)' }} />
           {validationErrors.name && <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>{validationErrors.name}</div>}
         </div>
@@ -251,12 +252,12 @@ const Signup = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
           <span style={{ fontFamily: 'var(--font-sans)', fontSize: 28, lineHeight: '36px', fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-            R{MONTHLY_FEE}
+            {MONTHLY_FEE}
           </span>
           <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>/ month</span>
         </div>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-          + {TAKE_RATE_PCT}% of every delivered load's value
+          + {TAKE_RATE} of every delivered load's value
         </div>
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>
           Cancel anytime, no long-term contract
@@ -328,10 +329,12 @@ const Signup = () => {
         .signup-split__content, .signup-split__form {
           flex: 1 1 50%;
           min-width: 0;
-          padding: 48px;
+          /* Both columns start at the same top edge, so the form card lines
+             up with the brand block instead of floating mid-height. */
+          padding: 80px 48px 48px;
           display: flex;
           flex-direction: column;
-          justify-content: center;
+          justify-content: flex-start;
         }
         .signup-split__form { align-items: center; }
       `}</style>

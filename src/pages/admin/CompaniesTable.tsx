@@ -104,7 +104,7 @@ const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
   suspended: 'Suspended',
   cancelled: 'Cancelled',
   trialing: 'Trialing',
-  none: 'No subscription',
+  none: 'No plan',
 };
 const subscriptionStatusLabel = (s: string) =>
   Object.prototype.hasOwnProperty.call(SUBSCRIPTION_STATUS_LABELS, s) ? SUBSCRIPTION_STATUS_LABELS[s] : s;
@@ -126,7 +126,7 @@ const CHARGE_STATUS_LABELS: Record<string, string> = {
 const chargeStatusLabel = (s: string) =>
   Object.prototype.hasOwnProperty.call(CHARGE_STATUS_LABELS, s) ? CHARGE_STATUS_LABELS[s] : s;
 
-const cardStyle: React.CSSProperties = { padding: 24 };
+const cardStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0,
 };
@@ -227,7 +227,7 @@ export function CompaniesTable() {
               ))}
             </SelectContent>
           </Select>
-          <input className="admin-control" aria-label="Search companies" style={inputStyle} placeholder="Search company or owner email…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="admin-control" aria-label="Search companies" style={inputStyle} placeholder="Company or owner email" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
@@ -238,9 +238,9 @@ export function CompaniesTable() {
               <tr>
                 <th style={thStyle}>Company</th>
                 <th style={thStyle}>Status</th>
-                <th style={thStyle}>Next billing</th>
-                <th className="num" style={thStyle}>Users</th>
-                <th className="num" style={thStyle}>Quotes</th>
+                <th className="adm-col-phone" style={thStyle}>Next billing</th>
+                <th className="num adm-col-phone" style={thStyle}>Users</th>
+                <th className="num adm-col-phone" style={thStyle}>Quotes</th>
                 <th className="num" style={thStyle}>Orders</th>
                 <th className="adm-col-low" style={thStyle}>Created</th>
                 <th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th>
@@ -275,9 +275,9 @@ export function CompaniesTable() {
                       <td style={tdStyle}>
                         <StatusChip tone={badgeTone(STATUS_BADGE_CLASS[c.subscription_status])} label={subscriptionStatusLabel(c.subscription_status)} size="sm" />
                       </td>
-                      <td style={{ ...tdStyle, color: c.next_billing_date ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{fmtDate(c.next_billing_date)}</td>
-                      <td className="num" style={tdStyle}>{c.user_count}</td>
-                      <td className="num" style={tdStyle}>{c.quote_count}</td>
+                      <td className="adm-col-phone" style={{ ...tdStyle, color: c.next_billing_date ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{fmtDate(c.next_billing_date)}</td>
+                      <td className="num adm-col-phone" style={tdStyle}>{c.user_count}</td>
+                      <td className="num adm-col-phone" style={tdStyle}>{c.quote_count}</td>
                       <td className="num" style={tdStyle}>{c.load_count}</td>
                       <td className="adm-col-low" style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{c.created_at ? formatDate(c.created_at) : 'Not recorded'}</td>
                       <td style={actionTdStyle}>

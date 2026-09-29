@@ -108,6 +108,14 @@ export const money = (v: number) => {
   if (r === 0) return formatMoney(0);
   return r < 0 ? `(${formatMoney(-r)})` : formatMoney(r);
 };
+/** Compact statement money: no currency sign (the table says "in rand"),
+ *  optionally whole rands. Negatives in accounting brackets. */
+export const moneyBare = (v: number, whole = false) => {
+  const r = whole ? Math.round(v) : round2(v);
+  // Narrow no-break space between thousands: same grouping, less width.
+  const body = formatMoney(Math.abs(r), whole ? 0 : 2).replace(/^R\s?/, '').replace(/[\s\u00a0]/g, '\u202f');
+  return r < 0 ? `(${body})` : body;
+};
 /** Whole rand for tiles: "R 182 053", negatives "−R 4 200". */
 export const moneyWhole = (v: number) => formatMoneyWhole(Math.round(v));
 export const int = (v: number) => formatNumber(Math.round(v));
@@ -134,21 +142,32 @@ export const monthsIn = (from: string, to: string) => {
   for (let m = from; m <= to && out.length < 60; m = addMonths(m, 1)) out.push(m);
   return out;
 };
-/** Months to show as columns or rows: the period up to its last month with
- *  any entry. Empty months inside that range stay (a real zero); only the
- *  empty tail after the last entry is dropped. With no entries at all the
- *  whole period is kept. Display only: totals are over the full period. */
+/** Months to show as columns or rows: the period from its first to its last
+ *  month with any entry. Empty months inside that range stay (a real zero);
+ *  only the empty lead-in before the first entry and the empty tail after the
+ *  last are dropped. With no entries at all the whole period is kept.
+ *  Display only: totals are over the full period. */
 export const shownMonths = (months: string[], hasEntry: (ym: string) => boolean) => {
-  let last = -1;
-  months.forEach((m, i) => { if (hasEntry(m)) last = i; });
-  return last < 0 ? months : months.slice(0, last + 1);
+  let first = -1; let last = -1;
+  months.forEach((m, i) => { if (hasEntry(m)) { if (first < 0) first = i; last = i; } });
+  return last < 0 ? months : months.slice(first, last + 1);
 };
-/** "No entries after Jun 2026, so Jul to Sep 2026 are not shown." or null. */
+/** "Oct to Nov 2025", "Dec 2025 to Feb 2026", "Jun 2026". */
+const monthSpan = (list: string[]) => {
+  const a = list[0]; const b = list[list.length - 1];
+  if (a === b) return monthLabel(a);
+  return a.slice(0, 4) === b.slice(0, 4) ? `${MONTHS[Number(a.slice(5, 7)) - 1]} to ${monthLabel(b)}` : `${monthLabel(a)} to ${monthLabel(b)}`;
+};
+/** Why some months of the period are not shown, or null:
+ *  "No entries after Jun 2026, so Jul to Sep 2026 are not shown." */
 export const trimNote = (all: string[], shown: string[]) => {
-  if (shown.length >= all.length) return null;
-  const from = all[shown.length]; const to = all[all.length - 1];
-  const gap = from === to ? monthLabel(from) : `${monthLabel(from)} to ${monthLabel(to)}`;
-  return `No entries after ${monthLabel(shown[shown.length - 1])}, so ${gap} ${from === to ? 'is' : 'are'} not shown.`;
+  if (!shown.length || shown.length >= all.length) return null;
+  const lead = all.slice(0, all.indexOf(shown[0]));
+  const tail = all.slice(all.indexOf(shown[shown.length - 1]) + 1);
+  const verb = (list: string[]) => (list.length === 1 ? 'is' : 'are');
+  if (lead.length && tail.length) return `Only ${monthSpan(shown)} ${shown.length === 1 ? 'has' : 'have'} entries, so ${monthSpan(lead)} and ${monthSpan(tail)} are not shown.`;
+  if (lead.length) return `No entries before ${monthLabel(shown[0])}, so ${monthSpan(lead)} ${verb(lead)} not shown.`;
+  return `No entries after ${monthLabel(shown[shown.length - 1])}, so ${monthSpan(tail)} ${verb(tail)} not shown.`;
 };
 export const monthLabel = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
 export const monthEnd = (ym: string) => {

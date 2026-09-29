@@ -253,7 +253,7 @@ export default function FleetImport() {
 
   return (
     <SettingsShell activeId="integrations">
-    <div style={{ maxWidth: 960 }}>
+    <div className="settings-wide" style={{ minWidth: 0 }}>
       <SettingsPageHeader
         title="Import trip data"
         description="Upload CSV or Excel files to import trip data into your fleet"
@@ -420,7 +420,7 @@ export default function FleetImport() {
           <h2 id="fleet-history-title" style={settingsCardTitleStyle}>Import history</h2>
         </div>
         {isLoading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}><Loader size={20} /></div>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--card-pad, 20px)' }}><Loader size={20} /></div>
         ) : importHistory && importHistory.length > 0 ? (
           <ul style={{ listStyle: 'none', margin: 0, padding: '4px 0' }}>
             {importHistory.map((item, i) => (
@@ -428,7 +428,7 @@ export default function FleetImport() {
                 key={item.id}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
-                  padding: '12px 24px',
+                  padding: '12px var(--card-pad, 20px)',
                   borderBottom: i < importHistory.length - 1 ? '1px solid var(--border-row)' : 'none',
                 }}
               >

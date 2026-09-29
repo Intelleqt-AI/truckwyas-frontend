@@ -19,16 +19,16 @@
   outline-offset: 3px;
 }
 @media (min-width: 768px) {
-  .os-app-shell .dashboard-results-caption { --results-caption-margin-bottom: 0px; padding: 0 24px 16px; }
+  .os-app-shell .dashboard-results-caption { --results-caption-margin-bottom: 0px; padding: 0 var(--card-pad) 16px; }
   .os-app-shell .card.dashboard-results-panel {
     --results-panel-padding: 0px;
     --results-panel-overflow: visible;
   }
   .os-app-shell .dashboard-results-actions { --results-actions-gap: 12px; gap: 12px; }
-  .os-app-shell .dashboard-results-pagination { --results-pagination-padding: 12px 24px; padding: 12px 24px; }
-  .os-app-shell .dashboard-results-empty-block { --results-empty-block-padding: 32px 24px; padding: 32px 24px; }
+  .os-app-shell .dashboard-results-pagination { --results-pagination-padding: 12px var(--card-pad); padding: 12px var(--card-pad); }
+  .os-app-shell .dashboard-results-empty-block { --results-empty-block-padding: 32px var(--card-pad); padding: 32px var(--card-pad); }
   .os-app-shell .dashboard-results-toolbar {
-    --results-toolbar-padding: 16px 24px;
+    --results-toolbar-padding: 16px var(--card-pad);
     --results-toolbar-margin-bottom: 0px;
     --results-toolbar-margin-top: 0px;
     display: flex;
@@ -36,7 +36,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 16px 24px;
+    padding: 16px var(--card-pad);
     margin: 0;
     border-bottom: 1px solid var(--border-active);
   }
@@ -53,22 +53,22 @@
     padding: 12px 16px;
   }
   .os-app-shell .dashboard-results-table .dashboard-results-cell:first-child {
-    --results-cell-padding: 12px 16px 12px 24px;
-    padding-left: 24px;
+    --results-cell-padding: 12px 16px 12px var(--card-pad);
+    padding-left: var(--card-pad);
   }
   .os-app-shell .dashboard-results-table .dashboard-results-cell:last-child {
-    --results-cell-padding: 12px 24px 12px 16px;
-    padding-right: 24px;
+    --results-cell-padding: 12px var(--card-pad) 12px 16px;
+    padding-right: var(--card-pad);
   }
   .os-app-shell .dashboard-results-table .dashboard-results-cell:only-child {
-    --results-cell-padding: 12px 24px;
-    padding-left: 24px;
-    padding-right: 24px;
+    --results-cell-padding: 12px var(--card-pad);
+    padding-left: var(--card-pad);
+    padding-right: var(--card-pad);
   }
   .os-app-shell .dashboard-results-table .dashboard-results-cell.dashboard-results-empty {
-    --results-cell-padding: 32px 24px;
+    --results-cell-padding: 32px var(--card-pad);
     --results-empty-inner-padding: 0px;
-    padding: 32px 24px;
+    padding: 32px var(--card-pad);
   }
   .os-app-shell .dashboard-results-table thead .dashboard-results-cell {
     --results-cell-border-bottom: 1px solid var(--border-active);

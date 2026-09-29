@@ -90,8 +90,10 @@ export default function PublicInvoice() {
   return (
     <div className="pd">
       <main className="pd-page">
-        {/* Sender identity on the page ground; the document itself below. */}
-        <header className="pd-brand">
+        {/* Sender identity on the page ground; the document itself below.
+            An invalid link has no sender to show: its centred message card is
+            the whole page, so no left-aligned "Invoice" head sits beside it. */}
+        {!isError && <header className="pd-brand">
           <div style={{ minWidth: 0 }}>
             {data?.company_logo_url
               ? <><img className="pd-brand__logo" src={data.company_logo_url} alt={data.company_name || 'Company logo'} /><h1 className="sr-only">{data.company_name}</h1></>
@@ -103,7 +105,7 @@ export default function PublicInvoice() {
               <div className="pd-brand__number">{data.invoice_number}</div>
             </div>
           )}
-        </header>
+        </header>}
 
         {isLoading && (
           <div className="pd-doc"><div className="pd-center"><Loader size={36} label="Loading invoice" /></div></div>

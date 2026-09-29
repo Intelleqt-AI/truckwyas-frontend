@@ -72,7 +72,16 @@ export default function AdminHome() {
     <div className="admin-home">
       <KpiRow>
         <KpiTile aria-label="Companies" label="Companies" figure={formatNumber(total)} note={companiesNote} onClick={() => navigate('/admin/companies')} />
-        <KpiTile aria-label="Users" label="Users" figure={formatNumber(overview.total_users)} note="Across all companies" onClick={() => navigate('/admin/users')} />
+        {/* The overview endpoint counts users of real companies only: the demo
+            company (where most test users live) and deleted ones are left out,
+            which is why it can be far below a single company's user list. */}
+        <KpiTile
+          aria-label="Users"
+          label="Users"
+          figure={formatNumber(overview.total_users)}
+          note={overview.has_demo_company ? 'Real companies, demo excluded' : 'Across all companies'}
+          onClick={() => navigate('/admin/users')}
+        />
         <KpiTile aria-label="Quotes" label="Quotes" figure={formatNumber(overview.total_quotes)} note={overview.quotes_this_month ? `${overview.quotes_this_month} this month` : 'None this month'} />
         <KpiTile aria-label="Orders" label="Orders" figure={formatNumber(overview.total_loads)} note={overview.loads_this_month ? `${overview.loads_this_month} this month` : 'None this month'} />
         {/* A zero MRR is not a headline number (design principles §1): the tile is left out. */}

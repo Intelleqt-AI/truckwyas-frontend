@@ -47,7 +47,7 @@
   display: grid; grid-template-columns: minmax(176px, 232px) minmax(0, 1fr) auto auto;
   grid-template-areas: "fig meta tog act" "fig line tog act" "ev ev ev ev";
   align-items: center; column-gap: 24px; row-gap: 6px;
-  padding: 16px 20px;
+  padding: var(--card-pad, 20px);
   background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card, 12px);
 }
 .fc__fig { grid-area: fig; min-width: 0; display: flex; flex-direction: column; }
@@ -107,7 +107,7 @@
 /* ------------------------------------------------------------- states */
 .ff-state {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px;
-  padding: 20px 24px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card, 12px);
+  padding: var(--card-pad, 20px); background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card, 12px);
 }
 .ff-state p { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-primary); }
 .ff-state__action {
@@ -148,7 +148,7 @@
   .fc {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas: "meta meta" "fig fig" "line line" "act tog" "ev ev";
-    row-gap: 6px; padding: 14px 16px;
+    row-gap: 6px; padding: var(--card-pad, 16px);
   }
   .fc__action { justify-self: start; }
   .fc__amount { font-size: 22px; line-height: 28px; }

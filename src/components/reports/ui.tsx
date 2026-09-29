@@ -1,14 +1,14 @@
-import { Fragment, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Check as CheckIcon, Download, Printer } from 'lucide-react';
+import { Check as CheckIcon, ChevronLeft, ChevronRight, Download, Printer } from 'lucide-react';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { Segmented } from '@/components/ui/Segmented';
-import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
+import { KpiRow, KpiStats, KpiTile } from '@/components/ui/KpiTile';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import LoadError from '@/components/data/LoadError';
 import { formatDistance } from '@/lib/formatters';
 import {
-  PERIODS, day, downloadCsv, int, money, pct, resolvePeriod, slug,
+  PERIODS, day, downloadCsv, int, money, moneyBare, pct, resolvePeriod, slug,
   type CsvCell, type Period, type PeriodId,
 } from './data';
 
@@ -37,7 +37,14 @@ export function PeriodControl({ period, onChange, options }: {
   const list = PERIODS.filter(p => !options || options.includes(p.id));
   return (
     <div className="fr-period">
-      <Seg label="Period" value={period.id} options={list.map(p => ({ id: p.id, label: p.label }))} onChange={id => onChange(id as PeriodId)} />
+      {/* Wide screens: the segmented control. Phones: the same choice as a
+          menu, so no option is ever cut off at the screen edge. */}
+      <span className="fr-period__seg">
+        <Seg label="Period" value={period.id} options={list.map(p => ({ id: p.id, label: p.label }))} onChange={id => onChange(id as PeriodId)} />
+      </span>
+      <span className="fr-period__menu">
+        <Choice label="Period" value={period.id} options={list.map(p => ({ id: p.id, label: p.label }))} onChange={id => onChange(id as PeriodId)} />
+      </span>
       {period.id === 'custom' && (
         <span className="fr-period__custom">
           <input type="month" className="fr-input" aria-label="From month" value={period.from} onChange={e => e.target.value && onChange('custom', e.target.value, period.to)} />
@@ -82,7 +89,7 @@ export function Choice<T extends string>({ label, prefix, value, options, onChan
   const current = options.find(o => o.id === value) ?? options[0];
   return (
     <Select value={(value as string) || NONE} onValueChange={v => onChange((v === NONE ? '' : v) as T)}>
-      <SelectTrigger aria-label={label} className={`fr-choice${wide ? ' fr-choice--wide' : ''}`} style={{ width: 'auto', minHeight: 32, height: 32, padding: '0 10px 0 12px', fontSize: 13 }}>
+      <SelectTrigger aria-label={label} className={`fr-choice${wide ? ' fr-choice--wide' : ''}`} style={{ width: 'auto', padding: '0 10px 0 12px', fontSize: 13 }}>
         <SelectValue>
           {prefix && <span className="fr-choice__pre">{prefix}</span>}
           <span className="fr-choice__val">{current?.label}</span>
@@ -125,24 +132,33 @@ export function ReportFrame({ title, sub, info, controls, tiles, gaps, csv, csvN
         <span>{printTitle || title} · {sub}</span>
         <span>Printed {day(new Date().toISOString())}</span>
       </div>
-      <div className="fr-head">
-        <p className="fr-head__sub">
-          <span>{sub}</span>
-          <InfoTip label={`How the ${title.toLowerCase()} is built`}>{info}</InfoTip>
-        </p>
-        <div className="fr-head__actions fr-noprint">
+      {/* The toolbar is the first content block: settings on the left,
+          Export and Print on the right, one row at desktop widths. The basis
+          line under it says what the figures are. */}
+      <div className="fr-top">
+        <div className="tw-toolbar fr-head fr-noprint" role="toolbar" aria-label={`${title} settings`}>
           {controls}
-          {csv && (
-            <button type="button" className="tw-btn fr-head__btn" onClick={() => downloadCsv(`truckwys-${csvName || slug(title)}.csv`, csv())}>
-              <Download size={16} strokeWidth={1.75} aria-hidden="true" />
-              Export CSV
+          <div className="tw-toolbar__end fr-head__actions">
+            {csv && (
+              <button type="button" className="tw-btn fr-head__btn" onClick={() => downloadCsv(`truckwys-${csvName || slug(title)}.csv`, csv())}>
+                <Download size={16} strokeWidth={1.75} aria-hidden="true" />
+                Export CSV
+              </button>
+            )}
+            <button type="button" className="tw-btn fr-head__btn" onClick={() => window.print()}>
+              <Printer size={16} strokeWidth={1.75} aria-hidden="true" />
+              Print
             </button>
-          )}
-          <button type="button" className="tw-btn fr-head__btn" onClick={() => window.print()}>
-            <Printer size={16} strokeWidth={1.75} aria-hidden="true" />
-            Print
-          </button>
+          </div>
         </div>
+        <p className="fr-head__sub">
+          {/* The last word and the info tip never part across lines. */}
+          {sub.slice(0, sub.lastIndexOf(' ') + 1)}
+          <span className="fr-head__tail">
+            {sub.slice(sub.lastIndexOf(' ') + 1)}
+            <InfoTip label={`How the ${title.toLowerCase()} is built`}>{info}</InfoTip>
+          </span>
+        </p>
       </div>
       {tiles}
       {children}
@@ -209,6 +225,17 @@ export function Tiles({ tiles, table }: { tiles: Tile[]; table?: Statement | Sta
     return [noteRepeats ? { ...t, note: t.noteFallback } : t];
   });
   if (!kept.length) return null;
+  const tone = (t: Tile) => (t.delta?.tone === 'down' ? 'danger' : t.delta?.tone === 'up' ? 'success' : 'neutral') as 'danger' | 'success' | 'neutral';
+  // One or two figures: a stats line inside one card, never a half-empty row.
+  if (kept.length <= 2) {
+    return (
+      <KpiStats
+        className="fr-stats"
+        aria-label="Summary"
+        items={kept.map(t => ({ label: t.label, figure: <span title={t.title}>{t.value}</span>, note: t.delta ? t.delta.text : t.note, tone: tone(t) }))}
+      />
+    );
+  }
   return (
     <KpiRow className={`fr-tiles fr-tiles--${Math.min(4, kept.length)}`}>
       {kept.map(t => (
@@ -217,7 +244,7 @@ export function Tiles({ tiles, table }: { tiles: Tile[]; table?: Statement | Sta
           label={t.label}
           figure={<span title={t.title}>{t.value}</span>}
           note={t.delta ? t.delta.text : t.note}
-          tone={t.delta?.tone === 'down' ? 'danger' : t.delta?.tone === 'up' ? 'success' : 'neutral'}
+          tone={tone(t)}
         />
       ))}
     </KpiRow>
@@ -236,18 +263,26 @@ export function changeText(now: number, before: number, label: string, higherIsG
 // --------------------------------------------------------------- statement
 
 export type ColType = 'text' | 'money' | 'int' | 'pct' | 'date' | 'km';
-export interface Col { label: string; type?: ColType }
+export interface Col { label: string; type?: ColType; /** false: left out on phones (a secondary column). */ phone?: boolean }
 export type RowKind = 'section' | 'row' | 'subtotal' | 'total' | 'grand' | 'muted' | 'ratio';
 export interface SRow { key: string; kind?: RowKind; cells: CsvCell[]; href?: string; indent?: boolean; /** Overrides the column type for number cells (e.g. a margin row). */ fmt?: ColType }
 export interface Statement { columns: Col[]; rows: SRow[] }
 
-function cell(v: CsvCell, type: ColType = 'text') {
+/** Display density of a fitted statement: 0 full ("R 38 550,00"), 1 tighter
+ *  cells, 2 no currency sign (the table says "in rand"), 3 whole rands at
+ *  12px. The table steps up only as far as it needs to fit its card. */
+type Density = 0 | 1 | 2 | 3;
+
+function cell(v: CsvCell, type: ColType = 'text', density: Density = 0) {
   if (v === '') return '';
   if (v == null) return type === 'text' ? '' : '—';
   // Only ISO dates are formatted; a label such as "Total" in a date column stays as written.
   if (typeof v === 'string') return type === 'date' && /^\d{4}-\d{2}-\d{2}/.test(v) ? day(v) : v;
   switch (type) {
-    case 'money': return money(Math.abs(v) < 0.005 ? 0 : v);
+    case 'money': {
+      const x = Math.abs(v) < 0.005 ? 0 : v;
+      return density >= 2 ? moneyBare(x, density >= 3) : money(x);
+    }
     case 'int': return int(v);
     case 'pct': return pct(v);
     case 'km': return formatDistance(v);
@@ -255,78 +290,141 @@ function cell(v: CsvCell, type: ColType = 'text') {
   }
 }
 
-export function StatementTable({ table, caption, stickyFirst = true, footer, scrollEnd = false }: {
+export function StatementTable({ table, caption, stickyFirst = true, footer, fit = false, pinLast = false, cue = ['Earlier months', 'Later months'] as [string, string] | null }: {
   table: Statement; caption: string; stickyFirst?: boolean; footer?: ReactNode;
-  /** Open scrolled to the right, so the latest months and the totals are in view. */
-  scrollEnd?: boolean;
+  /** Month statements: tighten cells (then drop the currency sign, then the
+   *  cents) only as far as needed to show every column without scrolling.
+   *  Display only: the CSV and the check lines keep cents. */
+  fit?: boolean;
+  /** Keep the last column (Total) in view on the right while the rest scroll. */
+  pinLast?: boolean;
+  /** Labels for the scroll buttons when the table still has to scroll; null for none. */
+  cue?: [string, string] | null;
 }) {
   const { columns, rows } = table;
   const scroller = useRef<HTMLDivElement>(null);
+  const sig = `${columns.map(c => c.label).join('|')}#${rows.length}`;
+  const [dense, setDense] = useState<{ sig: string; w: number; level: Density }>({ sig, w: -1, level: 0 });
+  const [edges, setEdges] = useState({ l: false, r: false });
+  const [, bump] = useState(0);
+
+  const readEdges = useCallback(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const l = el.scrollLeft > 1;
+    const r = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setEdges(e => (e.l === l && e.r === r ? e : { l, r }));
+    // Fades sit inside the pinned columns, not over them.
+    const heads = el.querySelectorAll<HTMLTableCellElement>('thead th');
+    const box = el.parentElement;
+    if (box && heads.length) {
+      box.style.setProperty('--fr-pin-l', `${stickyFirst ? heads[0].offsetWidth : 0}px`);
+      box.style.setProperty('--fr-pin-r', `${pinLast ? heads[heads.length - 1].offsetWidth : 0}px`);
+    }
+  }, [stickyFirst, pinLast]);
+
+  // Fit: before paint, step the density up until the table fits (or the
+  // tightest step is reached). A new table or a new width starts again at 0.
+  // The table always opens at the start of the range (scrollLeft 0).
   useLayoutEffect(() => {
     const el = scroller.current;
-    if (!scrollEnd || !el) return;
-    const table = el.querySelector('table');
-    table?.style.removeProperty('--fr-tail');
-    el.scrollLeft = el.scrollWidth;
-    // Opening at the right edge can leave the first visible month cut in half
-    // behind the sticky label column ("…45,60"). Add just enough trailing space
-    // after the last column that the cut column scrolls fully out of view, so
-    // every figure on screen is whole. Display only: no values change.
-    const heads = Array.from(el.querySelectorAll<HTMLTableCellElement>('thead th'));
-    if (!table || heads.length < 2 || el.scrollWidth <= el.clientWidth) return;
-    const left = el.scrollLeft + (stickyFirst ? heads[0].offsetWidth : 0);
-    const cut = heads.slice(1).find(th => th.offsetLeft < left - 1 && th.offsetLeft + th.offsetWidth > left + 1);
-    if (!cut) return;
-    const tail = Math.ceil(cut.offsetLeft + cut.offsetWidth - left);
-    table.style.setProperty('--fr-tail', `${tail}px`);
-    el.scrollLeft = el.scrollWidth;
-  }, [scrollEnd, stickyFirst, columns.length, rows.length]);
+    if (!el) return;
+    if (fit) {
+      const w = el.clientWidth;
+      if (dense.sig !== sig || dense.w !== w) { setDense({ sig, w, level: 0 }); return; }
+      if (el.scrollWidth > w + 1 && dense.level < 3) { setDense({ sig, w, level: (dense.level + 1) as Density }); return; }
+    }
+    readEdges();
+  });
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (el) el.scrollLeft = 0;
+  }, [sig]);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let w = el.clientWidth;
+    const ro = new ResizeObserver(() => { if (el.clientWidth !== w) { w = el.clientWidth; bump(n => n + 1); } });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const level: Density = fit && dense.sig === sig ? dense.level : 0;
+  const scrolls = edges.l || edges.r;
+  const page = (dir: -1 | 1) => {
+    const el = scroller.current;
+    if (!el) return;
+    const pinned = (stickyFirst ? parseFloat(el.parentElement?.style.getPropertyValue('--fr-pin-l') || '0') : 0)
+      + (pinLast ? parseFloat(el.parentElement?.style.getPropertyValue('--fr-pin-r') || '0') : 0);
+    el.scrollBy({ left: dir * Math.max(80, (el.clientWidth - pinned) * 0.8), behavior: 'smooth' });
+  };
+  const tableCls = ['fr-table', stickyFirst ? 'fr-table--sticky' : '', pinLast ? 'fr-table--pin-last' : '', level ? `fr-table--d${level}` : ''].filter(Boolean).join(' ');
+  const units = level >= 3 ? 'Amounts in rand, rounded to the nearest rand. Export CSV has the cents.' : level >= 2 ? 'Amounts in rand.' : null;
+
   return (
-    <section className="tw-card tw-card--flush fr-statement" aria-label={caption}>
-      <div ref={scroller} className="fr-scroll" tabIndex={0} role="region" aria-label={`${caption}, scrolls sideways`}>
-        <table className={`fr-table${stickyFirst ? ' fr-table--sticky' : ''}`}>
-          <caption className="fr-sr">{caption}</caption>
-          <thead>
-            <tr>
-              {columns.map((c, i) => (
-                <th key={i} scope="col" className={c.type && c.type !== 'text' && c.type !== 'date' ? 'is-num' : undefined}>{c.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(r => {
-              if (r.kind === 'section') {
+    <section className={`tw-card tw-card--flush fr-statement${scrolls ? ' is-scrolling' : ''}`} aria-label={caption}>
+      {fit && scrolls && cue && (
+        <div className="fr-cue fr-noprint">
+          <button type="button" className="fr-cue__btn" onClick={() => page(-1)} disabled={!edges.l} aria-label={`Show ${cue[0].toLowerCase()}`}>
+            <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />{cue[0]}
+          </button>
+          <button type="button" className="fr-cue__btn" onClick={() => page(1)} disabled={!edges.r} aria-label={`Show ${cue[1].toLowerCase()}`}>
+            {cue[1]}<ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+      <div className={`fr-scrollbox${edges.l ? ' has-l' : ''}${edges.r ? ' has-r' : ''}`}>
+        <div ref={scroller} className="fr-scroll" tabIndex={0} role="region" aria-label={`${caption}, scrolls sideways`} onScroll={readEdges}>
+          <table className={tableCls}>
+            <caption className="fr-sr">{caption}</caption>
+            <thead>
+              <tr>
+                {columns.map((c, i) => (
+                  <th key={i} scope="col" className={[c.type && c.type !== 'text' && c.type !== 'date' ? 'is-num' : '', c.phone === false ? 'fr-col--wide' : ''].filter(Boolean).join(' ') || undefined}>{c.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => {
+                if (r.kind === 'section') {
+                  return (
+                    <tr key={r.key} className="fr-row--section">
+                      <th scope="colgroup">{r.cells[0]}</th>
+                      {columns.length > 1 && <td colSpan={columns.length - 1} aria-hidden="true" />}
+                    </tr>
+                  );
+                }
                 return (
-                  <tr key={r.key} className="fr-row--section">
-                    <th scope="colgroup">{r.cells[0]}</th>
-                    {columns.length > 1 && <td colSpan={columns.length - 1} aria-hidden="true" />}
+                  <tr key={r.key} className={`fr-row--${r.kind || 'row'}`}>
+                    {r.cells.map((v, i) => {
+                      const type = i > 0 && r.fmt ? r.fmt : columns[i]?.type;
+                      const numeric = type && type !== 'text' && type !== 'date';
+                      const isZero = typeof v === 'number' && Math.abs(v) < 0.005 && type === 'money';
+                      const content = cell(v, type, level);
+                      const exact = level >= 2 && type === 'money' && typeof v === 'number' ? money(Math.abs(v) < 0.005 ? 0 : v) : undefined;
+                      const cls = [numeric ? 'is-num' : '', isZero ? 'is-zero' : '', typeof v === 'number' && v < -0.004 && type === 'money' ? 'is-neg' : '', i === 0 && r.indent ? 'is-indent' : '', columns[i]?.phone === false ? 'fr-col--wide' : ''].filter(Boolean).join(' ') || undefined;
+                      if (i === 0) {
+                        return (
+                          <th key={i} scope="row" className={cls} title={!numeric && typeof content === 'string' ? content : undefined}>
+                            {r.href ? <Link to={r.href} className="fr-link">{content}</Link> : content}
+                          </th>
+                        );
+                      }
+                      return <td key={i} className={cls} title={exact ?? (!numeric && typeof content === 'string' && content.length > 24 ? content : undefined)}>{content}</td>;
+                    })}
                   </tr>
                 );
-              }
-              return (
-                <tr key={r.key} className={`fr-row--${r.kind || 'row'}`}>
-                  {r.cells.map((v, i) => {
-                    const type = i > 0 && r.fmt ? r.fmt : columns[i]?.type;
-                    const numeric = type && type !== 'text' && type !== 'date';
-                    const isZero = typeof v === 'number' && Math.abs(v) < 0.005 && type === 'money';
-                    const content = cell(v, type);
-                    const cls = [numeric ? 'is-num' : '', isZero ? 'is-zero' : '', typeof v === 'number' && v < -0.004 && type === 'money' ? 'is-neg' : '', i === 0 && r.indent ? 'is-indent' : ''].filter(Boolean).join(' ') || undefined;
-                    if (i === 0) {
-                      return (
-                        <th key={i} scope="row" className={cls} title={!numeric && typeof content === 'string' ? content : undefined}>
-                          {r.href ? <Link to={r.href} className="fr-link">{content}</Link> : content}
-                        </th>
-                      );
-                    }
-                    return <td key={i} className={cls} title={!numeric && typeof content === 'string' && content.length > 24 ? content : undefined}>{content}</td>;
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-      {footer && <div className="fr-statement__foot">{footer}</div>}
+      {(footer || units) && (
+        <div className="fr-statement__foot">
+          {units && <p className="fr-units">{units}</p>}
+          {footer}
+        </div>
+      )}
     </section>
   );
 }

@@ -10,9 +10,17 @@ import { formatDate, formatDateTime } from '@/lib/formatters';
 import RowActions from '@/components/ui/RowActions';
 import { StatusChip } from '@/components/ui/StatusChip';
 
-const cardStyle: React.CSSProperties = { ...settingsCardStyle, padding: 24 };
+const cardStyle: React.CSSProperties = { ...settingsCardStyle, padding: 'var(--card-pad, 20px)' };
 
 const secondaryBtnStyle = settingsSecondaryButtonStyle;
+
+/** "e2c0 ···· d12e" from whatever identifier the API returns; never the whole key. */
+const maskKey = (k: { prefix?: string; key?: string }) => {
+  const full = String((k as any).key || '');
+  if (full.length >= 12) return `${full.slice(0, 4)} ···· ${full.slice(-4)}`;
+  if (k.prefix) return `${k.prefix} ····`;
+  return 'Key hidden';
+};
 
 const integrationInputStyle: React.CSSProperties = { ...settingsInputStyle, marginBottom: 8 };
 
@@ -432,7 +440,7 @@ export function IntegrationsSettings() {
   };
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
       <SettingsPageHeader title="Integrations" description="Connect TruckWys to your existing tools" />
 
       {/* Xero Integration Card */}
@@ -476,8 +484,8 @@ export function IntegrationsSettings() {
                 onClick={handleSyncInvoices}
                 disabled={syncingInvoices || isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
-                className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }}
+                className="settings-control"
+                style={{ ...secondaryBtnStyle, cursor: 'pointer' }}
               >
                 {syncingInvoices ? 'Syncing…' : 'Sync invoices'}
               </button>
@@ -485,8 +493,8 @@ export function IntegrationsSettings() {
                 onClick={handleSyncPayments}
                 disabled={syncingPayments || isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
-                className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }}
+                className="settings-control"
+                style={{ ...secondaryBtnStyle, cursor: 'pointer' }}
               >
                 {syncingPayments ? 'Syncing…' : 'Sync payments'}
               </button>
@@ -508,8 +516,8 @@ export function IntegrationsSettings() {
             onClick={handleXeroConnect}
             disabled={isDemo}
             title={isDemo ? 'Not available in the demo' : undefined}
-            className="btn-action settings-control"
-            style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            className="settings-control"
+            style={{ ...secondaryBtnStyle, cursor: 'pointer', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
           >
             Connect Xero
           </button>
@@ -584,7 +592,7 @@ export function IntegrationsSettings() {
                 disabled={connectingCartrack || isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
                 className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }}
+                style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)' }}
               >
                 {connectingCartrack ? 'Connecting…' : 'Connect'}
               </button>
@@ -598,8 +606,8 @@ export function IntegrationsSettings() {
             onClick={() => setShowCartrackForm(true)}
             disabled={isDemo}
             title={isDemo ? 'Not available in the demo' : undefined}
-            className="btn-action settings-control"
-            style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            className="settings-control"
+            style={{ ...secondaryBtnStyle, cursor: 'pointer', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
           >
             Connect Cartrack
           </button>
@@ -661,8 +669,8 @@ export function IntegrationsSettings() {
                 }}
                 disabled={isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
-                className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }}
+                className="settings-control"
+                style={{ ...secondaryBtnStyle, cursor: 'pointer' }}
               >
                 Re-sync vehicles
               </button>
@@ -769,8 +777,8 @@ export function IntegrationsSettings() {
                               onClick={() => handleLinkVehicle(cf.vehicle_code)}
                               disabled={linkingCode === cf.vehicle_code || isDemo}
                               title={isDemo ? 'Not available in the demo' : undefined}
-                              className="btn-action settings-control"
-                              style={{ borderRadius: 'var(--radius-control)' }}
+                              className="settings-control"
+                              style={{ ...secondaryBtnStyle, cursor: 'pointer' }}
                             >
                               {linkingCode === cf.vehicle_code ? '…' : 'Link'}
                             </button>
@@ -802,7 +810,7 @@ export function IntegrationsSettings() {
                 disabled={connectingCtrlfleet || isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
                 className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }}
+                style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)' }}
               >
                 {connectingCtrlfleet ? 'Connecting…' : 'Connect'}
               </button>
@@ -816,8 +824,8 @@ export function IntegrationsSettings() {
             onClick={() => setShowCtrlfleetForm(true)}
             disabled={isDemo}
             title={isDemo ? 'Not available in the demo' : undefined}
-            className="btn-action settings-control"
-            style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            className="settings-control"
+            style={{ ...secondaryBtnStyle, cursor: 'pointer', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
           >
             Connect CtrlFleet
           </button>
@@ -832,8 +840,8 @@ export function IntegrationsSettings() {
             onClick={() => setShowAddKey(!showAddKey)}
             disabled={isDemo}
             title={isDemo ? 'Not available in the demo' : undefined}
-            className="btn-action settings-control"
-            style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            className="settings-control"
+            style={{ ...secondaryBtnStyle, cursor: 'pointer', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
           >
             New key
           </button>
@@ -854,7 +862,7 @@ export function IntegrationsSettings() {
                 disabled={isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
                 className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }}
+                style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)' }}
               >
                 Generate
               </button>
@@ -868,7 +876,7 @@ export function IntegrationsSettings() {
         {loadingKeys ? (
           <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : apiKeys.length === 0 ? (
-          <div style={{ padding: 24, textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+          <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
             No API keys yet. Generate one to enable programmatic access.
           </div>
         ) : (
@@ -883,8 +891,9 @@ export function IntegrationsSettings() {
                   </div>
                   <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
                     {/* Only the key prefix is an identifier (mono); dates stay sans. */}
-                    <span style={{ fontFamily: 'var(--font-mono)' }}>{key.prefix}…</span> · Created {formatDate(key.created_at)}
-                    {key.last_used && ` · Last used ${formatDate(key.last_used)}`}
+                    {/* Never the whole key: a masked start and end when the API sends it, else "Key hidden". */}
+                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{maskKey(key)}</span> · Created {formatDate(key.created_at)}
+                    {(key.last_used || (key as any).last_used_at) && ` · Last used ${formatDate(key.last_used || (key as any).last_used_at)}`}
                   </div>
                 </div>
                 <RowActions
@@ -910,8 +919,8 @@ export function IntegrationsSettings() {
             onClick={() => setShowAddWebhook(!showAddWebhook)}
             disabled={isDemo}
             title={isDemo ? 'Not available in the demo' : undefined}
-            className="btn-action settings-control"
-            style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            className="settings-control"
+            style={{ ...secondaryBtnStyle, cursor: 'pointer', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
           >
             Add webhook
           </button>
@@ -953,7 +962,7 @@ export function IntegrationsSettings() {
                 disabled={isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
                 className="btn-action settings-control"
-                style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }}
+                style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)' }}
               >
                 Create
               </button>
@@ -967,7 +976,7 @@ export function IntegrationsSettings() {
         {loadingWebhooks ? (
           <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : webhooks.length === 0 ? (
-          <div style={{ padding: 24, textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+          <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
             No webhooks configured. Add one to receive real-time event notifications.
           </div>
         ) : (
@@ -1018,7 +1027,7 @@ export function IntegrationsSettings() {
         }} onClick={() => setGeneratedKey(null)}>
           <div style={{
             background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-dialog)', padding: 24, maxWidth: 500, width: '100%', boxSizing: 'border-box',
+            borderRadius: 'var(--radius-dialog)', padding: 'var(--card-pad, 20px)', maxWidth: 500, width: '100%', boxSizing: 'border-box',
           }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 8 }}>
               API key generated
@@ -1034,7 +1043,7 @@ export function IntegrationsSettings() {
               {generatedKey}
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={() => { copyToClipboard(generatedKey); setGeneratedKey(null); }} className="btn-action settings-control" style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }}>
+              <button onClick={() => { copyToClipboard(generatedKey); setGeneratedKey(null); }} className="btn-action settings-control" style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)' }}>
                 Copy and close
               </button>
               <button className="settings-control" onClick={() => setGeneratedKey(null)} style={{ ...secondaryBtnStyle, cursor: 'pointer' }}>

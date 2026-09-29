@@ -4,7 +4,7 @@
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card, 12px);
-  padding: 20px;
+  padding: var(--card-pad, 20px);
   box-shadow: none;
   display: flex;
   flex-direction: column;
@@ -87,7 +87,7 @@ a.ic-row:focus-visible { outline: 2px solid var(--accent-primary); outline-offse
   .ic-kpis--4 { --ic-cols: 2; }
 }
 @media (max-width: 767px) {
-  .ic-card { padding: 16px; }
+  .ic-card { padding: var(--card-pad, 16px); }
 }
 @media (max-width: 640px) {
   .ic-kpis { --ic-cols: 2; }

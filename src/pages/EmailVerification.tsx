@@ -1,4 +1,5 @@
 import "./auth-brand.css";
+import { formatMoneyWhole, formatPercent } from "@/lib/formatters";
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Check } from 'lucide-react';
@@ -9,13 +10,13 @@ import { MobileAuthLayout } from '@/components/MobileAuthLayout';
 // Kept in sync with Signup.tsx / core/services/paystack.py — this is step 2
 // of that same 3-step flow, so it shows the identical price/steps rather than
 // making the user recall what Signup told them.
-const MONTHLY_FEE = "4,499";
-const TAKE_RATE_PCT = "0.25";
+const MONTHLY_FEE = formatMoneyWhole(4499); // "R 4 499"
+const TAKE_RATE = formatPercent(0.25, 2); // "0,25%"
 
 const SIGNUP_STEPS = [
   { label: "Create your account", detail: "Name, email, password" },
   { label: "Verify your email", detail: "Enter the 6-digit code. You're here now" },
-  { label: "Add a card & pay", detail: `R${MONTHLY_FEE}/month, charged via Paystack. Your fleet goes live the moment it clears` },
+  { label: "Add card and pay", detail: `${MONTHLY_FEE}/month, charged via Paystack. Your fleet goes live the moment it clears` },
 ];
 
 const PLAN_FEATURES = [
@@ -173,12 +174,12 @@ export const EmailVerification = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
           <span style={{ fontFamily: 'var(--font-sans)', fontSize: 28, lineHeight: '36px', fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-            R{MONTHLY_FEE}
+            {MONTHLY_FEE}
           </span>
           <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>/ month</span>
         </div>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-          + {TAKE_RATE_PCT}% of every delivered load's value
+          + {TAKE_RATE} of every delivered load's value
         </div>
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>
           This is what step 3 will charge. Nothing is charged yet

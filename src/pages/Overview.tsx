@@ -13,10 +13,27 @@ import { InfoTip } from "@/components/ui/InfoTip";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { MicroBars, RevenueCostBars, PipelineBars, usePipeline } from "@/components/overview/today";
 import { presentSignal } from "@/components/overview/signals";
+import { useAllQuotes, useHomeLedger } from "@/components/overview/ledger";
 
 // Fetches + derives all dashboard data. Lives in the queryFn so the result is
 // cached by TanStack Query (keyed below) and survives navigation — revisiting
 // the page no longer refires these 8 requests until the cache goes stale.
+// Home fires its GETs together with the full ledgers; a throttled (429) or
+// dropped request is retried twice with a short back-off before the page says
+// a figure couldn't load. GET only; the same endpoints as before.
+async function getWithRetry(path: string, attempts = 3): Promise<any> {
+  for (let i = 0; ; i++) {
+    try {
+      return await fetchData(path);
+    } catch (err: any) {
+      const status = err?.status ?? err?.response?.status;
+      const transient = status == null || status === 429 || status >= 500;
+      if (!transient || i >= attempts - 1) throw err;
+      await new Promise((r) => setTimeout(r, 1200 * (i + 1)));
+    }
+  }
+}
+
 async function loadOverview() {
   // Each source may fail on its own; record which ones did so the page can
   // say so instead of presenting an empty fallback as a real zero.
@@ -36,19 +53,19 @@ async function loadOverview() {
     fleetData,
     eligibleData,
   ] = await Promise.all([
-    fetchData("api/v1/dashboard/finance/").catch(track("revenue and margin", null)),
-    fetchData("api/v1/dashboard/signals/").catch(() =>
-      fetchData("api/v1/dashboard/insights/").catch(track("alerts", [])),
+    getWithRetry("api/v1/dashboard/finance/").catch(track("revenue and margin", null)),
+    getWithRetry("api/v1/dashboard/signals/").catch(() =>
+      getWithRetry("api/v1/dashboard/insights/").catch(track("alerts", [])),
     ),
-    fetchData("api/v1/advances/").catch(track("advances", [])),
-    fetchData("api/v1/quotes/?limit=5").catch(track("recent quotes", [])),
-    fetchData("api/v1/loads/").catch(track("loads", [])),
-    fetchData("api/v1/activity/").catch(track("recent activity", [])),
-    fetchData("api/v1/vehicles/").catch(track("vehicles", [])),
-    fetchData("api/v1/fleet/overview/").catch(track("fleet utilisation", null)),
+    getWithRetry("api/v1/advances/").catch(track("advances", [])),
+    getWithRetry("api/v1/quotes/?limit=5").catch(track("recent quotes", [])),
+    getWithRetry("api/v1/loads/").catch(track("loads", [])),
+    getWithRetry("api/v1/activity/").catch(track("recent activity", [])),
+    getWithRetry("api/v1/vehicles/").catch(track("vehicles", [])),
+    getWithRetry("api/v1/fleet/overview/").catch(track("fleet utilisation", null)),
     // Invoices that qualify for a fast-pay advance but don't have one
     // requested yet: the actionable Capital opportunity on this page.
-    fetchData("api/v1/capital/eligible/").catch(track("capital eligibility", null)),
+    getWithRetry("api/v1/capital/eligible/").catch(track("capital eligibility", null)),
   ]);
 
   if (failedSources.length >= 9) {
@@ -200,12 +217,19 @@ export default function Overview() {
   const allQuotes: any[] = data?.quotes ?? [];
   const quotesTotal: number | undefined = data?.quotesTotal;
   const recentLoads = data?.recentLoads ?? [];
-  const activeLoadsCount = data?.activeLoadsCount ?? 0;
   const totalVehicles = data?.totalVehicles ?? 0;
   const availableVehicles = data?.availableVehicles ?? 0;
-  const heatmapData: number[] = data?.heatmapData ?? [];
-  const pipeline = usePipeline(allQuotes);
-  const allLoads: any[] = data?.loads ?? [];
+  // Money, loads and quotes come from the full ledgers the Reports use, so
+  // Home agrees with Cash, P&L and Debtors (see components/overview/ledger.ts).
+  const ledger = useHomeLedger();
+  const money = ledger.money;
+  const moneyLoading = ledger.loading;
+  const moneyFailed = ledger.error;
+  const quotesAll = useAllQuotes();
+  const pipelineQuotes: any[] = quotesAll.data?.rows ?? allQuotes;
+  const pipelineComplete = quotesAll.data ? quotesAll.data.complete : false;
+  const pipeline = usePipeline(pipelineQuotes);
+  const allLoads: any[] = (ledger.data?.loads as any[] | undefined) ?? data?.loads ?? [];
 
   useEffect(() => {
     document.title = "Home - TruckWys";
@@ -222,31 +246,39 @@ export default function Overview() {
     return `${get("weekday")}, ${Number(get("day"))} ${MONTHS_SHORT[Number(get("month")) - 1] || ""} ${get("year")}`;
   })();
 
-  // ---- Derived presentation values (no new calculations of business figures) ----
-  const trendAll: any[] = financeData?.monthly_trend || [];
-  // Layout rule §11.7: do not reserve half a chart for months with no data.
-  // Trailing months with neither revenue nor costs are trimmed from the
-  // chart (kept if that would leave fewer than 2) and named in a note.
-  const lastActive = (() => {
-    for (let i = trendAll.length - 1; i >= 0; i--) {
-      if ((Number(trendAll[i].revenue) || 0) !== 0 || (Number(trendAll[i].expenses) || 0) !== 0) return i;
-    }
-    return -1;
-  })();
-  const trend: any[] = lastActive >= 1 ? trendAll.slice(0, lastActive + 1) : trendAll;
-  const trimmedMonths: any[] = trendAll.slice(trend.length);
-  const monthLabel = (m: any) => MONTHS_SHORT[Number(String(m.month).slice(5, 7)) - 1] || m.month || "";
-  const marginBasis = financeData
-    ? financeData.revenue_mtd > 0 ? "this month" : financeData.total_revenue > 0 ? "all time" : null
-    : null;
-  const loads28 = heatmapData.reduce((a, b) => a + b, 0);
+  // ---- Derived presentation values ----
+  const monthLabel = (ym: string) => MONTHS_SHORT[Number(ym.slice(5, 7)) - 1] || ym;
+  const trend = money?.months ?? [];
+  const spanText = trend.length ? `${monthLabel(trend[0].ym)} ${trend[0].ym.slice(0, 4)} to ${monthLabel(trend[trend.length - 1].ym)} ${trend[trend.length - 1].ym.slice(0, 4)}` : "";
   const vehiclesFailed = failed.includes("vehicles") && !data?.totalVehicles;
-  const outstanding = Number(financeData?.outstanding_invoices_total || 0);
-  const overdue = Number(financeData?.overdue_invoices_total || 0);
+  const outstanding = money?.owed ?? 0;
+  const overdue = money?.pastDue ?? 0;
   const pastShare = outstanding > 0 ? Math.min(Math.max(overdue, 0), outstanding) / outstanding : 0;
+  const receivedChange = money && money.receivedPrior != null && money.receivedPrior > 0.005
+    ? ((money.received - money.receivedPrior) / money.receivedPrior) * 100 : null;
+  const marginChange = money && money.margin != null && money.marginPrior != null ? money.margin - money.marginPrior : null;
+
+  // Active loads and the 28-day bars use every load (all pages), not page 1.
+  const TERMINAL_LOAD_STATUSES = ["DELIVERED", "INVOICED", "CANCELLED", "COMPLETED", "PAID"];
+  const loadsReady = !!ledger.data || !!data;
+  const activeLoadsCount = allLoads.filter((l: any) => !TERMINAL_LOAD_STATUSES.includes(String(l.status || "").toUpperCase())).length;
+  const heatmapData: number[] = (() => {
+    const out = new Array(28).fill(0);
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    allLoads.forEach((load: any) => {
+      const at = load.created_at || load.pickup_date;
+      if (!at) return;
+      const daysAgo = Math.floor((now - new Date(at).getTime()) / dayMs);
+      if (daysAgo >= 0 && daysAgo < 28) out[27 - daysAgo]++;
+    });
+    return out;
+  })();
+  const loads28 = heatmapData.reduce((a, b) => a + b, 0);
+  const loadsFailed = failed.includes("loads") && !ledger.data;
 
   const skeleton = <span className="ov-skel" aria-label="Loading" />;
-  const unavailable = !loading && !financeData;
+  const unavailable = !moneyLoading && !money;
 
   return (
     <div className="overview-typography ov-page">
@@ -280,76 +312,91 @@ export default function Overview() {
             </button>
           </div>
         )}
+        {moneyFailed && (
+          <div className="stale-data-notice" role="status">
+            <span>Invoices, payments or expenses couldn&rsquo;t load, so money figures are not shown.</span>
+            <button type="button" className="stale-data-notice__retry" onClick={() => ledger.retry()}>
+              Try again
+            </button>
+          </div>
+        )}
+        {money && money.partial.length > 0 && (
+          <div className="stale-data-notice" role="status">
+            <span>Figures use the {money.partial.join(", ")} that loaded.</span>
+          </div>
+        )}
       </div>
 
-      {/* KPI tiles: label, big figure, change against a named period, micro trend. */}
+      {/* KPI tiles: label, big figure, one line. Money figures reconcile with Reports. */}
       <div className="td-kpis">
-        {/* Emphasis tile: the money that needs chasing. */}
+        {/* Emphasis tile: the money that needs chasing (= Debtors report, owed now). */}
         <section className="td-kpi td-kpi--emphasis" aria-label="Owed to you">
           <div className="td-kpi__head">
             <h2 className="td-kpi__label">
               Owed to you
               <InfoTip>
-                Sent invoices not yet paid. Past due means after the invoice due date.
-                {financeData && outstanding > 0 && (financeData.dso > 0
-                  ? ` Customers take ${Math.round(financeData.dso)} days to pay, on average.`
-                  : " Time to pay needs recent invoices.")}
+                Balance on sent invoices not yet paid, incl. VAT, the same figure as the Debtors report. Past due means after the invoice due date.
+                {financeData && outstanding > 0 && financeData.dso > 0 ? ` Customers take ${Math.round(financeData.dso)} days to pay, on average.` : ""}
               </InfoTip>
             </h2>
           </div>
           <div className="td-kpi__body">
-            <div className="td-kpi__value" title={financeData ? formatMoney(outstanding) : undefined}>
-              {loading ? skeleton : financeData ? wholeRand(outstanding) : "—"}
+            <div className="td-kpi__value" title={money ? formatMoney(outstanding) : undefined}>
+              {moneyLoading ? skeleton : money ? wholeRand(outstanding) : "—"}
             </div>
-            {financeData && pastShare > 0 && pastShare < 1 && (
+            {money && pastShare > 0 && pastShare < 1 && (
               <div className="td-kpi__strip" role="img" aria-label={`${Math.round(pastShare * 100)}% of what you are owed is past due`}>
                 <span style={{ width: `${pastShare * 100}%` }} />
               </div>
             )}
           </div>
           <div className="td-kpi__meta">
-            {financeData ? (
+            {money ? (
               outstanding <= 0 ? <span>Nothing outstanding</span>
-                : <span>{overdue >= outstanding ? "All past due" : overdue > 0 ? `${wholeRand(overdue)} past due` : "None past due"}</span>
+                : <span>{overdue >= outstanding - 0.005 ? "All past due" : overdue > 0 ? `${wholeRand(overdue)} past due` : "None past due"}</span>
             ) : unavailable ? <span>Unavailable</span> : null}
           </div>
         </section>
 
-        <section className="td-kpi" aria-label="Revenue received">
+        <section className="td-kpi" aria-label="Revenue received, last 12 months">
           <div className="td-kpi__head">
             <h2 className="td-kpi__label">
-              Revenue received
-              <InfoTip>Invoices paid in full, all time, incl. VAT. Change compares the last 30 days with the 30 before. Revenue per month is in the chart below.</InfoTip>
+              <span>Revenue<span className="td-hide-sm"> received</span>, 12 months</span>
+              <InfoTip>Money received from customers in the last 12 months, incl. VAT, by payment date: the Cash report&rsquo;s money in for the same period.</InfoTip>
             </h2>
           </div>
           <div className="td-kpi__body">
-            <div className="td-kpi__value" title={financeData ? formatMoney(financeData.total_revenue || 0) : undefined}>
-              {loading ? skeleton : financeData ? wholeRand(financeData.total_revenue || 0) : "—"}
+            <div className="td-kpi__value" title={money ? formatMoney(money.received) : undefined}>
+              {moneyLoading ? skeleton : money ? wholeRand(money.received) : "—"}
             </div>
           </div>
           <div className="td-kpi__meta">
-            {typeof financeData?.revenue_change_pct === "number" ? (
-              <Delta value={financeData.revenue_change_pct} unit="%" period="vs prior 30 days" />
-            ) : financeData ? <span>All time, incl. VAT</span> : unavailable ? <span>Unavailable</span> : null}
+            {money ? (
+              receivedChange != null
+                ? <><span>Incl. VAT · </span><Delta value={Math.round(receivedChange * 10) / 10} unit="%" period="vs prior 12 months" /></>
+                : <span>Paid, incl. VAT</span>
+            ) : unavailable ? <span>Unavailable</span> : null}
           </div>
         </section>
 
-        <section className="td-kpi" aria-label="Net margin">
+        <section className="td-kpi" aria-label="Net margin, last 12 months">
           <div className="td-kpi__head">
             <h2 className="td-kpi__label">
-              Net margin{marginBasis ? `, ${marginBasis}` : ""}
-              <InfoTip>Revenue received minus approved expenses, as a share of revenue. Change is in percentage points, last 30 days vs the 30 before.</InfoTip>
+              <span><span className="td-hide-sm">Net margin</span><span className="td-show-sm">Margin</span>, 12 months</span>
+              <InfoTip>Revenue received excl. VAT, minus approved expenses, as a share of that revenue. The same figure as the Profit and loss report, cash basis, last 12 months. Pending expenses are not deducted.</InfoTip>
             </h2>
           </div>
           <div className="td-kpi__body">
             <div className="td-kpi__value">
-              {loading ? skeleton : financeData && marginBasis ? formatPercent(financeData.net_margin_percent || 0) : "—"}
+              {moneyLoading ? skeleton : money && money.margin != null ? formatPercent(money.margin) : "—"}
             </div>
           </div>
           <div className="td-kpi__meta">
-            {typeof financeData?.margin_change_pts === "number" ? (
-              <Delta value={financeData.margin_change_pts} unit="pts" period="vs prior 30 days" />
-            ) : financeData ? <span>{marginBasis ? "No prior period" : "No revenue yet"}</span> : unavailable ? <span>Unavailable</span> : null}
+            {money ? (
+              money.margin == null ? <span>No revenue yet</span>
+                : marginChange != null ? <Delta value={Math.round(marginChange * 10) / 10} unit="pts" period="vs prior 12 months" />
+                  : <span>Excl. VAT, cash basis</span>
+            ) : unavailable ? <span>Unavailable</span> : null}
           </div>
         </section>
 
@@ -362,14 +409,14 @@ export default function Overview() {
                 {!loading && !vehiclesFailed && totalVehicles > 0 && data?.vehiclesComplete && ` ${availableVehicles} of ${totalVehicles} trucks are available now.`}
               </InfoTip>
             </h2>
-            <Link to="/bookings" className="td-kpi__go" aria-label="Open loads"><ArrowUpRight size={16} strokeWidth={1.75} /></Link>
+            <Link to="/bookings/orders" className="td-kpi__go" aria-label="Open orders"><ArrowUpRight size={16} strokeWidth={1.75} /></Link>
           </div>
           <div className="td-kpi__body">
-            <div className="td-kpi__value">{loading ? skeleton : failed.includes("loads") ? "—" : activeLoadsCount}</div>
+            <div className="td-kpi__value">{!loadsReady ? skeleton : loadsFailed ? "—" : activeLoadsCount}</div>
             <MicroBars values={heatmapData} ariaLabel={`Loads booked per day, last 28 days: ${loads28} in total`} />
           </div>
           <div className="td-kpi__meta">
-            {data && !failed.includes("loads") && <span>{loads28} booked in 28 days</span>}
+            {loadsReady && !loadsFailed && <span>{loads28} booked in 28 days</span>}
           </div>
         </section>
       </div>
@@ -382,11 +429,13 @@ export default function Overview() {
             <div className="tw-card__titles">
               <h2 id="td-chart-title" className="tw-card__title">
                 Revenue vs costs
-                <InfoTip>Revenue: invoices paid in the month. Costs: approved expenses dated in the month.</InfoTip>
+                <InfoTip>
+                  Revenue: money received in the month, excl. VAT (cash basis, as in the Profit and loss report). Costs: approved expenses dated in the month.
+                  {money?.trimmed ? ` ${money.trimmed}` : ""}
+                </InfoTip>
               </h2>
               <p className="tw-card__sub">
-                Per month{trend.length ? `, ${monthLabel(trend[0])} to ${monthLabel(trend[trend.length - 1])}` : ""}
-                {trimmedMonths.length > 0 && `. Nothing recorded since ${monthLabel(trend[trend.length - 1])}`}
+                {trend.length ? `Excl. VAT, cash basis, ${spanText}` : "Excl. VAT, cash basis"}
               </p>
             </div>
             <div className="td-legend" aria-hidden="true">
@@ -394,17 +443,17 @@ export default function Overview() {
               <span><i className="td-legend__cost" />Costs</span>
             </div>
           </div>
-          {loading ? (
+          {moneyLoading ? (
             <div className="ov-skel-block" />
-          ) : trend.length === 0 ? (
-            <p className="td-empty">{financeData ? "No monthly figures yet." : "Figures couldn't load."}</p>
+          ) : !money || trend.length === 0 || trend.every((m) => m.revenue === 0 && m.costs === 0) ? (
+            <p className="td-empty">{money ? "No money in or out in the last 12 months." : moneyFailed ? "Figures couldn't load." : "No monthly figures yet."}</p>
           ) : (
             <RevenueCostBars
               months={trend.map((m) => ({
-                label: monthLabel(m),
-                full: `${monthLabel(m)} ${String(m.month).slice(0, 4)}`,
-                revenue: Number(m.revenue) || 0,
-                costs: Number(m.expenses) || 0,
+                label: monthLabel(m.ym),
+                full: `${monthLabel(m.ym)} ${m.ym.slice(0, 4)}`,
+                revenue: m.revenue,
+                costs: m.costs,
               }))}
             />
           )}
@@ -506,8 +555,13 @@ export default function Overview() {
                   <li key={idx} className="td-needs__row">
                     <Icon className="td-needs__icon" size={16} strokeWidth={1.75} aria-hidden="true" />
                     <div className="td-needs__text">
-                      <div className="td-needs__title">{row.title}</div>
-                      {row.detail && <div className="td-needs__body" title={row.detail}>{row.detail}</div>}
+                      {row.amount ? (
+                        <div className="td-needs__line">
+                          <div className="td-needs__title">{row.title}<span className="ov-sr-only"> owes</span></div>
+                          <span className="td-needs__amount">{row.amount}</span>
+                        </div>
+                      ) : <div className="td-needs__title">{row.title}</div>}
+                      {row.detail && <div className="td-needs__body" title={row.detailTitle || row.detail}>{row.detail}</div>}
                     </div>
                     {row.actionLabel && insight.actionUrl && (
                       <Link to={insight.actionUrl} className="tw-btn tw-btn--sm td-needs__action" aria-label={`${row.actionLabel}: ${row.title}`}>{row.actionLabel}</Link>
@@ -530,19 +584,20 @@ export default function Overview() {
               <div className="tw-card__titles">
                 <h2 id="td-pipe-title" className="tw-card__title">
                   Quote pipeline
-                  <InfoTip align="end">Each stage counts quotes that reached it, by current status. Percent is of the stage before.</InfoTip>
+                  <InfoTip align="end">Each stage counts quotes that reached it, by current status. Win rate is accepted as a share of sent.</InfoTip>
                 </h2>
                 <p className="tw-card__sub">
-                  {loading ? "Quotes by stage" : allQuotes.length > 0 && quotesTotal != null && quotesTotal > allQuotes.length
-                    ? `Latest ${allQuotes.length} of ${quotesTotal} quotes`
-                    : `All ${allQuotes.length} quotes`}
+                  {quotesAll.isLoading && loading ? "Quotes by stage"
+                    : pipelineComplete ? `All ${pipelineQuotes.length} quotes`
+                      : quotesTotal != null && quotesTotal > pipelineQuotes.length ? `Latest ${pipelineQuotes.length} of ${quotesTotal} quotes`
+                        : `All ${pipelineQuotes.length} quotes`}
                 </p>
               </div>
               <Link to="/bookings/quotes" className="td-kpi__go" aria-label="Open quotes"><ArrowUpRight size={16} strokeWidth={1.75} /></Link>
             </div>
-            {loading ? (
+            {loading && quotesAll.isLoading ? (
               <div className="ov-skel-block ov-skel-block--short" />
-            ) : allQuotes.length === 0 ? (
+            ) : pipelineQuotes.length === 0 ? (
               <div className="td-empty">
                 <p>{failed.includes("recent quotes") ? "Quotes couldn't load." : "No quotes yet."}</p>
                 <button type="button" className="tw-btn" onClick={() => navigate("/bookings/quotes/new")}>New quote</button>

@@ -19,7 +19,7 @@ import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 // VehicleTypeViewSet._forbid_shared_type_write), this is the only place they
 // can actually be changed.
 
-const cardStyle: React.CSSProperties = { padding: 24 };
+const cardStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
 const sectionTitleStyle: React.CSSProperties = { fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16 };
 const thStyle: React.CSSProperties = {
   textAlign: 'left', padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontWeight: 500,

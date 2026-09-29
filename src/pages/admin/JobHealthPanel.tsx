@@ -11,7 +11,7 @@ import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 // we surface the raw timestamp and a status pill and let the human judge
 // staleness rather than computing it client-side.
 
-const cardStyle: React.CSSProperties = { padding: 24 };
+const cardStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16,
 };
@@ -75,7 +75,7 @@ export default function JobHealthPanel() {
               <tr>
                 <th style={thStyle}>Task</th>
                 <th style={thStyle}>Status</th>
-                <th style={thStyle}>Last started</th>
+                <th style={thStyle} className="adm-col-started">Last started</th>
                 {anyFinished && <th style={thStyle}>Last finished</th>}
                 {anyError && <th style={thStyle}>Last error</th>}
               </tr>
@@ -84,9 +84,13 @@ export default function JobHealthPanel() {
               {isLoading && <SkeletonRows rows={9} cols={3} />}
               {results.map(row => (
                 <tr key={row.task_name}>
-                  <td style={{ ...tdStyle, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${taskLabel(row.task_name)} (${row.task_name})`}>{taskLabel(row.task_name)}</td>
+                  <td className="adm-task" style={{ ...tdStyle, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${taskLabel(row.task_name)} (${row.task_name})`}>
+                    {taskLabel(row.task_name)}
+                    {/* Phones: the Last started column steps aside and rides here. */}
+                    <span className="adm-task__sub">Last started: {fmt(row.last_started_at)}</span>
+                  </td>
                   <td style={tdStyle}><StatusPill row={row} /></td>
-                  <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: row.last_started_at ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
+                  <td className="adm-col-started" style={{ ...tdStyle, whiteSpace: 'nowrap', color: row.last_started_at ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
                     {fmt(row.last_started_at)}
                   </td>
                   {anyFinished && <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: row.last_finished_at ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{fmt(row.last_finished_at)}</td>}

@@ -379,71 +379,29 @@ export default function Bookings() {
         const STEPS = ['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED'];
         const currentIdx = STEPS.indexOf(load.status);
         return (
-          <section className="bk-card" style={{ padding: '16px 24px', marginBottom: 'var(--section-gap, 24px)' }} aria-label="Order progress">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-          <div className="bk-stepper" style={{ flex: 1, minWidth: 0 }}>
-            <ol aria-label="Order progress" style={{ display: 'flex', gap: 0, listStyle: 'none', margin: 0, padding: 0 }}>
-              {STEPS.map((step, stepIdx) => {
-                const isActive = stepIdx === currentIdx;
-                const isPast   = stepIdx <= currentIdx;
-                // Forward-only: a step is clickable when it's a valid next
-                // status from where the load is now — this also naturally
-                // blocks skipping ahead, since VALID_TRANSITIONS only ever
-                // lists the immediate next step(s).
-                // Progress only: status changes go through "Change status".
-                const isClickable = false;
-                const label = titleCase(step);
-                // Done steps are filled, the current step is larger, a step you
-                // can move to next is an outlined ring. No glows.
-                const dot = (
-                  <span style={{
-                    width: isActive ? 12 : 10,
-                    height: isActive ? 12 : 10,
-                    boxSizing: 'border-box',
-                    borderRadius: '50%',
-                    background: isPast ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                    border: `2px solid ${isPast || isClickable ? 'var(--accent-primary)' : 'var(--border-active)'}`,
-                  }} />
-                );
-                const text = (
-                  <span style={{
-                    fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)',
-                    color: isActive ? 'var(--text-primary)' : isPast ? 'var(--text-secondary)' : (isClickable ? 'var(--accent-primary)' : 'var(--text-secondary)'),
-                    fontWeight: isActive ? 600 : 400,
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {label}
-                  </span>
-                );
-                return (
-                  <li key={step} aria-current={isActive ? 'step' : undefined} style={{ flex: 1, display: 'flex', alignItems: 'center', minWidth: 0 }}>
-                    <span aria-hidden="true" style={{ flex: 1, height: 2, background: isPast ? 'var(--accent-primary)' : 'var(--border-subtle)' }} />
-                    {isClickable ? (
-                      <button
-                        type="button"
-                        onClick={() => updateStatus(step)}
-                        title={`Mark as ${label}`}
-                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '4px 8px', minHeight: 40, background: 'none', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-                      >
-                        {dot}{text}
-                      </button>
-                    ) : (
-                      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '4px 8px' }}>
-                        {dot}{text}
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
+          <section className="bk-card bk-progress" aria-label="Order progress">
+          {/* One grid column per step: the dot sits at the column centre and
+              each connector runs from the previous dot to this one, so line
+              segments always meet the dots. Status changes go through
+              "Change status"; the steps only show progress. */}
+          <ol className="bk-steps" aria-label="Order progress">
+            {STEPS.map((step, stepIdx) => {
+              const isActive = stepIdx === currentIdx;
+              const isPast = stepIdx <= currentIdx;
+              return (
+                <li key={step} aria-current={isActive ? 'step' : undefined} className={`bk-step${isPast ? ' is-done' : ''}${isActive ? ' is-current' : ''}`}>
+                  <span className="bk-step__dot" aria-hidden="true" />
+                  <span className="bk-step__label">{titleCase(step)}</span>
+                </li>
+              );
+            })}
+          </ol>
           {billingBlocked && (
-            <p className="bk-help bk-help--danger" style={{ textAlign: 'right', maxWidth: 260 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
+            <p className="bk-help bk-help--danger bk-progress__note" title={subscriptionStatusDetail(authUser?.subscription_status)}>
               Status changes are blocked.{' '}
               <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>Go to billing</button>
             </p>
           )}
-          </div>
           </section>
         );
       })()}
@@ -533,7 +491,7 @@ export default function Bookings() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
               <p className="bk-help">
                 {!load.vehicle
-                  ? 'No vehicle assigned yet'
+                  ? 'Live position shows once a vehicle is assigned.'
                   : !vehicleDetail?.ctrlfleet_vehicle_code
                     ? 'The assigned vehicle is not linked to CtrlFleet, so there is no live tracking.'
                     : vehicleDetail?.last_location_at
@@ -575,49 +533,12 @@ export default function Bookings() {
             </div>
           </section>
 
-          {/* Actions — nothing to do here before the load has a vehicle, so
-              hide the whole card until it's at least Assigned. Invoicing
-              itself is automatic on delivery (see convert_to_invoice from
-              the delivery signal) — no manual "create invoice" trigger. */}
-          {load.status !== 'PENDING' && (
-            <section className="bk-card" aria-labelledby="bk-actions-title">
-              <div className="bk-card__head"><h2 className="bk-card__title" id="bk-actions-title">Actions</h2></div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {hasInvoice && (
-                  <button
-                    type="button"
-                    className="bk-btn bk-btn--primary bk-btn--block"
-                    onClick={() => navigate(`/finance/invoices/${invoiceId}`)}
-                  >
-                    View invoice
-                  </button>
-                )}
-
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  style={{ display: 'none' }}
-                  onChange={e => { if (e.target.files?.[0]) uploadPOD(e.target.files[0]); }}
-                />
-                <button
-                  type="button"
-                  className="bk-btn bk-btn--block bk-btn--secondary"
-                  onClick={() => (hasPOD ? setPodPreviewOpen(true) : fileRef.current?.click())}
-                  disabled={podButtonUploading}
-                >
-                  {podButtonUploading ? 'Uploading…' : hasPOD ? (load.pod_received_by ? `View POD, received by ${load.pod_received_by}` : 'View POD') : <><Upload size={16} aria-hidden="true" /> Upload POD</>}
-                </button>
-              </div>
-            </section>
-          )}
-
-          {/* Assignment */}
+          {/* Assignment and the order's documents */}
           <section className="bk-card" aria-labelledby="bk-assign-title">
             <div className="bk-card__head">
               <h2 className="bk-card__title" id="bk-assign-title">Assignment</h2>
               {!editingAssignment && !billingBlocked && !assignmentLocked && (
-                <button type="button" className="bk-btn bk-btn--secondary" onClick={startEditAssignment} style={{ margin: '-8px 0' }}>
+                <button type="button" className="bk-btn bk-btn--secondary bk-btn--sm" onClick={startEditAssignment} style={{ margin: '-6px 0' }}>
                   Edit
                 </button>
               )}
@@ -629,6 +550,13 @@ export default function Bookings() {
               </p>
             )}
 
+            {/* An order on the move with no vehicle is not a normal state: say so once, calmly. */}
+            {!load.vehicle && ['LOADING', 'IN_TRANSIT'].includes(load.status) && !editingAssignment && (
+              <div className="bk-assign__flag">
+                <StatusChip tone="warning" size="sm" label={`${load.status === 'IN_TRANSIT' ? 'In transit' : 'Loading'} · no vehicle assigned`} />
+                <p className="bk-help">Add the vehicle that is carrying it, so tracking and fleet status stay right.</p>
+              </div>
+            )}
             {!editingAssignment || assignmentLocked ? (
               [
                 { label: 'Vehicle', value: load.vehicle_info || 'Not assigned' },
@@ -636,7 +564,7 @@ export default function Bookings() {
               ].map(r => (
                 <div key={r.label} className="bk-kv">
                   <span className="bk-kv__label">{r.label}</span>
-                  <span className="bk-kv__value">{r.value}</span>
+                  <span className={`bk-kv__value${r.value === 'Not assigned' ? ' bk-muted' : ''}`}>{r.value}</span>
                 </div>
               ))
             ) : (
@@ -691,6 +619,38 @@ export default function Bookings() {
                   </button>
                 </div>
               </>
+            )}
+            {/* Documents for the order (was a separate one-button Actions card).
+                Nothing to do before the load has a vehicle, so hidden while
+                Pending. Invoicing itself is automatic on delivery. */}
+            {load.status !== 'PENDING' && !editingAssignment && (
+              <div className="bk-assign__actions">
+                {hasInvoice && (
+                  <button
+                    type="button"
+                    className="bk-btn bk-btn--primary bk-btn--block"
+                    onClick={() => navigate(`/finance/invoices/${invoiceId}`)}
+                  >
+                    View invoice
+                  </button>
+                )}
+
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  style={{ display: 'none' }}
+                  onChange={e => { if (e.target.files?.[0]) uploadPOD(e.target.files[0]); }}
+                />
+                <button
+                  type="button"
+                  className="bk-btn bk-btn--block bk-btn--secondary"
+                  onClick={() => (hasPOD ? setPodPreviewOpen(true) : fileRef.current?.click())}
+                  disabled={podButtonUploading}
+                >
+                  {podButtonUploading ? 'Uploading…' : hasPOD ? (load.pod_received_by ? `View POD, received by ${load.pod_received_by}` : 'View POD') : <><Upload size={16} aria-hidden="true" /> Upload POD</>}
+                </button>
+              </div>
             )}
           </section>
         </div>

@@ -3,8 +3,9 @@
    Tight type, big numbers with short labels, compact panels with generous
    space between them. Theme tokens only; mono only for identifiers. */
 .fleet-detail {
-  --fd-gap: var(--section-gap, 24px);
-  --fd-pad: 24px;
+  /* R3 rhythm: 16px between sibling cards, card padding from --card-pad. */
+  --fd-gap: var(--card-gap, 16px);
+  --fd-pad: var(--card-pad, 20px);
   --fd-panel-bg: var(--bg-surface);
   --fd-line: var(--border-subtle);
   --fd-row-line: var(--border-row);
@@ -32,7 +33,7 @@
 
 /* Buttons (the status control is the shared .tw-seg) */
 .fleet-detail .fd-button {
-  min-height: 40px; padding: 0 16px; font-size: 14px;
+  min-height: var(--control-h, 36px); padding: 0 14px; font-size: 14px;
   background: var(--fd-panel-bg); border: 1px solid var(--fd-line); border-radius: var(--radius-control, 8px);
   color: var(--text-primary); font: 500 14px/20px var(--font-sans); cursor: pointer; white-space: nowrap;
 }
@@ -88,12 +89,12 @@
 .fleet-detail .fd-body:not(.fd-body--wide) > .fd-side { position: sticky; top: 24px; }
 /* Few loads: one column; each Details group lays its rows across the width. */
 .fleet-detail .fd-body--wide { grid-template-columns: minmax(0, 1fr); }
-.fleet-detail .fd-body--wide .fd-rows {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); column-gap: 40px;
+/* Wide Details: the groups sit side by side, each a straight column of
+   label/value rows, so every row lines up (no ragged third column). */
+.fleet-detail .fd-body--wide .fd-groups {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 20px 40px; align-items: start;
 }
-.fleet-detail .fd-body--wide .fd-row:last-child { border-bottom: 1px solid var(--fd-row-line); }
-.fleet-detail .fd-body--wide .fd-rows + .fd-missing { border-top: 0; }
-.fleet-detail .fd-body--wide .fd-missing { justify-content: flex-start; }
+.fleet-detail .fd-body--wide .fd-groups > .fd-group + .fd-group { margin-top: 0; }
 
 .fleet-detail .fd-panel {
   min-width: 0; padding: 20px var(--fd-pad) var(--fd-pad);
@@ -219,7 +220,7 @@
   .fleet-detail .fd-head__row { align-items: stretch; flex-direction: column; }
   .fleet-detail .fd-head__actions { width: 100%; }
   .fleet-detail .fd-head__actions .fd-status-seg { max-width: 100%; overflow-x: auto; }
-  .fleet-detail .fd-button { min-height: 44px; }
+  .fleet-detail .fd-button { min-height: var(--control-h, 44px); }
   .fleet-detail .fd-panel { padding: 16px var(--fd-pad); }
   .fleet-detail .fd-panel--flush { padding-bottom: 4px; }
   /* Phone table: load + route stacked, revenue, status. */
@@ -287,3 +288,9 @@
   color: var(--text-primary); font: 400 14px/20px var(--font-sans); cursor: pointer;
 }
 
+/* Phone loads table: tighter inner cells so Load, Revenue and Status fit without a sideways scroll. */
+@media (max-width: 640px) {
+  .fleet-detail .fd-table th, .fleet-detail .fd-table td { padding-left: 8px; padding-right: 8px; }
+  .fleet-detail .fd-table th:first-child, .fleet-detail .fd-table td:first-child { padding-left: var(--fd-pad); }
+  .fleet-detail .fd-table th:last-child, .fleet-detail .fd-table td:last-child { padding-right: var(--fd-pad); }
+}

@@ -6,7 +6,7 @@ import { fetchData, patchData } from '@/lib/Api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertsPanel, DetailMessage, MiniStats, DetailSkeleton, Group, InfoTip, Kpi, KpiStrip, Panel, RecordHeader, Row, StatusChip,
-  StatusControl, Tag, dateText, daysUntil, expiryAlert, formatStatus, isNotFound, kmText, monthlySeries, num, plural,
+  StatusControl, Tag, dateText, monthsWithRevenue, daysUntil, expiryAlert, formatStatus, isNotFound, kmText, monthlySeries, num, plural,
   randCents, randWhole, type AlertItem, type Tone,
 } from '@/components/fleet-detail/parts';
 import { MonthlyBars } from '@/components/fleet-detail/MonthlyBars';
@@ -62,7 +62,7 @@ export default function VehicleFinancialProfile() {
   // Failing (even while retrying) with nothing to show: say so straight away.
   const isError = loadFailed(vehicleQuery);
 
-  const { data: loadsData } = useQuery({
+  const { data: loadsData, isLoading: loadsLoading } = useQuery({
     queryKey: ['vehicle-loads', id],
     queryFn: () => fetchData(`api/v1/loads/?vehicle=${id}&page_size=50`),
     enabled: !!id,
@@ -94,7 +94,8 @@ export default function VehicleFinancialProfile() {
       <LoadError what="this vehicle" error={loadError} busy={vehicleQuery.isFetching} onRetry={() => refetch()} />
     </div>
   );
-  if (isLoading && !isError) return <DetailSkeleton crumb="Vehicles" crumbTo="/fleet/vehicles" />;
+  // Loads decide the layout (one column or a rail): wait for them so nothing jumps.
+  if ((isLoading || loadsLoading) && !isError) return <DetailSkeleton crumb="Vehicles" crumbTo="/fleet/vehicles" />;
   if (!vehicle) return (
     <DetailMessage
       title="Vehicle not found"
@@ -203,7 +204,7 @@ export default function VehicleFinancialProfile() {
           label="Revenue"
           value={delivered.length > 0 ? randWhole(totalRevenue) : null}
           empty="No delivered loads"
-          sub={delivered.length > 0 ? <>{randWhole(avgRevPerTrip)} per load</> : undefined}
+          sub={delivered.length > 1 ? <>{randWhole(avgRevPerTrip)} per load</> : delivered.length === 1 ? 'From 1 load' : undefined}
           info={<>Delivered loads on this truck{partial ? `, latest ${loads.length} of ${loadsTotal}` : ''}. Invoiced and in-progress loads are not counted.</>}
         />
         <Kpi
@@ -226,7 +227,7 @@ export default function VehicleFinancialProfile() {
         <Kpi
           label="Loads delivered"
           value={formatNumber(delivered.length)}
-          sub={<>of {plural(loads.length, 'load')}{partial ? ` (latest of ${loadsTotal})` : ''}</>}
+          sub={delivered.length === loads.length && !partial ? (loads.length === 1 ? 'Its only load' : 'All of its loads') : <>of {plural(loads.length, 'load')}{partial ? ` (latest of ${loadsTotal})` : ''}</>}
         />
       </KpiStrip>
       ) : (
@@ -242,7 +243,7 @@ export default function VehicleFinancialProfile() {
       <div className={`fd-body${wideLayout ? ' fd-body--wide' : ''}`}>
         {(hasDelivered || loads.length > 0) && (
         <div className="fd-main">
-          {hasDelivered && (
+          {hasDelivered && monthsWithRevenue(months) >= 2 && (
           <Panel
             title="Revenue by month"
             sub="Delivered loads, last 12 months"
@@ -273,6 +274,7 @@ export default function VehicleFinancialProfile() {
           <AlertsPanel items={alerts} />
 
           <Panel title="Details">
+            <div className="fd-groups">
             <Group title="Vehicle" onAdd={openEdit} rows={[
               { label: 'Registration', value: vehicle.plate, mono: true },
               { label: 'VIN', value: vehicle.vin, mono: true },
@@ -319,6 +321,7 @@ export default function VehicleFinancialProfile() {
                 { label: 'Uptime', value: Number(vehicle.uptime_percentage) ? formatPercent(parseFloat(vehicle.uptime_percentage), 1) : null },
               ]}
             />
+            </div>
           </Panel>
         </aside>
       </div>

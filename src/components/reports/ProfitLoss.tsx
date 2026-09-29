@@ -81,7 +81,9 @@ export default function ProfitLoss({ d, companyName }: { d: Ledger; companyName?
         table={t.table}
         caption={`Profit and loss, ${periodText(period)}`}
         footer={t.check}
-        scrollEnd
+        fit
+        pinLast={!t.showPrior}
+        cue={t.showPrior ? ['Back', 'More columns'] : undefined}
       />
     </ReportFrame>
   );
@@ -169,7 +171,7 @@ function build(d: Ledger, period: Period, basis: Basis) {
 
   const pending = pendingList.reduce((s, e) => s + num(e.amount), 0);
   return {
-    table, check, rev, prevRev, gross, net, prevNet, priorLabel, trimmed: trimNote(allMonths, months),
+    table, check, showPrior, rev, prevRev, gross, net, prevNet, priorLabel, trimmed: trimNote(allMonths, months),
     costs: dNow.total + oNow.total, pending, pendingCount: pendingList.length,
   };
 }

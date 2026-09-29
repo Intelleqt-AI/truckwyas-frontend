@@ -134,7 +134,7 @@ export default function BillingHistoryPage() {
 
   return (
     <SettingsShell activeId="billing">
-    <div style={{ maxWidth: 960 }}>
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
       {/* Title block sits at the same y as every other settings section; the
           way back lives beside it instead of pushing the h1 down. */}
       <SettingsPageHeader
@@ -147,20 +147,20 @@ export default function BillingHistoryPage() {
         }
       />
 
-      <div style={{ marginBottom: 24, maxWidth: '100%', overflowX: 'auto' }}>
+      <div className="tw-toolbar" style={{ maxWidth: '100%', overflowX: 'auto' }}>
         <Segmented label="Period" value={period} onChange={setPeriod} options={PERIODS.map(p => ({ value: p, label: p }))} />
       </div>
 
       {loading ? (
         <div style={sectionStyle}>
-          <div style={{ padding: 24 }}>
+          <div style={{ padding: 'var(--card-pad, 20px)' }}>
             <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', width: '40%' }} />
           </div>
         </div>
       ) : (
         <>
           <HistoryTable title="Plan purchased" rows={planCharges} />
-          <HistoryTable title="Platform fee (0.25% per delivery)" rows={feeCharges} />
+          <HistoryTable title="Platform fee (0,25% per delivery)" rows={feeCharges} />
         </>
       )}
     </div>

@@ -27,7 +27,6 @@ const ROUTES: Array<[prefix: string, load: Loader]> = [
   ['/fleet/drivers/', () => import('@/pages/DriverProfile')],
   ['/fleet/drivers', () => import('@/pages/Drivers')],
   ['/fleet/heatmap', () => import('@/pages/FleetHeatmap')],
-  ['/fleet/overview', () => import('@/pages/FleetDashboard')],
   ['/capital', () => import('@/pages/Capital')],
   ['/insurance', () => import('@/pages/Insurance')],
   ['/copilot', () => import('@/pages/Copilot')],

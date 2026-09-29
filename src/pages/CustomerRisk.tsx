@@ -10,7 +10,9 @@ import {
 import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatDate, formatDays, formatPercent } from "@/lib/formatters";
 import LoadError, { loadFailed } from "@/components/data/LoadError";
-import { KpiRow, KpiTile } from "@/components/ui/KpiTile";
+import { KpiRow, KpiStats, KpiTile } from "@/components/ui/KpiTile";
+import { InfoTip } from "@/components/ui/InfoTip";
+import SectionHeader from "@/components/layout/SectionHeader";
 import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
 
 const BAND_TONE: Record<string, StatusTone> = {
@@ -54,6 +56,7 @@ interface RiskRow {
 
 export default function CustomerRisk() {
   const { id } = useParams();
+  const backTo = id ? `/customers/${id}` : "/customers";
   const navigate = useNavigate();
 
   const riskQuery = useQuery({
@@ -82,16 +85,8 @@ export default function CustomerRisk() {
   if (isLoading && !riskFailed) {
     return (
       <div className="fin-page" aria-busy="true" aria-label="Loading risk profile">
-        <button type="button" onClick={() => navigate(-1)} className="fin-back">
-          <span aria-hidden="true">←</span> Back
-        </button>
-        <header className="fin-detail-head">
-          <div style={{ minWidth: 0 }}>
-            <div className="fin-detail-head__eyebrow">Payment risk profile</div>
-            <span className="fin-skel fin-skel--line" aria-hidden="true" />
-          </div>
-        </header>
-        <div className="fin-skel fin-skel--card" aria-hidden="true" />
+        <SectionHeader title="Payment risk profile" back={{ to: backTo, label: 'Customer' }} />
+        <div key="skel" className="fin-skel fin-skel--card" aria-hidden="true" style={{ marginTop: 0 }} />
       </div>
     );
   }
@@ -162,6 +157,8 @@ export default function CustomerRisk() {
     },
   ];
 
+  const shownKpis = kpis.filter((k) => k.show);
+
   const legend = [
     { label: "Paid or open, up to 30 days late (normal)", color: "var(--text-tertiary)" },
     { label: "More than 30 days late", color: "var(--status-danger)" },
@@ -169,32 +166,38 @@ export default function CustomerRisk() {
 
   return (
     <div className="fin-page">
-      <button type="button" onClick={() => navigate(-1)} className="fin-back">
-        <span aria-hidden="true">←</span> Back
-      </button>
-      <header className="fin-detail-head">
-        <div style={{ minWidth: 0 }}>
-          <div className="fin-detail-head__eyebrow">Payment risk profile</div>
-          <div className="fin-detail-head__title-row">
-            <h1>{name}</h1>
-            <StatusChip
-              tone={bandTone}
-              label={bandLabel}
-              title={data.insufficient_history ? "Fewer than 3 invoices: not enough history" : `Risk band: ${fmtStatus(data.band)}`}
-            />
-          </div>
-          <p className="fin-detail-head__sub" style={{ maxWidth: "72ch" }}>
-            Scored only from how this customer pays: up to 30 days late is treated as normal; later payments and money still owed beyond 30 days raise the risk.
-            {data.blocked && " At this level their invoices can't be advanced."}
-          </p>
-        </div>
-      </header>
+      <SectionHeader
+        title={name}
+        titleAdornment={
+          <StatusChip
+            tone={bandTone}
+            label={bandLabel}
+            title={data.insufficient_history ? "Fewer than 3 invoices: not enough history" : `Risk band: ${fmtStatus(data.band)}`}
+          />
+        }
+        back={{ to: backTo, label: "Customer" }}
+        description={<>Payment risk profile{data.blocked && ", invoices can't be advanced"}</>}
+      />
 
-      <KpiRow className="fin-kpi-row">
-        {kpis.filter((k) => k.show).map((k) => (
-          <KpiTile key={k.label} label={k.label} figure={k.value} note={<span title={k.sub}>{k.sub}</span>} />
-        ))}
-      </KpiRow>
+      <div key="stack" className="fin-stack fin-stack--16 risk-stack">
+      {/* One or two figures: a stats line in one card; three or four: tiles. */}
+      {shownKpis.length <= 2 ? (
+        <KpiStats
+          aria-label="Risk figures"
+          items={shownKpis.map((k, i) => ({
+            label: k.label,
+            aside: i === 0 ? <InfoTip>{"Scored only from how this customer pays: up to 30 days late is treated as normal; later payments and money still owed beyond 30 days raise the risk."}</InfoTip> : undefined,
+            figure: k.value,
+            note: <span title={k.sub}>{k.sub}</span>,
+          }))}
+        />
+      ) : (
+        <KpiRow className="fin-kpi-row">
+          {shownKpis.map((k, i) => (
+            <KpiTile key={k.label} label={k.label} aside={i === 0 ? <InfoTip>{"Scored only from how this customer pays: up to 30 days late is treated as normal; later payments and money still owed beyond 30 days raise the risk."}</InfoTip> : undefined} figure={k.value} note={<span title={k.sub}>{k.sub}</span>} />
+          ))}
+        </KpiRow>
+      )}
 
       {data.ai_summary && (
         <section className="card fin-section" aria-labelledby="summary-title">
@@ -323,6 +326,7 @@ export default function CustomerRisk() {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

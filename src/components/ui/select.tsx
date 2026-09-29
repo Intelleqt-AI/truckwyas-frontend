@@ -22,8 +22,10 @@ const SelectTrigger = React.forwardRef<
       background: "var(--input-bg, var(--bg-surface))",
       border: "1px solid var(--border-control)",
       color: "var(--text-primary)",
-      padding: "8px 12px",
-      minHeight: 40,
+      padding: "0 12px",
+      // Form fields are --field-h (40); inside .tw-toolbar and page-head
+      // actions --select-h resolves to --control-h (36). R3 rhythm.
+      minHeight: "var(--select-h, var(--field-h, 40px))",
       borderRadius: "var(--radius-control)",
       fontSize: 14,
       lineHeight: "20px",

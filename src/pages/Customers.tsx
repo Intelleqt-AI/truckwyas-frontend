@@ -1,3 +1,4 @@
+import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
 import './customers-typography.css';
 import './table-heading-roles.css';
 import './bookings-section.css';
@@ -160,11 +161,23 @@ export default function Customers() {
     if (inv.due_date && inv.due_date.slice(0, 10) < today) row.overdue += num(inv.balance);
     owedBy.set(inv.customer, row);
   }
-  const moneyCell = (v: number | undefined) => {
+  // One money column (R3): Owed, with the overdue part as a second line only
+  // when it tells you something (all of it, or a part of it, is late).
+  const owedCell = (row: { owed: number; overdue: number } | undefined) => {
     if (!ledger.data) return <span className="bk-muted">{ledger.error ? 'Not loaded' : '…'}</span>;
-    if (!v || v < 0.005) return <span className="bk-muted">None</span>;
-    return formatCurrency(v);
+    const owed = row?.owed ?? 0;
+    const overdue = row?.overdue ?? 0;
+    if (owed < 0.005) return <span className="bk-muted">—</span>;
+    return (
+      <>
+        {formatCurrency(owed)}
+        {overdue >= 0.005 && (
+          <span className="cu-owed__sub">{Math.abs(overdue - owed) < 0.005 ? 'All overdue' : `${formatCurrency(overdue)} overdue`}</span>
+        )}
+      </>
+    );
   };
+
   // Customer is the company; the contact name is shown only when it differs.
   const displayName = (c: Customer) => (c.company_name || '').trim() || c.name;
   const contactName = (c: Customer) => {
@@ -183,6 +196,8 @@ export default function Customers() {
 
   const customerStatus = (c: Customer) =>
     c.is_active === false || c.status === "INACTIVE" ? "INACTIVE" : "ACTIVE";
+  // Status earns a column only when some customer is inactive.
+  const anyInactive = customers.some(c => customerStatus(c) !== 'ACTIVE');
 
   const filtered = [...customers].sort((a, b) => {
       switch (sortBy) {
@@ -253,7 +268,8 @@ export default function Customers() {
       </div>
     );
   }
-  if (loading) return <div className="customers-typography">{header}<TableSkeleton rows={8} cols={6} label="Loading customers" /></div>;
+  // The toolbar row is reserved while loading so the table does not jump.
+  if (loading) return <div className="customers-typography">{header}<div className="tw-toolbar" aria-hidden="true" /><TableSkeleton rows={8} cols={6} label="Loading customers" /></div>;
 
   return (
     <div className="customers-typography bookings-typography">
@@ -262,24 +278,16 @@ export default function Customers() {
       {/* Table. No summary tiles: nothing on this directory drives a decision
           except finding the customer, so the count sits in the toolbar. */}
       {/* Toolbar sits above the card, as on every other list. */}
-      <div className="bk-toolbar">
-          <input
-            type="search"
-            className="bk-search"
-            aria-label="Search customers"
-            placeholder="Search name, company, email, city"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0, marginLeft: "auto" }}>
-            <span className="bk-toolbar__end" style={{ marginRight: 8 }}>
-              {data && !data.complete
-                ? `First ${customers.length} of ${totalCustomers} customers`
-                : `${totalCustomers} ${totalCustomers === 1 ? "customer" : "customers"}`}
-            </span>
-            <span id="customers-sort-label" style={{ fontSize: 13, lineHeight: "20px", fontWeight: 500, fontFamily: "var(--font-sans)", color: "var(--text-secondary)", letterSpacing: 0 }}>Sort</span>
+      <Toolbar
+        className="cu-toolbar"
+        meta={data && !data.complete
+          ? `First ${customers.length} of ${totalCustomers} customers`
+          : `${totalCustomers} ${totalCustomers === 1 ? "customer" : "customers"}`}
+        end={
+          <>
+            <span id="customers-sort-label" className="cu-sort-label">Sort</span>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger aria-labelledby="customers-sort-label" style={{ width: 'auto', minWidth: 168, minHeight: 40 }}>
+              <SelectTrigger aria-labelledby="customers-sort-label" style={{ width: 'auto', minWidth: 168 }}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -292,8 +300,16 @@ export default function Customers() {
                 <SelectItem value="oldest">Oldest first</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-      </div>
+          </>
+        }
+      >
+        <SearchInput
+          aria-label="Search customers"
+          placeholder="Search name, company, email, city"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </Toolbar>
 
       <div className="card" style={{ padding: 0, overflow: "hidden", borderRadius: "var(--radius-card, 12px)" }}>
         {/* Sits above the table so it never covers the rows being chosen. */}
@@ -323,8 +339,7 @@ export default function Customers() {
               <th scope="col" className="bk-col-city">City</th>
               <th scope="col" className="bk-col-terms bk-col-narrow">Terms</th>
               <th scope="col" className="is-num bk-col-money">Owed</th>
-              <th scope="col" className="is-num bk-col-overdue bk-col-money">Overdue</th>
-              <th scope="col">Status</th>
+              {anyInactive && <th scope="col">Status</th>}
               <th scope="col" className="is-num"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
@@ -332,7 +347,7 @@ export default function Customers() {
             {filtered.length === 0 ? (
               customers.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: 0, whiteSpace: "normal" }}>
+                  <td colSpan={anyInactive ? 8 : 7} style={{ padding: 0, whiteSpace: "normal" }}>
                     <div className="bk-empty" style={{ padding: "48px 24px" }}>
                       <div className="bk-empty__icon"><Building2 size={32} strokeWidth={1.5} aria-hidden="true" /></div>
                       <h2 className="bk-empty__title">No customers yet</h2>
@@ -360,7 +375,7 @@ export default function Customers() {
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40, fontSize: 13 }}>
+                  <td colSpan={anyInactive ? 8 : 7} style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40, fontSize: 13 }}>
                     No customers match your search.
                   </td>
                 </tr>
@@ -385,19 +400,20 @@ export default function Customers() {
                     {contactName(c) && <span className="bk-muted" style={{ fontWeight: 400 }}> · {contactName(c)}</span>}
                   </td>
                   <td className="is-truncate bk-col-opt" title={c.email}>
-                    {c.email || <span className="bk-muted">None</span>}
+                    {c.email || <span className="bk-muted">—</span>}
                   </td>
                   <td className="is-truncate bk-col-city">
-                    {c.city || <span className="bk-muted">None</span>}
+                    {c.city || <span className="bk-muted">—</span>}
                   </td>
                   <td className="bk-col-terms bk-col-narrow">
                     {paymentTermsLabel(c.payment_terms_default).replace(/ days$/, '')}
                   </td>
-                  <td className="is-money bk-col-money">{moneyCell(owedBy.get(c.id)?.owed)}</td>
-                  <td className="is-money bk-col-overdue bk-col-money">{moneyCell(owedBy.get(c.id)?.overdue)}</td>
-                  <td>
-                    <StatusChip status={status === "ACTIVE" ? "ACTIVE" : "INACTIVE"} size="sm" />
-                  </td>
+                  <td className="is-money bk-col-money cu-owed">{owedCell(owedBy.get(c.id))}</td>
+                  {anyInactive && (
+                    <td>
+                      <StatusChip status={status === "ACTIVE" ? "ACTIVE" : "INACTIVE"} size="sm" />
+                    </td>
+                  )}
                   <td className="is-num">
                     <RowActions
                       label={c.name}

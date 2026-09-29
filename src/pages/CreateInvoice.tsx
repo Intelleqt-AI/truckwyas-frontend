@@ -110,7 +110,7 @@ export default function CreateInvoice() {
                   <label htmlFor="create-invoice-amount" className="fin-label">Amount excl. VAT (ZAR)</label>
                   <input id="create-invoice-amount" className="fin-control qi-input" type="number" inputMode="decimal" step="0.01" placeholder="0,00" value={form.amount} onChange={set('amount')} style={{ fontVariantNumeric: 'tabular-nums' }} />
                 </div>
-                <div>
+                <div className="fin-date-field">
                   <div className="fin-label">Due date</div>
                   <DatePicker value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} maxDate={today} />
                 </div>
@@ -121,14 +121,14 @@ export default function CreateInvoice() {
               </div>
               <div className="fin-form__row">
                 <div>
-                  <label id="create-invoice-status-label" htmlFor="create-invoice-status" className="fin-label">When it is created</label>
+                  <label id="create-invoice-status-label" htmlFor="create-invoice-status" className="fin-label">Save as</label>
                   <Select value={form.status} onValueChange={val => setForm(f => ({ ...f, status: val }))}>
                     <SelectTrigger id="create-invoice-status" aria-labelledby="create-invoice-status-label">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="DRAFT">Keep as draft</SelectItem>
-                      <SelectItem value="SENT">Mark as sent to customer</SelectItem>
+                      <SelectItem value="DRAFT">Draft, to send later</SelectItem>
+                      <SelectItem value="SENT">Sent, already with the customer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -153,10 +153,10 @@ export default function CreateInvoice() {
               {error && <div className="fin-inset fin-text-danger" role="alert" style={{ fontSize: 13, lineHeight: '20px', marginTop: 12 }}>{error}</div>}
 
               <div className="fin-summary-card__actions">
-                <button type="submit" className="btn-action qi-action" style={{ width: '100%' }} disabled={!canSubmit || mutation.isPending}>
+                <button type="submit" className="tw-btn tw-btn--primary fin-rail-btn" style={{ width: '100%' }} disabled={!canSubmit || mutation.isPending}>
                   {mutation.isPending ? 'Creating…' : 'Create invoice'}
                 </button>
-                <button type="button" className="btn-action fin-btn-secondary fin-btn-ghost qi-action" style={{ width: '100%' }} onClick={() => navigate('/finance/invoices')}>
+                <button type="button" className="tw-btn tw-btn--ghost fin-rail-btn" style={{ width: '100%' }} onClick={() => navigate('/finance/invoices')}>
                   Cancel
                 </button>
                 {!canSubmit && (

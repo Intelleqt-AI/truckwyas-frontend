@@ -148,11 +148,30 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
     const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
     return `${apiBase}/${url.replace(/^\//, '')}`;
   })();
+  // The sidebar's account line uses the SAME source as Settings > Billing
+  // (GET billing/status/, same query key shape), so it never says "Account
+  // active" on a free plan with no subscription. Roles that cannot read
+  // billing fall back to the auth user's subscription_status.
+  const { data: billingStatus } = useQuery<any>({
+    queryKey: ['billing-status-shell'],
+    queryFn: () => fetchData('api/v1/billing/status/'),
+    enabled: canAccessSettings,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const billingPlan = String(billingStatus?.subscription_plan ?? '').toLowerCase();
+  const billingSub = String(billingStatus?.subscription_status ?? subStatus ?? '').toLowerCase();
+  const onFreePlan = !!billingStatus && (!billingPlan || billingPlan === 'free' || billingPlan === 'starter' || !['active', 'grace_period', 'trialing'].includes(billingSub));
+  const baseLabel = subscriptionStatusLabel(billingSub || subStatus, cancelAtPeriodEnd);
   const status = {
-    label: subscriptionStatusLabel(subStatus, cancelAtPeriodEnd),
-    tone: statusTone,
-    detail: subscriptionStatusDetail(subStatus, cancelAtPeriodEnd),
-    needsBilling: isSubscriptionBlocked(subStatus) || cancelAtPeriodEnd,
+    // 'Online' is the "active, or not loaded yet" label: say what the plan
+    // really is once Billing's status is known.
+    label: baseLabel === 'Online' ? (onFreePlan ? 'Free plan' : 'Account active') : baseLabel,
+    tone: (baseLabel === 'Online' && onFreePlan ? 'neutral' : statusTone) as 'ok' | 'warn' | 'bad' | 'neutral',
+    detail: baseLabel === 'Online' && onFreePlan
+      ? 'No active subscription. Subscribe from Settings, Billing.'
+      : subscriptionStatusDetail(billingSub || subStatus, cancelAtPeriodEnd),
+    needsBilling: isSubscriptionBlocked(subStatus) || cancelAtPeriodEnd || (baseLabel === 'Online' && onFreePlan),
   };
 
   // Tablet widths get the rail automatically; the choice is remembered on desktop.

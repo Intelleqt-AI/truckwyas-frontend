@@ -57,3 +57,15 @@
 .qd-btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .qd-tools { display: flex; flex-wrap: wrap; gap: 4px; justify-content: space-between; }
 .qd-tools .bk-btn { padding-left: 8px; padding-right: 8px; }
+
+/* ---- Round 3 ---- */
+.quote-detail-grid { gap: var(--card-gap, 16px); }
+/* Tools sit in a quiet card instead of floating as bare text under the rail. */
+.bk-card.qd-tools { padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-start; }
+.bk-card.qd-tools .bk-btn--quiet-danger { margin-left: auto; }
+.qd .bk-btn.qd-tools-edit { display: none; }
+/* Phone: the head keeps Change status and the primary on one line; Edit moves to the tools card. */
+@media (max-width: 600px) {
+  .qd .bk-btn.qd-head-edit { display: none; }
+  .qd .bk-btn.qd-tools-edit { display: inline-flex; }
+}

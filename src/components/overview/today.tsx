@@ -179,9 +179,9 @@ export function PipelineBars({ stages }: { stages: { key: string; label: string;
   const max = Math.max(1, stages[0]?.count || 0);
   return (
     <ol className="td-pipe" aria-label="Quotes by how far they progressed">
-      {stages.map((s, i) => {
-        const prev = i > 0 ? stages[i - 1].count : null;
-        const rate = prev ? Math.round((s.count / prev) * 100) : null;
+      {stages.map((s) => {
+        // Stage-to-stage percentages read oddly beside the counts ("3 accepted
+        // 75%"); the one rate that matters is the win rate, shown below.
         return (
           <li key={s.key} className={`td-pipe__row${s.key === 'won' ? ' is-key' : ''}`}>
             <span className="td-pipe__label">{s.label}</span>
@@ -189,7 +189,6 @@ export function PipelineBars({ stages }: { stages: { key: string; label: string;
               <span style={{ width: `${(s.count / max) * 100}%` }} />
             </span>
             <span className="td-pipe__count">{s.count}</span>
-            <span className="td-pipe__rate">{rate != null ? `${rate}%` : ''}</span>
           </li>
         );
       })}

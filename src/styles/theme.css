@@ -211,9 +211,18 @@
   --space-8: 32px;
   --space-10: 40px;
 
+  /* R3 rhythm (DESIGN-PRINCIPLES §11.1): ONE card recipe and two gaps.
+     Card padding 20 (16 on phones), 16 between sibling cards, 24 between
+     sections. Nothing else. */
   --card-pad: 20px;
   --card-gap: 16px;
   --section-gap: 24px;
+
+  /* R3 control heights: 36 for every control in a page head or toolbar
+     (buttons, search, selects, segmented track), 40 for fields inside forms.
+     Coarse pointers and phones lift both to 44 (touch floor). */
+  --control-h: 36px;
+  --field-h: 40px;
 
   /* Page rhythm (one page-head geometry everywhere). Applied by
      .tw-page-head / SectionHeader and the shell's <main>:
@@ -234,7 +243,9 @@
   /* One content width (DESIGN-PRINCIPLES §11.8). */
   --content-max: 1600px;
   --form-max: 720px;
-  --kpi-height: 96px;
+  /* KPI tile: label 16 + figure 34 + note 16, inside the one card padding
+     (106 desktop, 98 phone). */
+  --kpi-height: calc(66px + 2 * var(--card-pad));
 
   --pill-radius: var(--radius-chip, 6px);
 }
@@ -368,13 +379,15 @@
   --focus-ring: rgba(37, 99, 235, 0.28);
   --focus-outline: var(--accent-primary);
 
-  --emphasis-bg: #1D4ED8;
-  --emphasis-border: #1D4ED8;
-  --emphasis-fg: #FFFFFF;
-  --emphasis-fg-muted: #DCE4FB;
-  --emphasis-track: rgba(255, 255, 255, 0.24);
-  --emphasis-fill: #FFFFFF;
-  --emphasis-focus: #FFFFFF;
+  /* Emphasis tile (R3): calm like dark. A raised, faintly blue surface with
+     the figure in accent ink; never a saturated slab. */
+  --emphasis-bg: #F4F7FE;
+  --emphasis-border: #D3E0FB;
+  --emphasis-fg: #1D4ED8;
+  --emphasis-fg-muted: #434A55;
+  --emphasis-track: rgba(37, 99, 235, 0.14);
+  --emphasis-fill: #2563EB;
+  --emphasis-focus: #1D4ED8;
 
   --alert-bg: var(--status-info-bg);
   --alert-border: rgba(37, 99, 235, 0.2);
@@ -1132,7 +1145,7 @@ code, pre, kbd, samp, .tw-code {
 }
 
 @media (max-width: 767px) {
-  .os-app-shell .card { padding: 16px; }
+  .os-app-shell .card { padding: var(--card-pad); }
   .os-app-shell .btn-action { min-height: 48px; }
 }
 
@@ -1168,7 +1181,10 @@ code, pre, kbd, samp, .tw-code {
 /* Page head: bold tight title, one short grey line, actions on the right. */
 /* Phone rhythm: the shell's main padding and the head offset tighten together. */
 @media (max-width: 768px) {
-  :root, :root[data-theme] { --main-pad-top: 16px; --page-head-top: 16px; --head-to-tabs: 12px; --tabs-to-content: 16px; --head-to-content: 16px; }
+  :root, :root[data-theme] { --main-pad-top: 16px; --page-head-top: 16px; --head-to-tabs: 12px; --tabs-to-content: 16px; --head-to-content: 16px; --card-pad: 16px; --control-h: 44px; --field-h: 44px; }
+}
+@media (pointer: coarse) {
+  :root, :root[data-theme] { --control-h: 44px; --field-h: 44px; }
 }
 
 /* ONE page head (shared with components/layout/SectionHeader, which renders
@@ -1186,6 +1202,52 @@ code, pre, kbd, samp, .tw-code {
 .tw-title { margin: 0; font: 600 var(--text-display)/34px var(--font-sans); letter-spacing: var(--tracking-display); color: var(--text-primary); }
 .tw-subtitle { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 72ch; }
 .tw-page-head__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 34px; }
+
+/* Page toolbar (R3): search, filters and report controls. It is the FIRST
+   content block, so it sits at the page's content-start y (head bottom +
+   --head-to-content, or tabs bottom + --tabs-to-content), and every control
+   in it is --control-h tall. Count or summary text goes in __meta; right
+   aligned controls in __end.
+     <div class="tw-toolbar">
+       <input class="tw-search" …/> <Select …/> <span class="tw-toolbar__meta">42 invoices</span>
+       <div class="tw-toolbar__end"><button class="tw-btn">Export</button></div>
+     </div>
+   React: <Toolbar> in src/components/ui/Toolbar.tsx. */
+.tw-toolbar {
+  --select-h: var(--control-h);
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
+  min-height: var(--control-h); margin: 0 0 var(--card-gap); min-width: 0;
+}
+.tw-toolbar__meta { font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tw-toolbar__end { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tw-toolbar .tw-btn, .tw-toolbar .tw-input, .tw-toolbar .tw-control, .tw-toolbar .tw-search { height: var(--control-h); }
+.tw-toolbar .tw-seg { padding: 3px; }
+.tw-toolbar .tw-seg__opt { height: calc(var(--control-h) - 6px); }
+/* Head actions are head controls: 36px buttons and selects. */
+.section-header__actions, .tw-page-head__actions { --select-h: var(--control-h); }
+.section-header__actions .tw-btn, .tw-page-head__actions .tw-btn { height: var(--control-h); }
+.section-header__actions .tw-seg, .tw-page-head__actions .tw-seg { padding: 3px; }
+.section-header__actions .tw-seg__opt, .tw-page-head__actions .tw-seg__opt { height: calc(var(--control-h) - 6px); }
+@media (max-width: 767px) {
+  .tw-toolbar > .tw-search, .tw-toolbar > .tw-search-wrap { flex: 1 1 100%; }
+  .tw-toolbar__end { margin-left: 0; }
+}
+
+/* Search field: 36px in toolbars and heads, magnifier inside on the left.
+     <label class="tw-search-wrap"><svg …/><input class="tw-search" type="search" …/></label> */
+.tw-search-wrap { position: relative; display: inline-flex; align-items: center; min-width: 0; flex: 0 1 320px; }
+.tw-search-wrap > svg { position: absolute; left: 10px; width: 16px; height: 16px; color: var(--text-tertiary); pointer-events: none; }
+.tw-search {
+  height: var(--control-h); width: 100%; min-width: 0; padding: 0 12px;
+  background: var(--input-bg); color: var(--text-primary);
+  border: 1px solid var(--border-control); border-radius: var(--radius-control);
+  font: 400 14px/20px var(--font-sans);
+}
+.tw-search-wrap > .tw-search { padding-left: 34px; }
+.tw-search::placeholder { color: var(--text-tertiary); }
+.tw-search:hover:not(:disabled) { border-color: var(--border-control-hover); }
+.tw-search:focus { outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.tw-search::-webkit-search-cancel-button { cursor: pointer; }
 
 /* Cards: 16px radius, a hairline border in light, a surface step in dark. */
 .tw-card {
@@ -1213,7 +1275,7 @@ code, pre, kbd, samp, .tw-code {
 /* Buttons */
 .tw-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  height: 36px; padding: 0 14px;
+  height: var(--control-h); padding: 0 14px;
   border-radius: var(--radius-control);
   border: 1px solid var(--border-default);
   background: var(--bg-surface);
@@ -1231,7 +1293,6 @@ code, pre, kbd, samp, .tw-code {
 .tw-btn--ghost { background: transparent; border-color: transparent; color: var(--text-secondary); }
 .tw-btn--ghost:hover { background: var(--nav-hover-bg); border-color: transparent; color: var(--text-primary); }
 .tw-btn:focus-visible { outline: 2px solid var(--focus-outline); outline-offset: 2px; }
-@media (max-width: 768px) { .tw-btn { height: 44px; } }
 /* Small row action (list rows, Needs you). Keeps a 44px hit area on touch. */
 .tw-btn--sm { height: 28px; padding: 0 10px; font-size: 12px; line-height: 16px; position: relative; }
 @media (max-width: 768px) { .tw-btn.tw-btn--sm { height: 32px; } }
@@ -1304,17 +1365,18 @@ code, pre, kbd, samp, .tw-code {
 
 /* Standard KPI tile (DESIGN-PRINCIPLES §11.6): label, figure, one line. 96px.
    React: src/components/ui/KpiTile.tsx. */
-/* The row sizes to its tile count (max 4 per row) and stops growing at
-   --kpi-max per tile, so 2 tiles never sit in a 4-column grid and wide
-   screens do not stretch tiles into mostly-empty slabs. KpiRow sets
+/* R3: the row sizes to its tile count (max 4 per row) and FILLS the content
+   width, so its right edge lines up with the table or card below. Pages with
+   only 1-2 figures use <KpiStats> (a stats line inside a card) or put the
+   tiles beside a related panel, never a half-empty row. KpiRow sets
    --kpi-cols from its children; :has() covers hand-written rows. */
 .tw-kpi-row {
   --kpi-cols: 4;
-  --kpi-gap: 16px;
+  --kpi-gap: var(--card-gap);
   display: grid;
   grid-template-columns: repeat(var(--kpi-cols), minmax(0, 1fr));
   gap: var(--kpi-gap);
-  max-width: calc(var(--kpi-cols) * var(--kpi-max, 296px) + (var(--kpi-cols) - 1) * var(--kpi-gap));
+  max-width: none;
 }
 .tw-kpi-row:has(> :only-child) { --kpi-cols: 1; }
 .tw-kpi-row:has(> :nth-child(2):last-child) { --kpi-cols: 2; }
@@ -1324,7 +1386,7 @@ code, pre, kbd, samp, .tw-code {
 }
 .tw-kpi {
   display: flex; flex-direction: column; justify-content: space-between; gap: 0;
-  box-sizing: border-box; height: var(--kpi-height); min-width: 0; padding: 14px 16px;
+  box-sizing: border-box; height: var(--kpi-height); min-width: 0; padding: var(--card-pad);
   background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card);
   color: var(--text-primary); text-align: left; text-decoration: none; font: inherit;
 }
@@ -1348,25 +1410,36 @@ code, pre, kbd, samp, .tw-code {
    tile (the 3rd of 3, the 5th of 5) spans the row as a compact line:
    label and note on the left, figure on the right. */
 @media (max-width: 767px) {
-  .tw-kpi-row, .tw-kpi-row[style] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: none; }
+  .tw-kpi-row, .tw-kpi-row[style] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--card-gap); max-width: none; }
+  /* The odd last tile keeps the SAME anatomy as its siblings (label, figure,
+     note stacked), spanning the row; no label-left/figure-right variant. */
   .tw-kpi-row:has(> :only-child) { grid-template-columns: 1fr; }
-  .tw-kpi-row > .tw-kpi:nth-child(odd):last-child:not(:first-child) {
-    grid-column: 1 / -1;
-    height: auto; min-height: 56px;
-    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto;
-    column-gap: 12px; align-items: center; padding: 10px 16px;
-  }
-  .tw-kpi-row > .tw-kpi:nth-child(odd):last-child:not(:first-child) .tw-kpi__head { grid-column: 1; grid-row: 1; }
-  .tw-kpi-row > .tw-kpi:nth-child(odd):last-child:not(:first-child) .tw-kpi__note { grid-column: 1; grid-row: 2; }
-  .tw-kpi-row > .tw-kpi:nth-child(odd):last-child:not(:first-child) .tw-kpi__figure { grid-column: 2; grid-row: 1 / span 2; font-size: 22px; line-height: 28px; }
+  .tw-kpi-row > .tw-kpi:nth-child(odd):last-child:not(:first-child) { grid-column: 1 / -1; }
   .tw-kpi__figure { font-size: 24px; line-height: 30px; }
+}
+
+/* KPI stats line (R3): 1-3 figures inside one card, hairline separated.
+   React: <KpiStats> in src/components/ui/KpiTile.tsx. */
+.tw-kpi-stats { min-width: 0; }
+.tw-kpi-stats__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.tw-kpi-stats__actions { display: flex; align-items: center; gap: 8px; }
+.tw-kpi-stats__list { display: flex; flex-wrap: wrap; margin: 0; row-gap: 16px; }
+.tw-kpi-stats__item { flex: 1 1 0; min-width: 140px; display: flex; flex-direction: column; gap: 2px; padding: 0 var(--card-pad); border-left: 1px solid var(--border-subtle); }
+.tw-kpi-stats__item:first-child { padding-left: 0; border-left: 0; }
+.tw-kpi-stats__label { display: flex; align-items: center; gap: 6px; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; }
+.tw-kpi-stats__figure { margin: 0; font: 600 20px/28px var(--font-sans); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; }
+.tw-kpi-stats__note { margin: 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+@media (max-width: 767px) {
+  .tw-kpi-stats__item { flex: 1 1 calc(50% - 1px); min-width: 0; }
+  .tw-kpi-stats__item:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .tw-kpi-stats__item:nth-child(even) { padding-right: 0; }
 }
 
 /* Form controls: the ONE boundary token for inputs, selects, textareas,
    select triggers, search and date fields (WCAG 1.4.11, >= 3:1). Pages style
    their own controls; these are the shared ones. */
 .tw-input, .tw-control {
-  height: 36px; padding: 0 12px; width: 100%;
+  height: var(--field-h); padding: 0 12px; width: 100%;
   background: var(--input-bg); color: var(--text-primary);
   border: 1px solid var(--border-control); border-radius: var(--radius-control);
   font: 400 14px/20px var(--font-sans);

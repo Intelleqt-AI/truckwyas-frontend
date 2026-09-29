@@ -344,29 +344,31 @@ export default function InvoiceDetail() {
         back={{ to: '/finance/invoices', label: 'Invoices' }}
         description={<>
           {invoice.customer_name}
-          {invoice.load_number && <>{' · Load '}<span className="fin-id">{invoice.load_number}</span></>}
+          {/* The number itself says it is a load ("LOAD-…"). */}
+          {invoice.load_number && <>{' · '}<span className="fin-id" title="Load">{invoice.load_number}</span></>}
         </>}
         actions={<>
           {/* One primary action; everything else sits behind one menu. */}
           {primary === 'remind' ? (
-            <button className="btn-action" onClick={() => setPreview('reminder')} disabled={sendingReminder}>
+            <button type="button" className="tw-btn tw-btn--primary" onClick={() => setPreview('reminder')} disabled={sendingReminder}>
               {sendingReminder ? 'Sending…' : 'Send reminder'}
             </button>
           ) : primary === 'send' ? (
-            <button className="btn-action" onClick={() => setPreview('invoice')} disabled={sending}>
+            <button type="button" className="tw-btn tw-btn--primary" onClick={() => setPreview('invoice')} disabled={sending}>
               {sending ? 'Sending…' : status === 'VIEWED' ? 'Resend to customer' : 'Send to customer'}
             </button>
           ) : primary === 'pay' ? (
             <button
+              type="button"
               onClick={() => setShowPaymentForm(true)}
-              className="btn-action"
+              className="tw-btn tw-btn--primary"
               disabled={showPaymentForm}
               aria-expanded={showPaymentForm}
               aria-controls="record-payment">
               Record payment
             </button>
           ) : (
-            <button className="btn-action fin-btn-secondary" onClick={handleDownloadPDF} disabled={downloading}>
+            <button type="button" className="tw-btn" onClick={handleDownloadPDF} disabled={downloading}>
               {downloading ? 'Downloading…' : 'Download PDF'}
             </button>
           )}
@@ -474,26 +476,25 @@ export default function InvoiceDetail() {
               </div>
             </div>
           ) : (
-            <div className="fin-doc__lines fin-doc__lines--padded">
-              <div className="fin-doc__head">
-                <h3 className="fin-panel-title">Charges</h3>
-                <p className="fin-panel-desc">No separate line items</p>
-              </div>
-              <dl className="fin-dl">
+            // One amount, no lines: the charges are a second row of facts in
+            // the same grid, not a half-empty list.
+            <div className="fin-doc__charges">
+              <h3 className="fin-sr">Charges</h3>
+              <dl className="fin-doc__facts fin-doc__facts--money">
                 {invoice.subtotal != null && (
-                  <div className="fin-dl__row"><dt>Subtotal, excl. VAT</dt><dd>{formatCurrency(num(invoice.subtotal))}</dd></div>
+                  <div><dt>Subtotal, excl. VAT</dt><dd>{formatCurrency(num(invoice.subtotal))}</dd></div>
                 )}
                 {num(invoice.discount) > 0 && (
-                  <div className="fin-dl__row"><dt>Discount</dt><dd>−{formatCurrency(num(invoice.discount))}</dd></div>
+                  <div><dt>Discount</dt><dd>−{formatCurrency(num(invoice.discount))}</dd></div>
                 )}
                 {vat != null && (
-                  <div className="fin-dl__row"><dt>VAT{vatRateText ? ` (${vatRateText})` : ''}</dt><dd>{formatCurrency(vat)}</dd></div>
+                  <div><dt>VAT{vatRateText ? ` (${vatRateText})` : ''}</dt><dd>{formatCurrency(vat)}</dd></div>
                 )}
-                <div className="fin-dl__row is-total"><dt>{showBalance && !partPaid ? 'Total due' : 'Total'}</dt><dd>{formatCurrency(total)}</dd></div>
+                <div className={partPaid ? undefined : 'is-total'}><dt>{showBalance && !partPaid ? 'Total due' : 'Total, incl. VAT'}</dt><dd>{formatCurrency(total)}</dd></div>
                 {partPaid && (
                   <>
-                    <div className="fin-dl__row"><dt>Paid to date</dt><dd>−{formatCurrency(paidInDoc ?? 0)}</dd></div>
-                    <div className="fin-dl__row is-total"><dt>Balance due</dt><dd>{formatCurrency(balance)}</dd></div>
+                    <div><dt>Paid to date</dt><dd>−{formatCurrency(paidInDoc ?? 0)}</dd></div>
+                    <div className="is-total"><dt>Balance due</dt><dd>{formatCurrency(balance)}</dd></div>
                   </>
                 )}
               </dl>

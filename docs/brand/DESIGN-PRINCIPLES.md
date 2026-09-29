@@ -88,9 +88,9 @@ All values live in `src/styles/theme.css`, in the `:root, [data-theme="dark"]` b
   - Link text is `--link` (`#1D4ED8` / `#7DB2FF`).
   - A selected tint is `--accent-dim` (`#EFF5FF` / 10% blue, never a solid navy).
 - **One emphasis tile per page**, reading only the `--emphasis-*` tokens:
-  - **Light** is inverted: `#1D4ED8` with white text, muted text `#DCE4FB`, and a white progress fill on a 24% white track.
+  - **Light** (R3) is calm, like dark: a raised, faintly blue surface `#F4F7FE` with a `#D3E0FB` border, the figure in accent ink `#1D4ED8`, muted text `#434A55`, and a `#2563EB` fill on a 14% blue track. Never a saturated blue slab.
   - **Dark** is a raised, faintly blue surface: `#16233A` with a `#25406B` border, `#EDEFF2` text, `#A9B9D3` muted text, and a `#6AA6FF` fill. Never a glowing blue block.
-  - **Focus** inside the tile uses `--emphasis-focus` (white). A blue ring on blue measures only 1.3:1.
+  - **Focus** inside the tile uses `--emphasis-focus` (`#1D4ED8` light, white dark).
 - **Active navigation** is a filled pill.
   - Light: ink `#0E1116` with white text.
   - Dark: `#262A31` with `#EDEFF2` text, weight 500.
@@ -151,10 +151,10 @@ Every pair the palette ships was computed with the WCAG relative-luminance formu
 | Danger button hover | `#FFFFFF` / `#B91C1C` | 6.47 | `#FFFFFF` / `#C4262C` | 5.74 | 4.5 |
 | Notification badge | `#FFFFFF` / `#C81E1E` | 5.74 | `#FFFFFF` / `#D93036` | 4.74 | 4.5 |
 | Accent hover as text on card | `#1D4ED8` / `#FFFFFF` | 6.70 | `#86B7FF` / `#131518` | 8.91 | 4.5 |
-| Emphasis figure | `#FFFFFF` / `#1D4ED8` | 6.70 | `#EDEFF2` / `#16233A` | 13.65 | 4.5 |
-| Emphasis muted text | `#DCE4FB` / `#1D4ED8` | 5.28 | `#A9B9D3` / `#16233A` | 7.91 | 4.5 |
-| Emphasis focus ring (white) | `#FFFFFF` / `#1D4ED8` | 6.70 | `#FFFFFF` / `#16233A` | 15.72 | 3 |
-| Emphasis progress fill vs tile | `#FFFFFF` / `#1D4ED8` | 6.70 | `#6AA6FF` / `#16233A` | 6.37 | 3 |
+| Emphasis figure | `#1D4ED8` / `#F4F7FE` | 6.25 | `#EDEFF2` / `#16233A` | 13.65 | 4.5 |
+| Emphasis muted text | `#434A55` / `#F4F7FE` | 8.34 | `#A9B9D3` / `#16233A` | 7.91 | 4.5 |
+| Emphasis focus ring | `#1D4ED8` / `#F4F7FE` | 6.25 | `#FFFFFF` / `#16233A` | 15.72 | 3 |
+| Emphasis progress fill vs tile | `#2563EB` / `#F4F7FE` | 4.82 | `#6AA6FF` / `#16233A` | 6.37 | 3 |
 | Nav active text | `#FFFFFF` / `#0E1116` | 18.91 | `#EDEFF2` / `#262A31` | 12.50 | 4.5 |
 | "Soon" on active nav | `#C3C8D0` / `#0E1116` | 11.25 | `#B4BAC3` / `#262A31` | 7.37 | 4.5 |
 | Tooltip text | `#FFFFFF` / `#0E1116` | 18.91 | `#0B0C0E` / `#EDEFF2` | 16.99 | 4.5 |
@@ -206,7 +206,7 @@ Every pair the palette ships was computed with the WCAG relative-luminance formu
 
 ## 8. Control sizes
 
-- Standalone buttons and inputs: 40px tall on desktop, 48px on phones.
+- R3: every control in a page head or toolbar (buttons, search, selects, the segmented track) is `--control-h` 36px. Form fields inside forms are `--field-h` 40px. On phones and coarse pointers both are 44px.
 - Row actions inside tables and inline link-style buttons may be 24 to 32px with a mouse so they sit inside 44 to 48px rows, but every one of them must reach a 44px target on touch screens (`@media (pointer: coarse)`, see `theme.css`).
 - Icon-only buttons: 44px target at every size.
 
@@ -233,6 +233,20 @@ The shell (`src/components/shell/`) and the primitives at the end of `src/styles
 
 ## 11. Use of space (v3 layout review, 28 Sep 2026)
 
+**R3 rhythm (binding, measured).** One recipe, set by tokens in `theme.css`:
+
+| Token | Desktop | Phone | Use |
+|---|---|---|---|
+| `--card-pad` | 20 | 16 | Padding of every card, KPI tile and stats line. No other recipe (no 24, 16/20, 14/16, 12/16). |
+| `--card-gap` | 16 | 16 | Between sibling cards, tiles and rows of cards. |
+| `--section-gap` | 24 | 24 | Between sections (a KPI row and the table below it, two card groups). |
+| `--control-h` | 36 | 44 | Page-head actions and toolbar controls: buttons, search, selects, segmented track. |
+| `--field-h` | 40 | 44 | Form fields inside forms (the shared Select trigger uses it by default). |
+| `--kpi-height` | 106 | 98 | KPI tile: 16 + 34 + 16 inside `--card-pad`. |
+
+- **Content start.** The first content block starts at the same y on every page of the same kind: untabbed pages at head bottom + `--head-to-content`, tabbed pages at tabs bottom + `--tabs-to-content`. A page toolbar (search, filters, report controls) is the FIRST content block and sits at that y: use `<Toolbar>` / `.tw-toolbar`, never a toolbar inside the head or wrapped below the meta line.
+- Cards never set their own padding: use `.tw-card` (or `var(--card-pad)`). Flush tables use `.tw-card--flush` and pad their first and last cells with `var(--card-pad)`.
+
 1. **Charts fill their card.** A chart's plot area spans the card's inner width. Never put a fixed `maxWidth` on a chart. Narrow data gets wider bands (up to 160px), not a narrower chart.
 2. **A chart never repeats the KPI row above it.**
    - If tiles show the figures, the chart shows the shape, and its values live in the tooltip and the table twin.
@@ -243,10 +257,11 @@ The shell (`src/components/shell/`) and the primitives at the end of `src/styles
 4. **One segmented control per page, in the page head.**
    - Filters and periods use `<Segmented>` / `.tw-seg`: 28px on desktop and 40px on touch, one track, a neutral active chip, never accent-filled, never separately boxed buttons.
    - Counts go inside the options.
-   - Toolbars are 32px tall.
+   - Toolbars and their controls are 36px tall (`--control-h`); the segmented track is 36 with 30px options there.
 5. **Accent appears once per screen**, on the key data mark or link. Primary buttons are ink. Filters, active tabs and chips are neutral.
 6. **Tiles are for decisions, not attributes.**
-   - At most 4 tiles, each 96px tall (`--kpi-height`), the same height on every page.
+   - At most 4 tiles, each `--kpi-height` tall (106px desktop, 98px phone: the one card padding around label, figure and note), the same height on every page.
+   - KPI rows fill the content width (no per-tile cap). A page with only 1 or 2 figures uses `<KpiStats>` (a stats line inside a card) or puts the tiles beside a related panel. Never a half-empty row.
    - Dates, distances, weights and limits go in definition lists.
    - No tile shows a dash or "No data".
 7. **No card is more than 25% empty.** If the content is short, the card shrinks or merges with its neighbour. Peers align at the top, and rails are sticky rather than stretched. Trim trailing empty periods from charts and say so in the subtitle.
@@ -259,11 +274,11 @@ The shell (`src/components/shell/`) and the primitives at the end of `src/styles
    - H1 box top at `--page-head-top` (24px desktop, 16px phone) below the top bar; 28/34 600.
    - The head block is `--page-head-h` (58px: title 34 + 4 + one subtitle line 20); the subtitle line is reserved even when empty, so tabs never move.
    - Tabs row (40px) at `--head-to-tabs` (16px) below the head; content at `--tabs-to-content` (24px) below the tabs, or `--head-to-content` (24px) below the head when there are no tabs.
-   - Section pages take their H1 from the sidebar item they live under ("Get paid", "Quotes and loads", "Fleet"): the nav label and the H1 always agree.
+   - Section pages take their H1 from the sidebar item they live under ("Finance", "Quotes and loads", "Fleet"): the nav label and the H1 always agree.
    - Actions and the period control sit on the H1 row.
    - First data by 150px on lists and analytics, by 200px on details, and by 400px at 390 wide.
 10. **Gutters are 16 or 24px.** Nothing else, at any width.
-11. **Phone grids never orphan.** KPI rows are 2 columns on phones; an odd last tile (the 3rd of 3) spans the row as a compact line with the figure on the right. Never 3-up with truncated labels. `.tw-kpi-row` does this automatically.
+11. **Phone grids never orphan.** KPI rows are 2 columns on phones; an odd last tile (the 3rd of 3) spans the row with the same anatomy as its siblings. Never 3-up with truncated labels. `.tw-kpi-row` does this automatically.
 12. **Focus rings hug the control.**
     - A text button's box is its line box, plus 4px.
     - Touch targets grow through an invisible hit area (`::after`), not a bigger visible box.
@@ -343,9 +358,44 @@ It renders a `radiogroup` with roving focus (arrow keys, Home and End). Plain ma
 - `onClick?` or `href?`: makes the whole tile interactive.
 - `className?`
 
-The tile is 96px: 12/16 label, 28/34 figure, 12/16 note, 16px padding.
+The tile is `--kpi-height` (106px): 12/16 label, 28/34 figure, 12/16 note, `--card-pad` padding.
 
-`KpiRow` sets its column count from its tiles (1 to 4; 2 tiles are 2 columns, never half a 4-column grid) and caps each tile at `--kpi-max` (296px), so the row follows its content on wide screens instead of stretching tiles into empty slabs. On phones it uses 2 columns, and an odd last tile spans the row as a compact line.
+`KpiRow` sets its column count from its tiles (1 to 4) and **fills the content width** (R3), so its right edge lines up with the table or card below. On phones it uses 2 columns, and an odd last tile spans the row with the same anatomy.
+
+### `<KpiStats>` (same file, styles `.tw-kpi-stats`)
+
+For pages with only 1 to 3 summary figures (or figures that sit above a table). A stats line inside one card: label, 20/28 figure, optional note, hairline separated. Wraps two per row on phones.
+
+```tsx
+<KpiStats
+  aria-label="Debtors summary"
+  title="Summary"                     // optional card head
+  actions={<button className="tw-btn">Export</button>}  // optional
+  items={[
+    { label: 'Owed to you', figure: 'R 542 140', note: '12 invoices' },
+    { label: 'Over 60 days', figure: 'R 88 200', note: '3 late', tone: 'danger' },
+  ]}
+/>
+```
+
+`bare` renders the line without its own card (inside an existing card).
+
+### `<Toolbar>` and `<SearchInput>` (`src/components/ui/Toolbar.tsx`, styles `.tw-toolbar`, `.tw-search`)
+
+The page toolbar is the first content block. Every control in it is `--control-h` (36px); shared `SelectTrigger`s inside it drop to 36 automatically (`--select-h`).
+
+```tsx
+<Toolbar meta="42 invoices" end={<button className="tw-btn">Export</button>}>
+  <SearchInput placeholder="Search invoices" aria-label="Search invoices" value={q} onChange={(e) => setQ(e.target.value)} />
+  <Select value={status} onValueChange={setStatus}><SelectTrigger style={{ width: 180 }}>…</SelectTrigger>…</Select>
+</Toolbar>
+```
+
+Plain HTML: `<div class="tw-toolbar">…<span class="tw-toolbar__meta">…</span><div class="tw-toolbar__end">…</div></div>`; search `<label class="tw-search-wrap"><svg/><input class="tw-search"/></label>`.
+
+### Missing values
+
+`valueOrDash(value, format?)` in `src/lib/formatters.ts`: null, undefined, '', NaN and the words "None", "null", "undefined", "n/a" render as "—". Zero is a value. Never print "None" or "null" in a value cell.
 
 ### Form controls
 

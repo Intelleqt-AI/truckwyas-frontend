@@ -187,7 +187,7 @@ export default function XeroIntegration() {
     return (
       <SettingsShell activeId="integrations">
         {/* Head first; only the content waits. */}
-        <div style={{ maxWidth: 720 }}>
+        <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
           <SettingsPageHeader
             title="Xero integration"
             description="Connect your Xero account to automatically sync invoices and payments"
@@ -200,7 +200,7 @@ export default function XeroIntegration() {
 
   return (
     <SettingsShell activeId="integrations">
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
       <SettingsPageHeader
         title="Xero integration"
         description="Connect your Xero account to automatically sync invoices and payments"
@@ -340,7 +340,7 @@ export default function XeroIntegration() {
                 key={log.id}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
-                  padding: '12px 24px',
+                  padding: '12px var(--card-pad, 20px)',
                   borderBottom: i < syncLogs.length - 1 ? '1px solid var(--border-row)' : 'none',
                 }}
               >

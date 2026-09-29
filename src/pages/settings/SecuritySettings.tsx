@@ -13,7 +13,7 @@ import { StatusChip } from '@/components/ui/StatusChip';
 const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle = settingsCardHeaderStyle;
 const sectionTitleStyle = settingsCardTitleStyle;
-const LIST_CAP = 8;
+const LIST_CAP = 5;
 const countStyle: React.CSSProperties = { fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' };
 const showAllRowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'center', padding: '8px 24px', borderTop: '1px solid var(--border-row)' };
 const labelStyle = settingsLabelStyle;
@@ -231,7 +231,7 @@ export function SecuritySettings() {
   };
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
       <SettingsPageHeader title="Security settings" description="Manage your account security and authentication methods" />
 
       {/* Change Password */}
@@ -239,7 +239,7 @@ export function SecuritySettings() {
         <div style={sectionHeaderStyle}>
           <h2 style={sectionTitleStyle}>Change password</h2>
         </div>
-        <div style={{ padding: 24 }}>
+        <div style={{ padding: 'var(--card-pad, 20px)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 16 }}>
             <div>
               <label htmlFor="pw-current" style={labelStyle}>Current password</label>
@@ -287,15 +287,15 @@ export function SecuritySettings() {
           {!loadingSessions && sessions.length > 0 && <span style={countStyle}>{sessions.length}</span>}
         </div>
         {loadingSessions ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading sessions…</div>
+          <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading sessions…</div>
         ) : sessions.length === 0 ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No active sessions</div>
+          <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No active sessions</div>
         ) : (
           <div>
           {visibleSessions.map((s, i) => (
             <div key={s.id ?? i} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '12px 24px', gap: 16, borderBottom: i < visibleSessions.length - 1 ? '1px solid var(--border-row)' : 'none',
+              padding: '12px var(--card-pad, 20px)', gap: 16, borderBottom: i < visibleSessions.length - 1 ? '1px solid var(--border-row)' : 'none',
             }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
@@ -328,7 +328,7 @@ export function SecuritySettings() {
           )}
           <div style={{
             display: 'flex', justifyContent: 'flex-end',
-            padding: '12px 24px', borderTop: '1px solid var(--border-row)',
+            padding: '12px var(--card-pad, 20px)', borderTop: '1px solid var(--border-row)',
           }}>
             <button
               className="settings-control"
@@ -353,9 +353,9 @@ export function SecuritySettings() {
           {!loadingActivity && activity.length > 0 && <span style={countStyle}>{activity.length}</span>}
         </div>
         {loadingActivity ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading activity…</div>
+          <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading activity…</div>
         ) : activity.length === 0 ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No recent activity</div>
+          <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No recent activity</div>
         ) : (
           <div>
           {visibleActivity.map((a, i) => {
@@ -364,7 +364,7 @@ export function SecuritySettings() {
             return (
               <div key={a.id} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
-                padding: '12px 24px', borderBottom: i < visibleActivity.length - 1 ? '1px solid var(--border-row)' : 'none',
+                padding: '12px var(--card-pad, 20px)', borderBottom: i < visibleActivity.length - 1 ? '1px solid var(--border-row)' : 'none',
               }}>
                 <span style={{
                   width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
@@ -396,7 +396,7 @@ export function SecuritySettings() {
           <h2 style={{ ...sectionTitleStyle, color: 'var(--status-danger-text)' }}>Danger zone</h2>
         </div>
         <div style={{
-          padding: 24, display: 'flex', alignItems: 'center',
+          padding: 'var(--card-pad, 20px)', display: 'flex', alignItems: 'center',
           justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
         }}>
           <div>
@@ -428,7 +428,7 @@ export function SecuritySettings() {
             position: 'fixed', inset: 0, zIndex: 2000,
             background: 'var(--modal-backdrop, rgba(0,0,0,0.65))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 24,
+            padding: 'var(--card-pad, 20px)',
           }}
           onClick={closeDeleteModal}
         >
@@ -440,7 +440,7 @@ export function SecuritySettings() {
               background: 'var(--bg-surface)',
               border: '1px solid var(--border-subtle)',
               borderRadius: 'var(--radius-dialog)',
-              padding: 24,
+              padding: 'var(--card-pad, 20px)',
               maxWidth: 440,
               width: '100%',
               boxSizing: 'border-box',

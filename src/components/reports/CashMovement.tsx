@@ -37,7 +37,7 @@ export default function CashMovement({ d, companyName }: { d: Ledger; companyNam
       { key: 's-in', kind: 'section', cells: ['Money in'] },
       ...methods.map<SRow>(me => {
         const list = receipts.filter(p => methodLabel(p.payment_method) === me);
-        return { key: `in-${me}`, indent: true, cells: [`Customer receipts, ${me}`, ...months.map(m => sumBy(list, p => p.payment_date, p => num(p.amount), m)), list.reduce((s, p) => s + num(p.amount), 0)] };
+        return { key: `in-${me}`, indent: true, cells: [me === 'Payment' ? 'Customer receipts' : me === 'Cash' ? 'Received in cash' : `Received by ${me === 'EFT' ? 'EFT' : me.toLowerCase()}`, ...months.map(m => sumBy(list, p => p.payment_date, p => num(p.amount), m)), list.reduce((s, p) => s + num(p.amount), 0)] };
       }),
       { key: 't-in', kind: 'subtotal', cells: ['Total money in', ...months.map(inM), totalIn] },
       { key: 's-out', kind: 'section', cells: ['Money out'] },
@@ -47,7 +47,7 @@ export default function CashMovement({ d, companyName }: { d: Ledger; companyNam
       }),
       { key: 't-out', kind: 'subtotal', cells: ['Total money out', ...months.map(outM), totalOut] },
       { key: 'net', kind: 'grand', cells: ['Net movement', ...months.map(m => inM(m) - outM(m)), totalIn - totalOut] },
-      { key: 'cum', kind: 'muted', cells: ['Cumulative from start of period', ...cumulative, totalIn - totalOut] },
+      { key: 'cum', kind: 'muted', cells: ['Running total', ...cumulative, totalIn - totalOut] },
     ],
   };
 
@@ -108,7 +108,8 @@ export default function CashMovement({ d, companyName }: { d: Ledger; companyNam
         table={table}
         caption={view === 'book' ? 'Cash book' : 'Cash movement by month'}
         stickyFirst={view !== 'book'}
-        scrollEnd={view !== 'book'}
+        fit={view !== 'book'}
+        pinLast={view !== 'book'}
         footer={receipts.length > 0 ? (
           <Check>
             {Math.abs(totalIn - toPaidSum) < 0.005

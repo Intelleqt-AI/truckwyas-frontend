@@ -14,7 +14,7 @@ import PaginationControls from '@/pages/admin/PaginationControls';
 
 const PAGE_SIZE = 20;
 
-const cardStyle: React.CSSProperties = { padding: 24 };
+const cardStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16,
 };

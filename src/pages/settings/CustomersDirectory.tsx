@@ -142,12 +142,12 @@ export function CustomersDirectory() {
   };
 
   return (
-    <div className="customer-directory-controls" style={{ maxWidth: 960, minWidth: 0 }}>
+    <div className="customer-directory-controls settings-wide" style={{ minWidth: 0 }}>
       <SettingsPageHeader title="Customers" description="Your customer directory" />
 
       <div style={sectionStyle}>
         <div style={{
-          padding: '12px 24px', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)',
+          padding: '12px var(--card-pad, 20px)', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)',
           display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between',
         }}>
           <h2 style={settingsCardTitleStyle}>
@@ -182,7 +182,7 @@ export function CustomersDirectory() {
 
         {/* Add form */}
         {showAdd && (
-          <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-deep)' }}>
+          <div style={{ padding: '16px var(--card-pad, 20px)', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-deep)' }}>
             <div className="customer-directory-add-grid" style={{ display: 'grid', gap: 12, marginBottom: 12 }}>
               {([
                 { k: 'name', ph: 'Name *' },
@@ -300,7 +300,7 @@ export function CustomersDirectory() {
       {editCustomer && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditCustomer(null)} />
-          <div style={{ position: 'relative', width: 'min(420px, 100vw)', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 24, overflowY: 'auto' }}>
+          <div style={{ position: 'relative', width: 'min(420px, 100vw)', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 'var(--card-pad, 20px)', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h2 style={{ ...settingsCardTitleStyle }}>Edit customer</h2>
               <button type="button" className="settings-control" aria-label="Close" onClick={() => setEditCustomer(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 18, lineHeight: 1, width: 40, height: 40, borderRadius: 'var(--radius-control)' }}>✕</button>

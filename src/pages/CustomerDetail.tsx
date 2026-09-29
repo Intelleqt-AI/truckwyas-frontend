@@ -81,6 +81,8 @@ const PAYMENT_TERMS = [
   { value: "NET90", label: "Net 90 days" },
 ];
 
+const QUOTES_SHOWN = 5;
+
 export default function CustomerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -91,6 +93,8 @@ export default function CustomerDetail() {
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [updating, setUpdating] = useState(false);
+  // Quotes: the 5 most recent, the rest behind "Show all" (many are repeat drafts).
+  const [allQuotes, setAllQuotes] = useState(false);
 
   const customerQuery = useQuery({
     queryKey: ["customer", id],
@@ -152,6 +156,7 @@ export default function CustomerDetail() {
   );
 
   const totalQuotes = quotes.length;
+  const sortedQuotes = [...quotes].sort((a: any, b: any) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
   // The quotes endpoint is paginated (page_size=50): every figure below is
   // computed from the quotes actually loaded, and says so when that is not all of them.
   const quotesOnServer: number = Array.isArray(quotesData) ? quotes.length : (quotesData?.count ?? quotes.length);
@@ -238,12 +243,6 @@ export default function CustomerDetail() {
         titleAdornment={<><StatusChip status={isActive ? "ACTIVE" : "INACTIVE"} /></>}
         description={showContact ? <>Contact: {contact}</> : undefined}
         actions={<>
-          <button
-            type="button"
-            className="bk-btn bk-btn--quiet"
-            disabled={updating}
-            onClick={handleStatusToggle}
-          >{updating ? "Updating…" : isActive ? "Mark inactive" : "Mark active"}</button>
           <button
             type="button"
             className="bk-btn bk-btn--secondary"
@@ -334,20 +333,36 @@ export default function CustomerDetail() {
           {[
             { label: "Payment terms", value: paymentTermsLabel(customer.payment_terms_default) },
             { label: "Owed now", value: ledger.data ? (owed > 0 ? formatZAR(owed) : "Nothing owed") : ledger.error ? "Could not load" : "…" },
-            { label: "Credit limit", value: customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : "Not set" },
+            {
+              label: "Credit limit",
+              tip: "Entered on this customer's record by your team (Edit customer). It feeds the payment risk profile; invoices above it are not blocked.",
+              value: customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : "Not set",
+            },
+            { label: "Invoices", value: theirInvoices.length ? `${theirInvoices.length} issued` : ledger.data ? "None yet" : "…" },
+            { label: "Last quote", value: sortedQuotes[0]?.created_at ? formatDate(sortedQuotes[0].created_at) : "None yet" },
             { label: "Customer since", value: customer.created_at ? formatDate(customer.created_at) : "Not recorded" },
-          ].map(r => (
+          ].map((r: { label: string; value: string; tip?: string }) => (
             <div key={r.label} className="bk-kv">
-              <span className="bk-kv__label">{r.label}</span>
+              <span className="bk-kv__label">{r.label}{r.tip && <InfoTip label={`Where the ${r.label.toLowerCase()} comes from`}>{r.tip}</InfoTip>}</span>
               <span className="bk-kv__value">{r.value}</span>
             </div>
           ))}
+          {/* Status lives with the account, not as a loose button in the head. */}
+          <div className="bk-kv">
+            <span className="bk-kv__label">Status</span>
+            <span className="bk-kv__value cd-status">
+              {isActive ? "Active" : "Inactive"}
+              <button type="button" className="bk-link" disabled={updating} onClick={handleStatusToggle}>
+                {updating ? "Updating…" : isActive ? "Mark inactive" : "Mark active"}
+              </button>
+            </span>
+          </div>
         </section>
       </div>
 
       {/* Invoices: open ones first, then the most recent settled ones. */}
       <section className="bk-card" style={{ marginTop: "var(--section-gap, 24px)", padding: 0 }} aria-labelledby="cd-invoices-title">
-        <div className="bk-card__head" style={{ padding: "24px 24px 0" }}>
+        <div className="bk-card__head" style={{ padding: "var(--card-pad, 20px) var(--card-pad, 20px) 0" }}>
           <h2 className="bk-card__title" id="cd-invoices-title">Invoices</h2>
           <span className="bk-toolbar__end">
             {theirInvoices.length > invoiceRows.length
@@ -359,7 +374,7 @@ export default function CustomerDetail() {
           ledger.error ? (
             <div className="bk-empty"><p className="bk-empty__text">Invoices could not be loaded. <button type="button" className="bk-link" onClick={ledger.retry}>Try again</button></p></div>
           ) : (
-            <div style={{ padding: 24 }}><div className="ops-skel" style={{ height: 120 }} /></div>
+            <div style={{ padding: "var(--card-pad, 20px)" }}><div className="ops-skel" style={{ height: 120 }} /></div>
           )
         ) : theirInvoices.length === 0 ? (
           <div className="bk-empty"><p className="bk-empty__text">No invoices for this customer yet.</p></div>
@@ -401,10 +416,12 @@ export default function CustomerDetail() {
 
       {/* Quotes table */}
       <section className="bk-card" style={{ marginTop: "var(--section-gap, 24px)", padding: 0 }} aria-labelledby="cd-quotes-title">
-        <div className="bk-card__head" style={{ padding: "24px 24px 0" }}>
+        <div className="bk-card__head" style={{ padding: "var(--card-pad, 20px) var(--card-pad, 20px) 0" }}>
           <h2 className="bk-card__title" id="cd-quotes-title">Quotes</h2>
           <span className="bk-toolbar__end">
-            {totalQuotes > 15 ? `Showing 15 of ${totalQuotes}` : `${totalQuotes} ${totalQuotes === 1 ? "quote" : "quotes"}`}
+            {quotesOnServer > totalQuotes
+              ? `Latest ${totalQuotes} of ${quotesOnServer}`
+              : `${totalQuotes} ${totalQuotes === 1 ? "quote" : "quotes"}`}
           </span>
         </div>
         {quotes.length === 0 ? (
@@ -424,7 +441,7 @@ export default function CustomerDetail() {
                 </tr>
               </thead>
               <tbody>
-                {quotes.slice(0, 15).map((q: any) => (
+                {(allQuotes ? sortedQuotes : sortedQuotes.slice(0, QUOTES_SHOWN)).map((q: any) => (
                   <tr
                     key={q.id}
                     className="is-clickable"
@@ -441,7 +458,10 @@ export default function CustomerDetail() {
                       {/* A quote that became a load reads as booked, not as the load's own state. */}
                       {String(q.status).toUpperCase() === "IT"
                         ? <StatusChip tone="success" label="Booked" size="sm" />
-                        : <StatusChip status={q.status} size="sm" />}
+                        : q.outcome === 'rejected' && String(q.status).toUpperCase() === 'SENT'
+                          // Same reading as the Quotes board: a lost answer sits with the declined ones.
+                          ? <StatusChip status="LOST" label="Marked lost" size="sm" />
+                          : <StatusChip status={q.status} size="sm" />}
                     </td>
                     <td className="is-date bk-col-narrow">
                       {q.created_at ? formatDate(q.created_at) : "—"}
@@ -453,6 +473,13 @@ export default function CustomerDetail() {
                 ))}
               </tbody>
             </table>
+            {sortedQuotes.length > QUOTES_SHOWN && (
+              <div className="cd-more">
+                <button type="button" className="bk-btn bk-btn--quiet" onClick={() => setAllQuotes(v => !v)} aria-expanded={allQuotes}>
+                  {allQuotes ? `Show the latest ${QUOTES_SHOWN}` : `Show all ${sortedQuotes.length}`}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </section>

@@ -189,12 +189,12 @@ export function VehicleTypesDirectory() {
   const formatRate = (v: any) => v ? formatMoney(parseFloat(v)) : '—';
 
   return (
-    <div style={{ maxWidth: 960 }}>
+    <div className="settings-wide" style={{ minWidth: 0 }}>
       <SettingsPageHeader title="Vehicle types" description="Configure vehicle categories and rate settings" />
 
       <div style={sectionStyle}>
         <div style={{
-          padding: '12px 24px', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)', gap: 12, flexWrap: 'wrap',
+          padding: '12px var(--card-pad, 20px)', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)', gap: 12, flexWrap: 'wrap',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <h2 style={settingsCardTitleStyle}>
@@ -351,7 +351,7 @@ export function VehicleTypesDirectory() {
       {showAdd && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setShowAdd(false)} />
-          <div style={{ position: 'relative', width: 420, maxWidth: '100%', background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 24, overflowY: 'auto' }}>
+          <div style={{ position: 'relative', width: 420, maxWidth: '100%', background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 'var(--card-pad, 20px)', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Add vehicle type</h2>
               <button
@@ -438,7 +438,7 @@ export function VehicleTypesDirectory() {
       {editType && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditType(null)} />
-          <div style={{ position: 'relative', width: 420, maxWidth: '100%', background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 24, overflowY: 'auto' }}>
+          <div style={{ position: 'relative', width: 420, maxWidth: '100%', background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 'var(--card-pad, 20px)', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit vehicle type</h2>
               <button

@@ -41,7 +41,7 @@ export function ExpenseReport({ d, companyName }: { d: Ledger; companyName?: str
     .sort((x, y) => (x.k === 'none' ? 1 : 0) - (y.k === 'none' ? 1 : 0) || y.a - x.a);
 
   const groupTable = (rows: typeof byCat, head: string): Statement => ({
-    columns: [{ label: head }, { label: 'Expenses', type: 'int' }, { label: 'Approved', type: 'money' }, { label: 'Share', type: 'pct' }, { label: 'Pending', type: 'money' }],
+    columns: [{ label: head }, { label: 'Expenses', type: 'int', phone: false }, { label: 'Approved', type: 'money' }, { label: 'Share', type: 'pct' }, { label: 'Pending', type: 'money' }],
     rows: [
       ...rows.map<SRow>(r => ({ key: r.k, kind: r.k === 'none' ? 'muted' : undefined, cells: [r.label, r.count, r.a, aTotal > 0 ? (r.a / aTotal) * 100 : null, r.p] })),
       { key: 'tot', kind: 'grand', cells: ['Total', list.length, aTotal, aTotal > 0 ? 100 : null, pTotal] },
@@ -88,7 +88,7 @@ export function ExpenseReport({ d, companyName }: { d: Ledger; companyName?: str
       csvName={`expenses-${view}-${period.from}-to-${period.to}`}
     >
       {list.length === 0 ? <Empty line={`No expenses dated in ${periodText(period)}.`} action={{ label: 'See expenses', to: '/finance/expenses' }} /> : (
-        <StatementTable table={table} caption={`Expenses ${view === 'register' ? 'register' : `by ${view}`}`} stickyFirst={view !== 'register'}
+        <StatementTable fit cue={null} table={table} caption={`Expenses ${view === 'register' ? 'register' : `by ${view}`}`} stickyFirst={view !== 'register'}
           footer={<Check>Approved total equals the approved costs in the profit and loss for {periodText(period)}.</Check>} />
       )}
     </ReportFrame>
@@ -128,7 +128,7 @@ export function VatReport({ d, companyName, vatNumber }: { d: Ledger; companyNam
 
   const table: Statement = view === 'month'
     ? {
-      columns: [{ label: 'Month' }, { label: basis === 'invoice' ? 'Invoices' : 'Payments', type: 'int' }, { label: 'Excl. VAT', type: 'money' }, { label: 'Output VAT', type: 'money' }, { label: 'Incl. VAT', type: 'money' }],
+      columns: [{ label: 'Month' }, { label: basis === 'invoice' ? 'Invoices' : 'Payments', type: 'int', phone: false }, { label: 'Excl. VAT', type: 'money' }, { label: 'Output VAT', type: 'money' }, { label: 'Incl. VAT', type: 'money' }],
       rows: [
         ...months.map<SRow>(m => {
           const l = lines.filter(x => ymOf(x.date) === m);
@@ -174,7 +174,7 @@ export function VatReport({ d, companyName, vatNumber }: { d: Ledger; companyNam
       csvName={`vat-${basis}-${period.from}-to-${period.to}`}
     >
       {lines.length === 0 ? <Empty line={`No ${basis === 'invoice' ? 'invoices issued' : 'payments received'} in ${periodText(period)}.`} /> : (
-        <StatementTable table={table} caption="Output VAT"
+        <StatementTable fit cue={null} table={table} caption="Output VAT"
           footer={<>
             <Check>Total excl. VAT plus output VAT equals the total incl. VAT across {plural(lines.length, basis === 'invoice' ? 'invoice' : 'payment')}.</Check>
             {zeroRated.length > 0 && <Check ok={false}>{plural(zeroRated.length, 'line')} carry no VAT. Check they are zero-rated.</Check>}

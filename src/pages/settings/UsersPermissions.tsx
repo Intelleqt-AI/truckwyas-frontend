@@ -1,3 +1,4 @@
+import { fetchAllPages } from '@/components/insights/findings';
 import '@/pages/table-heading-roles.css';
 import '@/pages/ops-tiles.css';
 import '@/pages/settings/settings-brand.css';
@@ -108,6 +109,16 @@ export function UsersPermissions() {
       .finally(() => setLoading(false));
   };
 
+  // Which users are also drivers (by email), so a driver holding the Admin
+  // role is visible. Roles are shown exactly as the API returns them; this
+  // page never changes a role except through "Change role".
+  const [driverEmails, setDriverEmails] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    fetchAllPages<any>('api/v1/drivers/')
+      .then(r => setDriverEmails(new Set(r.rows.map((d: any) => String(d.user_details?.email || d.email || '').toLowerCase()).filter(Boolean))))
+      .catch(() => setDriverEmails(new Set()));
+  }, []);
+
   const loadPendingInvites = () => {
     fetchData('api/v1/auth/invite/')
       .then((d: any) => {
@@ -122,6 +133,8 @@ export function UsersPermissions() {
   };
 
   const isAdmin = currentUser?.role?.toLowerCase() === 'admin';
+  const isDriver = (u: User) => !!u.email && driverEmails.has(u.email.toLowerCase());
+  const adminDrivers = users.filter(u => u.role?.toLowerCase() === 'admin' && isDriver(u)).length;
 
   const filtered = users.filter(u =>
     u.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -222,7 +235,7 @@ export function UsersPermissions() {
   };
 
   return (
-    <div style={{ maxWidth: 960 }}>
+    <div style={{ maxWidth: 'var(--form-max, 720px)', minWidth: 0 }}>
       <SettingsPageHeader title="Users and permissions" description="Manage team access and roles" />
 
       <div style={sectionStyle}>
@@ -235,7 +248,7 @@ export function UsersPermissions() {
               onChange={e => setSearch(e.target.value)}
               placeholder="Search users…"
               aria-label="Search users"
-              style={{ ...settingsInputStyle, width: 180, maxWidth: '100%' }}
+              style={{ ...settingsInputStyle, minHeight: 'var(--control-h, 36px)', width: 180, maxWidth: '100%' }}
             />
             {isAdmin && (
               <button
@@ -243,7 +256,7 @@ export function UsersPermissions() {
                 onClick={() => setShowInvite(!showInvite)}
                 disabled={isDemo}
                 title={isDemo ? 'Fixed in demo mode' : undefined}
-                style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
               >Invite user</button>
             )}
           </div>
@@ -252,7 +265,7 @@ export function UsersPermissions() {
         {/* Invite form */}
         {showInvite && (
           <div style={{
-            padding: '16px 24px',
+            padding: '16px var(--card-pad, 20px)',
             borderBottom: '1px solid var(--border-subtle)',
             background: 'var(--bg-surface-hover)',
             display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap',
@@ -290,11 +303,19 @@ export function UsersPermissions() {
               onClick={handleInvite}
               disabled={inviting || isDemo}
               title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+              style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
             >
               {inviting ? 'Sending…' : 'Send invite'}
             </button>
           </div>
+        )}
+
+        {/* A driver with full admin rights is worth knowing about; say it once, calmly. */}
+        {!loading && adminDrivers > 0 && (
+          <p className="st-note">
+            <span className="bk-dot bk-dot--warning" aria-hidden="true" />
+            {adminDrivers} {adminDrivers === 1 ? 'driver has' : 'drivers have'} the Admin role, with billing and user access.
+          </p>
         )}
 
         {/* Table */}
@@ -356,6 +377,9 @@ export function UsersPermissions() {
                 </td>
                 <td className="st-col-phone">
                   <span className="st-role" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{roleDisplay(u.role)}</span>
+                  {isDriver(u) && u.role?.toLowerCase() !== 'driver' && (
+                    <span style={{ display: 'block', fontSize: 12, lineHeight: '16px', color: 'var(--text-tertiary)' }}>Also a driver</span>
+                  )}
                 </td>
                 <td>
                   <StatusChip status={u.status} label={statusDisplay(u.status)} size="sm" />
@@ -447,7 +471,7 @@ export function UsersPermissions() {
           ].map((r, i, arr) => (
             <div key={r.role} style={{
               display: 'flex', alignItems: 'center', gap: 16,
-              padding: '12px 24px',
+              padding: '12px var(--card-pad, 20px)',
               borderBottom: i < arr.length - 1 ? '1px solid var(--border-row)' : 'none',
             }}>
               <span style={{ width: 96, flexShrink: 0, fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>{r.role}</span>
@@ -504,7 +528,7 @@ export function UsersPermissions() {
             background: 'var(--bg-surface)',
             border: '1px solid var(--border-subtle)',
             borderRadius: 'var(--radius-dialog)',
-            padding: 24,
+            padding: 'var(--card-pad, 20px)',
             maxWidth: 420,
             width: '100%',
             boxSizing: 'border-box',

@@ -62,7 +62,7 @@ export default function DebtorsAge({ d, companyName }: { d: Ledger; companyName?
   const bucketCols = BUCKETS.map(l => ({ label: l, type: 'money' as const }));
   const table: Statement = view === 'customer'
     ? {
-      columns: [{ label: 'Customer' }, { label: 'Invoices', type: 'int' }, ...bucketCols, { label: 'Total', type: 'money' }],
+      columns: [{ label: 'Customer' }, { label: 'Invoices', type: 'int', phone: false }, ...bucketCols, { label: 'Total', type: 'money' }],
       rows: [
         ...customers.map<SRow>(c => ({
           key: c.k, cells: [c.name, c.count, ...c.b, c.total],
@@ -73,7 +73,7 @@ export default function DebtorsAge({ d, companyName }: { d: Ledger; companyName?
       ],
     }
     : {
-      columns: [{ label: 'Invoice' }, { label: 'Customer' }, { label: 'Issued', type: 'date' }, { label: 'Due', type: 'date' }, { label: 'Days overdue', type: 'int' }, ...bucketCols, { label: 'Balance', type: 'money' }],
+      columns: [{ label: 'Invoice' }, { label: 'Customer', phone: false }, { label: 'Issued', type: 'date', phone: false }, { label: 'Due', type: 'date', phone: false }, { label: 'Days overdue', type: 'int' }, ...bucketCols, { label: 'Balance', type: 'money' }],
       rows: [
         ...[...aged].sort((a, b) => b.days - a.days).map<SRow>(a => ({
           key: `i${a.inv.id}`, href: `/finance/invoices/${a.inv.id}`,
@@ -82,6 +82,19 @@ export default function DebtorsAge({ d, companyName }: { d: Ledger; companyName?
         { key: 'tot', kind: 'grand', cells: ['Total', plural(aged.length, 'invoice'), '', '', '', ...byBucket, total] },
       ],
     };
+
+  // On screen, ageing columns with nothing in them are left out (a column of
+  // R 0,00 answers nothing); the CSV keeps all five buckets.
+  const firstBucket = view === 'customer' ? 2 : 5;
+  const emptyBuckets = BUCKETS.filter((_, b) => Math.abs(byBucket[b]) < 0.005);
+  const hide = new Set(BUCKETS.flatMap((_, b) => (Math.abs(byBucket[b]) < 0.005 ? [firstBucket + b] : [])));
+  const shown: Statement = hide.size === 0 || hide.size === BUCKETS.length ? table : {
+    columns: table.columns.filter((_, i) => !hide.has(i)),
+    rows: table.rows.map(r => (r.kind === 'section' ? r : { ...r, cells: r.cells.filter((_, i) => !hide.has(i)) })),
+  };
+  const hiddenNote = hide.size && hide.size < BUCKETS.length
+    ? `No balances in ${emptyBuckets.join(', ').replace(/, ([^,]*)$/, ' or $1')}, so ${hide.size === 1 ? 'that column is' : 'those columns are'} not shown.`
+    : null;
 
   // Reconcile to the invoice ledger (today only): every open balance, straight from the invoices.
   const ledgerOpen = d.invoices.filter(isOpen);
@@ -131,6 +144,7 @@ export default function DebtorsAge({ d, companyName }: { d: Ledger; companyName?
         ...(lateDays >= 1 ? [{ label: 'Average days late', value: formatDays(Math.round(lateDays)), note: 'Weighted by balance' }] : []),
         ...(customers[0] ? [{ label: 'Largest debtor share', value: pct((customers[0].total / total) * 100, 0), note: customers[0].name }] : []),
       ]} /> : undefined}
+      gaps={hiddenNote ? [hiddenNote] : undefined}
       csv={() => statementCsv(`Debtors age analysis as at ${asAt ?? todayISO()}`, 'Incl. VAT, aged by due date', table)}
       csvName={`debtors-age-${asAt ?? todayISO()}-${view}`}
     >
@@ -138,9 +152,12 @@ export default function DebtorsAge({ d, companyName }: { d: Ledger; companyName?
         <Empty line={`Nobody owed you money on ${dateText}.`} action={{ label: 'See invoices', to: '/finance/invoices' }} />
       ) : (
         <StatementTable
-          table={table}
+          table={shown}
           caption={`Debtors age analysis, ${view === 'customer' ? 'by customer' : 'by invoice'}`}
           stickyFirst
+          pinLast
+          fit
+          cue={null}
           footer={<>
             {!asAt
               ? (ties

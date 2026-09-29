@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { formatMoneyWhole } from '@/lib/formatters';
+import { formatMoneyWhole, formatCompact } from '@/lib/formatters';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
+const formatMoneyCompact = (v: number) => formatCompact(v, true);
 import { fetchAllPages } from '@/components/insights/findings';
-import { BlockSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import { BlockSkeleton, TilesSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import SectionHeader from '@/components/layout/SectionHeader';
 import './fleet-vehicles-brand.css';
 import { InfoTip } from '@/components/ui/InfoTip';
@@ -9,6 +11,7 @@ import LoadError, { loadFailed } from '@/components/data/LoadError';
 
 // 7-day heatmap — Mon → Sun
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAYS_LONG = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 function getUtilColor(value: number) {
@@ -57,7 +60,7 @@ function generateHeatmap(loads: any[], vehicleCount: number) {
 
 // Ranked row: the bar encodes the load count the list is sorted by, scaled
 // to the busiest route; the share of all loads sits next to the count.
-const RouteBar = ({ route, count, revenue, maxCount, total }: any) => (
+const RouteBar = ({ route, count, revenue, maxCount, total, top }: any) => (
   <div className="fleet-route">
     <div className="fleet-route__row">
       <span className="fleet-route__name">{route}</span>
@@ -67,7 +70,7 @@ const RouteBar = ({ route, count, revenue, maxCount, total }: any) => (
       </div>
     </div>
     <div className="fleet-route__track" aria-hidden="true">
-      <div className="fleet-route__fill" style={{ width: `${Math.min(100, (count / Math.max(maxCount, 1)) * 100)}%` }} />
+      <div className={`fleet-route__fill${top ? ' is-top' : ''}`} style={{ width: `${Math.min(100, (count / Math.max(maxCount, 1)) * 100)}%` }} />
     </div>
   </div>
 );
@@ -146,16 +149,36 @@ export default function FleetHeatmap() {
     routeMap[key].revenue += parseFloat(load.total_amount || '0');
   }
   const routed = loads.length - unrouted;
+  const totalValue = loads.reduce((n, l) => n + (parseFloat(l.total_amount || '0') || 0), 0);
   const topRoutes = Object.entries(routeMap)
     .sort((a, b) => b[1].count - a[1].count || b[1].revenue - a[1].revenue)
     .slice(0, 8);
   const maxRouteCount = topRoutes[0]?.[1].count ?? 0;
+  const busiestDay = byWeekday.indexOf(Math.max(...byWeekday));
+
+  // Pickups per month, oldest first, over the last 12 months; leading months
+  // with no pickups are trimmed so the chart starts at the first real month.
+  const now = new Date();
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+    return { y: d.getFullYear(), m: d.getMonth(), label: d.toLocaleString('en-ZA', { month: 'short' }), count: 0, revenue: 0 };
+  });
+  for (const l of withPickup) {
+    const d = isoDay(l.pickup_date);
+    const slot = months.find(x => x.y === d.getFullYear() && x.m === d.getMonth());
+    if (slot) { slot.count++; slot.revenue += parseFloat(l.total_amount || '0') || 0; }
+  }
+  const firstMonth = months.findIndex(x => x.count > 0);
+  const shownMonths = firstMonth < 0 ? [] : months.slice(firstMonth);
+  const maxMonth = Math.max(1, ...shownMonths.map(x => x.count));
+  const busiestMonth = shownMonths.reduce((b, x, i) => (x.count > (shownMonths[b]?.count ?? -1) ? i : b), 0);
+  const lastYear = shownMonths.reduce((n, x) => n + x.count, 0);
 
   return (
     <div className="fleet-page">
       <SectionHeader
-        title="Activity heatmap"
-        description="When pickups happen and the busiest routes"
+        title="Activity"
+        description="Pickups by day and month, and the busiest routes"
         back={{ to: '/fleet/vehicles', label: 'Fleet' }}
       />
 
@@ -167,8 +190,18 @@ export default function FleetHeatmap() {
           onRetry={() => loadsQuery.refetch()}
         />
       ) : isLoading ? (
-        <BlockSkeleton height={320} label="Loading activity" />
+        <div className="fleet-activity">
+          <TilesSkeleton count={4} />
+          <BlockSkeleton height={360} label="Loading activity" />
+        </div>
       ) : (
+      <div className="fleet-activity">
+      <KpiRow className="fleet-activity__kpis">
+        <KpiTile label="Loads" figure={loads.length} note={withPickup.length === loads.length ? 'All have a pickup date' : `${withPickup.length} with a pickup date`} />
+        <KpiTile label="Busiest day" figure={withPickup.length ? DAYS_LONG[busiestDay] : '—'} note={withPickup.length ? `${byWeekday[busiestDay]} of ${withPickup.length} pickups` : 'No pickups yet'} />
+        <KpiTile label="Routes run" figure={Object.keys(routeMap).length} note={unrouted ? `${unrouted} ${unrouted === 1 ? 'load has' : 'loads have'} no route` : 'Every load has a route'} />
+        <KpiTile label="Order value" aside={<InfoTip align="end">Sum of the order totals of every load, all time, as entered on the order.</InfoTip>} figure={formatMoneyWhole(totalValue)} note="All loads, all time" />
+      </KpiRow>
       <div className={`fleet-heatmap-grid${timesCaptured ? '' : ' fleet-heatmap-grid--2'}`}>
         {timesCaptured ? (
           <section className="card fleet-panel">
@@ -209,11 +242,10 @@ export default function FleetHeatmap() {
           <section className="card fleet-panel">
             <h2 className="fleet-panel__title" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               Pickups by weekday
-              <InfoTip>Pickups counted on their pickup date. {sampleNote}</InfoTip>
+              <InfoTip>Pickups counted on their pickup date. Pickup times are mostly not captured (only dates), so there is no hour-by-hour view{withPickup.length ? `: ${timed.length} of ${withPickup.length} pickups carry a time` : ''}. {sampleNote}</InfoTip>
             </h2>
             <p className="fleet-muted" style={{ margin: '4px 0 16px' }}>
-              Pickup times are not captured (only dates), so the hour view is hidden.
-              {withPickup.length ? ` ${timed.length} of ${withPickup.length} pickups carry a time.` : ''}
+              {withPickup.length} {withPickup.length === 1 ? 'pickup' : 'pickups'}, counted by date
             </p>
             {withPickup.length === 0 ? (
               <p className="fleet-muted">No loads have a pickup date yet.</p>
@@ -223,7 +255,7 @@ export default function FleetHeatmap() {
                   <div key={day} className="fleet-days__row" role="listitem" aria-label={`${day}, ${byWeekday[i]} ${byWeekday[i] === 1 ? 'pickup' : 'pickups'}`}>
                     <span className="fleet-days__day">{day}</span>
                     <span className="fleet-route__track fleet-days__track" aria-hidden="true">
-                      <span className="fleet-route__fill" style={{ display: 'block', width: `${(byWeekday[i] / maxDay) * 100}%` }} />
+                      <span className={`fleet-route__fill${i === busiestDay ? ' is-top' : ''}`} style={{ display: 'block', width: `${(byWeekday[i] / maxDay) * 100}%` }} />
                     </span>
                     <span className="fleet-days__count">{byWeekday[i]}</span>
                   </div>
@@ -239,18 +271,45 @@ export default function FleetHeatmap() {
             <InfoTip>Routes by number of loads, with order totals. Place names are cleaned first (spacing, case, and short codes such as JHB), so the same route is counted once. {sampleNote}</InfoTip>
           </h2>
           <p className="fleet-muted" style={{ margin: '0 0 16px' }}>
-            By number of loads{unrouted > 0 ? `. ${unrouted} ${unrouted === 1 ? 'load has' : 'loads have'} no route set and ${unrouted === 1 ? 'is' : 'are'} left out` : ''}
+            By number of loads{unrouted > 0 ? `, ${unrouted} without a route left out` : ''}
           </p>
           {topRoutes.length === 0 ? (
             <div className="fleet-muted" style={{ textAlign: 'center', padding: '20px 0' }}>No loads with a route yet.</div>
           ) : (
             <div className={`fleet-routes${timesCaptured ? '' : ' fleet-routes--1'}`}>
-              {topRoutes.map(([route, data]) => (
-                <RouteBar key={route} route={route} count={data.count} revenue={data.revenue} maxCount={maxRouteCount} total={routed} />
+              {topRoutes.map(([route, data], i) => (
+                <RouteBar key={route} route={route} count={data.count} revenue={data.revenue} maxCount={maxRouteCount} total={routed} top={i === 0} />
               ))}
             </div>
           )}
         </section>
+      </div>
+
+      <section className="card fleet-panel fleet-months" aria-labelledby="fleet-months-title">
+        <div className="fleet-panel__head">
+          <h2 className="fleet-panel__title" id="fleet-months-title">
+            Pickups by month
+            <InfoTip>Loads counted in the month of their pickup date, over the last 12 months, with their order totals. Months before the first pickup are left out.</InfoTip>
+          </h2>
+          <span className="fleet-muted">{lastYear} {lastYear === 1 ? 'pickup' : 'pickups'}</span>
+        </div>
+        {shownMonths.length === 0 ? (
+          <p className="fleet-muted">No pickups in the last 12 months.</p>
+        ) : (
+          <ol className="fleet-months__bars" style={{ ['--months' as any]: shownMonths.length }}>
+            {shownMonths.map((mo, i) => (
+              <li key={`${mo.y}-${mo.m}`} className="fleet-months__col" aria-label={`${mo.label} ${mo.y}: ${mo.count} ${mo.count === 1 ? 'pickup' : 'pickups'}, ${formatMoneyWhole(mo.revenue)}`}>
+                <span className="fleet-months__count">{mo.count}</span>
+                <span className="fleet-months__track" aria-hidden="true">
+                  <span className={`fleet-months__fill${i === busiestMonth && mo.count ? ' is-top' : ''}`} style={{ height: `${(mo.count / maxMonth) * 100}%` }} />
+                </span>
+                <span className="fleet-months__label">{mo.label}</span>
+                <span className="fleet-months__money">{mo.revenue ? formatMoneyCompact(mo.revenue) : '—'}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
       </div>
       )}
     </div>

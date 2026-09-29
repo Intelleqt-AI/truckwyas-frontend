@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 
 /**
- * v3 navigation model. Ordered the way money moves (price, get paid, know the
+ * v3 navigation model. Ordered the way money moves (price, bill and pay, know the
  * numbers), then the records that serve every job, then what is not live yet.
  *
  * `key` is the permission key checked against OSLayout's NAV_ACCESS table, so
@@ -43,7 +43,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Work',
     items: [
       { id: 'quote', key: '/bookings', label: 'Quotes and loads', short: 'Quote', to: '/bookings/quotes', match: ['/bookings', '/quotes'], icon: FileText },
-      { id: 'getpaid', key: '/invoices', label: 'Get paid', to: '/finance/invoices', match: ['/finance', '/invoices', '/expenses'], exclude: ['/finance/reports'], icon: Receipt },
+      { id: 'getpaid', key: '/invoices', label: 'Finance', to: '/finance/invoices', match: ['/finance', '/invoices', '/expenses'], exclude: ['/finance/reports'], icon: Receipt },
     ],
   },
   {

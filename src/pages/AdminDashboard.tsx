@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { useParams, NavLink, Navigate } from 'react-router-dom';
+import { useParams, NavLink, Navigate, useNavigate } from 'react-router-dom';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/AuthContext';
 import '@/pages/admin/admin-brand.css';
 
@@ -59,17 +59,7 @@ const ALL_ITEMS = SECTIONS.flatMap(s => s.items);
 export default function AdminDashboard() {
   const { section } = useParams();
   const { user: authUser } = useAuth();
-  // On phones the section list is one horizontal row; keep the current one in view.
-  const navRef = useRef<HTMLElement>(null);
-  const phoneNavRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const nav = phoneNavRef.current;
-    if (!nav || nav.scrollWidth <= nav.clientWidth) return;
-    const cur = nav.querySelector<HTMLElement>('[aria-current="page"]');
-    if (!cur) return;
-    const left = cur.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft;
-    nav.scrollLeft = left - (nav.clientWidth - cur.offsetWidth) / 2;
-  }, [section]);
+  const navigate = useNavigate();
 
   // Real enforcement is server-side (every /api/v1/admin/ endpoint requires
   // IsSuperUser) — this is just so a non-superuser never lands on a dead page.
@@ -83,28 +73,36 @@ export default function AdminDashboard() {
   const CurrentComponent = current.component;
 
   return (
-    <div className="tw-admin-shell" style={{ display: 'flex', minHeight: '100%', gap: 0 }}>
-      {/* Sidebar — same shape as Settings.tsx's own section nav, so the two
-          "many sub-pages under one prefix" areas of the app feel consistent. */}
-      <div className="tw-admin-shell__side" style={{
-        width: 220,
-        flexShrink: 0,
-        borderRight: '1px solid var(--border-subtle)',
-      }}>
-        <nav ref={navRef} aria-label="Admin dashboard" className="tw-admin-shell__nav" style={{
-          position: 'sticky',
-          top: 0,
-          maxHeight: '100vh',
-          overflowY: 'auto',
-          paddingTop: 8,
-          paddingBottom: 24,
-        }}>
-          <div className="tw-admin-shell__brand" style={{ padding: '4px 20px 16px' }}>
-            <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal' }}>
-              Platform
+    <div className="tw-admin-page">
+      {/* Head first, full width: the H1 sits at the same x and y as on every
+          other page, and the section list starts where the content starts. */}
+      <header className="section-header settings-page-head">
+        <div className="section-header__top">
+          <div className="section-header__titles">
+            <div className="section-header__title-row">
+              <h1 className="section-header__title">{current.label}</h1>
             </div>
-            <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>Admin dashboard</div>
+            <p className="section-header__description">Superuser only. Every change is audited.</p>
           </div>
+        </div>
+      </header>
+      {/* Phones: one picker instead of a strip of links that clips at both edges. */}
+      <div className="tw-admin-phone-nav">
+        <Select value={current.id} onValueChange={(v) => navigate(`/admin/${v}`)}>
+          <SelectTrigger aria-label="Admin section" className="tw-admin-phone-nav__trigger"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {SECTIONS.map(s => (
+              <SelectGroup key={s.group}>
+                <SelectLabel>{s.group}</SelectLabel>
+                {s.items.map(item => <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>)}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    <div className="tw-admin-shell">
+      <div className="tw-admin-shell__side">
+        <nav aria-label="Admin dashboard" className="tw-admin-shell__nav">
           {SECTIONS.map((s, idx) => (
             <div key={s.group} className="tw-admin-shell__group" style={{ marginBottom: idx < SECTIONS.length - 1 ? 20 : 0 }}>
               <div className="tw-admin-shell__group-label" style={{
@@ -114,7 +112,7 @@ export default function AdminDashboard() {
                 fontFamily: 'var(--font-sans)',
                 color: 'var(--text-tertiary)',
                 letterSpacing: 'normal',
-                padding: '12px 20px 6px',
+                padding: idx === 0 ? '0 12px 6px' : '12px 12px 6px',
               }}>
                 {s.group}
               </div>
@@ -127,8 +125,10 @@ export default function AdminDashboard() {
                     className="admin-control admin-nav-link"
                     aria-current={active ? 'page' : undefined}
                     style={{
-                      display: 'block',
-                      margin: '0 8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      minHeight: 36,
+                      margin: '1px 0',
                       padding: '8px 12px',
                       borderRadius: 'var(--radius-control)',
                       fontFamily: 'var(--font-sans)',
@@ -152,30 +152,10 @@ export default function AdminDashboard() {
       </div>
 
       {/* Content */}
-      <div className="tw-admin-shell__content" style={{ flex: 1, padding: '0 0 60px 32px', minWidth: 0 }}>
-        {/* Same page head as every other section (SectionHeader geometry). */}
-        <header className="section-header settings-page-head">
-          <div className="section-header__top">
-            <div className="section-header__titles">
-              <div className="section-header__title-row">
-                <h1 className="section-header__title">{current.label}</h1>
-              </div>
-              <p className="section-header__description">Superuser only. Every change is audited.</p>
-            </div>
-            <div className="section-header__actions" />
-          </div>
-        </header>
-        {/* Phones: the section list sits under the head, so the H1 is where
-            it is on every other page. */}
-        <nav ref={phoneNavRef} aria-label="Admin sections" className="tw-admin-phone-nav">
-          {ALL_ITEMS.map(item => (
-            <NavLink key={item.id} to={`/admin/${item.id}`} className="admin-control admin-nav-link" aria-current={section === item.id ? 'page' : undefined}>
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
+      <div className="tw-admin-shell__content">
         <CurrentComponent />
       </div>
+    </div>
     </div>
   );
 }

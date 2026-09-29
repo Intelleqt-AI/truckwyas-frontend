@@ -5,18 +5,20 @@ import './finance-brand.css';
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
-import { fetchData, postData, putData, deleteData } from '@/lib/Api';
+import { postData, putData, deleteData } from '@/lib/Api';
+import { fetchAllPages } from '@/components/insights/findings';
+import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
+import { KpiStats } from '@/components/ui/KpiTile';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { formatCompact, formatCurrency, formatDate, formatMonth, formatPercent } from '@/lib/formatters';
+import { formatCompact, formatCurrency, formatDate, formatPercent } from '@/lib/formatters';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import SectionHeader, { FINANCE_TABS } from '@/components/layout/SectionHeader';
 import RowActions from '@/components/ui/RowActions';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { wholeRand } from '@/components/finance/FinTile';
-import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 import { Segmented } from '@/components/ui/Segmented';
 import { StatusChip } from '@/components/ui/StatusChip';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
@@ -93,7 +95,7 @@ function FilterSelect({ label, value, onChange, options, short, allValue }: {
   const current = options.find(o => o.value === value) ?? options[0];
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger aria-label={label} className={`fin-filter${value !== allValue ? ' is-set' : ''}`} style={{ width: 'auto', minHeight: 32, height: 32, padding: '0 10px 0 12px', fontSize: 13 }}>
+      <SelectTrigger aria-label={label} className={`fin-filter${value !== allValue ? ' is-set' : ''}`} style={{ width: 'auto', padding: '0 10px 0 12px', fontSize: 13 }}>
         <SelectValue>
           {value === allValue
             ? <><span className="fin-filter__long">{current?.label}</span><span className="fin-filter__short">{short}</span></>
@@ -110,22 +112,17 @@ function FilterSelect({ label, value, onChange, options, short, allValue }: {
 const expenseDate = (e: Expense) => new Date(e.expense_date || e.date);
 
 export default function Expenses() {
+  // Every expense (all pages), so tiles, charts and counts agree with the
+  // P&L and Insights, never "the latest 20". Vehicles too (filter options).
   const expensesQuery = useQuery({
     queryKey: ["expenses-page"],
     queryFn: async () => {
-      const [expData, vehData] = await Promise.all([
-        fetchData('api/v1/expenses/'),
+      const [exp, veh] = await Promise.all([
+        fetchAllPages<Expense>('api/v1/expenses/'),
         // A vehicles failure must not hide the expenses list.
-        fetchData('api/v1/vehicles/').catch(() => []),
+        fetchAllPages<Vehicle>('api/v1/vehicles/').catch(() => ({ rows: [] as Vehicle[], count: 0, complete: true })),
       ]);
-      const list = (Array.isArray(expData) ? expData : (expData?.results || [])) as Expense[];
-      return {
-        expenses: list,
-        // Paginated endpoint: `count` is the full total, used to say how much
-        // of it this page is based on.
-        total: typeof expData?.count === 'number' ? expData.count : list.length,
-        vehicles: (Array.isArray(vehData) ? vehData : (vehData?.results || [])) as Vehicle[],
-      };
+      return { expenses: exp.rows, total: exp.count, complete: exp.complete, vehicles: veh.rows };
     },
   });
   const { data, isError, refetch } = expensesQuery;
@@ -135,6 +132,8 @@ export default function Expenses() {
 
   const expenses = data?.expenses ?? [];
   const totalExpenseCount: number = data?.total ?? expenses.length;
+  // Only false past 50 pages (1 000 expenses): then the figures say so.
+  const complete = data?.complete ?? true;
   const vehicles = data?.vehicles ?? [];
 
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -206,17 +205,6 @@ export default function Expenses() {
   // Sort by date desc
   const sorted = [...filtered].sort((a, b) => expenseDate(b).getTime() - expenseDate(a).getTime());
 
-  // Category totals across all expenses
-  const allCategoryTotals = expenses.reduce((acc, e) => {
-    acc[e.category] = (acc[e.category] || 0) + amountOf(e);
-    return acc;
-  }, {} as Record<string, number>);
-
-  const categoryBreakdown = Object.entries(allCategoryTotals)
-    .map(([category, total]) => ({ category, label: catLabel(category), total }))
-    .filter(c => c.total > 0)
-    .sort((a, b) => b.total - a.total);
-
   const totalPages = Math.ceil(sorted.length / perPage);
   const rows = sorted.slice((page - 1) * perPage, page * perPage);
 
@@ -279,6 +267,8 @@ export default function Expenses() {
     window.URL.revokeObjectURL(url);
   };
 
+  const resetPage = () => setPage(1);
+
   const header = (
     <SectionHeader
       eyebrow="Finance"
@@ -286,13 +276,63 @@ export default function Expenses() {
       tabs={FINANCE_TABS}
       actions={
         <>
-          <button className="btn-action fin-btn-secondary" onClick={handleExportCSV} disabled={loading}>
+          <button type="button" className="tw-btn" onClick={handleExportCSV} disabled={loading}>
             Export CSV
           </button>
-          <button className="btn-action" onClick={() => setShowAdd(true)}>Add expense</button>
+          <button type="button" className="tw-btn tw-btn--primary" onClick={() => setShowAdd(true)}>Add expense</button>
         </>
       }
     />
+  );
+
+  // The toolbar renders at once (also while loading) so nothing below the
+  // overview moves when the data arrives.
+  const statusCount = (s: string) => (loading ? undefined : expenses.filter(e => s === 'ALL' || (e.status || 'PENDING').toUpperCase() === s).length);
+  const toolbar = (
+    <Toolbar
+      className="fin-toolbar exp-toolbar"
+      aria-label="Filter expenses"
+      meta={loading ? ' ' : (
+        <>
+          {sorted.length} {sorted.length === 1 ? 'expense' : 'expenses'}
+          {!complete && ` · first ${expenses.length} of ${totalExpenseCount}`}
+        </>
+      )}
+    >
+      <SearchInput
+        wrapClassName="exp-search"
+        placeholder="Search expenses"
+        aria-label="Search expenses by description, vendor or reference"
+        value={search}
+        onChange={e => { setSearch(e.target.value); resetPage(); }}
+      />
+      <div className="exp-filters">
+        <FilterSelect label="Category" short="Category" allValue="All" value={categoryFilter}
+          onChange={v => { setCategoryFilter(v); resetPage(); }} options={CATS} />
+        <FilterSelect label="Vehicle" short="Vehicle" allValue="All" value={vehicleFilter}
+          onChange={v => { setVehicleFilter(v); resetPage(); }}
+          options={[{ value: 'All', label: 'All vehicles' }, ...vehicles.map(v => ({ value: String(v.id), label: String(v.plate || v.registration || v.vehicle_number || `Vehicle ${v.id}`) }))]} />
+        <FilterSelect label="Date range" short="Dates" allValue="all" value={dateFilter}
+          onChange={v => { setDateFilter(v); resetPage(); }} options={DATE_FILTERS} />
+      </div>
+      {dateFilter === 'custom' && (
+        <>
+          <input type="date" className="fin-control tw-input" aria-label="From date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); resetPage(); }} />
+          <input type="date" className="fin-control tw-input" aria-label="To date" value={customTo} onChange={e => { setCustomTo(e.target.value); resetPage(); }} />
+        </>
+      )}
+      <Segmented
+        label="Filter by status"
+        className="fin-seg"
+        value={statusFilter}
+        onChange={s => { setStatusFilter(s); resetPage(); }}
+        options={STATUS_FILTERS.map(s => ({
+          value: s,
+          label: s === 'ALL' ? 'All' : formatStatus(s),
+          count: statusCount(s),
+        }))}
+      />
+    </Toolbar>
   );
 
   if (failed) {
@@ -310,150 +350,138 @@ export default function Expenses() {
   }
 
   if (loading) {
+    // Same boxes, same heights as the loaded page (no layout shift).
     return (
-      <div className="fin-page expenses-type-roles">
+      <div className="fin-page expenses-type-roles exp-page">
         {header}
         <div className="exp-overview" aria-busy="true" aria-label="Loading expenses">
-          <div className="tw-kpi-row fin-kpi-row exp-tiles">
-            {[0, 1].map(i => <div key={i} className="tw-kpi fin-skel-tile" aria-hidden="true" />)}
-          </div>
+          <div className="tw-card exp-summary fin-skel-tile" aria-hidden="true" />
           <div className="card exp-cat fin-skel-tile" aria-hidden="true" />
+          <div className="card exp-month fin-skel-tile" aria-hidden="true" />
         </div>
-        <div className="fin-skel fin-skel--card" aria-hidden="true" />
+        {toolbar}
+        <div key="table-skel" className="fin-skel fin-skel--card exp-table-skel" aria-hidden="true" />
       </div>
     );
   }
 
-  const totalExpenses = expenses.reduce((sum, e) => sum + amountOf(e), 0);
-  const truncated = totalExpenseCount > expenses.length;
-  const validDates = expenses.map(expenseDate).filter(d => !isNaN(d.getTime()));
-  const oldestLoaded = validDates.length ? new Date(Math.min(...validDates.map(d => d.getTime()))) : null;
-  const newestLoaded = validDates.length ? new Date(Math.max(...validDates.map(d => d.getTime()))) : null;
+  // Money that counts as spend: approved and pending (rejected is not spend).
+  const isRejected = (e: Expense) => (e.status || '').toUpperCase() === 'REJECTED';
+  const spend = expenses.filter(e => !isRejected(e));
+  const spendTotal = spend.reduce((sum, e) => sum + amountOf(e), 0);
+  const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
   // Calendar months by expense date.
   const monthKey = (d: Date) => d.getFullYear() * 12 + d.getMonth();
   const nowKey = monthKey(now);
   const monthLong = (key: number) => MONTH_NAMES[((key % 12) + 12) % 12];
+  const monthShort = (key: number) => MONTHS[((key % 12) + 12) % 12];
+  const yearOf = (key: number) => Math.floor(key / 12);
+  const monthText = (key: number) => `${monthShort(key)} ${yearOf(key)}`;
   const inMonth = (e: Expense, key: number) => monthKey(expenseDate(e)) === key;
-  const thisMonthExpenses = expenses.filter(e => inMonth(e, nowKey));
-  const lastMonthExpenses = expenses.filter(e => inMonth(e, nowKey - 1));
-  const sumApproved = (list: Expense[]) => list.filter(e => e.status === 'APPROVED').reduce((s, e) => s + amountOf(e), 0);
-  const sumFuel = (list: Expense[]) => list.filter(e => e.category === 'FUEL').reduce((s, e) => s + amountOf(e), 0);
-  const approvedMtd = sumApproved(thisMonthExpenses);
-  const fuelMtd = sumFuel(thisMonthExpenses);
-  const pendingExpenses = expenses.filter(e => e.status === 'PENDING');
-  const pendingAmount = pendingExpenses.reduce((s, e) => s + amountOf(e), 0);
+  const sumOf = (list: Expense[]) => list.reduce((s, e) => s + amountOf(e), 0);
 
-  // A previous-month comparison is only honest when last month is fully loaded.
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthCovered = !truncated || (!!oldestLoaded && oldestLoaded < lastMonthStart);
-  const vsLastMonth = (current: number, previous: number) => {
-    if (!lastMonthCovered) return null;
-    const name = monthLong(nowKey - 1);
-    if (previous === 0) return current === 0 ? `None in ${name} either` : `None in ${name}`;
-    const pct = ((current - previous) / previous) * 100;
-    return `${pct >= 0 ? '+' : '−'}${formatPercent(Math.abs(pct), 0)} vs ${name}`;
-  };
+  // Last 12 months (this month and the 11 before), as in Reports.
+  const yearKeys = Array.from({ length: 12 }, (_, i) => nowKey - 11 + i);
+  const inYear = (e: Expense) => { const k = monthKey(expenseDate(e)); return k >= yearKeys[0] && k <= nowKey; };
+  const approvedYear = expenses.filter(e => (e.status || '').toUpperCase() === 'APPROVED' && inYear(e));
+  const pendingExpenses = expenses.filter(e => (e.status || 'PENDING').toUpperCase() === 'PENDING');
+  const pendingAmount = sumOf(pendingExpenses);
 
-  // Six calendar months ending at the latest month with an expense (or this
-  // month, when it has one): an empty tail after the last entry is not drawn
-  // as R 0 bars. Months older than the loaded page are marked, not shown as zero.
-  const oldestKey = oldestLoaded ? monthKey(oldestLoaded) : nowKey;
-  const endKey = newestLoaded ? Math.min(nowKey, monthKey(newestLoaded)) : nowKey;
-  // Only months the loaded page reaches: older ones would be blank dashes.
-  const startKey = truncated ? Math.max(endKey - 5, Math.min(endKey, oldestKey)) : endKey - 5;
-  const monthlyTrend = Array.from({ length: endKey - startKey + 1 }, (_, i) => startKey + i).map(key => {
-    const amount = expenses.filter(e => inMonth(e, key)).reduce((s, e) => s + amountOf(e), 0);
-    const count = expenses.filter(e => inMonth(e, key)).length;
-    const state: 'complete' | 'partial' | 'unloaded' =
-      !truncated || key > oldestKey ? 'complete' : key === oldestKey ? 'partial' : 'unloaded';
-    return { key, label: `${MONTHS[key % 12]} ${String(Math.floor(key / 12)).slice(2)}`, amount, count, state };
+  // Months with spend inside the 12: leading and trailing empty months are
+  // not drawn (inner empty months stay, a real zero), as in Reports.
+  const withSpend = yearKeys.filter(k => spend.some(e => inMonth(e, k)));
+  const chartKeys = withSpend.length ? yearKeys.slice(yearKeys.indexOf(withSpend[0]), yearKeys.indexOf(withSpend[withSpend.length - 1]) + 1) : [];
+  const monthlyTrend = chartKeys.map(key => {
+    const list = spend.filter(e => inMonth(e, key));
+    return { key, amount: sumOf(list), count: list.length };
   });
   const maxMonthlyAmount = Math.max(1, ...monthlyTrend.map(m => m.amount));
-  const compactRand = (n: number) => formatCompact(n);
+  const latestKey = withSpend[withSpend.length - 1];
+  const latestList = latestKey != null ? spend.filter(e => inMonth(e, latestKey)) : [];
+  const prevList = latestKey != null ? spend.filter(e => inMonth(e, latestKey - 1)) : [];
+  const vsPrev = (() => {
+    if (latestKey == null) return null;
+    const cur = sumOf(latestList); const prev = sumOf(prevList);
+    if (prev === 0) return `None in ${monthLong(latestKey - 1)}`;
+    const pct = ((cur - prev) / prev) * 100;
+    return `${pct >= 0 ? '+' : '−'}${formatPercent(Math.abs(pct), 0)} vs ${monthLong(latestKey - 1)}`;
+  })();
 
-  const categoryCounts = expenses.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + 1; return acc; }, {} as Record<string, number>);
+  // Category totals across every expense, approved and pending.
+  const byCategory = spend.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + amountOf(e); return acc; }, {} as Record<string, number>);
+  const categoryCounts = spend.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + 1; return acc; }, {} as Record<string, number>);
+  const categoryBreakdown = Object.entries(byCategory)
+    .map(([category, total]) => ({ category, label: catLabel(category), total }))
+    .filter(c => c.total > 0)
+    .sort((a, b) => b.total - a.total);
+  // Six rows fit the card; the rest are summed in one line.
+  const topCats = categoryBreakdown.length > 6 ? categoryBreakdown.slice(0, 5) : categoryBreakdown;
+  const restCats = categoryBreakdown.slice(topCats.length);
   const maxCategory = categoryBreakdown[0]?.total || 1;
-  const basisLabel = truncated
-    ? `the ${expenses.length} most recent of ${totalExpenseCount} expenses`
-    : `all ${expenses.length} recorded ${expenses.length === 1 ? 'expense' : 'expenses'}`;
-
-  const resetPage = () => setPage(1);
 
   return (
     <div className="fin-page expenses-type-roles exp-page">
       {header}
 
-      {/* Headline figures: the standard tile, only real KPIs, never a dash
-          or "None yet" (the header already offers Add expense). */}
-      {/* Overview: headline tiles, then where the money goes and when, above
-          the register. On a phone the analytics move below the table. */}
+      {/* Overview: three figures in one card beside where the money goes and
+          when, all from every expense. On a phone the charts follow the list. */}
       <div className="exp-overview">
-      <KpiRow className="fin-kpi-row exp-tiles">
-        {thisMonthExpenses.length === 0 ? (
-          <KpiTile
-            label={truncated ? `Latest ${expenses.length}` : 'Recorded'}
-            aside={<InfoTip>{`Total of ${basisLabel}, all statuses, amounts as entered. Nothing is dated in ${monthLong(nowKey)} yet${newestLoaded ? `; the last expense is dated ${formatDate(newestLoaded)}` : ''}.${truncated ? ' The full history is in Reports, Expense report.' : ''}`}</InfoTip>}
-            figure={<span title={formatCurrency(totalExpenses)}>{wholeRand(totalExpenses)}</span>}
-            note={truncated && oldestLoaded && newestLoaded
-              ? `${formatDate(oldestLoaded, { year: undefined })} to ${formatDate(newestLoaded)}`
-              : `${expenses.length} ${expenses.length === 1 ? 'expense' : 'expenses'}`}
-          />
-        ) : (
-          <KpiTile
-            label={`Approved in ${monthLong(nowKey)}`}
-            aside={<InfoTip>{`Approved expenses dated this calendar month.${lastMonthCovered ? ` Change compares ${monthLong(nowKey - 1)}.` : ' No comparison: last month is not fully loaded.'}`}</InfoTip>}
-            figure={<span title={formatCurrency(approvedMtd)}>{wholeRand(approvedMtd)}</span>}
-            note={vsLastMonth(approvedMtd, sumApproved(lastMonthExpenses)) ?? 'By expense date'}
-          />
-        )}
-        {pendingExpenses.length > 0 && (
-          <KpiTile
-            label="To approve"
-            aside={<InfoTip>{`Pending expenses${truncated ? ' in the loaded list' : ''}, amounts as entered. Select to review them.`}</InfoTip>}
-            figure={<span title={formatCurrency(pendingAmount)}>{wholeRand(pendingAmount)}</span>}
-            note={`${pendingExpenses.length} ${pendingExpenses.length === 1 ? 'expense' : 'expenses'} to review`}
-            tone="warning"
-            onClick={statusFilter !== 'PENDING' ? () => { setStatusFilter('PENDING'); resetPage(); } : undefined}
-            aria-label={`Waiting for approval: ${formatCurrency(pendingAmount)}. Show pending expenses`}
-          />
-        )}
-        {thisMonthExpenses.length > 0 && fuelMtd > 0 && (
-          <KpiTile
-            label={`Fuel in ${monthLong(nowKey)}`}
-            aside={<InfoTip>Fuel expenses dated this calendar month, all statuses.</InfoTip>}
-            figure={<span title={formatCurrency(fuelMtd)}>{wholeRand(fuelMtd)}</span>}
-            note={vsLastMonth(fuelMtd, sumFuel(lastMonthExpenses)) ?? 'By expense date'}
-          />
-        )}
-      </KpiRow>
+        <KpiStats
+          className="exp-summary"
+          aria-label="Expense summary"
+          items={[
+            ...(latestKey != null ? [{
+              label: latestKey === nowKey ? `Spent in ${monthLong(latestKey)}` : `Spent in ${monthText(latestKey)}`,
+              aside: <InfoTip>{`Approved and pending expenses dated ${monthText(latestKey)}, amounts as entered.${latestKey !== nowKey ? ` Nothing is dated after ${monthText(latestKey)} yet.` : ''}`}</InfoTip>,
+              figure: <span title={formatCurrency(sumOf(latestList))}>{wholeRand(sumOf(latestList))}</span>,
+              note: vsPrev ?? plural(latestList.length, 'expense'),
+            }] : []),
+            {
+              label: 'Approved, 12 months',
+              aside: <InfoTip>{`Approved expenses dated ${monthText(yearKeys[0])} to ${monthText(nowKey)}: the costs in the profit and loss for the same period.`}</InfoTip>,
+              figure: <span title={formatCurrency(sumOf(approvedYear))}>{wholeRand(sumOf(approvedYear))}</span>,
+              note: plural(approvedYear.length, 'expense'),
+            },
+            {
+              label: 'To approve',
+              aside: <InfoTip>Pending expenses, any date, amounts as entered. They are not in the profit and loss until approved.</InfoTip>,
+              figure: <span title={formatCurrency(pendingAmount)}>{wholeRand(pendingAmount)}</span>,
+              note: pendingExpenses.length === 0 ? 'Nothing waiting' : (
+                statusFilter !== 'PENDING'
+                  ? <button type="button" className="exp-stat-link" onClick={() => { setStatusFilter('PENDING'); resetPage(); }}>{`Show ${plural(pendingExpenses.length, 'expense')}`}</button>
+                  : plural(pendingExpenses.length, 'expense')
+              ),
+            },
+          ]}
+        />
         <section className="card exp-cat" aria-labelledby="exp-cat-title">
           <div className="fin-panel-head">
             <div className="fin-panel-head__text">
               <h2 id="exp-cat-title" className="fin-panel-title fin-panel-title--tip">
                 Spend by category
-                <InfoTip align="end">{formatCurrency(totalExpenses)} across {basisLabel}, all statuses, amounts as entered.</InfoTip>
+                <InfoTip align="end">{formatCurrency(spendTotal)} across {plural(spend.length, 'expense')}, approved and pending, amounts as entered. Rejected expenses are left out.</InfoTip>
               </h2>
-              <p className="fin-panel-desc">{truncated ? `Latest ${expenses.length} expenses` : 'All expenses'}, all statuses</p>
+              <p className="fin-panel-desc">All {plural(spend.length, 'expense')}, approved and pending</p>
             </div>
           </div>
           {categoryBreakdown.length === 0 ? (
             <div className="fin-empty fin-empty--compact">No expenses recorded yet</div>
           ) : (
             <div className="fin-rank" role="list">
-              {categoryBreakdown.map((cat, i) => (
-                <div key={cat.category} className="fin-rank__row fin-rank__row--compact" role="listitem" aria-label={`${cat.label}: ${formatCurrency(cat.total)}, ${categoryCounts[cat.category] || 0} ${(categoryCounts[cat.category] || 0) === 1 ? 'expense' : 'expenses'}`}>
-                  <span className="fin-rank__label">
-                    {cat.label}
-                    <small>{categoryCounts[cat.category] || 0} {(categoryCounts[cat.category] || 0) === 1 ? 'expense' : 'expenses'}</small>
-                  </span>
-                  <span className="fin-rank__track" aria-hidden="true">
-                    <span className={`fin-rank__bar${i === 0 ? ' fin-rank__bar--accent' : ''}`} style={{ display: 'block', width: `${(cat.total / maxCategory) * 100}%` }} />
-                  </span>
-                  <span className="fin-rank__value" title={formatCurrency(cat.total)}>{wholeRand(cat.total)}</span>
-                  <span className="fin-rank__share">{formatPercent(totalExpenses > 0 ? (cat.total / totalExpenses) * 100 : 0, 0)}</span>
-                </div>
-              ))}
+              {[...topCats, ...(restCats.length ? [{ category: '__rest', label: `${plural(restCats.length, 'other category', 'other categories')}`, total: restCats.reduce((s, c) => s + c.total, 0) }] : [])].map((cat, i) => {
+                const n = cat.category === '__rest' ? restCats.reduce((s, c) => s + (categoryCounts[c.category] || 0), 0) : categoryCounts[cat.category] || 0;
+                return (
+                  <div key={cat.category} className="fin-rank__row fin-rank__row--compact" role="listitem" aria-label={`${cat.label}: ${formatCurrency(cat.total)}, ${plural(n, 'expense')}`}>
+                    <span className="fin-rank__label">{cat.label}</span>
+                    <span className="fin-rank__track" aria-hidden="true">
+                      <span className={`fin-rank__bar${i === 0 ? ' fin-rank__bar--accent' : ''}`} style={{ display: 'block', width: `${(cat.total / maxCategory) * 100}%` }} />
+                    </span>
+                    <span className="fin-rank__value" title={formatCurrency(cat.total)}>{wholeRand(cat.total)}</span>
+                    <span className="fin-rank__share">{formatPercent(spendTotal > 0 ? (cat.total / spendTotal) * 100 : 0, 0)}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>
@@ -462,94 +490,48 @@ export default function Expenses() {
             <div className="fin-panel-head__text">
               <h2 id="exp-month-title" className="fin-panel-title fin-panel-title--tip">
                 Spend by month
-                <InfoTip>
-                  Total recorded per calendar month by expense date, all statuses, amounts as entered.
-                  {endKey < nowKey && ` Nothing is dated after ${formatMonth(new Date(Math.floor(endKey / 12), endKey % 12, 1))}, so later months are not drawn.`}
-                  {monthlyTrend.some(m => m.state !== 'complete') && ' Faded months are only partly loaded on this page.'}
+                <InfoTip align="end">
+                  Approved and pending expenses per calendar month, by expense date, over the last 12 months.
+                  {chartKeys.length > 0 && chartKeys.length < 12 && ` Months before ${monthText(chartKeys[0])} or after ${monthText(chartKeys[chartKeys.length - 1])} have no expenses and are not drawn.`}
                 </InfoTip>
               </h2>
-              <p className="fin-panel-desc">{`${formatMonth(new Date(Math.floor(startKey / 12), startKey % 12, 1))} to ${formatMonth(new Date(Math.floor(endKey / 12), endKey % 12, 1))}`}, all statuses</p>
+              <p className="fin-panel-desc">
+                {chartKeys.length
+                  ? `${chartKeys.length === 1 ? monthText(chartKeys[0]) : `${monthText(chartKeys[0])} to ${monthText(chartKeys[chartKeys.length - 1])}`}, approved and pending`
+                  : 'Last 12 months'}
+              </p>
             </div>
           </div>
-          {expenses.length === 0 ? (
-            <div className="fin-empty fin-empty--compact">No expenses recorded yet</div>
+          {monthlyTrend.length === 0 ? (
+            <div className="fin-empty fin-empty--compact">No expenses in the last 12 months</div>
           ) : (
             <div className="fin-months" role="list" aria-label="Expenses per month">
-              {monthlyTrend.map(m => (
+              {monthlyTrend.map((m, i) => (
                 <div
                   key={m.key}
-                  className={`fin-months__col${m.key === nowKey ? ' is-current' : ''}${m.state !== 'complete' ? ' is-partial' : ''}`}
+                  className={`fin-months__col${m.key === nowKey ? ' is-current' : ''}`}
                   role="listitem"
-                  aria-label={`${m.label}: ${m.state === 'unloaded' ? 'not loaded' : `${formatCurrency(m.amount)} across ${m.count} ${m.count === 1 ? 'expense' : 'expenses'}${m.state === 'partial' ? ', partly loaded' : ''}`}`}
-                  title={m.state === 'unloaded' ? 'Not loaded on this page' : `${formatCurrency(m.amount)} · ${m.count} ${m.count === 1 ? 'expense' : 'expenses'}`}
+                  aria-label={`${monthText(m.key)}: ${formatCurrency(m.amount)} across ${plural(m.count, 'expense')}`}
+                  title={`${monthText(m.key)} · ${formatCurrency(m.amount)} · ${plural(m.count, 'expense')}`}
                 >
-                  <span className="fin-months__val" aria-hidden="true">
-                    {m.state === 'unloaded' ? '—' : m.amount > 0 ? compactRand(m.amount) : 'R 0'}
+                  <span className="fin-months__val" aria-hidden="true">{m.amount > 0 ? formatCompact(m.amount) : 'R 0'}</span>
+                  <div className="fin-months__bar" style={{ height: `${Math.max(2, (m.amount / maxMonthlyAmount) * 100)}px` }} />
+                  <span className="fin-months__lab" aria-hidden="true">
+                    {monthShort(m.key)}
+                    {/* The year under the first month and under each January. */}
+                    <span className="fin-months__year">{i === 0 || m.key % 12 === 0 ? yearOf(m.key) : ' '}</span>
                   </span>
-                  {m.state !== 'unloaded' && (
-                    <div className="fin-months__bar" style={{ height: `${Math.max(2, (m.amount / maxMonthlyAmount) * 120)}px` }} />
-                  )}
-                  <span className="fin-months__lab" aria-hidden="true">{m.label}</span>
                 </div>
               ))}
             </div>
           )}
         </section>
-
       </div>
 
-      {/* Filters: same toolbar layout as Invoices */}
-      <div className="fin-toolbar expenses-filter-bar">
-        <input
-          type="search"
-          className="fin-control fin-control--search"
-          placeholder="Search expenses"
-          aria-label="Search expenses by description, vendor or reference"
-          value={search}
-          onChange={e => { setSearch(e.target.value); resetPage(); }}
-        />
-        <div className="exp-filters">
-          <FilterSelect label="Category" short="Category" allValue="All" value={categoryFilter}
-            onChange={v => { setCategoryFilter(v); resetPage(); }} options={CATS} />
-          <FilterSelect label="Vehicle" short="Vehicle" allValue="All" value={vehicleFilter}
-            onChange={v => { setVehicleFilter(v); resetPage(); }}
-            options={[{ value: 'All', label: 'All vehicles' }, ...vehicles.map(v => ({ value: String(v.id), label: String(v.plate || v.registration || v.vehicle_number || `Vehicle ${v.id}`) }))]} />
-          <FilterSelect label="Date range" short="Dates" allValue="all" value={dateFilter}
-            onChange={v => { setDateFilter(v); resetPage(); }} options={DATE_FILTERS} />
-        </div>
-        {dateFilter === 'custom' && (
-          <>
-            <input type="date" className="fin-control" aria-label="From date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); resetPage(); }} />
-            <input type="date" className="fin-control" aria-label="To date" value={customTo} onChange={e => { setCustomTo(e.target.value); resetPage(); }} />
-          </>
-        )}
-        <Segmented
-          label="Filter by status"
-          className="fin-seg"
-          value={statusFilter}
-          onChange={s => { setStatusFilter(s); resetPage(); }}
-          options={STATUS_FILTERS.map(s => ({
-            value: s,
-            label: s === 'ALL' ? 'All' : formatStatus(s),
-            count: expenses.filter(e => s === 'ALL' || (e.status || 'PENDING').toUpperCase() === s).length,
-          }))}
-        />
-        <span className="fin-toolbar__count">
-          {sorted.length} {sorted.length === 1 ? 'expense' : 'expenses'}
-          {truncated && (
-            <>
-              {` · latest ${expenses.length} of ${totalExpenseCount}`}
-              <InfoTip align="end">
-                This page holds the {expenses.length} most recent of {totalExpenseCount} expenses. Search, filters, totals and
-                charts use these {expenses.length}; Export CSV exports the filtered list.
-              </InfoTip>
-            </>
-          )}
-        </span>
-      </div>
+      {toolbar}
 
       {/* Table */}
-      <div className="card fin-table-card fin-table-card--fit fin-section">
+      <div key="table" className="card fin-table-card fin-table-card--fit fin-section">
         <div className="fin-table-scroll">
           <table className="fin-table fin-table--stack table-heading-roles">
             <thead>
@@ -627,8 +609,8 @@ export default function Expenses() {
           <div className="fin-table-foot">
             <span>{(page - 1) * perPage + 1} to {Math.min(page * perPage, sorted.length)} of {sorted.length}</span>
             <div className="fin-table-foot__nav">
-              <button className="btn-action fin-btn-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</button>
-              <button className="btn-action fin-btn-secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</button>
+              <button type="button" className="tw-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</button>
+              <button type="button" className="tw-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</button>
             </div>
           </div>
         )}

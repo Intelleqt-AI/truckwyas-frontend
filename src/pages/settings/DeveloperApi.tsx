@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/InfoTip';
 import '@/pages/table-heading-roles.css';
 import { formatDateTime, formatMoneyWhole, formatNumber } from '@/lib/formatters';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -252,16 +253,16 @@ export function DeveloperApi() {
   };
 
   return (
-    <div style={{ maxWidth: 960 }}>
+    <div className="settings-wide" style={{ minWidth: 0 }}>
       <SettingsPageHeader
-        title="Risk-scoring API"
-        description="Score any invoice with the same 7-pillar underwriting engine your Capital product uses. Partners authenticate with an API key and are metered per call."
+        title="Payment risk API"
+        description={<>Check how likely an invoice is to be paid, from your own systems<InfoTip label="How the payment risk API works">Scores any invoice with the same 7-pillar underwriting engine Fast Pay uses. Partners authenticate with an API key and are metered per call.</InfoTip></>}
       />
 
       {/* ── Endpoint reference ── */}
       <div style={sectionStyle}>
         <div style={sectionHeader}><h2 style={sectionTitle}>Endpoint</h2></div>
-        <div style={{ padding: 24 }}>
+        <div style={{ padding: 'var(--card-pad, 20px)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <span style={{ ...mono, fontWeight: 600, color: 'var(--accent-primary)', padding: '2px 8px', border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-chip)' }}>POST</span>
             <span style={{ ...mono, color: 'var(--text-primary)' }}>/api/v1/risk/underwrite/</span>
@@ -317,7 +318,7 @@ export function DeveloperApi() {
         <div style={sectionHeader}><h2 style={sectionTitle}>API keys</h2></div>
 
         {/* Create row */}
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-subtle)' }}>
+        <div style={{ padding: '16px var(--card-pad, 20px)', borderBottom: '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: showAdvCreate ? 16 : 0 }}>
             <div style={{ flex: 2 }}>
               <label style={labelStyle}>Key name</label>
@@ -378,7 +379,7 @@ export function DeveloperApi() {
           return (
             <div key={k.id} style={{ borderBottom: i < keys.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
               {/* Key row */}
-              <div style={{ padding: '16px 24px' }}>
+              <div style={{ padding: '16px var(--card-pad, 20px)' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{k.name}</div>
@@ -439,7 +440,7 @@ export function DeveloperApi() {
 
               {/* Call history panel */}
               {logsOpen && (
-                <div style={{ background: 'var(--bg-deep)', borderTop: '1px solid var(--border-subtle)', padding: '16px 24px' }}>
+                <div style={{ background: 'var(--bg-deep)', borderTop: '1px solid var(--border-subtle)', padding: '16px var(--card-pad, 20px)' }}>
                   <h4 style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', margin: 0, marginBottom: 8 }}>Call history (last 100)</h4>
                   {logsLoading[k.id] ? (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0' }}><Loader size={16} /></div>
@@ -508,7 +509,7 @@ export function DeveloperApi() {
             <button className="btn-action settings-control" style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }} onClick={runTry} disabled={running}>{running ? 'Scoring…' : 'Run'}</button>
           </div>
         </div>
-        <div style={{ padding: 24, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+        <div style={{ padding: 'var(--card-pad, 20px)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           <div>
             <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>Request body</div>
             <textarea value={body} onChange={e => setBody(e.target.value)} spellCheck={false}
@@ -551,7 +552,7 @@ export function DeveloperApi() {
       {/* ── Edit key drawer ── */}
       {editKey && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }} onClick={() => setEditKey(null)}>
-          <div style={{ width: 440, maxWidth: '100%', boxSizing: 'border-box', background: 'var(--bg-surface)', borderLeft: '1px solid var(--border-subtle)', height: '100%', overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }} onClick={e => e.stopPropagation()}>
+          <div style={{ width: 440, maxWidth: '100%', boxSizing: 'border-box', background: 'var(--bg-surface)', borderLeft: '1px solid var(--border-subtle)', height: '100%', overflowY: 'auto', padding: 'var(--card-pad, 20px)', display: 'flex', flexDirection: 'column', gap: 16 }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit API key</h2>
               <button className="settings-control" aria-label="Close" onClick={() => setEditKey(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 20, cursor: 'pointer', lineHeight: 1, minWidth: 44, minHeight: 44, borderRadius: 'var(--radius-control)' }}>×</button>

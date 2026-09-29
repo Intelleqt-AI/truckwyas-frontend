@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Children, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { StatusMenu } from './StatusMenu';
 import SectionHeader from '@/components/layout/SectionHeader';
 import { formatDate, formatDistance, formatMoney, formatMoneyWhole, formatMonth, formatNumber } from '@/lib/formatters';
@@ -85,8 +85,14 @@ export function monthlySeries(loads: any[], n = 12, now = new Date()): MonthPoin
     p.revenue += num(l.total_amount);
     p.loads += 1;
   }
-  return out;
+  // Months before the first load are not "empty months", they are before
+  // this record had any work: trim them (keeping at least 3 bars).
+  const first = out.findIndex((m) => m.loads > 0);
+  return first < 0 ? out : out.slice(Math.min(first, Math.max(0, out.length - 3)));
 }
+
+/** Months that actually carry revenue: a chart needs at least two to say anything. */
+export const monthsWithRevenue = (months: MonthPoint[]) => months.filter((m) => m.revenue > 0).length;
 
 // ------------------------------------------------------------------ info
 
@@ -225,8 +231,12 @@ export function Kpi({ label, value, unit, tag, info, sub, tone }: KpiProps) {
   );
 }
 
+// Kpi returns null for a missing value; drop those children before KpiRow
+// counts its columns, so 3 tiles fill the width instead of 3/4 of it.
 export const KpiStrip = ({ label, children }: { label: string; children: ReactNode }) => (
-  <section className="fd-strip" aria-label={label}><KpiRow>{children}</KpiRow></section>
+  <section className="fd-strip" aria-label={label}>
+    <KpiRow>{Children.toArray(children).filter((c) => !(isValidElement(c) && c.type === Kpi && (c.props as KpiProps).value == null))}</KpiRow>
+  </section>
 );
 
 // ----------------------------------------------------------------- panels

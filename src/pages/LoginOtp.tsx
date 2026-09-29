@@ -115,7 +115,7 @@ export const LoginOtp = () => {
           </div>
 
           <button type="submit" className="btn-action" style={{ width: '100%', borderRadius: 'var(--radius-control)' }} disabled={loading || code.length !== 6}>
-            {loading ? 'Verifying…' : 'Verify & sign in'}
+            {loading ? 'Verifying…' : 'Verify and sign in'}
           </button>
         </form>
 

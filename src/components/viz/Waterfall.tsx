@@ -19,6 +19,9 @@ import {
  * and dropped to the tooltip and table when none of those is clear of the zero
  * line, the connectors and the other labels by 4px.
  */
+/** Drawn over a step with no activity (never "None"). */
+const EMPTY_MARK = 'R 0';
+
 export interface WaterfallStep {
   label: string;
   /** For 'delta' the signed change; for 'total' the level itself. */
@@ -112,39 +115,70 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, va
 
   // ---- label collision pass
   const obstacles: Box[] = [hLine(axisW, W, zeroY)];
-  // The "None" marks of empty steps are text too.
-  steps.forEach((s, i) => { if (s.kind === 'delta' && s.value === 0) obstacles.push(textBox('None', cx(i), y(geo[i].from) - 8)); });
+  // The "R 0" marks of empty steps are text too.
+  steps.forEach((s, i) => { if (s.kind === 'delta' && s.value === 0) obstacles.push(textBox(EMPTY_MARK, cx(i), y(geo[i].from) - 8)); });
   bars.forEach((b, i) => {
     if (i < steps.length - 1) obstacles.push(hLine(b.x + bw / 2, cx(i + 1) - bw / 2, b.y1));
   });
   const barBox = (b: typeof bars[number]): Box => ({ x0: b.x - bw / 2, x1: b.x + bw / 2, y0: b.top, y1: b.bottom });
   const bounds: Box = { x0: 0, x1: W, y0: 0, y1: height - padB + 2 };
-  const placed: Record<number, { x: number; y: number; inside: boolean; text: string }> = {};
-  bars.forEach((b, i) => {
-    const s = steps[i];
-    if (!wantsLabel(i) || b.empty) return;
-    const text = `${s.kind === 'delta' && s.value > 0 ? '+' : ''}${randCompact(s.value)}`;
-    const tw = textW(text);
-    const lx = Math.max(tw / 2 + 1, Math.min(W - tw / 2 - 1, b.x));
-    const down = s.kind === 'delta' ? s.value < 0 : geo[i].to < 0;
-    // A label wider than its bar would sit on the connector at the bar's end: the second
-    // candidate on each side steps 4px further out to clear it.
-    const above = [{ x: lx, y: b.top - 7, inside: false }, { x: lx, y: b.top - 11, inside: false }];
-    const below = [{ x: lx, y: b.bottom + 15, inside: false }, { x: lx, y: b.bottom + 19, inside: false }];
-    const cands = (down ? [...below, ...above] : [...above, ...below]).map((c) => ({ ...c, box: textBox(text, c.x, c.y) }));
-    if (b.h >= 22 && bw >= tw + 6 && roleOf(s, geo[i]) !== 'cost') {
-      const inY = down ? b.bottom - 7 : b.top + 16;
-      cands.push({ x: lx, y: inY, inside: true, box: textBox(text, lx, inY) });
-    }
-    const others = [
-      ...obstacles,
-      ...bars.filter((o) => o.i !== i && o.h >= 1).map(barBox),
-      ...Object.values(placed).map((p) => textBox(p.text, p.x, p.y)),
-    ];
-    // Outside candidates sit beyond the bar's own ends; the inside one sits on it by design.
-    const pick = placeLabel(cands, others, bounds, 4);
-    if (pick) placed[i] = { x: pick.x, y: pick.y, inside: pick.inside, text };
-  });
+  type Placed = Record<number, { x: number; y: number; inside: boolean; text: string }>;
+  // Labels are placed in story order, so when a narrow chart cannot fit them all the
+  // ones that matter win: totals, then the best and worst step, then the rest by size.
+  const rank = (i: number) => (steps[i].kind === 'total' ? 0 : i === maxUp || i === maxDown ? 1 : 2);
+  const placeAll = (order: typeof bars) => {
+    const placed: Placed = {};
+    order.forEach((b) => {
+      const i = b.i;
+      const s = steps[i];
+      if (!wantsLabel(i) || b.empty) return;
+      const text = `${s.kind === 'delta' && s.value > 0 ? '+' : ''}${randCompact(s.value)}`;
+      const tw = textW(text);
+      const lx = Math.max(tw / 2 + 1, Math.min(W - tw / 2 - 1, b.x));
+      const down = s.kind === 'delta' ? s.value < 0 : geo[i].to < 0;
+      // A label wider than its bar would sit on the connector at the bar's end: the second
+      // candidate on each side steps 4px further out to clear it. Story labels (totals, best,
+      // worst) may also take a row one line further out to clear a neighbour's label.
+      const far = rank(i) <= 1;
+      type Cand = { x: number; y: number; inside: boolean; near: boolean };
+      const above: Cand[] = [{ x: lx, y: b.top - 7, inside: false, near: true }, { x: lx, y: b.top - 11, inside: false, near: true }, ...(far ? [{ x: lx, y: b.top - 29, inside: false, near: false }] : [])];
+      const below: Cand[] = [{ x: lx, y: b.bottom + 15, inside: false, near: true }, { x: lx, y: b.bottom + 19, inside: false, near: true }, ...(far ? [{ x: lx, y: b.bottom + 37, inside: false, near: false }] : [])];
+      // A label wider than its bar may also sit flush with either bar edge, which on a
+      // narrow band keeps it off the neighbouring bar and its label.
+      const shift = Math.max(0, tw / 2 - bw / 2);
+      const all = down ? [...below, ...above] : [...above, ...below];
+      const close = all.filter((c) => c.near);
+      const farRow = all.filter((c) => !c.near);
+      const nudged = shift > 0 ? close.flatMap((c) => [
+        { ...c, x: Math.max(tw / 2 + 1, c.x - shift) }, { ...c, x: Math.min(W - tw / 2 - 1, c.x + shift) },
+      ]) : [];
+      // Wider than its column: flush with a bar edge first, leaving the neighbour's side free.
+      const ordered = tw > band - 4 ? [...nudged, ...close, ...farRow] : [...close, ...nudged, ...farRow];
+      const cands = ordered.map((c) => ({ ...c, box: textBox(text, c.x, c.y) }));
+      if (b.h >= 22 && bw >= tw + 6 && roleOf(s, geo[i]) !== 'cost') {
+        const inY = down ? b.bottom - 7 : b.top + 16;
+        cands.push({ x: lx, y: inY, inside: true, near: true, box: textBox(text, lx, inY) });
+      }
+      const others = [
+        ...obstacles,
+        ...bars.filter((o) => o.i !== i && o.h >= 1).map(barBox),
+        ...Object.values(placed).map((p) => textBox(p.text, p.x, p.y)),
+      ];
+      // Outside candidates sit beyond the bar's own ends; the inside one sits on it by design.
+      const pick = placeLabel(cands, others, bounds, 4);
+      if (pick) placed[i] = { x: pick.x, y: pick.y, inside: pick.inside, text };
+    });
+    return placed;
+  };
+  const baseOrder = [...bars].sort((a, b) => rank(a.i) - rank(b.i) || Math.abs(steps[b.i].value) - Math.abs(steps[a.i].value));
+  const story = (p: Placed) => baseOrder.filter((b) => rank(b.i) <= 1 && p[b.i]).length;
+  let placed = placeAll(baseOrder);
+  // A story label that lost out: try again with it placed first and keep whichever pass labels more of the story.
+  const missed = baseOrder.filter((b) => rank(b.i) <= 1 && wantsLabel(b.i) && !b.empty && !placed[b.i]);
+  if (missed.length > 0) {
+    const retry = placeAll([...missed, ...baseOrder.filter((b) => !missed.includes(b))]);
+    if (story(retry) > story(placed) || (story(retry) === story(placed) && Object.keys(retry).length > Object.keys(placed).length)) placed = retry;
+  }
 
   const open = (i: number, el: Element) => {
     const s = steps[i];
@@ -207,7 +241,7 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, va
                 {lab && (
                   <text x={lab.x} y={lab.y} textAnchor="middle" className={lab.inside ? 'viz-on-mark' : 'viz-strong viz-halo'}>{lab.text}</text>
                 )}
-                {b.empty && <text x={x} y={y0 - 8} textAnchor="middle" className="viz-muted">None</text>}
+                {b.empty && <text x={x} y={y0 - 8} textAnchor="middle" className="viz-muted">{EMPTY_MARK}</text>}
                 <text x={catX} y={height - (catLines.length > 1 ? 22 : 8)} textAnchor="middle" className={s.kind === 'total' ? 'viz-strong' : undefined} style={catPx !== 12 ? { fontSize: catPx } : undefined}>
                   {catLines.map((t, k) => <tspan key={k} x={catX} dy={k === 0 ? 0 : 14}>{t}</tspan>)}
                 </text>

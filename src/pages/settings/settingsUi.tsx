@@ -1,5 +1,6 @@
 import '@/pages/settings/settings-brand.css';
-import { SettingsPhoneNav } from './SettingsShell';
+import { createPortal } from 'react-dom';
+import { useSettingsShell } from './SettingsShell';
 import '@/components/layout/section-header.css';
 
 // Shared presentation roles for every settings section (see
@@ -17,7 +18,7 @@ export const settingsCardStyle: React.CSSProperties = {
 };
 
 export const settingsCardHeaderStyle: React.CSSProperties = {
-  padding: '20px 24px 16px',
+  padding: '16px var(--card-pad, 20px)',
   borderBottom: '1px solid var(--border-subtle)',
   display: 'flex',
   alignItems: 'center',
@@ -37,7 +38,7 @@ export const settingsCardTitleStyle: React.CSSProperties = {
   margin: 0,
 };
 
-export const settingsCardBodyStyle: React.CSSProperties = { padding: 24 };
+export const settingsCardBodyStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
 
 export const settingsLabelStyle: React.CSSProperties = {
   display: 'block',
@@ -61,7 +62,7 @@ export const settingsInputStyle: React.CSSProperties = {
   background: 'var(--input-bg)',
   border: '1px solid var(--border-subtle)',
   borderRadius: 'var(--radius-control)',
-  minHeight: 40,
+  minHeight: 'var(--field-h, 40px)',
   minWidth: 0,
   padding: '8px 12px',
   color: 'var(--text-primary)',
@@ -132,7 +133,7 @@ export function SettingsToggleRow({ label, description, checked, onChange, disab
   return (
     <div className="settings-toggle-row" style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-      padding: '12px 24px',
+      padding: '12px var(--card-pad, 20px)',
       minHeight: 48,
       opacity: disabled ? 0.6 : 1,
     }}>
@@ -173,8 +174,8 @@ export const settingsSecondaryButtonStyle: React.CSSProperties = {
   background: 'transparent',
   border: '1px solid var(--border-subtle)',
   color: 'var(--text-primary)',
-  padding: '8px 16px',
-  minHeight: 40,
+  padding: '0 14px',
+  minHeight: 'var(--control-h, 36px)',
   borderRadius: 'var(--radius-control)',
   fontFamily: 'var(--font-sans)',
   fontSize: 14,
@@ -196,20 +197,23 @@ export const settingsDangerButtonStyle: React.CSSProperties = {
  * geometry and type as the shared SectionHeader (28/34 title, one grey line,
  * actions on the title row), so every page head in the product matches. */
 export function SettingsPageHeader({ title, description, actions }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode }) {
-  return (
-    <>
+  // Inside the settings shell the head is portalled into the shell's head
+  // slot, above the sub-nav, so the H1 sits where it does on every page.
+  const shell = useSettingsShell();
+  const head = (
     <header className="section-header settings-page-head">
       <div className="section-header__top">
         <div className="section-header__titles">
           <div className="section-header__title-row">
             <h1 className="section-header__title">{title}</h1>
           </div>
-          {description && <p className="section-header__description">{description}</p>}
+          <p className="section-header__description">{description}</p>
         </div>
-        <div className="section-header__actions">{actions}</div>
+        {actions ? <div className="section-header__actions">{actions}</div> : null}
       </div>
     </header>
-    <SettingsPhoneNav />
-    </>
   );
+  if (!shell) return head;
+  if (!shell.slot) return null;
+  return createPortal(<>{head}{shell.phoneNav}</>, shell.slot);
 }

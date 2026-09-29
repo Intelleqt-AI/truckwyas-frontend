@@ -5,10 +5,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
 import {
   AlertsPanel, DetailMessage, MiniStats, DetailSkeleton, Group, InfoTip, Kpi, KpiStrip, Panel, RecordHeader, Row, StatusChip,
-  StatusControl, Tag, dateText, daysUntil, expiryAlert, formatStatus, isNotFound, kmText, monthlySeries, num, plural,
+  StatusControl, Tag, dateText, monthsWithRevenue, daysUntil, expiryAlert, formatStatus, isNotFound, kmText, monthlySeries, num, plural,
   randCents, randWhole, type AlertItem, type Tone,
 } from '@/components/fleet-detail/parts';
 import { MonthlyBars } from '@/components/fleet-detail/MonthlyBars';
+import { StatusChip as UiStatusChip } from '@/components/ui/StatusChip';
 import { formatNumber, formatPercent } from '@/lib/formatters';
 import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
 import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
@@ -48,7 +49,7 @@ export default function DriverProfile() {
   // Failing (even while retrying) with nothing to show: say so straight away.
   const isError = loadFailed(driverQuery);
 
-  const { data: loadsData } = useQuery({
+  const { data: loadsData, isLoading: loadsLoading } = useQuery({
     queryKey: ['driver-loads', driverId],
     queryFn: () => fetchData(`api/v1/loads/?driver=${driverId}&page_size=50`),
     enabled: !!driverId,
@@ -62,7 +63,9 @@ export default function DriverProfile() {
       <LoadError what="this driver" error={loadError} busy={driverQuery.isFetching} onRetry={() => refetch()} />
     </div>
   );
-  if (isLoading && !isError) return <DetailSkeleton crumb="Drivers" crumbTo="/fleet/drivers" />;
+  // Wait for the loads too: they decide the layout (one column or a rail),
+  // so drawing before they land made the details rail jump.
+  if ((isLoading || loadsLoading) && !isError) return <DetailSkeleton crumb="Drivers" crumbTo="/fleet/drivers" />;
   if (!driver) return (
     <DetailMessage
       title="Driver not found"
@@ -166,12 +169,18 @@ export default function DriverProfile() {
           info="Completed loads with an actual delivery time on or before the planned date. Needs actual delivery times to be recorded."
         />
       </KpiStrip>
-      ) : (
+      ) : loads.length === 0 ? (
         <section className="fd-panel fd-empty-line" aria-label="Driver summary">
-          <p className="fd-empty-line__text">No completed loads yet. {loads.length > 0 ? `${plural(loads.length, 'load')} in progress${driver.status && driver.status !== 'ACTIVE' ? `, although ${firstName || name} is marked ${formatStatus(driver.status).toLowerCase()}` : ''}.` : `Assign ${firstName || name} to a load to track their work.`}</p>
+          <p className="fd-empty-line__text">No loads yet. Assign {firstName || name} to a load to track their work.</p>
           <button type="button" className="fd-button" onClick={() => navigate('/bookings/orders')}>Open orders</button>
         </section>
-      )}
+      ) : driver.status && driver.status !== 'ACTIVE' ? (
+        // The loads table below already lists the work; say only what it cannot: the status disagrees.
+        <section className="fd-panel fd-empty-line" aria-label="Driver status">
+          <p className="fd-empty-line__text"><UiStatusChip tone="warning" size="sm" label={`Marked ${formatStatus(driver.status).toLowerCase()} · on an open load`} /></p>
+          <button type="button" className="fd-button" onClick={() => navigate('/bookings/orders')}>Open orders</button>
+        </section>
+      ) : null}
 
       {/* Few loads: one column, with Details laid out across the width, so the
           two columns never end hundreds of pixels apart. Otherwise the side
@@ -179,7 +188,7 @@ export default function DriverProfile() {
       <div className={`fd-body${wideLayout ? ' fd-body--wide' : ''}`}>
         {(hasCompleted || loads.length > 0) && (
         <div className="fd-main">
-          {hasCompleted && (
+          {hasCompleted && monthsWithRevenue(months) >= 2 && (
           <Panel
             title="Revenue by month"
             sub="Completed loads, last 12 months"
@@ -211,6 +220,7 @@ export default function DriverProfile() {
           <AlertsPanel items={alerts} />
 
           <Panel title="Details">
+            <div className="fd-groups">
             <Group title="Contact" rows={[
               { label: 'Phone', value: phone || null },
               { label: 'Email', value: email || null },
@@ -241,6 +251,7 @@ export default function DriverProfile() {
                 { label: 'Average rating', value: Number(driver.avg_rating) ? `${driver.avg_rating}` : null },
               ]}
             />
+            </div>
           </Panel>
         </aside>
       </div>

@@ -13,18 +13,16 @@
   --ins-track: var(--surface-tint-active);
 }
 
-/* Page head: the standard .tw-page-head (28px title, one-line subtitle). The
-   Margin period control sits on the title row, right-aligned. */
-/* Vertical rhythm comes from the shared spacing tokens (theme.css), so the head,
-   tabs and first card sit where they sit on every other page. The top margin is
-   the standard .tw-page-head one; only the head-to-tabs gap is set here. */
+/* Page head: the standard .tw-page-head (28px title, one-line subtitle), the
+   same shape on every tab. Vertical rhythm comes from the shared tokens. */
 .insights-header { margin-bottom: var(--head-to-tabs, 16px); }
-.insights-head-actions { justify-content: flex-end; min-width: 0; max-width: 100%; }
-/* Six periods do not fit a phone: the one track scrolls locally, never the page. */
-.insights-seg-scroll { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
-.insights-seg-scroll::-webkit-scrollbar { display: none; }
-.insights-custom { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Margin period: the tab's toolbar, its first content block (.tw-toolbar sets
+   the 36px control height and the gap to the first card). */
+.insights-period { margin: 0; }
+.insights-custom { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .insights-custom__to { color: var(--text-secondary); font-size: 13px; line-height: 20px; }
+.insights-month { width: 150px; max-width: 100%; }
 
 .insights-stack { display: flex; flex-direction: column; gap: var(--card-gap, 16px); min-width: 0; }
 
@@ -48,6 +46,9 @@
 /* KPI row inside the margin card, separated from the chart beneath. */
 .insights-kpis { padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border-row); }
 
+/* One-line takeaway at the top of a chart card: the answer before the evidence. */
+.insights-takeaway { margin: 0 0 4px; font: 500 14px/20px var(--font-sans); color: var(--text-primary); }
+
 /* Small stats: under a funnel (where items dropped out) or at the head of a card. */
 .insights-stats {
   margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--border-row);
@@ -64,7 +65,7 @@
 .insights-empty p { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
 .insights-state {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px;
-  padding: 20px 24px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card, 12px);
+  padding: var(--card-pad, 20px); background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card, 12px);
 }
 .insights-state p { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-primary); }
 .insights-state__action {
@@ -76,9 +77,16 @@
 .insights-state__action:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 3px; }
 .insights-skel { min-height: 240px; border-radius: var(--radius-card, 12px); background: var(--surface-tint-hover); }
 .insights-skel--card { min-height: 360px; }
+/* Reserve the Margin cards' height while the ledgers load, so nothing moves when they land. */
+.insights-skel--margin { min-height: 470px; }
 
 @media (max-width: 767px) {
-  .insights-head-actions { justify-content: flex-start; width: 100%; }
+  /* Six periods never clip on a phone: the track becomes a 3 x 2 grid of 44px options. */
+  .insights-period .tw-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; overflow: visible; }
+  .insights-period .tw-seg__opt { min-width: 0; }
+  .insights-period .tw-toolbar__meta { white-space: normal; }
+  .insights-custom { width: 100%; }
+  .insights-month { flex: 1 1 0; width: auto; }
   .insights-brand-tab, .insights-state__action { min-height: 48px; }
   .ic-kpis.insights-kpis { --ic-cols: 2; }
   .insights-kpis .ic-kpi__value { font-size: 22px; line-height: 28px; }

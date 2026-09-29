@@ -23,6 +23,7 @@ import { InfoTip } from '@/components/ui/InfoTip';
 import './ops-tiles.css';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Segmented } from '@/components/ui/Segmented';
+import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
 import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
@@ -316,15 +317,7 @@ export default function Drivers() {
       )}
 
       {/* Search + status filter toolbar */}
-      <div className="fleet-toolbar">
-        <input data-fleet-control
-          type="text"
-          aria-label="Search drivers"
-          placeholder="Search name, licence or username"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="fleet-search"
-        />
+      <Toolbar className="fleet-toolbar" end={
         <Segmented
           label="Driver status"
           value={statusFilter}
@@ -334,7 +327,14 @@ export default function Drivers() {
             label: status === 'All' ? 'All' : formatStatus(status),
           }))}
         />
-      </div>
+      }>
+        <SearchInput
+          aria-label="Search drivers"
+          placeholder="Search name, licence or username"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </Toolbar>
 
       {/* Table */}
       {failed ? (

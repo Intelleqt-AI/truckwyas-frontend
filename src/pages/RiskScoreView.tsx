@@ -1,5 +1,6 @@
 import './table-heading-roles.css';
 import './finance-brand.css';
+import SectionHeader from '@/components/layout/SectionHeader';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -106,24 +107,20 @@ export default function RiskScoreView() {
 
   return (
     <div className="fin-page">
-      <header className="fin-detail-head">
-        <div style={{ minWidth: 0 }}>
-          <div className="fin-detail-head__eyebrow">Fast Pay</div>
-          <div className="fin-detail-head__title-row"><h1>Customer risk scores</h1></div>
-          <p className="fin-detail-head__sub" style={{ maxWidth: '72ch' }}>
-            How safe each customer's invoices would be to advance, scored out of 100 by the Fast Pay rules. Higher is safer.
-            {!CAPITAL_LAUNCHED && ` ${CAPITAL_COMING_SOON}`}
-          </p>
-        </div>
-      </header>
+      <SectionHeader
+        title="Customer risk scores"
+        back={{ to: '/capital', label: 'Fast Pay' }}
+        description={<>Out of 100 by the Fast Pay rules; higher is safer.{!CAPITAL_LAUNCHED && ' Not live yet.'}</>}
+      />
 
+      <div className="fin-stack fin-stack--16 risk-stack">
       <div className="fin-grid-2">
         <section className="card" aria-labelledby="tiers-title">
           <div className="fin-panel-head">
             <div className="fin-panel-head__text">
               <h2 id="tiers-title" className="fin-panel-title">How are your customers spread across risk tiers?</h2>
-              <p className="fin-panel-desc">
-                {customerScores.length > 0
+              <p className="fin-panel-desc risk-desc-2">
+                {isLoading ? 'Loading scores…' : customerScores.length > 0
                   ? `${customerScores.length} customers scored, average ${avgScore} out of 100. Each customer's highest stored score is shown.${expiredCount > 0 ? ` ${expiredCount === customerScores.length ? 'All' : expiredCount} of these scores ${expiredCount === 1 ? 'has' : 'have'} expired, so treat them as out of date.` : ''}`
                   : 'Customers appear here once their invoices are scored.'}
               </p>
@@ -158,7 +155,10 @@ export default function RiskScoreView() {
               <p className="fin-panel-desc">{pillars.length > 0 ? `The ${pillars.length} areas the model scores, and how much each counts towards 100.` : 'The areas the model scores.'}</p>
             </div>
           </div>
-          {pillars.length === 0 ? (
+          {pillars.length === 0 && isLoading ? (
+            // Seven areas, as the loaded list: nothing below moves when it lands.
+            <span className="fin-skel" style={{ height: 315, borderRadius: 8 }} aria-hidden="true" />
+          ) : pillars.length === 0 ? (
             <div className="fin-empty fin-empty--compact">The breakdown appears once a customer is scored.</div>
           ) : (
             <dl className="fin-dl">
@@ -231,6 +231,7 @@ export default function RiskScoreView() {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

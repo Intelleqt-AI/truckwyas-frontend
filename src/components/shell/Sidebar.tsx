@@ -16,7 +16,7 @@ interface SidebarProps {
   companyLogo?: string;
   onSignOut: () => void;
   theme: 'dark' | 'light';
-  status: { label: string; tone: 'ok' | 'warn' | 'bad'; detail: string; needsBilling: boolean };
+  status: { label: string; tone: 'ok' | 'warn' | 'bad' | 'neutral'; detail: string; needsBilling: boolean };
 }
 
 function NavLinkItem({ item, active, collapsed }: { item: NavItem; active: boolean; collapsed: boolean }) {
@@ -196,7 +196,7 @@ export function Sidebar({ allowed, canAccessSettings, isAdmin, collapsed, onTogg
           style={{ cursor: status.needsBilling ? 'pointer' : 'default' }}
         >
           <span className="tw-dot" aria-hidden="true" />
-          <span className="tw-side__status-label">{status.label === 'Online' ? 'Account active' : status.label}</span>
+          <span className="tw-side__status-label">{status.label}</span>
           <span className="tw-tip tw-tip--wide" role="tooltip">{status.detail}</span>
         </button>
       </div>

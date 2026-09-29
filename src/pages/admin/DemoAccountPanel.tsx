@@ -8,7 +8,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { StatusChip } from '@/components/ui/StatusChip';
 
-const cardStyle: React.CSSProperties = { padding: 24 };
+const cardStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16,
 };

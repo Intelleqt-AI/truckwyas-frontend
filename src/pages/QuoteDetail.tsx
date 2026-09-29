@@ -331,6 +331,12 @@ export default function QuoteDetail() {
   const isRound = quote.trip_type === 'ROUND_TRIP';
   // Company first; the contact name only when it is a different person.
   const company = (quote.customer_company || '').trim() || quote.customer_name || '';
+  // "Durban Harbour, Durban" -> the city when the API gives it, else the first part.
+  const placeShort = (city?: string, loc?: string) => (city || '').trim() || String(loc || '').split(',')[0].trim();
+  const routeFrom = placeShort(quote.pickup_city, quote.pickup_location);
+  const routeTo = placeShort(quote.delivery_city, quote.delivery_location);
+  const showWinChance = !!quote.win_probability && (quote.status === 'DRAFT' || quote.status === 'SENT');
+  const routeSummary = routeFrom && routeTo ? `${routeFrom} → ${routeTo}` : '';
   const contact = (quote.customer_name || '').trim();
   const showContact = !!contact && contact.toLowerCase() !== company.toLowerCase();
   // Emails break at "@" and dots, never mid-word ("co.z / a").
@@ -385,7 +391,9 @@ export default function QuoteDetail() {
         titleAdornment={<><StatusChip status={quote.status} label={STATUS_LABEL[quote.status]} />
             {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && <StatusChip status="WON" />}
             {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <StatusChip status="LOST" />}</>}
-        description={<>{[company, quote.customer_city, isRound ? 'Round trip' : ''].filter(Boolean).join(' · ')}</>}
+        // The subtitle reads as the job: customer, then the route (never the
+        // customer's own city, which read as a destination).
+        description={<>{[company, routeSummary, isRound ? 'Round trip' : ''].filter(Boolean).join(' · ')}</>}
         actions={<>
           <StatusMenu
             subject={quote.quote_number}
@@ -397,7 +405,7 @@ export default function QuoteDetail() {
             intercept={(v) => { if (v === 'SENT' && quote.status !== 'SENT') { setSendPreview('status'); return true; } return false; }}
             onChange={(v) => statusMutation.mutate(v)}
           />
-          <button type="button" className="bk-btn bk-btn--secondary" onClick={() => navigate(`/bookings/quotes/${id}/edit`)}>
+          <button type="button" className="bk-btn bk-btn--secondary qd-head-edit" onClick={() => navigate(`/bookings/quotes/${id}/edit`)}>
             Edit quote
           </button>
           {quote.status === 'ACCEPTED' ? (
@@ -476,7 +484,7 @@ export default function QuoteDetail() {
             </div>
             <hr className="qd-rule" />
             <dl className="qd-facts">
-              {fact('Cargo', quote.cargo_description || 'Not recorded')}
+              {fact('Cargo', quote.cargo_description ? String(quote.cargo_description).replace(/^\s*\S/, (c: string) => c.toUpperCase()) : 'Not recorded')}
               {fact('Truck type', sentenceCaseLabel(quote.vehicle_type) || 'Not recorded')}
               {fact('Weight', quote.weight ? `${formatNumber(parseFloat(quote.weight))} kg` : 'Not recorded')}
               {fact('Distance', quote.distance ? formatDistance(parseFloat(quote.distance)) : 'Not recorded')}
@@ -511,7 +519,7 @@ export default function QuoteDetail() {
             <div className="qd-total">{formatMoney(total)}</div>
             <div className="qd-sub">
               {marginText && <span>{marginText} margin</span>}
-              {quote.win_probability && (quote.status === 'DRAFT' || quote.status === 'SENT') && (
+              {showWinChance && (
                 // Stored 0 to 100 already; do not multiply again.
                 <span title="Estimated chance of winning at this price">{Math.round(Number(quote.win_probability))}% chance to win</span>
               )}
@@ -519,7 +527,10 @@ export default function QuoteDetail() {
             {fuelNote && (
               <p className="qd-fuel" role="status">
                 <span className="bk-dot bk-dot--warning" aria-hidden="true" />
-                <span>{fuelNote}{fuelAlert?.action ? ` ${normaliseFigures(fuelAlert.action).replace(/\.?$/, '.')}` : ''}</span>
+                <span>{fuelNote}{quote.status === 'DRAFT'
+                  // A draft was never offered, so there is nothing to renegotiate: update the price instead.
+                  ? ' Update the price before sending.'
+                  : fuelAlert?.action ? ` ${normaliseFigures(fuelAlert.action).replace(/\.?$/, '.')}` : ''}</span>
               </p>
             )}
             <div className="qd-price-rows">
@@ -538,7 +549,8 @@ export default function QuoteDetail() {
                 </div>
               )}
               {quote.created_at && <div className="bk-kv"><span className="bk-kv__label">Created</span><span className="bk-kv__value">{formatDate(quote.created_at)}</span></div>}
-              {quote.confidence && <div className="bk-kv"><span className="bk-kv__label">Price confidence</span><span className="bk-kv__value">{sentenceCase(quote.confidence)}</span></div>}
+              {/* One uncertainty signal: the chance to win when it is shown, else the price confidence. */}
+              {quote.confidence && !showWinChance && <div className="bk-kv"><span className="bk-kv__label">Price confidence</span><span className="bk-kv__value">{sentenceCase(quote.confidence)}</span></div>}
             </div>
           </section>
 
@@ -604,7 +616,12 @@ export default function QuoteDetail() {
             </section>
           )}
 
-          <div className="qd-tools">
+          {/* Secondary tools in one quiet card (phones also get Edit here, so
+              the head keeps two controls on one line). */}
+          <div className="bk-card qd-tools">
+            <button type="button" className="bk-btn bk-btn--quiet qd-tools-edit" onClick={() => navigate(`/bookings/quotes/${id}/edit`)}>
+              Edit quote
+            </button>
             <button
               type="button"
               onClick={() => {

@@ -13,7 +13,7 @@ interface PhoneBarProps {
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
   onSignOut: () => void;
-  status: { label: string; tone: 'ok' | 'warn' | 'bad' };
+  status: { label: string; tone: 'ok' | 'warn' | 'bad' | 'neutral' };
 }
 
 /**
@@ -134,7 +134,7 @@ export function PhoneBar({ allowed, canAccessSettings, canAsk, open, setOpen, th
             </div>
             <div className={`tw-side__status is-${status.tone}`} aria-label={`Account: ${status.label}`}>
               <span className="tw-dot" aria-hidden="true" />
-              <span>{status.label === 'Online' ? 'Account active' : status.label}</span>
+              <span>{status.label}</span>
             </div>
           </div>
         </div>

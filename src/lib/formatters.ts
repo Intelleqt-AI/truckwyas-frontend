@@ -49,6 +49,41 @@ const fixed = (n: number, decimals: number, minDecimals = decimals): string => {
   return `${n < 0 && !isZero ? MINUS : ''}${zaify(s)}`;
 };
 
+// ---------------------------------------------------------------- missing values
+
+/** Placeholder words a backend or an old serializer may send for "no value". */
+const EMPTY_WORDS = new Set(['none', 'null', 'undefined', 'nan', 'n/a']);
+
+/**
+ * THE rule for value cells (R3): never print "None", "null" or "undefined".
+ *   valueOrDash(null)        "—"
+ *   valueOrDash('None')      "—"
+ *   valueOrDash('')          "—"
+ *   valueOrDash(NaN)         "—"
+ *   valueOrDash('Durban')    "Durban"
+ *   valueOrDash(0)           "0"      (zero is a value, not missing)
+ *   valueOrDash(v, formatMoney)  formats real values, dashes the rest
+ */
+export function valueOrDash<T>(
+  value: T | null | undefined,
+  format?: (v: T) => string,
+): string {
+  if (isMissingValue(value)) return MISSING;
+  if (format) return format(value as T);
+  return String(value);
+}
+
+/** True for null/undefined/''/NaN and the words "None", "null", "undefined", "NaN", "n/a". */
+export const isMissingValue = (value: unknown): boolean => {
+  if (value == null) return true;
+  if (typeof value === 'number') return !Number.isFinite(value);
+  if (typeof value === 'string') {
+    const t = value.trim();
+    return t === '' || EMPTY_WORDS.has(t.toLowerCase());
+  }
+  return false;
+};
+
 // ---------------------------------------------------------------- money
 
 /** "R 20 505,65". Null/NaN -> "—". */

@@ -12,6 +12,7 @@ import RowActions from "@/components/ui/RowActions";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { wholeRand } from "@/components/finance/FinTile";
 import { KpiRow, KpiTile } from "@/components/ui/KpiTile";
+import { Toolbar, SearchInput } from "@/components/ui/Toolbar";
 import { Segmented } from "@/components/ui/Segmented";
 import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
 import LoadError, { loadFailed } from "@/components/data/LoadError";
@@ -315,7 +316,7 @@ export default function Invoices() {
         title="Finance"
         tabs={financeTabsFor(location.pathname)}
         actions={
-          <button className="btn-action" onClick={() => navigate("/finance/invoices/new")}>
+          <button type="button" className="tw-btn tw-btn--primary" onClick={() => navigate("/finance/invoices/new")}>
             New invoice
           </button>
         }
@@ -425,11 +426,27 @@ export default function Invoices() {
         )
       )}
 
-      {/* Filters */}
-      <div className="fin-toolbar">
-        <input
-          type="search"
-          className="fin-control fin-control--search"
+      {/* Filters: the shared toolbar (36px controls), as on every list. */}
+      <Toolbar
+        className="fin-toolbar"
+        aria-label="Filter invoices"
+        meta={
+          <>
+            {filtered.length} {filtered.length === 1 ? "invoice" : "invoices"}
+            {!loading && truncated && (
+              <>
+                {` · latest ${allInvoices.length} of ${totalInvoices}`}
+                <InfoTip align="end">
+                  This list holds the {allInvoices.length} most recent of {totalInvoices} invoices; search and filters apply to
+                  these. The figures above cover all {totalInvoices}.
+                </InfoTip>
+              </>
+            )}
+          </>
+        }
+      >
+        <SearchInput
+          wrapClassName="inv-search"
           placeholder="Search invoices"
           aria-label="Search invoices by number or customer"
           value={search}
@@ -450,19 +467,7 @@ export default function Invoices() {
             count: loading ? undefined : allInvoices.filter((inv) => statusMatches(inv, s)).length,
           }))}
         />
-        <span className="fin-toolbar__count">
-          {filtered.length} {filtered.length === 1 ? "invoice" : "invoices"}
-          {!loading && truncated && (
-            <>
-              {` · latest ${allInvoices.length} of ${totalInvoices}`}
-              <InfoTip align="end">
-                This list holds the {allInvoices.length} most recent of {totalInvoices} invoices; search and filters apply to
-                these. The figures above cover all {totalInvoices}.
-              </InfoTip>
-            </>
-          )}
-        </span>
-      </div>
+      </Toolbar>
 
       {/* Table: 10 per page, clickable */}
       <div className="card fin-table-card fin-table-card--fit">
@@ -619,13 +624,15 @@ export default function Invoices() {
             </span>
             <div className="fin-table-foot__nav">
               <button
-                className="btn-action fin-btn-secondary"
+                type="button"
+                className="tw-btn"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}>
                 Previous
               </button>
               <button
-                className="btn-action fin-btn-secondary"
+                type="button"
+                className="tw-btn"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}>
                 Next

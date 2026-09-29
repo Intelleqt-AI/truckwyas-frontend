@@ -53,7 +53,7 @@ export default function CustomerStatement({ d, company }: { d: Ledger; company?:
   const closing = opening + invoiced - paid;
 
   const table: Statement = {
-    columns: [{ label: 'Date', type: 'date' }, { label: 'Transaction' }, { label: 'Reference' }, { label: 'Due', type: 'date' }, { label: 'Invoiced', type: 'money' }, { label: 'Paid', type: 'money' }, { label: 'Balance', type: 'money' }],
+    columns: [{ label: 'Date', type: 'date' }, { label: 'Transaction' }, { label: 'Reference' }, { label: 'Due', type: 'date', phone: false }, { label: 'Invoiced', type: 'money' }, { label: 'Paid', type: 'money' }, { label: 'Balance', type: 'money' }],
     rows: [
       ...(sinceDate ? [{ key: 'open', kind: 'subtotal' as const, cells: [sinceDate, 'Opening balance', '', '', '', '', opening] }] : []),
       ...shown.map<SRow>((e, i) => ({ key: `e${i}`, cells: [e.date, e.type, e.ref, e.due ?? '', e.debit || '', e.credit || '', (bal += e.debit - e.credit)] })),
@@ -98,7 +98,7 @@ export default function CustomerStatement({ d, company }: { d: Ledger; company?:
       csv={() => [
         [`Statement for ${name}`], [`From ${company?.company_name || ''}${company?.vat_number ? `, VAT ${company.vat_number}` : ''}`], [`Statement date ${todayISO()}`], [],
         ...statementCsv('', '', table).slice(3),
-        [], ...statementCsv('', '', ageTable).slice(3),
+        ...(ageB.some(v => Math.abs(v) >= 0.005) ? [[], ...statementCsv('', '', ageTable).slice(3)] : []),
       ]}
       csvName={`statement-${name}-${todayISO()}`}
     >
@@ -124,11 +124,14 @@ export default function CustomerStatement({ d, company }: { d: Ledger; company?:
         table={table}
         caption={`Statement for ${name}`}
         stickyFirst={false}
+        fit
+        cue={null}
         footer={ties
           ? <Check>Closing balance equals the open invoice balances for {name}.</Check>
           : <Check ok={false}>Closing balance differs from the open invoice balances for {name} ({money(openLedger)}).</Check>}
       />
-      <StatementTable table={ageTable} caption="Amount due by age" stickyFirst={false} />
+      {/* Nothing due: no row of R 0,00 buckets. */}
+      {ageB.some(v => Math.abs(v) >= 0.005) && <StatementTable table={ageTable} caption="Amount due by age" stickyFirst={false} />}
     </ReportFrame>
   );
 }

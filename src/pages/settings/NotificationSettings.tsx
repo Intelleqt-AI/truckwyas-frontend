@@ -101,7 +101,7 @@ export function NotificationSettings() {
 
   return (
     // Settings forms cap at 720px so each toggle sits near its label.
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
       <SettingsPageHeader title="Notifications" description="Choose what you get notified about and how" />
       <div>
         {loadFailed && (
@@ -139,7 +139,7 @@ export function NotificationSettings() {
           <ToggleRow label="Maintenance due" checked={settings.push.maintenance_due} onChange={v => setChannel('push', 'maintenance_due', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           <ToggleRow label="Driver status updates" checked={settings.push.driver_updates} onChange={v => setChannel('push', 'driver_updates', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           {pushHint && (
-            <div style={{ padding: '12px 24px', borderTop: '1px solid var(--border-row)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{pushHint}</div>
+            <div style={{ padding: '12px var(--card-pad, 20px)', borderTop: '1px solid var(--border-row)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{pushHint}</div>
           )}
         </div>
       </div>

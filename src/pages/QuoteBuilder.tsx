@@ -1,3 +1,4 @@
+import "@/components/layout/section-header.css";
 import "./quote-invoice-roles.css";
 import { localDateISO } from '@/lib/dates';
 import "./quote-builder-controls.css";
@@ -1291,22 +1292,28 @@ export default function QuoteBuilder() {
   return (
     <div className={`qi-form qb-controls${!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 ? " qb-has-pricebar" : ""}`}>
       {/* header */}
-      <div className="qb-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
-        <div>
-          <div style={labelS}>Bookings</div>
-          <h1 style={{ fontSize: "var(--text-display, 28px)", lineHeight: "34px", fontWeight: 600, letterSpacing: "var(--tracking-display, -0.025em)", color: "var(--text-primary)", margin: "4px 0 0" }}>{isEditing ? "Edit quote" : "New quote"}</h1>
+      {/* Same page head as every page (layout only): H1 on the title row,
+          one grey line under it, actions on the right. */}
+      <header className="section-header qb-head">
+        <div className="section-header__top">
+        <div className="section-header__titles">
+          <div className="section-header__title-row">
+            <h1 className="section-header__title">{isEditing ? "Edit quote" : "New quote"}</h1>
+          </div>
+          <p className="section-header__description">Quotes and loads</p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div className="section-header__actions" style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", display: "flex", alignItems: "center", gap: 6 }}>
             {saving ? "Saving…" : lastSavedAt ? `Saved to browser ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Auto-saves to this browser as you work"}
             <span style={dot(saving ? "var(--status-warning)" : lastSavedAt ? "var(--status-success)" : "var(--text-tertiary)")} />
           </div>
           <button onClick={startNew} title="Clear every field and start a fresh quote (this one stays saved)"
-            style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "transparent", color: "var(--accent-primary)", border: "1px solid var(--accent-primary)", borderRadius: "var(--radius-control, 8px)", padding: "9px 12px", cursor: "pointer" }}>
+            style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "transparent", color: "var(--text-primary)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-control, 8px)", minHeight: "var(--control-h, 36px)", padding: "0 12px", cursor: "pointer" }}>
             Clear &amp; new quote
           </button>
         </div>
-      </div>
+        </div>
+      </header>
 
       {/* Resume-unsaved banner — opt-in, only before the first DB save */}
       {resumable && !isEditing && (

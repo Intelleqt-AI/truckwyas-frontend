@@ -11,6 +11,10 @@ export interface SignalRow {
   kind: 'invoice' | 'fleet' | 'other';
   title: string;
   detail: string;
+  /** Money figure shown right-aligned on the row (never wrapped into the title). */
+  amount?: string;
+  /** Longer detail for the tooltip (invoice, due date, lateness). */
+  detailTitle?: string;
   actionLabel: string | null;
 }
 
@@ -38,11 +42,15 @@ export function presentSignal(s: { title?: string; body?: string; action?: strin
     const amount = Number(owes[2].replace(/,/g, ''));
     const due = toDate(owes[3]);
     const late = due ? daysSince(due) : null;
-    const parts = [invNo, due ? `due ${formatDate(due)}` : null, late != null && late > 0 ? `${formatDays(late)} late` : null].filter(Boolean);
+    // Short detail (one line in the side column): lateness first, then the invoice.
+    const when = late != null && late > 0 ? `${formatDays(late)} late` : due ? `due ${formatDate(due)}` : null;
+    const parts = [when, invNo].filter(Boolean);
     return {
       kind: 'invoice',
-      title: `${owes[1]} owes ${Number.isFinite(amount) ? formatMoneyWhole(amount) : normaliseFigures(`R ${owes[2]}`)}`,
-      detail: parts.join(', ').replace(/^./, (c) => c.toUpperCase()),
+      title: owes[1],
+      amount: Number.isFinite(amount) ? formatMoneyWhole(amount) : normaliseFigures(`R ${owes[2]}`),
+      detail: parts.join(' · ').replace(/^./, (c) => c.toUpperCase()),
+      detailTitle: [invNo, due ? `due ${formatDate(due)}` : null, when && late != null && late > 0 ? when : null].filter(Boolean).join(', '),
       actionLabel,
     };
   }

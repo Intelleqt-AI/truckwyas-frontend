@@ -45,7 +45,7 @@ const tabActive = (t: SectionTab, pathname: string) =>
  * tabs row at --head-to-tabs and content at --tabs-to-content.
  *
  * Section pages (those that pass `tabs`) take their H1 from the sidebar item
- * they live under, so the nav label and the H1 always agree ("Get paid",
+ * they live under, so the nav label and the H1 always agree ("Finance",
  * "Quotes and loads", "Fleet"). Tabs render only when one of them matches the
  * current route, so a page that has its own nav item (Reports) shows no
  * orphan tab row.
@@ -125,7 +125,7 @@ export function PageHeadSkeleton() {
   );
 }
 
-// Finance ("Get paid") tabs. Reports has its own sidebar item, so it is not a tab.
+// Finance tabs (Invoices, Expenses). Reports has its own sidebar item, so it is not a tab.
 export const FINANCE_TABS: SectionTab[] = [
   { label: 'Invoices', to: '/finance/invoices' },
   { label: 'Expenses', to: '/finance/expenses' },

@@ -33,45 +33,20 @@ table.admin-table .num { text-align: right !important; font-variant-numeric: tab
   background: var(--surface-tint-hover) !important;
 }
 
-/* ---- Phone and small tablet: the admin section list becomes one scrollable
-   row of links above the page, so tables get the full width. ---- */
+/* ---- Shell (R3): head first, full width; then the 220px section list and
+   the content, starting on the same line (same geometry as Settings). */
+.tw-admin-page { min-width: 0; }
+.tw-admin-shell { display: flex; align-items: stretch; min-height: 100%; gap: 32px; min-width: 0; }
+.tw-admin-shell__side { width: 220px; flex-shrink: 0; }
+.tw-admin-shell__nav { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; padding: 0 0 24px; }
+.tw-admin-shell__content { flex: 1; min-width: 0; padding-bottom: 60px; }
 .tw-admin-phone-nav { display: none; }
 @media (max-width: 768px) {
+  .tw-admin-shell { flex-direction: column; gap: 0; }
   .tw-admin-shell > .tw-admin-shell__side { display: none !important; }
-  .tw-admin-phone-nav {
-    display: flex; align-items: center; gap: 4px;
-    overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
-    margin: calc(-1 * var(--head-to-content, 16px) + 4px) 0 var(--head-to-content, 16px);
-    padding: 0 0 8px;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-  .tw-admin-phone-nav::-webkit-scrollbar { display: none; }
-  .tw-admin-phone-nav .admin-nav-link { display: block; white-space: nowrap; flex-shrink: 0; padding: 8px 12px; border-radius: var(--radius-control); font: 400 14px/20px var(--font-sans); color: var(--text-secondary); text-decoration: none; }
-  .tw-admin-phone-nav .admin-nav-link[aria-current="page"] { background: var(--surface-tint-active); color: var(--text-primary); font-weight: 500; }
-}
-@media (max-width: 768px) {
-  .tw-admin-shell { flex-direction: column; }
-  .tw-admin-shell > .tw-admin-shell__side-legacy {
-    width: auto !important;
-    border-right: none !important;
-    border-bottom: 1px solid var(--border-subtle);
-    margin-bottom: 16px;
-    min-width: 0;
-  }
-  .tw-admin-shell .tw-admin-shell__nav {
-    position: static !important;
-    max-height: none !important;
-    display: flex; align-items: center; gap: 4px;
-    overflow-x: auto; overflow-y: hidden;
-    padding: 0 0 8px !important;
-    scrollbar-width: none;
-  }
-  .tw-admin-shell .tw-admin-shell__nav::-webkit-scrollbar { display: none; }
-  .tw-admin-shell .tw-admin-shell__brand,
-  .tw-admin-shell .tw-admin-shell__group-label { display: none; }
-  .tw-admin-shell .tw-admin-shell__group { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin: 0 !important; }
-  .tw-admin-shell .admin-nav-link { white-space: nowrap; flex-shrink: 0; margin: 0 !important; }
-  .tw-admin-shell > .tw-admin-shell__content { padding: 0 0 24px !important; }
+  .tw-admin-phone-nav { display: block; margin: calc(-1 * var(--head-to-content, 16px) + 4px) 0 var(--head-to-content, 16px); }
+  .tw-admin-phone-nav .tw-admin-phone-nav__trigger { width: 100%; }
+  .tw-admin-shell > .tw-admin-shell__content { padding: 0 0 24px; }
 }
 
 /* Platform health: job table beside a narrower integrations rail. minmax(0, …)
@@ -84,7 +59,8 @@ table.admin-table .num { text-align: right !important; font-variant-numeric: tab
   align-items: start;
 }
 .admin-health-grid > * { min-width: 0; }
-@media (max-width: 1100px) {
+/* The job table needs ~560px for Task, Status and Last started: stack the rail below until there is room. */
+@media (max-width: 1360px) {
   .admin-health-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -119,3 +95,12 @@ table.admin-table .ops-skel-tr td { padding: 12px 16px; height: 45px; box-sizing
 @media (max-width: 520px) { table.admin-table td[title] { max-width: 150px !important; } }
 /* Reserve the summary's two phone lines so the table below never jumps. */
 @media (max-width: 520px) { .admin-job-summary { min-height: 40px; } }
+/* Health on phones: task and status; last started rides under the task name. */
+.admin-table .adm-task__sub { display: none; }
+@media (max-width: 520px) {
+  .admin-table .adm-col-started { display: none; }
+  .admin-table td.adm-task { white-space: normal !important; max-width: none !important; }
+  .admin-table .adm-task__sub { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+}
+/* Companies on phones: name, status, orders and the row menu. */
+@media (max-width: 520px) { table.admin-table .adm-col-phone { display: none; } }

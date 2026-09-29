@@ -18,7 +18,7 @@ import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 // Zimborders bridge toll). An edit here applies to every company's quotes
 // immediately, same reasoning as the Truck Types page.
 
-const cardStyle: React.CSSProperties = { padding: 24, marginBottom: 16 };
+const cardStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)', marginBottom: 16 };
 const sectionTitleStyle: React.CSSProperties = { fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 };
 const thStyle: React.CSSProperties = {
   textAlign: 'left', padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontWeight: 500,

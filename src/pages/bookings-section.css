@@ -7,7 +7,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  min-height: 40px;
+  min-height: var(--control-h, 36px);
   margin-bottom: var(--card-gap, 16px);
   flex-shrink: 0;
 }
@@ -23,7 +23,8 @@
 
 .bk-search {
   box-sizing: border-box;
-  min-height: 40px;
+  height: var(--control-h, 36px);
+  min-height: var(--control-h, 36px);
   width: 280px;
   max-width: 100%;
   padding: 8px 12px;
@@ -45,8 +46,8 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 40px;
-  padding: 8px 12px;
+  min-height: var(--control-h, 36px);
+  padding: 0 12px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-control, 8px);
   background: var(--bg-surface);
@@ -76,8 +77,8 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 40px;
-  padding: 8px 16px;
+  min-height: var(--control-h, 36px);
+  padding: 0 14px;
   border-radius: var(--radius-control, 8px);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -119,8 +120,8 @@
 .bk-table { width: 100%; border-collapse: collapse; }
 .bk-table thead tr { background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); }
 .bk-table th { height: 44px; padding: 12px 16px; text-align: left; white-space: nowrap; vertical-align: middle; box-sizing: border-box; }
-.bk-table th:first-child, .bk-table td:first-child { padding-left: 24px; }
-.bk-table th:last-child, .bk-table td:last-child { padding-right: 24px; }
+.bk-table th:first-child, .bk-table td:first-child { padding-left: var(--card-pad, 20px); }
+.bk-table th:last-child, .bk-table td:last-child { padding-right: var(--card-pad, 20px); }
 .bk-table td {
   padding: 7px 16px;
   font-family: var(--font-sans);
@@ -277,7 +278,7 @@
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card, 12px);
-  padding: 24px;
+  padding: var(--card-pad, 20px);
   min-width: 0;
 }
 .bk-card__head {
@@ -347,8 +348,8 @@
 .bk-icon-btn:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
 .bk-icon-btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 
-@media (max-width: 600px) {
-  .bk-card { padding: 16px; }
+@media (max-width: 767px) {
+  .bk-card { padding: var(--card-pad, 16px); }
 }
 
 .bk-btn--danger-outline { background: transparent; border-color: var(--status-danger-text); color: var(--status-danger-text); }
@@ -480,3 +481,43 @@
 .bk-route__label { font-size: 13px; line-height: 20px; font-weight: 500; color: var(--text-secondary); }
 .bk-route__place { font-size: 14px; line-height: 20px; color: var(--text-primary); overflow-wrap: anywhere; }
 .bk-route__meta { font-size: 13px; line-height: 20px; color: var(--text-secondary); }
+
+/* ---- Round 3: customer detail ---- */
+.bk-kv__label { display: inline-flex; align-items: center; gap: 4px; }
+.cd-status { display: inline-flex; align-items: baseline; gap: 12px; }
+.cd-status .bk-link { font-size: 13px; color: var(--text-secondary); }
+.cd-status .bk-link:hover:not(:disabled) { color: var(--text-primary); }
+.cd-more { display: flex; justify-content: center; padding: 8px var(--card-pad, 20px) 12px; border-top: 1px solid var(--border-row); }
+
+/* ---- Round 3: orders and history ---- */
+/* Routes are city to city now; give them the room the customer column does not need. */
+@container (min-width: 1041px) { .bk-table .bk-col-route { max-width: 36ch; } }
+.bk-table .bk-col-assign .tw-status { max-width: 100%; }
+/* A quiet row action: no outline stack down the right edge. */
+.bk-table .bk-row-action { color: var(--accent-primary); font-weight: 500; }
+.bk-table .bk-row-action:hover:not(:disabled) { color: var(--accent-primary); background: var(--bg-surface-hover); }
+
+/* ---- Round 3: booking detail ---- */
+.bk-progress { margin-bottom: var(--section-gap, 24px); padding: 16px var(--card-pad, 20px); display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.bk-progress__note { text-align: right; max-width: 260px; }
+.bk-steps { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); list-style: none; margin: 0; padding: 0; }
+.bk-step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; text-align: center; }
+/* Connector from the previous dot's centre to this dot's centre, at dot height. */
+.bk-step + .bk-step::before { content: ''; position: absolute; top: 5px; right: 50%; width: 100%; height: 2px; background: var(--border-subtle); }
+.bk-step.is-done + .bk-step.is-done::before { background: var(--accent-primary); }
+.bk-step__dot { position: relative; z-index: 1; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; background: var(--bg-surface); border: 2px solid var(--border-active); }
+.bk-step.is-done .bk-step__dot { background: var(--accent-primary); border-color: var(--accent-primary); }
+.bk-step.is-current .bk-step__dot { box-shadow: 0 0 0 3px var(--bg-surface), 0 0 0 4px var(--accent-primary); }
+.bk-step__label { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.bk-step.is-current .bk-step__label { color: var(--text-primary); font-weight: 600; }
+@media (max-width: 520px) {
+  .bk-progress { padding: 12px 8px; }
+  .bk-step__label { font-size: 11px; line-height: 16px; white-space: normal; }
+}
+/* Assignment card also carries the order's documents (no one-button Actions card). */
+.bk-assign__flag { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border-row); }
+.bk-assign__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.bk-kv__value.bk-muted { color: var(--text-tertiary); }
+/* Long record IDs (LOAD-20260616-9737) stay on one line; the chip wraps instead. */
+.bk-detail .section-header__title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+@container (max-width: 520px) { .bk-table .bk-col-action { display: none; } }

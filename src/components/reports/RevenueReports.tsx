@@ -41,7 +41,7 @@ export function RevenueByCustomer({ d, companyName }: { d: Ledger; companyName?:
   const vat = rows.reduce((s, r) => s + r.vat, 0);
   const noun = basis === 'invoice' ? 'Invoices' : 'Payments';
   const table: Statement = {
-    columns: [{ label: 'Customer' }, { label: noun, type: 'int' }, { label: 'Excl. VAT', type: 'money' }, { label: 'VAT', type: 'money' }, { label: basis === 'invoice' ? 'Incl. VAT' : 'Received', type: 'money' }, { label: 'Share', type: 'pct' }],
+    columns: [{ label: 'Customer' }, { label: noun, type: 'int', phone: false }, { label: 'Excl. VAT', type: 'money', phone: false }, { label: 'VAT', type: 'money', phone: false }, { label: basis === 'invoice' ? 'Incl. VAT' : 'Received', type: 'money' }, { label: 'Share', type: 'pct' }],
     rows: [
       ...rows.map<SRow>(r => ({ key: r.key, cells: [r.name, r.count, r.excl, r.vat, r.excl + r.vat, excl > 0 ? (r.excl / excl) * 100 : null], href: r.id != null ? `/finance/reports?report=statement&customer=${r.id}` : undefined })),
       { key: 'tot', kind: 'grand', cells: ['Total', sourceCount, excl, vat, excl + vat, excl > 0 ? 100 : null] },
@@ -74,7 +74,7 @@ export function RevenueByCustomer({ d, companyName }: { d: Ledger; companyName?:
       csvName={`revenue-by-customer-${period.from}-to-${period.to}-${basis}`}
     >
       {rows.length === 0 ? <Empty line={`No ${basis === 'invoice' ? 'invoices issued' : 'payments received'} in ${periodText(period)}.`} /> : (
-        <StatementTable table={table} caption="Revenue by customer"
+        <StatementTable fit cue={null} table={table} caption="Revenue by customer"
           footer={Math.abs(excl + vat - sourceTotal) < 0.01
             ? <Check>Total equals the {plural(sourceCount, noun.toLowerCase().slice(0, -1))} {basis === 'invoice' ? 'issued' : 'received'} in the period.</Check>
             : <Check ok={false}>Total {money(excl + vat)} differs from the {plural(sourceCount, noun.toLowerCase().slice(0, -1))} {basis === 'invoice' ? 'issued' : 'received'} in the period ({money(sourceTotal)}).</Check>} />
@@ -161,7 +161,7 @@ export function SalesByMonth({ d, companyName }: { d: Ledger; companyName?: stri
   const paid = issued.reduce((s, i) => s + num(i.paid_amount), 0);
   const draftIncl = drafts.reduce((s, i) => s + num(i.total_amount), 0);
   const table: Statement = {
-    columns: [{ label: 'Month' }, { label: 'Invoices', type: 'int' }, { label: 'Excl. VAT', type: 'money' }, { label: 'VAT', type: 'money' }, { label: 'Incl. VAT', type: 'money' }, { label: 'Paid to date', type: 'money' }, { label: 'Still owed', type: 'money' }],
+    columns: [{ label: 'Month' }, { label: 'Invoices', type: 'int', phone: false }, { label: 'Excl. VAT', type: 'money', phone: false }, { label: 'VAT', type: 'money', phone: false }, { label: 'Incl. VAT', type: 'money' }, { label: 'Paid to date', type: 'money' }, { label: 'Still owed', type: 'money' }],
     rows: [
       ...months.map(m => rowFor(monthLabel(m), issued.filter(i => ymOf(i.issue_date) === m), undefined, m)),
       rowFor('Total', issued, 'grand', 'tot'),
@@ -189,7 +189,7 @@ export function SalesByMonth({ d, companyName }: { d: Ledger; companyName?: stri
       csvName={`sales-by-month-${period.from}-to-${period.to}`}
     >
       {issued.length === 0 ? <Empty line={`No invoices issued in ${periodText(period)}.`} action={{ label: 'See invoices', to: '/finance/invoices' }} /> : (
-        <StatementTable table={table} caption="Sales by month"
+        <StatementTable fit cue={null} table={table} caption="Sales by month"
           footer={<Check>Total equals the {plural(issued.length, 'issued invoice')} dated in the period.</Check>} />
       )}
     </ReportFrame>

@@ -162,7 +162,7 @@ select.fin-control { cursor: pointer; padding-right: 8px; }
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 20px 24px 12px;
+  padding: var(--card-pad, 20px) var(--card-pad, 20px) 12px;
 }
 .fin-table-scroll { min-width: 0; position: relative; }
 @media (max-width: 900px) { .fin-table-scroll { overflow-x: auto; } }
@@ -199,9 +199,9 @@ table.fin-table td {
   font-weight: 400;
 }
 table.fin-table th:first-child,
-table.fin-table td:first-child { padding-left: 24px; }
+table.fin-table td:first-child { padding-left: var(--card-pad, 20px); }
 table.fin-table th:last-child,
-table.fin-table td:last-child { padding-right: 24px; }
+table.fin-table td:last-child { padding-right: var(--card-pad, 20px); }
 table.fin-table tbody tr:last-child td { border-bottom: none; }
 table.fin-table tbody tr.is-clickable { cursor: pointer; }
 table.fin-table tbody tr:hover td { background: var(--bg-surface-hover); }
@@ -239,7 +239,7 @@ table.fin-table td.actions { text-align: right; width: 1%; white-space: nowrap; 
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 12px 24px;
+  padding: 12px var(--card-pad, 20px);
   border-top: 1px solid var(--border-subtle);
   font-size: 13px;
   line-height: 20px;
@@ -477,10 +477,11 @@ a.expense-menu-item { text-decoration: none; box-sizing: border-box; }
 @media (max-width: 767px) { .fin-page .btn-action { min-height: 48px; } }
 
 /* ==== Design principles v2 (docs/brand/DESIGN-PRINCIPLES.md) ==== */
-/* Cards: 1px border, no shadow, 12px radius, 24px padding. Hover never swaps
-   the border or adds a shadow; interactive rows tint instead. */
+/* Cards: 1px border, no shadow, 12px radius, the one card padding
+   (--card-pad: 20 desktop, 16 phone). Hover never swaps the border or adds a
+   shadow; interactive rows tint instead. */
 .fin-page .card {
-  padding: 24px;
+  padding: var(--card-pad, 20px);
   border-radius: var(--radius-card, 12px);
   box-shadow: none;
 }
@@ -529,7 +530,7 @@ table.fin-table tfoot tr.fin-total-row td { color: var(--text-primary); font-wei
   margin: 4px 0 0;
   max-width: 72ch;
 }
-.fin-table-card > .fin-panel-head { padding: 24px 24px 0; }
+.fin-table-card > .fin-panel-head { padding: var(--card-pad, 20px) var(--card-pad, 20px) 0; }
 @media (max-width: 767px) { .fin-table-card > .fin-panel-head { padding: 16px 16px 0; } }
 .fin-stack { display: flex; flex-direction: column; gap: 24px; }
 .fin-stack--16 { gap: 16px; }
@@ -851,7 +852,7 @@ table.fin-table td.fin-nowrap { white-space: nowrap; }
   /* The row sizes to its count (shared .tw-kpi-row): two or three tiles
      fill the row instead of leaving it half empty. */
   .fin-toolbar { gap: 8px 12px; }
-  .fin-page .fin-toolbar .fin-control { min-height: 32px; height: 32px; font-size: 13px; }
+  .fin-page .fin-toolbar .fin-control { min-height: var(--control-h, 36px); height: var(--control-h, 36px); font-size: 13px; }
   .fin-page .fin-toolbar .fin-control--search { width: 240px; }
 }
 .fin-toolbar .fin-seg { flex: none; }
@@ -870,7 +871,7 @@ table.fin-table td.fin-nowrap { white-space: nowrap; }
 .fin-create-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 24px;
+  gap: var(--card-gap, 16px);
   align-items: start;
 }
 .fin-rail {
@@ -890,29 +891,33 @@ table.fin-table td.fin-nowrap { white-space: nowrap; }
 .fin-page .card.fin-doc { padding: 0; overflow: hidden; }
 .fin-doc__facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px 24px;
   margin: 0;
-  padding: 20px 24px;
+  padding: var(--card-pad, 20px);
   border-bottom: 1px solid var(--border-row);
 }
+@media (max-width: 767px) { .fin-doc__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Charges without lines: the amounts as a second row of facts. */
+.fin-doc__facts--money { border-bottom: 0; }
+.fin-doc__facts--money > .is-total dd { font: 600 16px/20px var(--font-sans); }
 .fin-doc__facts > div { min-width: 0; }
 .fin-doc__facts dt { margin: 0 0 2px; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); }
 .fin-doc__facts dd { margin: 0; font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fin-doc__late { display: block; font: 500 12px/16px var(--font-sans); }
-.fin-doc__head { padding: 20px 24px 8px; }
-.fin-doc__lines--padded { padding: 0 24px 8px; }
+.fin-doc__head { padding: var(--card-pad, 20px) var(--card-pad, 20px) 8px; }
+.fin-doc__lines--padded { padding: 0 var(--card-pad, 20px) 8px; }
 .fin-doc__lines--padded .fin-doc__head { padding-left: 0; padding-right: 0; }
 table.fin-table tfoot tr.fin-doc__rule td { border-top: 1px solid var(--border-subtle); }
 table.fin-table tfoot tr.fin-doc__grand td { font-size: 16px; line-height: 24px; font-weight: 600; color: var(--text-primary); }
-.fin-doc__note { padding: 0 24px 20px; }
+.fin-doc__note { padding: 0 var(--card-pad, 20px) var(--card-pad, 20px); }
 .fin-dl__row.is-total:last-child dd { font-size: 16px; }
 
 /* Payments in the rail: date + method over the amount, compact. */
 .fin-paylist { list-style: none; margin: 0; padding: 0 0 4px; }
 .fin-paylist__row {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  min-height: 44px; padding: 8px 24px; border-top: 1px solid var(--border-row);
+  min-height: 44px; padding: 8px var(--card-pad, 20px); border-top: 1px solid var(--border-row);
   font-size: 14px; line-height: 20px; color: var(--text-primary);
 }
 .fin-paylist__main { display: flex; flex-direction: column; min-width: 0; }
@@ -952,41 +957,66 @@ table.fin-table tfoot tr.fin-doc__grand td { font-size: 16px; line-height: 24px;
 .fin-skel--card { height: 320px; margin-top: var(--section-gap, 24px); }
 @media (prefers-reduced-motion: reduce) { .fin-skel { animation: none; } }
 
-/* ==== Expenses overview (round 2): tiles, where the money goes and when,
-   in one row above the register; no half-empty tile row. ==== */
+/* ==== Expenses overview (round 3): a summary card (three figures,
+   stacked) beside where the money goes and when. One row, equal heights,
+   fixed so the loading placeholders take exactly the same space. ==== */
 .exp-overview {
   display: grid; gap: var(--card-gap, 16px); margin-bottom: var(--section-gap, 24px);
-  grid-template-columns: minmax(220px, 1fr) minmax(0, 1.5fr) minmax(0, 1.3fr);
-  align-items: stretch;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.4fr) minmax(0, 1.4fr);
+  grid-auto-rows: 292px;
 }
-.exp-overview > .fin-kpi-row.exp-tiles { margin: 0; max-width: none; grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(var(--kpi-height, 96px), 1fr); gap: var(--card-gap, 16px); }
-.exp-overview > .exp-tiles .tw-kpi { height: auto; min-height: var(--kpi-height, 96px); }
-.exp-overview > .card { margin: 0; min-width: 0; display: flex; flex-direction: column; }
-.exp-overview > .card.fin-skel-tile { min-height: 208px; }
-.exp-overview .fin-panel-head { margin-bottom: 12px; }
-.exp-overview .fin-rank { gap: 6px; }
-.exp-overview .fin-months { flex: 1; min-height: 132px; }
+.exp-overview > * { margin: 0; min-width: 0; box-sizing: border-box; height: 100%; overflow: hidden; }
+.exp-overview > .card { display: flex; flex-direction: column; }
+.exp-overview .fin-panel-head { margin-bottom: 8px; }
+.exp-overview .fin-rank { gap: 4px; }
+.exp-overview .exp-cat .fin-rank__row { min-height: 28px; padding-top: 4px; padding-bottom: 4px; }
+.exp-overview .fin-months { flex: 1; height: auto; min-height: 0; }
+/* Summary: the shared stats line, stacked in one column. */
+.exp-overview .exp-summary .tw-kpi-stats__list { flex-direction: column; flex-wrap: nowrap; height: 100%; row-gap: 0; }
+.exp-overview .exp-summary .tw-kpi-stats__item { flex: 1 1 0; justify-content: center; padding: 0; border-left: 0; border-top: 1px solid var(--border-subtle); min-width: 0; }
+.exp-overview .exp-summary .tw-kpi-stats__item:first-child { border-top: 0; justify-content: flex-start; }
+.exp-overview .exp-summary .tw-kpi-stats__item:last-child { justify-content: flex-end; }
+.exp-summary .tw-kpi-stats__label .tw-info { margin-left: auto; }
+.exp-summary .tw-kpi-stats__label { width: 100%; }
+.exp-stat-link {
+  padding: 0; border: 0; background: none; font: inherit; color: var(--text-link, var(--accent-primary)); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+}
+.exp-stat-link:hover { text-decoration-color: currentColor; }
+.exp-stat-link:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
+/* Month labels: "Apr" with the year under the first month and each January. */
+.fin-months__lab { display: flex; flex-direction: column; align-items: center; }
+.fin-months__year { font-size: 11px; line-height: 14px; color: var(--text-tertiary); }
+.exp-table-skel { height: 560px; margin-top: 0; }
 @media (max-width: 1279px) {
-  .exp-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .exp-overview > .fin-kpi-row.exp-tiles { grid-column: 1 / -1; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); grid-auto-rows: auto; }
-  .exp-overview > .exp-tiles .tw-kpi { height: var(--kpi-height, 96px); }
+  .exp-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; }
+  .exp-overview > .exp-summary { grid-column: 1 / -1; height: 106px; }
+  .exp-overview > .exp-cat, .exp-overview > .exp-month { height: 292px; }
+  .exp-overview .exp-summary .tw-kpi-stats__list { flex-direction: row; }
+  .exp-overview .exp-summary .tw-kpi-stats__item { justify-content: flex-start !important; padding: 0 var(--card-pad); border-top: 0; border-left: 1px solid var(--border-subtle); }
+  .exp-overview .exp-summary .tw-kpi-stats__item:first-child { padding-left: 0; border-left: 0; }
 }
-/* Phone: tiles, filters and the register first; the analytics follow. */
+/* Phone: summary, filters and the register first; the analytics follow. */
 @media (max-width: 767px) {
   .exp-page { display: flex; flex-direction: column; }
   .exp-page > * { min-width: 0; }
   .exp-overview { display: contents; }
-  .exp-overview > .fin-kpi-row.exp-tiles { margin-bottom: var(--section-gap, 24px); grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .exp-overview > .fin-kpi-row.exp-tiles:has(> :only-child) { grid-template-columns: minmax(0, 1fr); }
-  .exp-overview > .card.exp-cat { order: 20; margin-bottom: var(--card-gap, 16px); }
-  .exp-overview > .card.exp-month { order: 21; }
-  .exp-page > .fin-table-card { order: 10; }
-  .exp-page > .fin-toolbar { order: 9; }
+  .exp-overview > .exp-summary { order: 1; height: auto; margin-bottom: var(--card-gap, 16px); }
+  .exp-overview > .exp-summary.fin-skel-tile { height: 190px; }
+  .exp-overview .exp-summary .tw-kpi-stats__list { flex-wrap: wrap; row-gap: 16px; }
+  .exp-overview .exp-summary .tw-kpi-stats__item { flex: 1 1 calc(50% - 1px); padding: 0 0 0 var(--card-pad); }
+  .exp-overview .exp-summary .tw-kpi-stats__item:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .exp-overview .exp-summary .tw-kpi-stats__item:nth-child(3) { flex-basis: 100%; border-top: 1px solid var(--border-subtle); padding-top: 16px; }
+  .exp-overview > .card.exp-cat { order: 20; height: auto; margin-bottom: var(--card-gap, 16px); }
+  .exp-overview > .card.exp-month { order: 21; height: 292px; }
+  .exp-page > .exp-toolbar { order: 2; }
+  .exp-page > .fin-table-card, .exp-page > .exp-table-skel { order: 3; margin-bottom: var(--section-gap, 24px); }
 }
+@media (min-width: 768px) { .exp-toolbar .exp-search { flex: 0 1 240px; } }
 
 /* Toolbar filters on the shared select: 32px beside the search and seg. */
 .exp-filters { display: flex; gap: 8px; flex-wrap: nowrap; min-width: 0; }
-.fin-page .fin-toolbar .fin-filter.tw-select-trigger { width: auto; min-height: 32px; height: 32px; padding: 0 10px 0 12px; font-size: 13px; max-width: 220px; }
+.fin-page .fin-toolbar .fin-filter.tw-select-trigger { width: auto; min-height: var(--control-h, 36px); height: var(--control-h, 36px); padding: 0 10px 0 12px; font-size: 13px; max-width: 220px; }
 .fin-filter > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
 .fin-filter__short { display: none; }
 @media (max-width: 767px) {
@@ -1000,8 +1030,30 @@ table.fin-table tfoot tr.fin-doc__grand td { font-size: 16px; line-height: 24px;
 .exp-overview .exp-cat .fin-rank__label small { display: none; }
 .exp-overview .exp-cat .fin-rank__row { min-height: 28px; padding-top: 4px; padding-bottom: 4px; }
 .exp-overview .fin-panel-head { margin-bottom: 8px; }
-.expenses-type-roles .expenses-filter-bar .fin-filter.tw-select-trigger { min-height: 32px; }
+.expenses-type-roles .expenses-filter-bar .fin-filter.tw-select-trigger { min-height: var(--control-h, 36px); }
 @media (max-width: 767px), (pointer: coarse) {
   .expenses-type-roles .expenses-filter-bar .fin-filter.tw-select-trigger { min-height: 44px; }
 }
 .section-header__description .fin-id { color: inherit; font-size: inherit; }
+.fin-page .tw-toolbar .tw-search-wrap > .tw-search { width: 100%; }
+@media (min-width: 768px) { .fin-page .tw-toolbar .inv-search { flex: 0 1 320px; } }
+/* A page rule gives inputs position: relative; keep the magnifier on top. */
+.fin-page .tw-search-wrap > svg { z-index: 1; }
+/* Phone: the status filter fits the width without a clipped last option. */
+@media (max-width: 767px) {
+  .fin-page .tw-toolbar .fin-seg { width: 100%; }
+  .fin-page .tw-toolbar .fin-seg .tw-seg__opt { flex: 1 1 auto; padding-left: 6px; padding-right: 6px; }
+}
+/* Meta count sits at the right end of the toolbar, as on other lists. */
+.fin-page .tw-toolbar.fin-toolbar > .tw-toolbar__meta { margin-left: auto; }
+@media (max-width: 767px) { .fin-page .tw-toolbar.fin-toolbar > .tw-toolbar__meta { margin-left: 0; } }
+/* Risk pages: sibling cards 16 apart (the stack's gap), no extra margins. */
+.risk-stack > .fin-section, .risk-stack > .fin-kpi-row, .risk-stack > .fin-grid-2 { margin: 0; }
+@media (min-width: 1101px) { .risk-desc-2 { min-height: 40px; } }
+@media (max-width: 640px) { .risk-desc-2 { min-height: 80px; } }
+/* Form fields are --field-h (40; 44 on touch and phones), buttons in a form
+   rail match them. The shared date picker input included. */
+.fin-page .fin-form input.fin-control { min-height: var(--field-h, 40px); height: var(--field-h, 40px); box-sizing: border-box; }
+.fin-page .fin-form .fin-date-field .tw-date-field { height: var(--field-h, 40px); box-sizing: border-box; }
+.fin-page .fin-form .fin-date-field .tw-date-field > input { height: 100%; min-height: 0; }
+.fin-page .fin-rail .fin-rail-btn { height: var(--field-h, 40px); font-size: 14px; }

@@ -2,18 +2,17 @@ import './insights-page-brand.css';
 import { localDateISO } from '@/lib/dates';
 import { useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { fetchData } from '@/lib/Api';
-import { DatePicker } from '@/components/ui/date-picker';
 import { Segmented } from '@/components/ui/Segmented';
 import InsightCard from '@/components/insights/InsightCard';
 import KpiTile from '@/components/insights/KpiTile';
 import RankedList from '@/components/insights/RankedList';
-import FindingsFeed, { RETRY, useAllRows } from '@/components/insights/FindingsFeed';
-import type { ExpenseRec, InvoiceRec, LoadRec } from '@/components/insights/findings';
+import FindingsFeed, { useAllRows } from '@/components/insights/FindingsFeed';
+import type { InvoiceRec, LoadRec } from '@/components/insights/findings';
+import { resolvePeriod, periodText, useLedger, type PeriodId } from '@/components/reports/data';
+import { marginFromLedger, chartMonths, type MarginMonth } from '@/components/insights/margin-ledger';
 import { Waterfall, PaymentDotPlot, LaneScatter, Funnel, rand } from '@/components/viz';
 import { paymentRows, lanePoints } from '@/components/insights/insight-series';
-import { formatDate, formatPercent } from '@/lib/formatters';
+import { formatPercent } from '@/lib/formatters';
 
 /* Insights. The first tab is the findings feed: what to change and what it is
    worth. The other tabs keep the charts that answer one question each, with a
@@ -27,24 +26,11 @@ const MIN_TRIPS = 3;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthName = (ym: string) => MONTHS[Number(ym.slice(5, 7)) - 1] || ym;
 const monthYear = (ym: string) => `${monthName(ym)} ${ym.slice(0, 4)}`;
-const formatDay = (iso?: string) => (iso ? formatDate(iso.slice(0, 10)) : '');
 /** "Apr to Jun 2026" or "Oct 2025 to Jun 2026". */
 const monthSpan = (a: string, b: string) => (a === b ? monthYear(a) : a.slice(0, 4) === b.slice(0, 4) ? `${monthName(a)} to ${monthYear(b)}` : `${monthYear(a)} to ${monthYear(b)}`);
 
-/* Calendar day and month of an instant in South African time, the backend's
-   time zone, so client-side month buckets match the API's period filters. */
-const SAST_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit' });
-const sastDay = (iso: string) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : SAST_DAY.format(d); };
-const monthsBetween = (fromYm: string, toYm: string) => {
-  const out: string[] = [];
-  let y = Number(fromYm.slice(0, 4)); let m = Number(fromYm.slice(5, 7));
-  const ty = Number(toYm.slice(0, 4)); const tm = Number(toYm.slice(5, 7));
-  while ((y < ty || (y === ty && m <= tm)) && out.length < 120) { out.push(`${y}-${String(m).padStart(2, '0')}`); m += 1; if (m > 12) { m = 1; y += 1; } }
-  return out;
-};
-
 type TabType = 'findings' | 'margin' | 'paid' | 'fleet' | 'lanes';
-type PeriodType = 'THIS_MONTH' | 'LAST_MONTH' | 'LAST_3M' | 'LAST_6M' | 'LAST_12M' | 'CUSTOM';
+type PeriodType = PeriodId;
 
 const TABS: { id: TabType; label: string }[] = [
   { id: 'findings', label: 'Findings' },
@@ -54,13 +40,14 @@ const TABS: { id: TabType; label: string }[] = [
   { id: 'lanes', label: 'Lanes' },
 ];
 
+// The Profit and loss report's periods: whole calendar months, the current one included.
 const PERIOD_OPTIONS: { value: PeriodType; label: string; ariaLabel?: string }[] = [
-  { value: 'THIS_MONTH', label: 'This month' },
-  { value: 'LAST_MONTH', label: 'Last month' },
-  { value: 'LAST_3M', label: '3M', ariaLabel: 'Last 3 months' },
-  { value: 'LAST_6M', label: '6M', ariaLabel: 'Last 6 months' },
-  { value: 'LAST_12M', label: '12M', ariaLabel: 'Last 12 months' },
-  { value: 'CUSTOM', label: 'Custom' },
+  { value: 'this-month', label: 'This month' },
+  { value: 'last-month', label: 'Last month' },
+  { value: 'last-3', label: '3M', ariaLabel: 'Last 3 months' },
+  { value: 'last-6', label: '6M', ariaLabel: 'Last 6 months' },
+  { value: 'last-12', label: '12M', ariaLabel: 'Last 12 months' },
+  { value: 'custom', label: 'Custom' },
 ];
 
 interface PeriodState {
@@ -69,30 +56,7 @@ interface PeriodState {
   customTo: string; setCustomTo: (v: string) => void;
 }
 
-interface MonthlyTrend { month: string; revenue: number; expenses: number; margin: number }
-interface FinanceData {
-  revenue_period: number; expenses_period: number; net_margin_period: number; net_margin_percent_period: number;
-  from_date?: string; to_date?: string; monthly_trend?: MonthlyTrend[];
-}
 interface Vehicle { id: number; plate: string; make: string; model: string; status: string; revenue_generated: number | string }
-
-function periodRange(period: PeriodType, customFrom: string, customTo: string): { from: string; to: string } {
-  if (period === 'CUSTOM' && customFrom && customTo) return { from: customFrom, to: customTo };
-  const now = new Date();
-  let from = '';
-  let to = localDateISO();
-  switch (period) {
-    case 'THIS_MONTH': from = localDateISO(new Date(now.getFullYear(), now.getMonth(), 1)); break;
-    case 'LAST_MONTH':
-      from = localDateISO(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-      to = localDateISO(new Date(now.getFullYear(), now.getMonth(), 0));
-      break;
-    case 'LAST_3M': from = localDateISO(new Date(now.getFullYear(), now.getMonth() - 3, now.getDate())); break;
-    case 'LAST_6M': from = localDateISO(new Date(now.getFullYear(), now.getMonth() - 6, now.getDate())); break;
-    default: from = localDateISO(new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())); break;
-  }
-  return { from, to };
-}
 
 function Stack({ children }: { children: ReactNode }) {
   return <div className="insights-stack">{children}</div>;
@@ -119,8 +83,8 @@ export default function Insights() {
   const tabParam = (rawTab === 'cash' ? 'paid' : rawTab) as TabType | null;
   const tab: TabType = TABS.some(t => t.id === tabParam) ? tabParam! : 'findings';
   const setTab = (t: TabType) => setParams(p => { const n = new URLSearchParams(p); if (t === 'findings') n.delete('tab'); else n.set('tab', t); return n; }, { replace: true });
-  // The Margin period lives in the page head: one segmented control per page, never in a card.
-  const [period, setPeriod] = useState<PeriodType>('LAST_12M');
+  // The Margin period (the P&L's periods) sits in the tab's toolbar, never in the head or a card.
+  const [period, setPeriod] = useState<PeriodType>('last-12');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const periodState: PeriodState = { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo };
@@ -132,20 +96,6 @@ export default function Insights() {
           <h1 className="tw-title">Insights</h1>
           <p className="tw-subtitle">Findings worth money, each with one next step.</p>
         </div>
-        {tab === 'margin' && (
-          <div className="tw-page-head__actions insights-head-actions">
-            <div className="insights-seg-scroll">
-              <Segmented label="Period" value={period} onChange={setPeriod} options={PERIOD_OPTIONS} />
-            </div>
-            {period === 'CUSTOM' && (
-              <div className="insights-custom">
-                <DatePicker value={customFrom} onChange={setCustomFrom} placeholder="From" style={{ width: 150, maxWidth: '100%', padding: 0, fontSize: 14, lineHeight: '20px' }} />
-                <span className="insights-custom__to">to</span>
-                <DatePicker value={customTo} onChange={setCustomTo} placeholder="To" style={{ width: 150, maxWidth: '100%', padding: 0, fontSize: 14, lineHeight: '20px' }} />
-              </div>
-            )}
-          </div>
-        )}
       </header>
 
       <nav className="insights-tabs" aria-label="Insights sections">
@@ -167,141 +117,91 @@ export default function Insights() {
 
 // ------------------------------------------------------------------ margin
 
-interface MonthRow { ym: string; month: string; revenue: number; expenses: number; margin: number }
-
 /**
- * Net margin per calendar month for the selected period, trimmed to the months
- * that have activity (no leading or trailing empty months).
- *
- * The finance API's monthly_trend is fixed to the last 6 calendar months, so
- * the months are bucketed here from the same rows the other tabs read (paid
- * invoices by payment date, approved expenses by expense date: the API's own
- * definitions). They are only used when they add up to the API's period totals
- * to the cent; otherwise the chart falls back to the API's 6 months, clipped
- * to the period, and says so.
+ * Profit for the period and net margin month by month, on the Profit and loss
+ * report's default basis (excl. VAT, cash basis) from the same full ledgers
+ * (components/reports/data.ts), so the two pages print the same figures for
+ * the same months. See components/insights/margin-ledger.ts.
  */
-function monthlyForPeriod(
-  f: FinanceData, from: string, to: string,
-  inv: { rows: InvoiceRec[]; complete: boolean } | undefined,
-  exp: { rows: ExpenseRec[]; complete: boolean } | undefined,
-): { months: MonthRow[]; source: 'rows' | 'api'; note?: string } {
-  const pFrom = (f.from_date ?? from).slice(0, 10);
-  const pTo = (f.to_date ?? to).slice(0, 10);
-  const span = monthsBetween(pFrom.slice(0, 7), pTo.slice(0, 7));
-  let rows: MonthRow[] | null = null;
-  if (inv?.complete && exp?.complete) {
-    const rev = new Map<string, number>();
-    const cost = new Map<string, number>();
-    inv.rows.forEach(i => {
-      if ((i.status || '').toUpperCase() !== 'PAID' || !i.paid_at) return;
-      const d = sastDay(i.paid_at);
-      if (!d || d < pFrom || d > pTo) return;
-      rev.set(d.slice(0, 7), (rev.get(d.slice(0, 7)) ?? 0) + num(i.total_amount));
-    });
-    exp.rows.forEach(e => {
-      if ((e.status || '').toUpperCase() !== 'APPROVED' || !e.expense_date) return;
-      const d = e.expense_date.slice(0, 10);
-      if (d < pFrom || d > pTo) return;
-      cost.set(d.slice(0, 7), (cost.get(d.slice(0, 7)) ?? 0) + num(e.amount));
-    });
-    const built = span.map(ym => { const r = rev.get(ym) ?? 0; const c = cost.get(ym) ?? 0; return { ym, month: monthName(ym), revenue: r, expenses: c, margin: r - c }; });
-    const sumRev = built.reduce((s, m) => s + m.revenue, 0);
-    const sumCost = built.reduce((s, m) => s + m.expenses, 0);
-    if (Math.abs(sumRev - num(f.revenue_period)) < 0.01 && Math.abs(sumCost - num(f.expenses_period)) < 0.01) rows = built;
-  }
-  const source: 'rows' | 'api' = rows ? 'rows' : 'api';
-  let shortNote: string | undefined;
-  if (!rows) {
-    // Only calendar months wholly inside the period (the last one may run to today).
-    const firstFull = pFrom.endsWith('-01') ? pFrom.slice(0, 7) : monthsBetween(pFrom.slice(0, 7), '9999-12')[1];
-    const api = [...(f.monthly_trend ?? [])].sort((a, b) => a.month.localeCompare(b.month));
-    if (api.length > 0 && api[0].month > firstFull) {
-      shortNote = `Only ${monthSpan(api[0].month, api[api.length - 1].month)} is available here, so the bars do not add up to the period total.`;
-    }
-    rows = api
-      .filter(m => m.month >= firstFull && m.month <= pTo.slice(0, 7))
-      .map(m => ({ ym: m.month, month: monthName(m.month), revenue: num(m.revenue), expenses: num(m.expenses), margin: num(m.margin) }));
-  }
-  const active = (m: MonthRow) => m.revenue !== 0 || m.expenses !== 0;
-  const firstI = rows.findIndex(active);
-  if (firstI < 0) return { months: [], source };
-  let lastI = rows.length - 1;
-  while (lastI > firstI && !active(rows[lastI])) lastI -= 1;
-  const months = rows.slice(firstI, lastI + 1);
-  // Month labels carry the year when the chart crosses a year end.
-  if (months.length > 0 && months[0].ym.slice(0, 4) !== months[months.length - 1].ym.slice(0, 4)) {
-    months.forEach((m, k) => { if (k === 0 || m.ym.endsWith('-01')) m.month = monthYear(m.ym); });
-  }
-  const after = rows.length - 1 - lastI;
-  const note = [shortNote, after > 0 ? `Nothing paid or approved after ${monthYear(months[months.length - 1].ym)}.` : null].filter(Boolean).join(' ') || undefined;
-  return { months, source, note };
-}
-
-function MarginTab({ period, setPeriod, customFrom, customTo }: PeriodState) {
-  const { from, to } = periodRange(period, customFrom, customTo);
-  const finance = useQuery<FinanceData | null>({
-    queryKey: ['insights-finance', from, to],
-    queryFn: () => fetchData(`api/v1/dashboard/finance/?from=${from}&to=${to}`),
-    staleTime: 5 * 60_000,
-    ...RETRY,
-  });
-  const expenses = useAllRows<ExpenseRec>('expenses', 'api/v1/expenses/');
-  const invoices = useAllRows<InvoiceRec>('invoices', 'api/v1/invoices/');
-  const f = finance.data;
-
-  const pendingInPeriod = (expenses.data?.rows ?? [])
-    .filter(e => (e.status || '').toUpperCase() === 'PENDING' && e.expense_date >= (f?.from_date ?? from) && e.expense_date <= (f?.to_date ?? to))
-    .reduce((s, e) => s + num(e.amount), 0);
+function MarginTab({ period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo }: PeriodState) {
+  const p = resolvePeriod(period, customFrom, customTo);
+  const ledger = useLedger(['invoices', 'payments', 'expenses']);
+  const plHref = `/finance/reports?report=pl&period=${p.id}${p.id === 'custom' ? `&from=${p.from}&to=${p.to}` : ''}`;
+  const pickPeriod = (v: PeriodType) => {
+    if (v === 'custom' && !(customFrom && customTo)) { setCustomFrom(p.from); setCustomTo(p.to); }
+    setPeriod(v);
+  };
 
   return (
     <Stack>
-      {(finance.isLoading || finance.isError) ? (
-        <TabState loading={finance.isLoading} error={finance.isError} onRetry={() => finance.refetch()} />
-      ) : !f ? null : (() => {
-        const rev = num(f.revenue_period);
-        const cost = num(f.expenses_period);
-        const margin = num(f.net_margin_period);
-        const range = f.from_date && f.to_date ? `${formatDay(f.from_date)} to ${formatDay(f.to_date)}` : 'Selected period';
-        const withPending = margin - pendingInPeriod;
-        const pct = rev > 0 ? (margin / rev) * 100 : null;
-        const monthly = monthlyForPeriod(f, from, to, invoices.data, expenses.data);
-        const trend = monthly.months;
-        const totalNet = trend.reduce((s, d) => s + d.margin, 0);
+      {/* The period is the tab's first content block (R3 toolbar), not a head action, so the head keeps one shape on every tab. */}
+      <div className="tw-toolbar insights-period">
+        <Segmented label="Period" value={period} onChange={pickPeriod} options={PERIOD_OPTIONS} />
+        {period === 'custom' && (
+          <span className="insights-custom">
+            <input type="month" className="tw-input insights-month" aria-label="From month" value={p.from} max={p.to} onChange={e => e.target.value && setCustomFrom(e.target.value)} />
+            <span className="insights-custom__to">to</span>
+            <input type="month" className="tw-input insights-month" aria-label="To month" value={p.to} min={p.from} onChange={e => e.target.value && setCustomTo(e.target.value)} />
+          </span>
+        )}
+        <span className="tw-toolbar__meta">Excl. VAT, cash basis, as in the P&amp;L</span>
+      </div>
+      {(ledger.loading || ledger.error || !ledger.data) ? (
+        ledger.loading || !ledger.error
+          ? <><div className="insights-skel insights-skel--margin" aria-busy="true" aria-label="Loading" /><div className="insights-skel insights-skel--card" aria-hidden="true" /></>
+          : <TabState loading={false} error onRetry={ledger.retry} />
+      ) : (() => {
+        const r = marginFromLedger(ledger.data, p);
+        const { shown, before, after } = chartMonths(r.months);
+        const span = periodText(p);
+        const withPending = r.net - r.pending;
+        const partial = ledger.data.partial.length ? ` Based on the ${ledger.data.partial.join(', ')}.` : '';
+        const crossYear = shown.length > 0 && shown[0].ym.slice(0, 4) !== shown[shown.length - 1].ym.slice(0, 4);
+        const label = (ym: string, k: number) => (crossYear && (k === 0 || ym.endsWith('-01')) ? monthYear(ym) : monthName(ym));
+        const gap = (list: string[]) => (list.length === 1 ? monthYear(list[0]) : monthSpan(list[0], list[list.length - 1]));
+        const empties = [before.length ? gap(before) : '', after.length ? gap(after) : ''].filter(Boolean);
+        const trimNote = empties.length
+          ? `No entries in ${empties.join(' or ')}, so ${before.length + after.length === 1 ? 'that month is' : 'those months are'} not drawn; the total covers all of ${span}.`
+          : undefined;
+        const extremes = shown.filter(m => m.revenue !== 0 || m.costs !== 0);
+        const best = extremes.reduce<MarginMonth | null>((b, m) => (b == null || m.net > b.net ? m : b), null);
+        const worst = extremes.reduce<MarginMonth | null>((b, m) => (b == null || m.net < b.net ? m : b), null);
         return (
           <>
             <InsightCard
               title="Profit this period"
-              description={range}
-              info={`Revenue is paid invoices including VAT, by payment date. Costs are approved expenses, by expense date. Pending costs are expenses dated in the period and still waiting for approval; reports leave them out.`}
+              description={`${span} · excl. VAT, cash basis`}
+              info={`The Profit and loss report's default basis, from the same ledgers. Revenue: money received from customers by payment date, less the VAT share of each invoice. Costs: approved expenses by expense date. Pending costs are expenses dated in the period still waiting for approval; the P&L lists them below the result and does not deduct them.${partial}`}
+              action={<Link className="ic-text-button" to={plHref}>Open the P&amp;L</Link>}
             >
-              {rev === 0 && cost === 0 && pendingInPeriod === 0 ? (
+              {r.revenue === 0 && r.costs === 0 && r.pending === 0 ? (
                 <div className="insights-empty">
-                  <p>Nothing paid or approved in this period.</p>
-                  {period !== 'LAST_12M' && <button type="button" className="ic-text-button" onClick={() => setPeriod('LAST_12M')}>Show the last 12 months</button>}
+                  <p>Nothing received or approved in {span}.</p>
+                  {period !== 'last-12' && <button type="button" className="ic-text-button" onClick={() => setPeriod('last-12')}>Show the last 12 months</button>}
                 </div>
               ) : (
                 <>
                   <dl className="ic-kpis ic-kpis--4 insights-kpis">
-                    <KpiTile label="Revenue" value={rand(rev, 0)} />
-                    <KpiTile label="Approved costs" value={rand(cost, 0)} />
-                    <KpiTile label="Net margin" value={pct != null ? formatPercent(pct) : rand(margin, 0)} tone={margin < 0 ? 'danger' : undefined} note={pct != null ? rand(margin, 0) : undefined} />
-                    {pendingInPeriod > 0
-                      ? <KpiTile label="With pending costs" value={rand(withPending, 0)} tone={withPending < 0 ? 'danger' : undefined} note={`${rand(pendingInPeriod, 0)} not approved`} />
-                      : <KpiTile label="Pending costs" value="None" note="Every cost is approved" />}
+                    <KpiTile label="Revenue" value={rand(r.revenue, 0)} note={plural(r.paymentCount, 'payment')} />
+                    <KpiTile label="Approved costs" value={rand(r.costs, 0)} />
+                    <KpiTile label="Net margin" value={r.pct != null ? formatPercent(r.pct) : rand(r.net, 0)} tone={r.net < 0 ? 'danger' : undefined} note={r.pct != null ? rand(r.net, 0) : undefined} />
+                    {r.pending > 0
+                      ? <KpiTile label="With pending costs" value={rand(withPending, 0)} tone={withPending < 0 ? 'danger' : undefined} note={`${rand(r.pending, 0)} not approved (${r.pendingCount})`} />
+                      : <KpiTile label="Pending costs" value={rand(0, 0)} note="Every cost is approved" />}
                   </dl>
                   {/* The tiles above carry every figure; the bridge shows the shape, values live in the tooltip and table. */}
                   <Waterfall
                     height={220}
                     values="none"
                     valueHeader="Amount"
-                    caption="Revenue, costs and net margin for the period"
-                    ariaLabel={`Revenue ${rand(rev)}, minus approved costs ${rand(cost)}, leaves ${rand(margin)}.${pendingInPeriod > 0 ? ` Pending costs of ${rand(pendingInPeriod)} would leave ${rand(withPending)}.` : ''}`}
+                    caption={`Revenue, costs and net margin, ${span}, excl. VAT, cash basis`}
+                    ariaLabel={`Revenue ${rand(r.revenue)}, minus approved costs ${rand(r.costs)}, leaves ${rand(r.net)}.${r.pending > 0 ? ` Pending costs of ${rand(r.pending)} would leave ${rand(withPending)}.` : ''}`}
                     steps={[
-                      { label: 'Revenue', value: rev, kind: 'total' },
-                      { label: 'Approved costs', value: -cost, kind: 'delta', tone: 'cost' },
-                      { label: 'Net margin', value: margin, kind: 'total' },
-                      ...(pendingInPeriod > 0 ? [
-                        { label: 'Pending costs', value: -pendingInPeriod, kind: 'delta' as const, tone: 'cost' as const },
+                      { label: 'Revenue', value: r.revenue, kind: 'total' },
+                      { label: 'Approved costs', value: -r.costs, kind: 'delta', tone: 'cost' },
+                      { label: 'Net margin', value: r.net, kind: 'total' },
+                      ...(r.pending > 0 ? [
+                        { label: 'Pending costs', value: -r.pending, kind: 'delta' as const, tone: 'cost' as const },
                         { label: 'If approved', value: withPending, kind: 'total' as const },
                       ] : []),
                     ]}
@@ -310,29 +210,28 @@ function MarginTab({ period, setPeriod, customFrom, customTo }: PeriodState) {
               )}
             </InsightCard>
 
-            {(invoices.isLoading || expenses.isLoading) ? (
-              <div className="insights-skel insights-skel--card" aria-busy="true" aria-label="Loading net margin by month" />
-            ) : trend.length > 1 && (
+            {shown.length > 1 && (
               <InsightCard
                 title="Net margin by month"
-                description={`${monthSpan(trend[0].ym, trend[trend.length - 1].ym)}, adding up`}
-                info={`Each month's paid invoices (including VAT, by payment date) less approved expenses (by expense date), added to the months before. Calendar months within the selected period; a part month at either end counts only the days inside the period.${monthly.source === 'api' ? ' This chart can only show the last 6 calendar months.' : ''}`}
+                description={`${span}, adding up to ${rand(r.net, 0)}`}
+                info={`Each month's revenue (money received, excl. VAT) less approved expenses, added to the months before. The bars add up to the period's net margin above and to the Net profit line of the P&L.${partial}`}
               >
                 <Waterfall
                   height={260}
+                  values="all"
                   valueHeader="Net margin"
-                  caption="Net margin per month and the running total"
-                  note={monthly.note}
-                  ariaLabel={`Net margin by month from ${monthYear(trend[0].ym)} to ${monthYear(trend[trend.length - 1].ym)}, adding up to ${rand(totalNet)}.`}
+                  caption={`Net margin per month and the running total, ${span}, excl. VAT, cash basis`}
+                  note={trimNote}
+                  ariaLabel={`Net margin by month, ${span}, adding up to ${rand(r.net)}.${best && best.net > 0 ? ` Best month ${monthYear(best.ym)} ${rand(best.net)}.` : ''}${worst && worst.net < 0 ? ` Worst month ${monthYear(worst.ym)} ${rand(worst.net)}.` : ''}`}
                   steps={[
-                    ...trend.map(d => ({
-                      label: d.month,
-                      value: d.margin,
+                    ...shown.map((m, k) => ({
+                      label: label(m.ym, k),
+                      value: m.net,
                       kind: 'delta' as const,
-                      emptyText: d.revenue === 0 && d.expenses === 0 ? 'Nothing paid or approved' : undefined,
-                      detail: `Revenue ${rand(d.revenue)}, costs ${rand(d.expenses)}`,
+                      emptyText: m.revenue === 0 && m.costs === 0 ? 'Nothing received or approved' : undefined,
+                      detail: `Revenue ${rand(m.revenue)}, costs ${rand(m.costs)}`,
                     })),
-                    { label: `${trend.length} months`, value: totalNet, kind: 'total' as const },
+                    { label: 'Total', value: r.net, kind: 'total' as const },
                   ]}
                 />
               </InsightCard>
@@ -475,6 +374,23 @@ function FleetTab() {
 
 // ------------------------------------------------------------------- lanes
 
+/** One line: which lane to push and which sits below the fleet's rate (lanes with enough trips only). */
+function laneTakeaway(points: ReturnType<typeof lanePoints>['points'], overall: number | null): string {
+  const ev = points.filter(p => !p.thin).sort((a, b) => b.perKm - a.perKm);
+  if (points.length === 0) return 'Revenue per kilometre against trip length';
+  if (ev.length === 0 || !overall) return `No lane has ${MIN_TRIPS} trips yet, so none can be judged; each dot's rate is in the table.`;
+  const vs = (v: number) => Math.round((v / overall - 1) * 100);
+  const top = ev[0];
+  const low = ev.length > 1 ? ev[ev.length - 1] : null;
+  const head = vs(top.perKm) > 0
+    ? `${top.label} earns ${rand(top.perKm, 0)}/km, ${vs(top.perKm)}% above your average`
+    : `Your best-evidenced lane, ${top.label}, earns ${rand(top.perKm, 0)}/km, ${Math.abs(vs(top.perKm))}% below your average`;
+  if (!low) return `${head}.`;
+  return vs(low.perKm) < 0
+    ? `${head}; ${low.label} is ${Math.abs(vs(low.perKm))}% below it.`
+    : `${head}; ${low.label} earns ${rand(low.perKm, 0)}/km.`;
+}
+
 function LanesTab() {
   const loads = useAllRows<LoadRec & { distance?: unknown }>('loads', 'api/v1/loads/');
   if (loads.isLoading || loads.isError) {
@@ -487,7 +403,7 @@ function LanesTab() {
     <Stack>
       <InsightCard
         title="Revenue per km by lane"
-        description="Dot size is the lane's revenue"
+        description="Revenue per kilometre against trip length"
         info={`Revenue per kilometre against trip length, from every load with a pickup city, delivery city and distance. Shorter trips usually earn more per kilometre, so compare lanes of similar length. Lanes with fewer than ${MIN_TRIPS} trips are drawn hollow.${noDistance > 0 ? ` ${plural(noDistance, 'lane')} without a distance ${noDistance === 1 ? 'is' : 'are'} left out.` : ''}${partial}`}
       >
         {points.length === 0 ? (
@@ -496,7 +412,10 @@ function LanesTab() {
             <Link className="ic-text-button" to="/bookings/quotes/new">Quote a load</Link>
           </div>
         ) : (
-          <LaneScatter points={points} overallPerKm={overall} minTrips={MIN_TRIPS} />
+          <>
+            <p className="insights-takeaway">{laneTakeaway(points, overall)}</p>
+            <LaneScatter points={points} overallPerKm={overall} minTrips={MIN_TRIPS} />
+          </>
         )}
       </InsightCard>
     </Stack>

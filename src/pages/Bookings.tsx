@@ -596,26 +596,31 @@ export default function Bookings() {
               const extra = parseFloat(load.additional_charges || '0') || 0;
               const total = parseFloat(load.total_amount || '0') || 0;
               const gap = Math.round((total - (rate + fuel + extra)) * 100) / 100;
-              const rows: { label: React.ReactNode; key?: string; value: string; muted?: boolean }[] = [
-              { label: 'Base rate', value: formatCurrency(rate) },
-              {
-                label: <>Base rate per km <InfoTip>Base rate divided by distance, before surcharges.</InfoTip></>,
-                key: 'per-km',
-                value: parseFloat(load.distance || '0') > 0 ? formatMoney(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)) : 'Not recorded',
-              },
+              // The per-km figure is a rate, not a summand, so it sits as a
+              // note under Base rate rather than among the lines (R10).
+              const dist = parseFloat(load.distance || '0') || 0;
+              const perKm = dist > 0 ? `${formatMoney(rate / Math.max(dist, 1))}/km` : null;
+              const rows: { label: React.ReactNode; key?: string; value: string; note?: string | null; muted?: boolean }[] = [
+              { label: 'Base rate', value: formatCurrency(rate), note: perKm },
               { label: 'Fuel surcharge', value: formatCurrency(fuel) },
               { label: 'Additional charges', value: formatCurrency(extra) },
               ];
+              // Normal weight: when it is a large share of the total it is the
+              // line a reader most needs to see, never the faintest one.
               if (Math.abs(gap) > 0.5) rows.push({
                 key: 'not-itemised',
-                label: <>Not itemised <InfoTip>The order total includes charges not broken down here.</InfoTip></>,
+                label: <>Not itemised <InfoTip>{load.quote_number
+                  ? `The order total includes charges not broken down here. Quote ${load.quote_number} has the full breakdown.`
+                  : 'Set on the order when it was created: its total includes charges that were not entered as separate lines.'}</InfoTip></>,
                 value: formatCurrency(gap),
-                muted: true,
               });
               return rows.map(r => (
                 <div key={r.key ?? String(r.label)} className={`bk-kv${r.muted ? ' bk-muted' : ''}`}>
                   <span className="bk-kv__label">{r.label}</span>
-                  <span className={`bk-kv__value${r.muted || r.value === 'Not recorded' ? ' bk-muted' : ''}`}>{r.value}</span>
+                  <span className={`bk-kv__value${r.muted || r.value === 'Not recorded' ? ' bk-muted' : ''}`}>
+                    {r.value}
+                    {r.note && <span className="bk-kv__note" title="Base rate divided by distance, before surcharges">{r.note}</span>}
+                  </span>
                 </div>
               ));
             })()}

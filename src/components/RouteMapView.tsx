@@ -318,7 +318,9 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
         // Fit padding clears the overlaid controls (R8): the zoom buttons on
         // the left (32px, 44px on touch), the expand button on the right, the
         // 30px drop-off pin above its point, and the attribution chip (and the
-        // "Estimated route" chip, bottom left) below.
+        // "Estimated route" chip, bottom left) below. The chip's top sits
+        // 30px above the bottom edge, so a dashed fit keeps 48px: a pin
+        // (20px circle) near the bottom-left clears it (R10).
         // Quarter-step zoom for this fit only, so a long route fills the map
         // instead of snapping a whole level out; capped for short routes.
         const box = map.getContainer().getBoundingClientRect();
@@ -328,7 +330,7 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
         const right = eb && eb.width ? Math.ceil(box.right - eb.left) + 14 : 40;
         const snap = map.options.zoomSnap;
         map.options.zoomSnap = 0.25;
-        map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [left, 36], paddingBottomRight: [right, dashed ? 36 : 24], maxZoom: 12 });
+        map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [left, 36], paddingBottomRight: [right, dashed ? 48 : 24], maxZoom: 12 });
         map.options.zoomSnap = snap;
         fittedKeyRef.current = fitKey;
       }

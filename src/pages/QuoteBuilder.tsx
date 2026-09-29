@@ -8,7 +8,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, patchData, fetchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
-import { formatCurrency, formatNumber, formatDateTime, normaliseFigures } from "@/lib/formatters";
+import { formatCurrency, formatNumber, formatDateTime, normaliseFigures, sentenceCaseLabel } from "@/lib/formatters";
 import { DatePicker } from "@/components/ui/date-picker";
 import { resolveDieselPrice, dieselBasisNote, liveDieselHint } from "@/lib/dieselPrice";
 import { LocationInput, type LocationCoords } from "@/components/LocationInput";
@@ -347,6 +347,16 @@ export default function QuoteBuilder() {
   const barChatSlotRef = useRef<HTMLSpanElement | null>(null);
   const [chatSlot, setChatSlot] = useState<HTMLSpanElement | null>(null);
   useEffect(() => { setChatSlot(barChatSlotRef.current ?? nlChatSlotRef.current); });
+  // Presentation only (R10): the in-page map is 50px shorter while the
+  // "+ Add stop" row shows, so the map card stays close to the cost card's
+  // height instead of ending ~80px below it. Leaflet only
+  // re-measures on a window resize, so nudge it after the height changes
+  // (before the async route draw fits the view).
+  const inlineMapH = pickupCoords && deliveryCoords && stops.length === 0 ? 250 : 300;
+  useEffect(() => {
+    const r = requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
+    return () => cancelAnimationFrame(r);
+  }, [inlineMapH]);
   const narrowNl = useNarrow(640);
   // In-progress "create this client/vehicle type" mini-conversation (see
   // backend/core/services/quote_entity_chat.py) — round-tripped every turn
@@ -841,7 +851,7 @@ export default function QuoteBuilder() {
     // Floored at 0: serviceCharge has no visible line item in the cost
     // breakdown, so letting it go negative would silently apply a hidden
     // discount below full cost with no on-screen explanation.
-    if (suggestedPrice && suggestedPrice > 0) { setServiceCharge(prev => Math.max(0, prev + (suggestedPrice - total))); toast.success("Applied AI-recommended price"); }
+    if (suggestedPrice && suggestedPrice > 0) { setServiceCharge(prev => Math.max(0, prev + (suggestedPrice - total))); toast.success("Applied the suggested price"); }
   };
   // serviceCharge is only ever written by applyOptimal (or the form reset) —
   // there's no other manual markup control — so it's purely the AI delta.
@@ -1163,12 +1173,8 @@ export default function QuoteBuilder() {
             <StopPickPill key={stop.id} index={i} active={pickMode === stop.id} filled={!!stop.coords}
               onSelect={() => setPickMode(stop.id)} onRemove={() => removeStop(stop.id)} />
           ))}
-          {pickupCoords && deliveryCoords && (
-            <button type="button" onClick={addStop} title="Add stop" aria-label="Add stop"
-              className="tw-seg__opt" style={{ padding: "0 6px" }}>
-              <Plus size={13} aria-hidden="true" />
-            </button>
-          )}
+          {/* No bare "+" between the two targets: "+ Add stop" under the
+              map is the one way to add a stop (R10). */}
           <button type="button" onClick={() => setPickMode("delivery")} aria-pressed={pickMode === "delivery"}
             className={`tw-seg__opt${pickMode === "delivery" ? " is-active" : ""}`}>
             <span className={`qb-pin qb-pin--to${deliveryCoords ? " is-set" : ""}`} aria-hidden="true" />
@@ -1439,7 +1445,7 @@ export default function QuoteBuilder() {
 
       {/* details */}
       <div style={{ marginBottom: 24 }}>
-        <div className="qb-grid qb-grid--details" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16 }}>
+        <div className="qb-grid qb-grid--details" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gridAutoFlow: "row dense", gap: 16 }}>
           <div>
             <div style={fieldLabelS}><span>Vehicle type</span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New vehicle type" onClick={() => navigate("/fleet/vehicles")}><Plus size={12} aria-hidden="true" />New</button>}</div>
             <div className="qb-select">
@@ -1462,20 +1468,11 @@ export default function QuoteBuilder() {
             <ChevronDown size={14} className="qb-select__chev" aria-hidden="true" />
             </div>
           </div>
-          {/* The app's shared DatePicker: it hands back the same "yyyy-MM-dd"
-              string the native date input did, straight to the same setter. */}
-          {([
-            ["qb-date-pickup", "Pickup date", pickupDate, setPickupDate],
-            ["qb-date-delivery", "Delivery date", deliveryDate, setDeliveryDate],
-            ["qb-date-valid", "Valid until", validUntil, setValidUntil],
-          ] as const).map(([id, label, value, set]) => (
-            <div key={id} role="group" aria-labelledby={id} className="qb-date">
-              <div style={fieldLabelS}><span id={id}>{label}</span></div>
-              <DatePicker value={value} onChange={set} style={{ minHeight: "var(--field-h, 40px)", boxSizing: "border-box" }} />
-            </div>
-          ))}
           {/* Spans the grid: sits directly under the Vehicle type field but
               gets the full form width, so the options stay on one line.
+              It follows Vehicle type in the markup, so on phones (one
+              column) it reads right after it; the grid packs densely, so on
+              wider screens the dates still fill the rest of the first row.
               Rendered only when there is something to show, so an empty row
               doesn't add a second grid gap. */}
           {suggestions.length > 0 && <div style={{ gridColumn: "1 / -1", marginTop: -8 }}>
@@ -1496,16 +1493,17 @@ export default function QuoteBuilder() {
                     onClick={() => applyVehicleType(x.vt.name)}
                     className="qb-textbtn qb-textbtn--pick"
                   >
-                    {x.vt.name} ({capLabel(x.cap)})
+                    {/* Display only: sentence case, as on the quote detail. */}
+                    {sentenceCaseLabel(x.vt.name)} ({capLabel(x.cap)})
                   </button>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button type="button" title={`Why ${x.vt.name} suits this load`} aria-label={`Why ${x.vt.name} suits this load`} className="qb-info">
+                      <button type="button" title={`Why ${sentenceCaseLabel(x.vt.name)} suits this load`} aria-label={`Why ${sentenceCaseLabel(x.vt.name)} suits this load`} className="qb-info">
                         <Info size={14} aria-hidden="true" />
                       </button>
                     </PopoverTrigger>
                     <PopoverContent align="start" style={{ width: 270, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
-                      <div style={{ ...labelS, marginBottom: 8 }}>{x.vt.name}</div>
+                      <div style={{ ...labelS, marginBottom: 8 }}>{sentenceCaseLabel(x.vt.name)}</div>
                       {suggestionReasons(x).map((reason, ri) => (
                         <div key={ri} style={{ display: "flex", gap: 7, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 6 }}>
                           <span style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>&middot;</span>
@@ -1519,6 +1517,18 @@ export default function QuoteBuilder() {
             </div>
           )}
           </div>}
+          {/* The app's shared DatePicker: it hands back the same "yyyy-MM-dd"
+              string the native date input did, straight to the same setter. */}
+          {([
+            ["qb-date-pickup", "Pickup date", pickupDate, setPickupDate],
+            ["qb-date-delivery", "Delivery date", deliveryDate, setDeliveryDate],
+            ["qb-date-valid", "Valid until", validUntil, setValidUntil],
+          ] as const).map(([id, label, value, set]) => (
+            <div key={id} role="group" aria-labelledby={id} className="qb-date">
+              <div style={fieldLabelS}><span id={id}>{label}</span></div>
+              <DatePicker value={value} onChange={set} style={{ minHeight: "var(--field-h, 40px)", boxSizing: "border-box" }} />
+            </div>
+          ))}
           <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span>Cargo</span></div><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} aria-label="Cargo" /></div>
           <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span id="qb-trip-label">Trip</span></div>
             {/* The shared segmented control: neutral track, raised active option. */}
@@ -1533,7 +1543,11 @@ export default function QuoteBuilder() {
       {/* Top-aligned: each card is as tall as its content (no stretched card). */}
       <div className="qb-grid qb-grid--mapcost" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", alignItems: "start", gap: 16, marginBottom: 16 }}>
           <div style={{ ...cardS, overflow: "hidden" }}>
-            {renderMapPanel(300, (
+            {/* The "+ Add stop" row (43px) joins the card once both points
+                are set; the map gives up that height (and a little more),
+                so the card ends within 48px of the checklist cost card
+                instead of ~80px below it (R10). */}
+            {renderMapPanel(inlineMapH, (
               <Dialog>
                 <DialogTrigger asChild>
                   <button type="button" title="Expand map" aria-label="Expand map" className="qb-iconbtn">
@@ -1628,7 +1642,7 @@ export default function QuoteBuilder() {
             )}
             {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && !calculatingRoute && (<>
               {[
-                { key: "fuel", l: `Fuel: ${oneDp(fuelConsumption)} L/100 km @ ${formatCurrency(fuelPricePerL)}/L${fuelZoneNote}${fuelBasisNote}`, v: fuelCost, c: "var(--status-danger)" },
+                { key: "fuel", l: `Fuel: ${oneDp(fuelConsumption)} L/100 km at ${formatCurrency(fuelPricePerL)}/L${fuelZoneNote}${fuelBasisNote}`, v: fuelCost, c: "var(--status-danger)" },
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
                 ...(crossBorderCost > 0 ? [{ key: "cb", l: "Cross-border / weighbridge", v: crossBorderCost, c: "#2BB6A6" }] : []),
                 { key: "driver", l: "Driver allowance", v: driverAllowance, c: "var(--text-tertiary)" },

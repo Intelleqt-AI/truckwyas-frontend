@@ -86,12 +86,16 @@ export default function QuoteDetail() {
     retry: (count, err) => (err as { status?: number } | null)?.status !== 404 && count < 1,
   });
   const { data: quote, isLoading, error } = quoteQuery;
-  // Columns end within 48px (R6): the route map takes up the difference.
+  // The route map grows to end level with the rail when the rail is the
+  // longer column, but never drops below a readable floor (R10): 320px on
+  // desktop, 240px on phones. When the Job card is long, the main column
+  // simply ends lower; the ≤48px rule is about stretched cards, not maps.
   // The customer always sits in the Job card, on drafts and sent quotes
   // alike (R9): one layout for one record type. A quote with no map shows a
   // short note in the map's place, which may shrink further than a map.
   const hasMapCoords = !!(quote?.pickup_lat || quote?.delivery_lat);
-  const fill = useMapFill({ base: 200, min: quote && !hasMapCoords ? 88 : 160, max: 440 });
+  const mapFloor = typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches ? 240 : 320;
+  const fill = useMapFill({ base: mapFloor, min: quote && !hasMapCoords ? 88 : mapFloor, max: 440 });
   const railRef = useCallback((node: HTMLDivElement | null) => { fill.sideRef.current = node; stickyRail(node); }, [stickyRail, fill.sideRef]);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [emailStatus, setEmailStatus] = useState<{ sent: boolean; address: string | null; reason?: string | null } | null>(null);
@@ -383,6 +387,21 @@ export default function QuoteDetail() {
       <dd className="bk-fact__value">{value}</dd>
     </div>
   );
+  // Load facts (cargo, truck, weight, distance and the rest): beside the
+  // route on one-leg quotes, under both legs on round trips.
+  const loadFacts = (
+            <dl className="qd-facts qd-facts--load">
+              {fact('Cargo', quote.cargo_description ? String(quote.cargo_description).replace(/^\s*\S/, (c: string) => c.toUpperCase()) : 'Not recorded')}
+              {fact('Truck type', sentenceCaseLabel(quote.vehicle_type) || 'Not recorded')}
+              {fact('Weight', quote.weight ? `${formatNumber(parseFloat(quote.weight))} kg` : 'Not recorded')}
+              {fact('Distance', quote.distance ? formatDistance(parseFloat(quote.distance)) : 'Not recorded')}
+              {quote.pickup_date && fact('Pickup date', formatDate(quote.pickup_date))}
+              {quote.vehicle_display && fact('Vehicle', quote.vehicle_display)}
+              {quote.driver_display && fact('Driver', quote.driver_display)}
+              {isRound && quote.return_notes && fact('Return notes', quote.return_notes, true)}
+              {quote.notes && fact('Notes', <span style={{ whiteSpace: 'pre-wrap', color: 'var(--text-secondary)' }}>{quote.notes}</span>, true)}
+            </dl>
+  );
   const priceRows = [
     { label: 'Base rate', value: parseFloat(quote.base_rate || '0') },
     { label: 'Fuel surcharge', value: parseFloat(quote.fuel_surcharge || '0') },
@@ -430,9 +449,12 @@ export default function QuoteDetail() {
             onChange={(v) => statusMutation.mutate(v)}
           />
           {needsEdit ? (<>
-            <button type="button" className="bk-btn bk-btn--secondary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending}>
+            {/* An expired quote is not sent again as it stands: the body card
+                offers "Send an updated quote", so the head holds Edit only.
+                A price-stale draft that is still valid keeps Send beside it. */}
+            {!lapsed && <button type="button" className="bk-btn bk-btn--secondary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending}>
               {sendToCustomerMutation.isPending ? (quote.status === 'SENT' ? 'Resending…' : 'Generating…') : sendLabel}
-            </button>
+            </button>}
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate(`/bookings/quotes/${id}/edit`)} aria-label="Edit quote">
               <span className="qd-label-long" data-short="Edit">Edit quote</span>
             </button>
@@ -475,7 +497,10 @@ export default function QuoteDetail() {
               {quote.customer_phone && fact('Phone', quote.customer_phone)}
             </dl>
             <hr className="qd-rule" />
-            <div className="qd-route-row">
+            {/* One-leg routes (R10): the route and the load facts share one
+                row, so the card has no blank right half. Round trips keep
+                the two legs side by side with the facts below. */}
+            <div className={isRound ? 'qd-route-row' : 'qd-route-row qd-route-row--single'}>
               <div>
                 <div className="bk-fact__label" style={{ marginBottom: 8 }}>{isRound ? 'Leg 1, outbound' : 'Route'}</div>
                 <ol className="bk-route">
@@ -516,19 +541,9 @@ export default function QuoteDetail() {
                   </ol>
                 </div>
               )}
+            {isRound ? null : loadFacts}
             </div>
-            <hr className="qd-rule" />
-            <dl className="qd-facts">
-              {fact('Cargo', quote.cargo_description ? String(quote.cargo_description).replace(/^\s*\S/, (c: string) => c.toUpperCase()) : 'Not recorded')}
-              {fact('Truck type', sentenceCaseLabel(quote.vehicle_type) || 'Not recorded')}
-              {fact('Weight', quote.weight ? `${formatNumber(parseFloat(quote.weight))} kg` : 'Not recorded')}
-              {fact('Distance', quote.distance ? formatDistance(parseFloat(quote.distance)) : 'Not recorded')}
-              {quote.pickup_date && fact('Pickup date', formatDate(quote.pickup_date))}
-              {quote.vehicle_display && fact('Vehicle', quote.vehicle_display)}
-              {quote.driver_display && fact('Driver', quote.driver_display)}
-              {isRound && quote.return_notes && fact('Return notes', quote.return_notes, true)}
-              {quote.notes && fact('Notes', <span style={{ whiteSpace: 'pre-wrap', color: 'var(--text-secondary)' }}>{quote.notes}</span>, true)}
-            </dl>
+            {isRound && <><hr className="qd-rule" />{loadFacts}</>}
           </section>
 
           {(quote.pickup_lat || quote.delivery_lat) ? (
@@ -568,8 +583,10 @@ export default function QuoteDetail() {
             {fuelNote && (
               <p className="qd-fuel" role="status">
                 <span className="bk-dot bk-dot--warning" aria-hidden="true" />
-                <span>{fuelNote}{quote.status === 'DRAFT'
-                  // A draft was never offered, so there is nothing to renegotiate: update the price instead.
+                <span>{fuelNote}{quote.status === 'DRAFT' || lapsed
+                  // A draft was never offered, and an expired quote can no
+                  // longer be accepted, so there is nothing to renegotiate:
+                  // update the price before it goes out.
                   ? ' Update the price before sending.'
                   : fuelAlert?.action ? ` ${normaliseFigures(fuelAlert.action).replace(/\.?$/, '.')}` : ''}</span>
               </p>
@@ -599,11 +616,12 @@ export default function QuoteDetail() {
             <section className="bk-card" aria-labelledby="qd-customer-title">
               <h2 className="bk-card__title" id="qd-customer-title" style={{ marginBottom: 12 }}>With the customer</h2>
               {effectiveShareUrl && lapsed && (
-                // The customer's link stopped working at the valid-until date,
-                // so there is nothing to copy or share (R9).
+                // The public link still opens after the valid-until date, but
+                // shows the quote as expired (ClientQuoteView), so there is
+                // nothing useful to copy or share (R9, wording R10).
                 <div style={{ marginBottom: 16 }}>
                   <p className="bk-help" style={{ margin: '0 0 12px' }}>
-                    The link to this quote expired on {formatDate(quote.valid_until)}, so the customer can no longer open it.
+                    The customer's link still opens, but shows this quote as expired on {formatDate(quote.valid_until)}.
                   </p>
                   <button type="button" className="bk-btn bk-btn--secondary bk-btn--block" onClick={() => navigate(`/bookings/quotes/${id}/edit`)}>
                     Send an updated quote

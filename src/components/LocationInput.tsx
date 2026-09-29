@@ -200,7 +200,10 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
   }
 
   return (
-    <div ref={containerRef} style={{ position: 'relative' }}>
+    <div ref={containerRef}>
+      {/* The list anchors to the input's own box, not to the wrapper that
+          also holds the GPS link, so it opens directly under the field. */}
+      <div style={{ position: 'relative' }}>
       <input
         type="text"
         placeholder={placeholder}
@@ -210,6 +213,10 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
           if (suggestions.length > 0) setOpen(true);
           else if (!value) fetchRecentOnFocus();
           onFocus?.();
+        }}
+        onKeyDown={e => {
+          // Escape closes the list only; the typed text stays as it is.
+          if (e.key === 'Escape' && open) { e.preventDefault(); e.stopPropagation(); setOpen(false); }
         }}
         style={style}
         autoComplete="off"
@@ -226,11 +233,11 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
       )}
       {open && suggestions.length > 0 && (
         <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0,
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
           background: 'var(--bg-surface)',
           border: '1px solid var(--border-subtle)',
-          borderTop: 'none',
-          borderRadius: '0 0 var(--radius-control) var(--radius-control)',
+          borderRadius: 'var(--radius-control)',
+          boxShadow: 'var(--shadow-pop)',
           zIndex: 1100, maxHeight: 220, overflowY: 'auto',
         }}>
           {suggestions.map((s, i) => (
@@ -271,6 +278,7 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
           ))}
         </div>
       )}
+      </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button type="button" style={{ ...toggleLink, marginTop: 4 }} onClick={switchToGps}>
           Enter GPS coordinates →

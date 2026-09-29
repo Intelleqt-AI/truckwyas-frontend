@@ -33,6 +33,16 @@
 }
 .qd-rule { border: 0; height: 1px; background: var(--border-row); margin: 20px 0; }
 .qd-route-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px 24px; }
+/* R10: a one-leg route shares its row with the load facts (two columns
+   of facts in the right half), so the Job card has no blank half. The
+   halves match the four-column customer grid above (col 3 starts at the
+   same x). Narrow main columns stack: route, then the facts. */
+.qd-route-row--single { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.qd-route-row--single .qd-facts--load { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@container qd-main (max-width: 539px) {
+  .qd-route-row--single { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .qd-route-row--single .qd-facts--load { border-top: 1px solid var(--border-row); margin-top: 20px; padding-top: 20px; }
+}
 /* Emails wrap at "@" and dots (<wbr>), never inside a word. */
 .qd-email { overflow-wrap: normal; word-break: normal; }
 .bk-card.qd-map { padding: 0; overflow: hidden; }

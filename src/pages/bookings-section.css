@@ -299,6 +299,8 @@
 .bk-kv__label { font-size: 13px; line-height: 20px; color: var(--text-secondary); flex-shrink: 0; }
 .bk-kv__value { font-size: 14px; line-height: 20px; color: var(--text-primary); text-align: right; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
 .bk-kv--total { border-bottom: none; padding-top: 12px; }
+/* A rate shown under its line (Base rate → R x/km): not a summand (R10). */
+.bk-kv__note { display: block; font-size: 12px; line-height: 16px; color: var(--text-secondary); }
 .bk-kv--total .bk-kv__label { font-weight: 500; color: var(--text-primary); }
 .bk-kv--total .bk-kv__value { font-weight: 600; }
 

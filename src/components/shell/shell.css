@@ -41,10 +41,9 @@
   gap: 8px;
   padding: 0 0 0 8px;
 }
-/* Quieter wordmark: 16px and softened, so the company (below) leads. */
-.tw-side__logo { display: block; height: 16px; overflow: hidden; flex-shrink: 0; opacity: 0.72; transition: opacity 0.12s; }
-.tw-side__logo:hover, .tw-side__logo:focus-visible { opacity: 1; }
-.tw-side__logo img { display: block; height: 16px; width: auto; }
+/* Wordmark at full strength; the company chip below carries the tenant. */
+.tw-side__logo { display: block; height: 20px; overflow: hidden; flex-shrink: 0; }
+.tw-side__logo img { display: block; height: 20px; width: auto; }
 
 /* Company chip: the customer's logo (or initial) + name; opens the company menu. */
 .tw-company { position: relative; margin: 4px 0 12px; }
@@ -230,36 +229,38 @@
   z-index: 100;
 }
 .tw-top__mark { display: none; }
-.tw-top .tw-search { position: relative; flex: 1; max-width: 440px; min-width: 0; }
-.tw-top .tw-search__icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-tertiary); pointer-events: none; }
-.tw-search__input {
+/* Top-bar Ask box. Its own class names: the page toolbar search is .tw-search. */
+.tw-topsearch { position: relative; flex: 1; max-width: 420px; min-width: 0; }
+.tw-topsearch__icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-tertiary); pointer-events: none; }
+.tw-topsearch__input {
+  display: block;
   width: 100%;
-  height: 40px;
-  padding: 0 64px 0 36px;
+  height: var(--control-h, 36px);
+  padding: 0 56px 0 36px;
   border-radius: var(--radius-control);
   border: 1px solid var(--border-control);
-  background: var(--input-bg);
+  background: var(--bg-surface);
   color: var(--text-primary);
   font: 400 14px/20px var(--font-sans);
   transition: border-color 0.12s, box-shadow 0.12s;
 }
-.tw-search__input::placeholder { color: var(--text-tertiary); }
-.tw-search__input:hover { border-color: var(--border-control-hover); }
-.tw-search__input:focus { outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.tw-topsearch__input::placeholder { color: var(--text-tertiary); }
+.tw-topsearch__input:hover { border-color: var(--border-control-hover); }
+.tw-topsearch__input:focus { outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--focus-ring); }
 .tw-kbd {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   font: 500 11px/16px var(--font-sans);
   padding: 2px 6px;
   border-radius: 6px;
   border: 1px solid var(--border-subtle);
-  background: var(--bg-deep);
+  background: var(--bg-raised);
   color: var(--text-tertiary);
   pointer-events: none;
 }
 .tw-top__actions { margin-left: auto; display: flex; align-items: center; gap: 4px; }
 .tw-icon-btn {
   position: relative;
-  width: 40px; height: 40px;
+  width: 36px; height: 36px;
   display: grid; place-items: center;
   border: 0; border-radius: var(--radius-control);
   background: transparent;
@@ -272,13 +273,13 @@
 .tw-icon-btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 .tw-side__toggle { width: 32px; height: 32px; color: var(--text-tertiary); }
 .tw-top__ask { display: none; }
-.os-app-shell.tw-shell .theme-toggle { width: 40px; height: 40px; border: 0; }
 
 /* Notification bell: quieter at the v3 icon size. */
-.tw-top .dashboard-notification-trigger { min-width: 40px !important; min-height: 40px !important; }
+.tw-top .dashboard-notification-trigger { width: 36px !important; height: 36px !important; min-width: 36px !important; min-height: 36px !important; border-radius: var(--radius-control) !important; }
 .tw-top .dashboard-notification-trigger:hover { background: var(--nav-hover-bg); color: var(--text-primary) !important; }
 .tw-top .dashboard-notification-icon { width: 18px !important; height: 18px !important; }
-.tw-top .dashboard-notification-count { background: var(--badge-bg) !important; color: var(--badge-fg) !important; top: 4px !important; right: 2px !important; min-width: 16px !important; height: 16px !important; font-size: 10px !important; font-weight: 600 !important; }
+/* Unread count: a small neutral ink badge, not an alarm. */
+.tw-top .dashboard-notification-count { background: var(--text-primary) !important; color: var(--bg-surface) !important; top: 3px !important; right: 3px !important; min-width: 16px !important; height: 16px !important; padding: 0 4px !important; font-size: 10px !important; font-weight: 600 !important; box-shadow: 0 0 0 2px var(--bg-deep); }
 
 .tw-pill {
   display: inline-flex; align-items: center; gap: 6px;
@@ -291,10 +292,10 @@
 }
 .tw-pill--warn { background: var(--status-warning-bg); color: var(--status-warning-text); }
 
-.tw-profile { position: relative; margin-left: 8px; }
+.tw-profile { position: relative; margin-left: 4px; }
 .tw-profile__trigger {
-  display: flex; align-items: center; gap: 10px;
-  height: 44px; padding: 0 8px 0 4px;
+  display: grid; place-items: center;
+  width: 36px; height: 36px; padding: 0;
   border: 0; border-radius: var(--radius-control);
   background: transparent; cursor: pointer; color: var(--text-primary);
   text-align: left;
@@ -311,10 +312,6 @@
   letter-spacing: 0.02em;
 }
 .tw-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.tw-profile__text { display: flex; flex-direction: column; min-width: 0; }
-.tw-profile__name { font: 600 13px/18px var(--font-sans); color: var(--text-primary); white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
-.tw-profile__role { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
-.tw-profile__chev { color: var(--text-tertiary); }
 
 .tw-menu {
   position: absolute; top: calc(100% + 8px); right: 0;
@@ -374,11 +371,11 @@
   .tw-shell > .tw-top { grid-column: 1; padding: 0 8px 0 16px; gap: 8px; border-bottom: 1px solid var(--border-subtle); }
   .tw-top__mark { display: block; height: 20px; overflow: hidden; }
   .tw-top__mark img { height: 20px; width: auto; display: block; }
-  .tw-top .tw-search, .tw-top__theme, .tw-profile__text, .tw-profile__chev { display: none !important; }
+  .tw-top .tw-topsearch { display: none !important; }
   .tw-top__ask { display: grid; }
   .tw-icon-btn, .tw-top .dashboard-notification-trigger { width: 44px; height: 44px; min-width: 44px !important; min-height: 44px !important; }
   .tw-profile { margin-left: 0; }
-  .tw-profile__trigger { padding: 0 6px; }
+  .tw-profile__trigger { width: 44px; height: 44px; }
   .os-app-shell.tw-shell > .tw-main { grid-column: 1; padding: var(--main-pad-top, 16px) 16px 32px; }
 
   .tw-tabbar {

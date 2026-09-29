@@ -241,12 +241,12 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
         </a>
 
         {canAsk && (
-          <div className="tw-search">
-            <Search className="tw-search__icon" size={16} strokeWidth={1.75} aria-hidden="true" />
+          <div className="tw-topsearch">
+            <Search className="tw-topsearch__icon" size={16} strokeWidth={1.75} aria-hidden="true" />
             <input
               ref={searchRef}
               type="text"
-              className="tw-search__input"
+              className="tw-topsearch__input"
               aria-label="Ask Copilot"
               placeholder="Ask about your business"
               value={agentQuery}
@@ -278,29 +278,28 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
             </button>
           )}
           <NotificationBell />
-          <button type="button" className="tw-icon-btn tw-top__theme theme-toggle" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} title="Toggle theme">
-            {theme === 'dark' ? <Sun size={18} strokeWidth={1.75} /> : <Moon size={18} strokeWidth={1.75} />}
-          </button>
           <div ref={profileRef} className="os-profile-anchor tw-profile">
-            <button type="button" className="os-profile-trigger tw-profile__trigger" aria-label="Open profile menu" aria-expanded={showProfileMenu}
+            <button type="button" className="os-profile-trigger tw-profile__trigger" aria-label={`Account menu for ${userName}`} aria-expanded={showProfileMenu}
               onClick={() => setShowProfileMenu(p => !p)}
               title={userName}
             >
               <span className="tw-avatar" aria-hidden="true">
                 {avatarUrl ? <img src={avatarUrl} alt="" /> : initials}
               </span>
-              <span className="tw-profile__text">
-                <span className="tw-profile__name">{userName}</span>
-                <span className="tw-profile__role">{roleLabel}</span>
-              </span>
-              <ChevronDown className="tw-profile__chev" size={14} strokeWidth={1.75} aria-hidden="true" />
             </button>
             {showProfileMenu && (
               <div className="os-header-popover tw-menu" role="menu">
                 <div className="tw-menu__head">
                   <div className="tw-menu__name">{userName}</div>
                   <div className="tw-menu__email">{authUser?.email || authUser?.username || ''}</div>
+                  {roleLabel && <div className="tw-menu__email">{roleLabel}</div>}
                 </div>
+                <button type="button" role="menuitem" className="os-profile-action tw-menu__item theme-toggle"
+                  onClick={() => { toggleTheme(); }}
+                >
+                  {theme === 'dark' ? <Sun size={16} strokeWidth={1.75} aria-hidden="true" /> : <Moon size={16} strokeWidth={1.75} aria-hidden="true" />}
+                  {theme === 'dark' ? 'Light theme' : 'Dark theme'}
+                </button>
                 <button type="button" role="menuitem" className="os-profile-action tw-menu__item"
                   onClick={() => {
                     setShowProfileMenu(false);

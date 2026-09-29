@@ -83,7 +83,7 @@ export function NotificationBell() {
             borderRadius: 999, background: 'var(--note-danger-surface, var(--status-danger))', color: 'var(--note-danger-text, #fff)',
             fontSize: 'var(--note-support-size, 12px)', fontWeight: 'var(--note-label-weight, 700)', display: 'grid', placeItems: 'center',
             fontFamily: 'var(--note-font, var(--font-sans))', lineHeight: 'var(--note-line, 1)',
-          }}>{unread > 99 ? '99+' : unread}</span>
+          }}>{unread > 9 ? '9+' : unread}</span>
         )}
       </button>
 

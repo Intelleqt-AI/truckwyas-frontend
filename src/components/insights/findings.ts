@@ -416,7 +416,7 @@ export function computeFindings(input: FindingInputs, now = new Date()): Finding
     }
   }
 
-  // 8. Loads never closed (R6: the one stale-work rule, src/lib/staleWork.ts) --
+  // 8. Loads left open (R6: the one stale-work rule, src/lib/staleWork.ts) --
   // The same loads Orders, Home and the fleet pages flag: open (Pending,
   // Assigned, Loading, In transit) and past the delivery date or open more
   // than 30 days. Together the two cards below count every such load, so they
@@ -443,14 +443,18 @@ export function computeFindings(input: FindingInputs, now = new Date()): Finding
       const words: Record<string, string> = { IN_TRANSIT: 'in transit', LOADING: 'loading', ASSIGNED: 'assigned' };
       const mix = ['IN_TRANSIT', 'LOADING', 'ASSIGNED'].filter(k => by.get(k)).map(k => `${by.get(k)} ${words[k]}`).join(', ');
       const oldest = staleLabel(staleWork(billable[0], today)!);
+      const statuses = [...by.keys()];
       out.push({
         id: 'open_loads', kind: 'open_loads', category: 'Bill your work', basis: 'Measured', confidence: 'medium',
         severity: 'medium',
         amount: total,
-        headline: 'Loads never closed',
+        headline: billable.length === 1 ? 'Load left open' : 'Loads left open',
         line: `${plural(billable.length, 'load')} left open (${mix}); the oldest ${oldest.text}.`,
-        action: { label: 'Close and invoice loads', href: '/bookings/orders' },
-        method: `Loads with a vehicle (Assigned, Loading or In transit) past their delivery date, or open more than ${STALE_AFTER_DAYS} days: the same rule as Orders, Home and the fleet pages. If they were delivered, mark them delivered and invoice them; if not, cancel them. Value is the load total, excluding VAT. Pending loads were never picked up, so they are not counted here.` + (input.loads.complete ? '' : ' Not every load could be loaded.'),
+        // R8: none of these is delivered, so none can be invoiced yet. The
+        // action is staleAction's move for the status (said of them all when
+        // they share one), else "Update or cancel each load".
+        action: { label: statuses.length === 1 ? staleAction(billable[0]).replace(/ it$/, billable.length === 1 ? ' it' : ' them') : 'Update or cancel each load', href: '/bookings/orders' },
+        method: `Loads with a vehicle (Assigned, Loading or In transit) past their delivery date, or open more than ${STALE_AFTER_DAYS} days: the same rule as Orders, Home and the fleet pages. None is delivered, so none can be invoiced yet. In transit: mark it delivered (then invoice it) or cancel it. Loading: mark it in transit or cancel it. Assigned: start it, reassign it or cancel it. Value is the load total, excluding VAT. Pending loads were never picked up, so they are not counted here.` + (input.loads.complete ? '' : ' Not every load could be loaded.'),
         evidence: evidenceOf(billable),
         evidenceNoun: ['load', 'loads'],
         invoiceIds: [], loadIds: billable.map(l => l.id), cash: true,

@@ -1,5 +1,5 @@
 import { formatDate, formatDays, formatMoneyWhole, normaliseFigures, sentenceCaseLabel, toDate } from '@/lib/formatters';
-import { staleLabel, staleLoads, staleWork } from '@/lib/staleWork';
+import { isOpenLoad, staleLabel, staleLoads, staleWork } from '@/lib/staleWork';
 import { localDateISO, saDaysBetween } from '@/lib/dates';
 
 /**
@@ -101,6 +101,54 @@ export function presentSignal(s: { title?: string; body?: string; action?: strin
 export const isIdleVehiclesSignal = (s: { title?: string }) => /(vehicles?|trucks?)\s+idle/i.test(String(s?.title || ''));
 /** Where "N vehicles idle · View" goes: the Vehicles list, Available tile. */
 export const idleVehiclesUrl = '/fleet/vehicles?tile=free';
+
+/**
+ * Home's "N vehicles idle" row, computed from the same vehicles and loads the
+ * Vehicles page uses (R8), so Home never names a truck Vehicles shows on an
+ * order. The backend's signal text is not passed through.
+ *   idle      status Available (Vehicles' Available tile: AVAILABLE or ACTIVE)
+ *             and no current open load (a load left open is not current work,
+ *             src/lib/staleWork.ts, the same rule as Vehicles "Doing now").
+ *   free      idle trucks with no open load at all: the ones named.
+ *   holding   idle trucks still holding an order left open: counted, not named
+ *             as free, the same way Vehicles notes "order left open".
+ * Null when fewer than one truck is idle.
+ */
+export function idleSignal(vehicles: any[], loads: any[], today: Date = new Date()): (SignalRow & { actionUrl: string }) | null {
+  const byVehicle = new Map<number, any[]>();
+  for (const l of loads) {
+    if (l?.vehicle == null || !isOpenLoad(l)) continue;
+    const k = Number(l.vehicle);
+    byVehicle.set(k, [...(byVehicle.get(k) || []), l]);
+  }
+  const freeStatus = (v: any) => ['AVAILABLE', 'ACTIVE'].includes(String(v?.status || '').toUpperCase());
+  const idle = vehicles.filter((v) => freeStatus(v) && !(byVehicle.get(Number(v.id)) || []).some((l) => !staleWork(l, today)));
+  if (idle.length === 0) return null;
+  const plate = (v: any) => String(v.plate || [v.make, v.model].filter(Boolean).join(' ') || `Vehicle ${v.id}`);
+  const free = idle.filter((v) => !byVehicle.has(Number(v.id)));
+  const holding = idle.filter((v) => byVehicle.has(Number(v.id)));
+  const n = idle.length;
+  const named = free.slice(0, 2).map(plate);
+  const more = free.length - named.length;
+  const freeText = free.length === 0 ? '' : `${named.join(', ')}${more > 0 ? ` and ${more} more` : ''}`;
+  const detail = holding.length === 0
+    ? freeText
+    : free.length === 0
+      ? (holding.length === 1 ? 'It holds an order left open' : 'All hold an order left open')
+      : `${free.length} with no load · ${holding.length} ${holding.length === 1 ? 'holds' : 'hold'} an order left open`;
+  const detailTitle = [
+    free.length ? `Available with no load: ${free.map(plate).join(', ')}.` : '',
+    holding.length ? `Available but still on an order left open: ${holding.map(plate).join(', ')}.` : '',
+  ].filter(Boolean).join(' ');
+  return {
+    kind: 'fleet',
+    title: `${n} ${n === 1 ? 'vehicle' : 'vehicles'} idle`,
+    detail,
+    detailTitle,
+    actionLabel: 'View',
+    actionUrl: idleVehiclesUrl,
+  };
+}
 
 /** True for the backend's "N loads in transit" signal, which Home replaces with the stale-work row. */
 export const isInTransitSignal = (s: { title?: string }) => /loads?\s+in\s+transit/i.test(String(s?.title || ''));

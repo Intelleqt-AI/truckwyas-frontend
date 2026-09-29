@@ -68,7 +68,7 @@ export default function AdminHome() {
   const failed = jobRows.filter(j => j.last_success === false);
   const neverRun = jobRows.filter(j => j.last_started_at === null);
 
-  const newest: { id: number; company_name: string; owner_email: string | null; created_at: string; subscription_status: string }[] =
+  const newest: { id: number; company_name: string; owner_email: string | null; created_at: string; subscription_status: string; quote_count?: number; load_count?: number }[] =
     [...(companiesPage?.results || [])]
       .sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)))
       .slice(0, 5);
@@ -192,12 +192,20 @@ export default function AdminHome() {
             <div className="ops-skel" style={{ height: 80 }} />
           ) : newest.length === 0 ? (
             <p className="bk-help">No companies yet.</p>
-          ) : newest.map(c => (
-            <div key={c.id} className="bk-kv">
-              <span className="bk-kv__label" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }} title={c.owner_email || undefined}>{c.company_name}</span>
-              <span className="bk-kv__value" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{formatDate(c.created_at)}</span>
-            </div>
-          ))}
+          ) : newest.map(c => {
+            // What each new company has done so far (R8): the row carries a
+            // fact beyond its name and date, so the card is not name-and-gap.
+            const q = Number(c.quote_count) || 0, l = Number(c.load_count) || 0;
+            const act = q + l === 0 ? 'No quotes or orders yet'
+              : [q ? `${q} ${q === 1 ? 'quote' : 'quotes'}` : null, l ? `${l} ${l === 1 ? 'order' : 'orders'}` : null].filter(Boolean).join(' · ');
+            return (
+              <div key={c.id} className="bk-kv ah-new__row">
+                <span className="bk-kv__label" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }} title={c.owner_email || undefined}>{c.company_name}</span>
+                <span className="ah-new__act">{act}</span>
+                <span className="bk-kv__value" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{formatDate(c.created_at)}</span>
+              </div>
+            );
+          })}
         </section>
       </div>
     </div>

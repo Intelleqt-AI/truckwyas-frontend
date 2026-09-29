@@ -20,6 +20,7 @@ import QuoteSendPreview from '@/components/QuoteSendPreview';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import SectionHeader from '@/components/layout/SectionHeader';
 import { StatusChip } from '@/components/ui/StatusChip';
+import { boardStage } from '@/components/overview/today';
 import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
 import { StatusMenu, type StatusOption } from '@/components/fleet-detail/StatusMenu';
 import { BlockSkeleton } from '@/components/fleet-detail/ContentSkeleton';
@@ -351,9 +352,11 @@ export default function QuoteDetail() {
     return parts.map((p, i) => <span key={i}>{i > 0 && <wbr />}{p}</span>);
   };
   const validUntil = quote.valid_until ? new Date(quote.valid_until).getTime() : null;
+  // One expiry rule with the board, list and Home (boardStage, R8).
+  const lapsed = boardStage(quote) === 'EXPIRED';
   const validNote = validUntil == null ? null
-    : validUntil <= Date.now() ? 'expired'
-    : validUntil - Date.now() < 48 * 3600_000 ? `${Math.ceil((validUntil - Date.now()) / 3600_000)} h left`
+    : lapsed ? 'expired'
+    : validUntil > Date.now() && validUntil - Date.now() < 48 * 3600_000 ? `${Math.ceil((validUntil - Date.now()) / 3600_000)} h left`
     : null;
   // Fuel: a compact note built from the numbers, in the house format.
   const fuelDelta = Number(fuelAlert?.fuel_delta_zar);
@@ -363,6 +366,14 @@ export default function QuoteDetail() {
       ? `Diesel is up ${formatMoney(fuelDelta)}/L since this quote was made, so the job costs about ${formatMoneyWhole(fuelImpact)} more.`
       : normaliseFigures(fuelAlert.message))
     : null;
+  // An expired quote, or a draft priced before the diesel rise, is edited
+  // before it goes out (R8): Edit quote is the primary, Send the secondary.
+  const openStatus = quote.status === 'DRAFT' || quote.status === 'SENT';
+  const needsEdit = openStatus && (lapsed || (quote.status === 'DRAFT' && !!fuelAlert?.has_alert));
+  const sendLabel = quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer';
+  const headChip = (size?: 'sm') => lapsed
+    ? <span title={`${STATUS_LABEL[quote.status]}, past its valid-until date`}><StatusChip status="EXPIRED" label="Expired" size={size} /></span>
+    : <StatusChip status={quote.status} label={STATUS_LABEL[quote.status]} size={size} />;
   const fact = (term: string, value: React.ReactNode, wide = false) => (
     <div className={wide ? 'qd-fact qd-fact--wide' : 'qd-fact'}>
       <dt className="bk-fact__label">{term}</dt>
@@ -396,12 +407,12 @@ export default function QuoteDetail() {
         back={{ to: '/bookings/quotes', label: 'Quotes' }}
         // Phones (R5): the chips move to the start of the subtitle so the
         // title row holds the quote number and the one primary action.
-        titleAdornment={<span className="qd-head-chips"><StatusChip status={quote.status} label={STATUS_LABEL[quote.status]} />
+        titleAdornment={<span className="qd-head-chips">{headChip()}
             {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && <StatusChip status="WON" />}
             {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <StatusChip status="LOST" />}</span>}
         // The subtitle reads as the job: customer, then the route (never the
         // customer's own city, which read as a destination).
-        description={<><span className="qd-desc-chips"><StatusChip status={quote.status} label={STATUS_LABEL[quote.status]} size="sm" />
+        description={<><span className="qd-desc-chips">{headChip('sm')}
             {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && <StatusChip status="WON" size="sm" />}
             {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <StatusChip status="LOST" size="sm" />}</span>{company}{routeSummary && <span className="qd-desc-route">{company ? ' · ' : ''}{routeSummary}</span>}</>}
         actions={<>
@@ -415,10 +426,19 @@ export default function QuoteDetail() {
             intercept={(v) => { if (v === 'SENT' && quote.status !== 'SENT') { setSendPreview('status'); return true; } return false; }}
             onChange={(v) => statusMutation.mutate(v)}
           />
+          {needsEdit ? (<>
+            <button type="button" className="bk-btn bk-btn--secondary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending}>
+              {sendToCustomerMutation.isPending ? (quote.status === 'SENT' ? 'Resending…' : 'Generating…') : sendLabel}
+            </button>
+            <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate(`/bookings/quotes/${id}/edit`)} aria-label="Edit quote">
+              <span className="qd-label-long" data-short="Edit">Edit quote</span>
+            </button>
+          </>) : (
           <button type="button" className="bk-btn bk-btn--secondary qd-head-edit" onClick={() => navigate(`/bookings/quotes/${id}/edit`)}>
             Edit quote
           </button>
-          {quote.status === 'ACCEPTED' ? (
+          )}
+          {needsEdit ? null : quote.status === 'ACCEPTED' ? (
             <button type="button" className="bk-btn bk-btn--primary" onClick={handleConvertToLoad} disabled={convertToLoadMutation.isPending} aria-label={convertToLoadMutation.isPending ? undefined : 'Convert to booking'}>
               {convertToLoadMutation.isPending ? 'Converting…' : <span className="qd-label-long" data-short="Convert">Convert to booking</span>}
             </button>
@@ -428,7 +448,7 @@ export default function QuoteDetail() {
                 ? (quote.status === 'SENT' ? 'Resending…' : 'Generating…')
                 // Phones: the short label keeps it on the title row (R5); the
                 // full label stays as its accessible name.
-                : <span className="qd-label-long" data-short={quote.status === 'SENT' ? 'Resend' : 'Send'}>{quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer'}</span>}
+                : <span className="qd-label-long" data-short={quote.status === 'SENT' ? 'Resend' : 'Send'}>{sendLabel}</span>}
             </button>
           )}
         </>}

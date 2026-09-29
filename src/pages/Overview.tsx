@@ -12,10 +12,10 @@ import { CircleAlert, ArrowUpRight, TrendingUp, TrendingDown, Truck, FileText } 
 import { InfoTip } from "@/components/ui/InfoTip";
 import SectionHeader from "@/components/layout/SectionHeader";
 import { StatusChip } from "@/components/ui/StatusChip";
-import { MicroBars, RevenueCostBars, PipelineBars, usePipeline } from "@/components/overview/today";
-import { presentSignal, staleSignal, isInTransitSignal, isIdleVehiclesSignal, idleVehiclesUrl } from "@/components/overview/signals";
+import { MicroBars, RevenueCostBars, PipelineBars, usePipeline, boardStage } from "@/components/overview/today";
+import { presentSignal, staleSignal, idleSignal, isInTransitSignal, isIdleVehiclesSignal, idleVehiclesUrl } from "@/components/overview/signals";
 import { isOpenLoad, staleWork } from "@/lib/staleWork";
-import { useAllQuotes, useHomeLedger } from "@/components/overview/ledger";
+import { useAllQuotes, useAllVehicles, useHomeLedger } from "@/components/overview/ledger";
 
 // Fetches + derives all dashboard data. Lives in the queryFn so the result is
 // cached by TanStack Query (keyed below) and survives navigation — revisiting
@@ -236,11 +236,24 @@ export default function Overview() {
   // the same count as Orders and Findings; the backend's "N loads in transit"
   // signal is replaced by that row. Everything else is the backend's signals.
   // Wait for the full loads ledger so the count never changes after paint.
-  const needsLoading = loading || (!ledger.data && !ledger.error);
+  // The idle-vehicles row is computed here from every vehicle and load (the
+  // Vehicles page's own sources and rule), never from the backend's plate list.
+  const allVehicles = useAllVehicles();
+  const vehiclesSettled = !!allVehicles.data || (allVehicles.isError && !allVehicles.isFetching);
+  const needsLoading = loading || (!ledger.data && !ledger.error) || !vehiclesSettled;
   const stale = !needsLoading && allLoads.length ? staleSignal(allLoads) : null;
+  const idle = !needsLoading && allVehicles.data && ledger.data ? idleSignal(allVehicles.data.rows, allLoads) : null;
   const needs: { row: ReturnType<typeof presentSignal>; actionUrl: string | null; severity: string }[] = [
     ...(stale ? [{ row: stale, actionUrl: stale.actionUrl, severity: "medium" }] : []),
-    ...signals.filter((i: any) => !(stale && isInTransitSignal(i))).map((i: any) => ({ row: presentSignal(i, allLoads), actionUrl: isIdleVehiclesSignal(i) ? idleVehiclesUrl : i.actionUrl as string | null, severity: String(i.severity || "low") })),
+    ...signals
+      .filter((i: any) => !(stale && isInTransitSignal(i)))
+      // Idle row: ours when the full fleet loaded (dropped if none are idle);
+      // else the backend's count only, without its plate list.
+      .flatMap((i: any) => {
+        if (!isIdleVehiclesSignal(i)) return [{ row: presentSignal(i, allLoads), actionUrl: i.actionUrl as string | null, severity: String(i.severity || "low") }];
+        if (allVehicles.data && ledger.data) return idle ? [{ row: idle as ReturnType<typeof presentSignal>, actionUrl: idle.actionUrl, severity: String(i.severity || "low") }] : [];
+        return [{ row: { ...presentSignal(i, allLoads), detail: "" }, actionUrl: idleVehiclesUrl, severity: String(i.severity || "low") }];
+      }),
   ];
 
   useEffect(() => {
@@ -530,7 +543,7 @@ export default function Overview() {
                         <td className="td-ellipsis td-hide-sm">{quote.customer_name || "—"}</td>
                         <td className="ov-muted td-hide-sm">{shortPlace(quote.pickup_location)} to {shortPlace(quote.delivery_location)}</td>
                         <td className="num">{wholeRand(parseFloat(quote.total_amount || "0"))}</td>
-                        <td><StatusChip status={quote.status} /></td>
+                        <td><StatusChip status={boardStage(quote) === 'EXPIRED' ? 'EXPIRED' : quote.status} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -618,7 +631,7 @@ export default function Overview() {
               <div className="tw-card__titles">
                 <h2 id="td-pipe-title" className="tw-card__title">
                   Quote pipeline
-                  <InfoTip align="end">Draft, Sent, Accepted and Declined are the Quotes board columns (a quote marked lost counts as Declined). On the road counts in-transit loads still on schedule; in-transit loads past their delivery date are said under that row as not closed. Win rate is accepted as a share of every quote sent{pipeline.sentEver > 0 ? `: ${pipeline.accepted} of ${pipeline.sentEver}` : ""}.</InfoTip>
+                  <InfoTip align="end">Draft, Sent, Accepted, Declined and Expired are the Quotes board columns (a quote marked lost counts as Declined; a draft or sent quote past its valid-until date is Expired and not counted as live). On the road counts in-transit loads still on schedule; in-transit loads past their delivery date are said under that row as not closed. Win rate is accepted as a share of every quote sent{pipeline.sentEver > 0 ? `: ${pipeline.accepted} of ${pipeline.sentEver}` : ""}.</InfoTip>
                 </h2>
                 <p className="tw-card__sub">
                   {quotesAll.isLoading && loading ? "Quotes by stage"

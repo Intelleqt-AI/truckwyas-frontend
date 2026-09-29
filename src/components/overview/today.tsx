@@ -153,29 +153,53 @@ export function RevenueCostBars({ months }: { months: MonthPoint[] }) {
 // ------------------------------------------------------------- quote pipeline
 
 /**
- * The Quotes board's stage for a quote (same rules as QuotesList and the
- * backend's status filter): Accepted also holds the legacy IT/COMPLETED
- * statuses, and a Sent quote marked lost sits in Declined, not Sent.
- * Anything else (e.g. EXPIRED) is on no board column and is not counted.
+ * True once a quote's valid-until day is over (compared as local calendar
+ * days, so a quote valid until 20 Jul is still live all of 20 Jul).
  */
-export function boardStage(q: any): 'DRAFT' | 'SENT' | 'ACCEPTED' | 'DECLINED' | null {
+export function quoteLapsed(q: any, now: Date = new Date()): boolean {
+  const v = String(q?.valid_until || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return v < today;
+}
+
+/**
+ * The one stage rule for a quote, shared by the Quotes board, the Quotes list,
+ * Home's pipeline and Customer detail (R8). Accepted also holds the legacy
+ * IT/COMPLETED statuses; a Sent quote marked lost sits in Declined. A Draft or
+ * Sent quote past its valid-until date is Expired: it is not live work, so it
+ * is not counted under Draft or Sent anywhere.
+ */
+export type BoardStage = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED';
+export function boardStage(q: any, now?: Date): BoardStage | null {
   const st = String(q?.status || '').toUpperCase();
-  if (st === 'DRAFT') return 'DRAFT';
-  if (st === 'SENT') return q?.outcome === 'rejected' ? 'DECLINED' : 'SENT';
+  if (st === 'SENT' && q?.outcome === 'rejected') return 'DECLINED';
+  if (st === 'DRAFT' || st === 'SENT') return quoteLapsed(q, now) ? 'EXPIRED' : st;
   if (st === 'ACCEPTED' || st === 'IT' || st === 'COMPLETED') return 'ACCEPTED';
   if (st === 'DECLINED') return 'DECLINED';
+  if (st === 'EXPIRED') return 'EXPIRED';
   return null;
 }
 
 /**
  * Quotes by their board column, plus orders on the road. Counts are the
- * board's (Draft, Sent, Accepted, Declined); "On the road" is the Orders
- * tab's In transit count (loads with status IN_TRANSIT), not a quote status.
+ * board's (Draft, Sent, Accepted, Declined, Expired); "On the road" is the
+ * Orders tab's In transit count (loads with status IN_TRANSIT), not a quote
+ * status. Expired quotes are listed last and never counted as live.
  */
 export function usePipeline(quotes: any[], loads: any[] = []) {
   return useMemo(() => {
-    const by = { DRAFT: 0, SENT: 0, ACCEPTED: 0, DECLINED: 0 };
-    for (const q of quotes) { const s = boardStage(q); if (s) by[s] += 1; }
+    const by = { DRAFT: 0, SENT: 0, ACCEPTED: 0, DECLINED: 0, EXPIRED: 0 };
+    let expiredSent = 0;
+    let draftsAll = 0;
+    for (const q of quotes) {
+      const s = boardStage(q);
+      if (s) by[s] += 1;
+      const st = String(q?.status || '').toUpperCase();
+      if (st === 'DRAFT') draftsAll += 1;
+      if (s === 'EXPIRED' && st === 'SENT') expiredSent += 1;
+    }
     // R7: "On the road" is current work only. In-transit loads past their
     // delivery date (or open > 30 days, src/lib/staleWork.ts) are "not closed",
     // counted separately so the card can say so instead of calling them active.
@@ -187,13 +211,15 @@ export function usePipeline(quotes: any[], loads: any[] = []) {
       { key: 'sent', label: 'Sent', count: by.SENT },
       { key: 'won', label: 'Accepted', count: by.ACCEPTED },
       // Stale in-transit loads are said under this row, never counted in it.
-      { key: 'moving', label: 'On the road', count: onTheRoad, note: staleInTransit > 0 ? `+${staleInTransit} past delivery date, not closed` : undefined },
+      { key: 'moving', label: 'On the road', count: onTheRoad, note: staleInTransit > 0 ? `${staleInTransit} past ${staleInTransit === 1 ? 'its' : 'their'} delivery date, not closed` : undefined },
       { key: 'lost', label: 'Declined', count: by.DECLINED },
+      ...(by.EXPIRED > 0 ? [{ key: 'expired', label: 'Expired', count: by.EXPIRED }] : []),
     ];
-    // Every quote that went out: still waiting, accepted or declined.
-    const sentEver = by.SENT + by.ACCEPTED + by.DECLINED;
+    // Every quote that went out: still waiting, accepted, declined, or sent
+    // and left to lapse.
+    const sentEver = by.SENT + by.ACCEPTED + by.DECLINED + expiredSent;
     const winRate = sentEver > 0 ? Math.round((by.ACCEPTED / sentEver) * 100) : null;
-    return { stages, awaiting: by.SENT, drafts: by.DRAFT, accepted: by.ACCEPTED, sentEver, winRate, staleInTransit };
+    return { stages, awaiting: by.SENT, drafts: by.DRAFT, draftsAll, expired: by.EXPIRED, accepted: by.ACCEPTED, sentEver, winRate, staleInTransit };
   }, [quotes, loads]);
 }
 

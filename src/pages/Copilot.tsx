@@ -7,14 +7,14 @@ import { StatusChip } from '@/components/ui/StatusChip';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { CAPITAL_LAUNCHED } from '@/lib/features';
 import { toast } from '@/lib/toast';
-import { normaliseFigures, formatMoney, formatDateTime } from '@/lib/formatters';
-import { saDateISO } from '@/lib/dates';
+import { normaliseFigures, formatMoney, formatDate, formatDateTime, formatDays } from '@/lib/formatters';
+import { saDateISO, saDaysBetween } from '@/lib/dates';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { postData, fetchData, deleteData } from '@/lib/Api';
 import { useAuth } from '@/lib/AuthContext';
 import Markdown from '@/components/copilot/Markdown';
 import ProposalCard, { Proposal } from '@/components/copilot/ProposalCard';
-import ConversationList, { ConversationSummary, conversationTitle, updatedAgo } from '@/components/copilot/ConversationList';
+import ConversationList, { ConversationSummary, conversationTitle } from '@/components/copilot/ConversationList';
 import ConversationsSheet from '@/components/copilot/ConversationsSheet';
 
 interface Action { label: string; route: string; }
@@ -36,19 +36,19 @@ interface Message {
 }
 
 /**
- * When a reply was written, so an old answer's figures never read as today's
- * (R7): "Today, 14:05" for today's replies, else "3 hours ago" / "104 days ago".
- * The full date and time are the title.
+ * The day a stretch of the conversation was written (R8): said once, as a
+ * divider, when the conversation starts and whenever the day changes, so an
+ * old answer's figures never read as today's without repeating the age on
+ * every reply. "Today", "Yesterday", else "15 Jun 2026 · 104 days ago".
+ * The full date and time of the first message that day are the title.
  */
-function replyWhen(iso?: string | null): string {
-  if (!iso) return '';
-  const t = new Date(iso);
-  if (Number.isNaN(t.getTime())) return '';
-  if (saDateISO(t) === saDateISO(new Date())) {
-    const hm = formatDateTime(t).split(', ').pop();
-    return hm ? `Today, ${hm}` : updatedAgo(iso);
-  }
-  return updatedAgo(iso);
+function dayDivider(iso: string): string {
+  const day = saDateISO(new Date(iso));
+  if (!day) return '';
+  const age = saDaysBetween(day) ?? 0;
+  if (age <= 0) return 'Today';
+  if (age === 1) return 'Yesterday';
+  return `${formatDate(day)} · ${formatDays(age)} ago`;
 }
 
 // The Typewriter streams raw text, which would flash unrendered markdown syntax.
@@ -477,24 +477,33 @@ export default function Copilot() {
               <div className="cp-thread" aria-live="polite" aria-relevant="additions">
                 {messages.slice(1).map((m, i) => {
                   const realIndex = i + 1;
+                  // A day divider before the first message of each day (R8).
+                  const day = m.createdAt ? saDateISO(new Date(m.createdAt)) : null;
+                  const prevDay = (() => {
+                    for (let j = realIndex - 1; j >= 1; j--) {
+                      const c = messages[j].createdAt;
+                      if (c) return saDateISO(new Date(c));
+                    }
+                    return null;
+                  })();
+                  const divider = m.createdAt && day && day !== prevDay ? (
+                    <p className="cp-day" key={`d-${realIndex}`}>
+                      <time dateTime={m.createdAt} title={formatDateTime(m.createdAt)}>{dayDivider(m.createdAt)}</time>
+                    </p>
+                  ) : null;
                   if (m.role === 'user') {
-                    return (
+                    return [divider,
                       <div key={realIndex} className="cp-msg cp-msg--user">
                         <span className="cp-sr">You said: </span>
                         <div className="cp-bubble">{m.content}</div>
-                      </div>
-                    );
+                      </div>,
+                    ];
                   }
-                  return (
+                  return [divider,
                     <div key={realIndex} className="cp-msg cp-msg--assistant">
                       <span className="cp-mark" aria-hidden="true"><Bot size={16} /></span>
                       <div className="cp-msg__body">
                         <span className="cp-sr">Copilot: </span>
-                        {m.createdAt && replyWhen(m.createdAt) && (
-                          <p className="cp-msg__meta">
-                            <time dateTime={m.createdAt} title={formatDateTime(m.createdAt)}>{replyWhen(m.createdAt)}</time>
-                          </p>
-                        )}
                         <div className="cp-answer">
                           {m.animate && !looksLikeMarkdown(m.content)
                             ? <Typewriter
@@ -545,8 +554,8 @@ export default function Copilot() {
                           </div>
                         )}
                       </div>
-                    </div>
-                  );
+                    </div>,
+                  ];
                 })}
                 {loading && (
                   <div className="cp-msg cp-msg--assistant">

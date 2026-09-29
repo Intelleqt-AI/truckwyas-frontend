@@ -1,4 +1,5 @@
 import "@/components/layout/section-header.css";
+import SectionHeader from "@/components/layout/SectionHeader";
 import "./quote-invoice-roles.css";
 import { localDateISO } from '@/lib/dates';
 import "./quote-builder-controls.css";
@@ -18,7 +19,7 @@ import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { AIChatPanel, type ChatMessage } from "@/components/AIChatPanel";
 import { useAuth } from "@/lib/AuthContext";
 import { isSubscriptionBlocked, subscriptionStatusDetail } from "@/lib/subscriptionStatus";
-import { MessageCircle, Map, Info, Sparkles, Maximize2, Mic, Square, X, Plus, GripVertical, ChevronDown, ChevronUp } from "lucide-react";
+import { MessageCircle, Map, Info, Sparkles, Maximize2, Mic, Square, X, Plus, GripVertical, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -128,14 +129,14 @@ function SortableStopRow({ stop, index, inputStyle, onLocationChange, onRemove }
       opacity: removing ? 0 : (isDragging ? 0.5 : 1),
       zIndex: isDragging ? 2 : "auto",
     }}>
-      <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--accent-primary)", color: "var(--btn-action-color)", fontSize: 11, fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-raised)", color: "var(--text-primary)", boxShadow: "inset 0 0 0 1px var(--border-default)", fontSize: 11, fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         {index + 1}
       </span>
       <span {...attributes} {...listeners} title="Drag to reorder"
         style={{ width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", cursor: "grab", color: "var(--text-tertiary)", flexShrink: 0, touchAction: "none" }}>
         <GripVertical size={14} />
       </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="qb-loc" style={{ flex: 1, minWidth: 0 }}>
         <LocationInput value={stop.location} onChange={onLocationChange} placeholder="Stop location" style={inputStyle} />
       </div>
       <button type="button" onClick={handleRemoveClick} title="Remove stop"
@@ -162,11 +163,9 @@ function StopPickPill({ index, active, filled, onSelect, onRemove }: {
   const [hovered, setHovered] = useState(false);
   return (
     <div style={{ position: "relative" }} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <button onClick={onSelect}
-        style={{ height: 24, minWidth: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", padding: "0 8px", borderRadius: "var(--radius-chip, 6px)", cursor: "pointer", whiteSpace: "nowrap",
-          border: `1px solid ${active || filled ? "var(--accent-primary)" : "var(--border-subtle)"}`,
-          background: active ? "var(--status-success-bg)" : "transparent",
-          color: active || filled ? "var(--accent-primary)" : "var(--text-tertiary)" }}>
+      <button type="button" onClick={onSelect} aria-pressed={active} aria-label={`Stop ${index + 1}`}
+        className={`tw-seg__opt${active ? " is-active" : ""}`} style={{ minWidth: 28, fontVariantNumeric: "tabular-nums" }}>
+        <span className={`qb-pin qb-pin--stop${filled ? " is-set" : ""}`} aria-hidden="true" />
         {index + 1}
       </button>
       {hovered && (
@@ -1098,9 +1097,9 @@ export default function QuoteBuilder() {
   // ---- map panel (shared between the inline card and the expanded modal) ----
   const renderMapPanel = (height: number, expandButton?: React.ReactNode, closeButton?: React.ReactNode) => (
     <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)" }}>
-        <span style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 6 }}>
-          <Map size={13} />
+      <div className="qb-maphead">
+        <span className="qb-maphead__hint">
+          <Map size={13} aria-hidden="true" style={{ flexShrink: 0 }} />
           {(() => {
             // pickMode is "pickup", "delivery", or a stop's id — resolve
             // whichever one is currently selected to its display label and
@@ -1114,17 +1113,19 @@ export default function QuoteBuilder() {
             const activeFilled = pickMode === "pickup" ? !!pickupCoords
               : pickMode === "delivery" ? !!deliveryCoords
               : !!activeStop?.coords;
+            // Same gesture on both: Leaflet reads a double-tap as its dblclick.
+            // Only the verb changes, by input type (CSS, no logic).
+            const verb = <><span className="qb-hint-mouse">Double-click</span><span className="qb-hint-touch">Double-tap</span></>;
             return activeFilled || !activeLabel
-              ? "Double-click the map to move a pin, or search above"
-              : <>Double-click the map to set <b style={{ color: "var(--text-secondary)" }}>{activeLabel}</b></>;
+              ? <span>{verb} the map to move a pin, or search above</span>
+              : <span>{verb} the map to set <b style={{ fontWeight: 500, color: "var(--text-primary)" }}>{activeLabel}</b></span>;
           })()}
         </span>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <button onClick={() => setPickMode("pickup")}
-            style={{ height: 24, display: "inline-flex", alignItems: "center", fontSize: 13, fontFamily: "var(--font-sans)", padding: "0 8px", borderRadius: "var(--radius-chip, 6px)", cursor: "pointer", whiteSpace: "nowrap",
-              border: `1px solid ${pickMode === "pickup" || pickupCoords ? "#16a34a" : "var(--border-subtle)"}`,
-              background: pickMode === "pickup" ? "color-mix(in srgb, #16a34a 12%, transparent)" : "transparent",
-              color: pickMode === "pickup" || pickupCoords ? "var(--status-success-text, #16a34a)" : "var(--text-secondary)" }}>
+        <div className="qb-maphead__tools">
+          <div className="tw-seg tw-seg--sm qb-picks" role="group" aria-label="Which point the map sets">
+          <button type="button" onClick={() => setPickMode("pickup")} aria-pressed={pickMode === "pickup"}
+            className={`tw-seg__opt${pickMode === "pickup" ? " is-active" : ""}`}>
+            <span className={`qb-pin qb-pin--from${pickupCoords ? " is-set" : ""}`} aria-hidden="true" />
             Collection
           </button>
           {stops.map((stop, i) => (
@@ -1132,19 +1133,17 @@ export default function QuoteBuilder() {
               onSelect={() => setPickMode(stop.id)} onRemove={() => removeStop(stop.id)} />
           ))}
           {pickupCoords && deliveryCoords && (
-            <button type="button" onClick={addStop} title="Add stop"
-              style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, borderRadius: "var(--radius-chip, 6px)", cursor: "pointer", flexShrink: 0,
-                border: "1px solid var(--border-subtle)", background: "transparent", color: "var(--accent-primary)" }}>
-              <Plus size={13} />
+            <button type="button" onClick={addStop} title="Add stop" aria-label="Add stop"
+              className="tw-seg__opt" style={{ padding: "0 6px" }}>
+              <Plus size={13} aria-hidden="true" />
             </button>
           )}
-          <button onClick={() => setPickMode("delivery")}
-            style={{ height: 24, display: "inline-flex", alignItems: "center", fontSize: 13, fontFamily: "var(--font-sans)", padding: "0 8px", borderRadius: "var(--radius-chip, 6px)", cursor: "pointer", whiteSpace: "nowrap",
-              border: `1px solid ${pickMode === "delivery" || deliveryCoords ? "#dc2626" : "var(--border-subtle)"}`,
-              background: pickMode === "delivery" ? "color-mix(in srgb, #dc2626 12%, transparent)" : "transparent",
-              color: pickMode === "delivery" || deliveryCoords ? "var(--status-danger-text, #dc2626)" : "var(--text-secondary)" }}>
+          <button type="button" onClick={() => setPickMode("delivery")} aria-pressed={pickMode === "delivery"}
+            className={`tw-seg__opt${pickMode === "delivery" ? " is-active" : ""}`}>
+            <span className={`qb-pin qb-pin--to${deliveryCoords ? " is-set" : ""}`} aria-hidden="true" />
             Delivery
           </button>
+          </div>
           {expandButton}
           {closeButton}
         </div>
@@ -1164,9 +1163,8 @@ export default function QuoteBuilder() {
       {pickupCoords && deliveryCoords && (
         <div style={{ padding: "10px", borderTop: "1px solid var(--border-subtle)" }}>
           {stops.length === 0 ? (
-            <button type="button" onClick={addStop}
-              style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", padding: 0, color: "var(--accent-primary)", cursor: "pointer", fontSize: 13, lineHeight: "20px", fontWeight: 500 }}>
-              <Plus size={12} /> Add stop
+            <button type="button" onClick={addStop} className="qb-textbtn">
+              <Plus size={12} aria-hidden="true" /> Add stop
             </button>
           ) : (
             <div>
@@ -1184,7 +1182,7 @@ export default function QuoteBuilder() {
                   <div style={{ position: "absolute", left: 9, top: 10, bottom: 10, width: 1, background: "var(--border-subtle)" }} />
 
                   <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-surface)", border: "2px solid #16a34a", flexShrink: 0 }} />
+                    <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-surface)", border: "2px solid var(--accent-primary)", flexShrink: 0 }} />
                     <span style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", fontWeight: 400 }}>{pickup || "Collection"}</span>
                   </div>
 
@@ -1203,12 +1201,12 @@ export default function QuoteBuilder() {
                     </SortableContext>
                   </DndContext>
 
-                  <button type="button" onClick={addStop} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", padding: "0 0 10px 28px", color: "var(--accent-primary)", cursor: "pointer", fontSize: 13, lineHeight: "20px", fontWeight: 500 }}>
-                    <Plus size={12} /> Add stop
+                  <button type="button" onClick={addStop} className="qb-textbtn" style={{ position: "relative", margin: "0 0 10px 28px" }}>
+                    <Plus size={12} aria-hidden="true" /> Add stop
                   </button>
 
                   <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-surface)", border: "2px solid #dc2626", flexShrink: 0 }} />
+                    <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-surface)", border: "2px solid var(--text-primary)", flexShrink: 0 }} />
                     <span style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", fontWeight: 400 }}>{delivery || "Delivery"}</span>
                   </div>
                 </div>
@@ -1223,10 +1221,10 @@ export default function QuoteBuilder() {
             <Tooltip key={i}>
               <TooltipTrigger asChild>
                 <button
+                  type="button"
                   onClick={() => setSelectedRouteIndex(i)}
-                  style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 13, lineHeight: "20px", padding: "5px 9px", borderRadius: "var(--radius-chip, 6px)", cursor: "pointer",
-                    border: `1px solid ${i === selectedRouteIndex ? "var(--accent-primary)" : "var(--border-subtle)"}`,
-                    background: i === selectedRouteIndex ? "var(--status-success-bg)" : "var(--bg-surface)", color: i === selectedRouteIndex ? "var(--accent-primary)" : "var(--text-secondary)" }}>
+                  aria-pressed={i === selectedRouteIndex}
+                  className="qb-routeopt">
                   {r.label || r.summary || `Route ${i + 1}`} · {Math.round(r.distance_km)} km
                 </button>
               </TooltipTrigger>
@@ -1251,9 +1249,9 @@ export default function QuoteBuilder() {
           only one option rather than silently showing nothing. */}
       {routeData?.routes?.length === 1 && (routeData.stops_count ?? stops.length) > 0 && (
         <div style={{ padding: 10, borderTop: "1px solid var(--border-subtle)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--status-success-bg)", border: "1px solid var(--accent-primary)", borderRadius: "var(--radius-nested, 8px)" }}>
-            <Map size={13} color="var(--accent-primary)" />
-            <span style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 13, lineHeight: "20px", fontWeight: 600, color: "var(--accent-primary)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--bg-raised)", borderRadius: "var(--radius-nested, 8px)" }}>
+            <Map size={13} color="var(--text-tertiary)" aria-hidden="true" />
+            <span style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 13, lineHeight: "20px", fontWeight: 500, color: "var(--text-primary)" }}>
               Route via {routeData.stops_count ?? stops.length} stop{(routeData.stops_count ?? stops.length) > 1 ? "s" : ""} · {Math.round(routeData.routes[0].distance_km)} km · {formatDuration(routeData.routes[0].duration_minutes)}
             </span>
           </div>
@@ -1271,10 +1269,11 @@ export default function QuoteBuilder() {
   // Brand label role: 13/20/500 sans, sentence case (label strings are
   // authored in sentence case; no uppercase transform).
   const labelS: React.CSSProperties = { fontSize: 13, lineHeight: "20px", fontWeight: 500, fontFamily: "var(--font-sans)", color: "var(--text-secondary)", letterSpacing: "normal", textTransform: "none" };
+  // Field label row: label left, an optional quiet "New" text button right.
+  const fieldLabelS: React.CSSProperties = { ...labelS, marginBottom: 6, minHeight: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 };
   // Marks a field required for the cost calculation to run (see `ready`).
   const Req = () => <span style={{ display: "inline-block", width: 4, height: 4, borderRadius: "50%", background: "var(--status-danger)", marginLeft: 5, verticalAlign: "middle" }} />;
-  const inputS: React.CSSProperties = { background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-control, 8px)", padding: "9px 11px", color: "var(--text-primary)", fontSize: 14, lineHeight: "20px", fontFamily: "var(--font-sans)", width: "100%", minHeight: 40, boxSizing: "border-box" };
-  const dot = (c: string): React.CSSProperties => ({ width: 7, height: 7, borderRadius: 2, background: c, flexShrink: 0 });
+  const inputS: React.CSSProperties = { background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-control, 8px)", padding: "9px 11px", color: "var(--text-primary)", fontSize: 14, lineHeight: "20px", fontFamily: "var(--font-sans)", width: "100%", minHeight: "var(--field-h, 40px)", boxSizing: "border-box" };
 
   // All four AI fields (recommended price, margin, win probability, sweet-spot)
   // come from the same analyze response — show them together only once it has
@@ -1294,42 +1293,39 @@ export default function QuoteBuilder() {
       {/* header */}
       {/* Same page head as every page (layout only): H1 on the title row,
           one grey line under it, actions on the right. */}
-      <header className="section-header qb-head">
-        <div className="section-header__top">
-        <div className="section-header__titles">
-          <div className="section-header__title-row">
-            <h1 className="section-header__title">{isEditing ? "Edit quote" : "New quote"}</h1>
-          </div>
-          <p className="section-header__description">Quotes and loads</p>
-        </div>
-        <div className="section-header__actions" style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", display: "flex", alignItems: "center", gap: 6 }}>
-            {saving ? "Saving…" : lastSavedAt ? `Saved to browser ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Auto-saves to this browser as you work"}
-            <span style={dot(saving ? "var(--status-warning)" : lastSavedAt ? "var(--status-success)" : "var(--text-tertiary)")} />
-          </div>
-          <button onClick={startNew} title="Clear every field and start a fresh quote (this one stays saved)"
-            style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "transparent", color: "var(--text-primary)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-control, 8px)", minHeight: "var(--control-h, 36px)", padding: "0 12px", cursor: "pointer" }}>
+      {/* The shared page head: breadcrumb back to Quotes on the subtitle
+          line, with the autosave state as a quiet status after it (never
+          over the title). One head action; Send lives in the price bar. */}
+      <SectionHeader
+        title={isEditing ? "Edit quote" : "New quote"}
+        back={isEditing ? { to: `/bookings/quotes/${editId}`, label: "Quote" } : { to: "/bookings/quotes", label: "Quotes" }}
+        description={
+          <span className="qb-savestate" aria-live="polite">
+            {saving ? "Saving…" : lastSavedAt ? `Saved in this browser at ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Auto-saves in this browser"}
+          </span>
+        }
+        actions={
+          <button type="button" className="tw-btn" onClick={startNew} title="Clear every field and start a fresh quote (this one stays saved)">
             Clear &amp; new quote
           </button>
-        </div>
-        </div>
-      </header>
+        }
+      />
 
       {/* Resume-unsaved banner — opt-in, only before the first DB save */}
       {resumable && !isEditing && (
-        <div style={{ ...cardS, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 14px", marginBottom: 12, borderColor: "var(--accent-primary)" }}>
-          <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+        <div className="qb-resume" style={{ ...cardS, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, padding: "12px 16px", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", minWidth: 0 }}>
             You have an unsaved quote from earlier{resumable.pickup ? ` (${resumable.pickup}${resumable.delivery ? ` → ${resumable.delivery}` : ""})` : ""}.
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={applyResumable} style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: "var(--radius-control, 8px)", padding: "9px 12px", cursor: "pointer" }}>Resume</button>
-            <button onClick={discardResumable} style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "transparent", color: "var(--text-secondary)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-control, 8px)", padding: "9px 12px", cursor: "pointer" }}>Discard</button>
+            <button type="button" className="tw-btn tw-btn--ghost" onClick={discardResumable}>Discard</button>
+            <button type="button" className="tw-btn tw-btn--primary" onClick={applyResumable}>Resume</button>
           </div>
         </div>
       )}
 
       {/* NL input — typed or voice */}
-      <div style={{ ...cardS, display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 14, background: "var(--bg-surface-hover)", minHeight: 44 }}>
+      <div className="qb-nl" style={{ ...cardS, border: "1px solid var(--border-control)", display: "flex", alignItems: "center", gap: 8, padding: "8px 8px 8px 14px", marginBottom: 16, minHeight: 44 }}>
         {voice.recording ? (
           <>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--status-danger)", flexShrink: 0, animation: "pulse-dot 1s infinite" }} />
@@ -1351,37 +1347,42 @@ export default function QuoteBuilder() {
           </div>
         ) : (
           <>
-            <MessageCircle size={16} color="var(--text-tertiary)" />
+            <MessageCircle size={16} color="var(--text-tertiary)" aria-hidden="true" style={{ flexShrink: 0 }} />
             <input value={nlText} onChange={e => setNlText(e.target.value)} onKeyDown={e => e.key === "Enter" && submitNL()}
-              placeholder="Describe it, e.g. “20t steel, JHB to Cape Town, flatbed, Tuesday”" style={{ ...inputS, border: "none", background: "transparent" }} />
+              placeholder="Describe it, e.g. “20t steel, JHB to Cape Town, flatbed, Tuesday”" aria-label="Describe the load" style={{ ...inputS, border: "none", background: "transparent", paddingLeft: 4, minWidth: 0 }} />
             <button type="button" onClick={voice.start} title="Record voice" aria-label="Record voice"
-              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface)", color: "var(--accent-primary)", cursor: "pointer", flexShrink: 0, padding: 0 }}>
+              className="tw-btn qb-nl__mic">
               <Mic size={16} />
             </button>
-            <button onClick={() => submitNL()} disabled={nlBusy || !nlText.trim()} style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: "var(--radius-control, 8px)", padding: "9px 14px", cursor: "pointer", opacity: nlText.trim() ? 1 : 0.5 }}>{nlBusy ? "Reading…" : "Fill"}</button>
+            <button type="button" onClick={() => submitNL()} disabled={nlBusy || !nlText.trim()} className="tw-btn qb-nl__fill">{nlBusy ? "Reading…" : "Fill"}</button>
           </>
         )}
       </div>
 
       {/* 1 — inputs */}
-      <div className="qb-grid qb-grid--inputs" style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+      {/* One 4-column grid for every field row (inputs, details, cargo/trip),
+          same template and gap, so field edges line up row to row. */}
+      <div className="qb-grid qb-grid--inputs" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16, marginBottom: 16 }}>
         <div>
-          <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Client<Req /></span>{!authUser?.is_demo && <span onClick={() => navigate("/customers")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span>}</div>
-          <select value={customerId} onChange={e => setCustomerId(e.target.value)} style={inputS}>
-            <option value="">Select client…</option>
-            {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <div style={fieldLabelS}><span>Client<Req /></span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New client" onClick={() => navigate("/customers")}><Plus size={12} aria-hidden="true" />New</button>}</div>
+          <div className="qb-select">
+            <select value={customerId} onChange={e => setCustomerId(e.target.value)} style={inputS} data-empty={customerId ? undefined : ""} aria-label="Client">
+              <option value="">Select client…</option>
+              {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <ChevronDown size={14} className="qb-select__chev" aria-hidden="true" />
+          </div>
         </div>
         <div>
-          <div style={{ ...labelS, marginBottom: 5 }}>Weight (t)<Req /></div>
-          <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} />
+          <div style={fieldLabelS}><span>Weight (t)<Req /></span></div>
+          <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} aria-label="Weight in tonnes" />
         </div>
-        <div>
-          <div style={{ ...labelS, marginBottom: 5 }}>Collection<Req /></div>
+        <div className="qb-loc">
+          <div style={fieldLabelS}><span>Collection<Req /></span></div>
           <LocationInput value={pickup} onChange={(v, c) => { setPickup(v); setPickupCoords(c || null); }} placeholder="City / address" style={inputS} />
         </div>
-        <div>
-          <div style={{ ...labelS, marginBottom: 5 }}>Delivery<Req /></div>
+        <div className="qb-loc">
+          <div style={fieldLabelS}><span>Delivery<Req /></span></div>
           <LocationInput value={delivery} onChange={(v, c) => { setDelivery(v); setDeliveryCoords(c || null); }} placeholder="City / address" style={inputS} />
         </div>
       </div>
@@ -1401,11 +1402,12 @@ export default function QuoteBuilder() {
       )}
 
       {/* details */}
-      <div style={{ marginBottom: 18 }}>
-        <div className="qb-grid qb-grid--details" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+      <div style={{ marginBottom: 24 }}>
+        <div className="qb-grid qb-grid--details" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16 }}>
           <div>
-            <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Vehicle type</span>{!authUser?.is_demo && <span onClick={() => navigate("/fleet/vehicles")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span>}</div>
-            <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS}>
+            <div style={fieldLabelS}><span>Vehicle type</span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New vehicle type" onClick={() => navigate("/fleet/vehicles")}><Plus size={12} aria-hidden="true" />New</button>}</div>
+            <div className="qb-select">
+            <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS} aria-label="Vehicle type">
               <option value="">Not decided yet</option>
               {vehicleTypes.map((v: any) => (
                 <option key={v.id || v.name} value={v.name}>{v.name}{Number(v.capacity) > 0 ? ` (${v.capacity}t)` : ""}</option>
@@ -1421,18 +1423,22 @@ export default function QuoteBuilder() {
                   return <option key={n} value={n}>{n}{Number(v?.capacity) > 0 ? ` (${v.capacity}t)` : ""}</option>;
                 })}
             </select>
+            <ChevronDown size={14} className="qb-select__chev" aria-hidden="true" />
+            </div>
           </div>
-          <div><div style={{ ...labelS, marginBottom: 5 }}>Pickup date</div><input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)} style={inputS} /></div>
-          <div><div style={{ ...labelS, marginBottom: 5 }}>Delivery date</div><input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} style={inputS} /></div>
-          <div><div style={{ ...labelS, marginBottom: 5 }}>Valid until</div><input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} style={inputS} /></div>
+          <div><div style={fieldLabelS}><span>Pickup date</span></div><input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)} style={inputS} data-empty={pickupDate ? undefined : ""} aria-label="Pickup date" /></div>
+          <div><div style={fieldLabelS}><span>Delivery date</span></div><input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} style={inputS} data-empty={deliveryDate ? undefined : ""} aria-label="Delivery date" /></div>
+          <div><div style={fieldLabelS}><span>Valid until</span></div><input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} style={inputS} data-empty={validUntil ? undefined : ""} aria-label="Valid until" /></div>
           {/* Spans the grid: sits directly under the Vehicle type field but
-              gets the full form width, so the options stay on one line. */}
-          <div style={{ gridColumn: "1 / -1" }}>
+              gets the full form width, so the options stay on one line.
+              Rendered only when there is something to show, so an empty row
+              doesn't add a second grid gap. */}
+          {suggestions.length > 0 && <div style={{ gridColumn: "1 / -1", marginTop: -8 }}>
           {/* Offered, not applied. Accepting one is a real selection, so the
               rate, the capacity check and the lane benchmark all switch on
               together — the same as picking it from the list by hand. */}
           {suggestions.length > 0 && (
-            <div style={{ marginTop: 3, display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px 14px", fontSize: 13, lineHeight: 1.6 }}>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px 16px", fontSize: 13, lineHeight: "20px" }}>
               {/* Label sits on the same line as the options: it's a lead-in, not
                   a field heading, so it keeps the form's spacing tight. */}
               <span style={{ ...labelS, textTransform: "none", letterSpacing: "normal" }}>
@@ -1443,15 +1449,14 @@ export default function QuoteBuilder() {
                   <button
                     type="button"
                     onClick={() => applyVehicleType(x.vt.name)}
-                    style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "var(--accent-primary)", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2, textAlign: "left" }}
+                    className="qb-textbtn qb-textbtn--pick"
                   >
                     {x.vt.name} ({x.cap}t)
                   </button>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button type="button" title={`Why ${x.vt.name} suits this load`}
-                        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>
-                        <Info size={9} />
+                      <button type="button" title={`Why ${x.vt.name} suits this load`} aria-label={`Why ${x.vt.name} suits this load`} className="qb-info">
+                        <Info size={14} aria-hidden="true" />
                       </button>
                     </PopoverTrigger>
                     <PopoverContent align="start" style={{ width: 270, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
@@ -1468,35 +1473,33 @@ export default function QuoteBuilder() {
               ))}
             </div>
           )}
-          </div>
-          <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Cargo</div><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} /></div>
-          <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Trip</div>
-            <div style={{ display: "flex", gap: 6 }}>
-              {(["ONE_WAY", "ROUND_TRIP"] as const).map(t => <button key={t} onClick={() => setTripType(t)} style={{ ...inputS, width: "auto", flex: 1, cursor: "pointer", background: tripType === t ? "var(--accent-primary)" : "var(--input-bg)", color: tripType === t ? "var(--btn-action-color)" : "var(--text-secondary)", fontWeight: tripType === t ? 500 : 400 }}>{t === "ONE_WAY" ? "One way" : "Round"}</button>)}
+          </div>}
+          <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span>Cargo</span></div><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} aria-label="Cargo" /></div>
+          <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span id="qb-trip-label">Trip</span></div>
+            {/* The shared segmented control: neutral track, raised active option. */}
+            <div className="tw-seg tw-seg--block qb-trip" role="group" aria-labelledby="qb-trip-label">
+              {(["ONE_WAY", "ROUND_TRIP"] as const).map(t => <button key={t} type="button" onClick={() => setTripType(t)} aria-pressed={tripType === t} className={`tw-seg__opt${tripType === t ? " is-active" : ""}`}>{t === "ONE_WAY" ? "One way" : "Round"}</button>)}
             </div>
           </div>
         </div>
       </div>
 
       {/* 2 — map + cost */}
-      <div className="qb-grid qb-grid--mapcost" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 16, marginBottom: 16 }}>
+      {/* Top-aligned: each card is as tall as its content (no stretched card). */}
+      <div className="qb-grid qb-grid--mapcost" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", alignItems: "start", gap: 16, marginBottom: 16 }}>
           <div style={{ ...cardS, overflow: "hidden" }}>
             {renderMapPanel(300, (
               <Dialog>
                 <DialogTrigger asChild>
-                  <button type="button" title="Expand map"
-                    style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "var(--radius-chip, 6px)", cursor: "pointer",
-                      border: "1px solid var(--border-subtle)", background: "transparent", color: "var(--text-tertiary)" }}>
-                    <Maximize2 size={12} />
+                  <button type="button" title="Expand map" aria-label="Expand map" className="qb-iconbtn">
+                    <Maximize2 size={14} aria-hidden="true" />
                   </button>
                 </DialogTrigger>
                 <DialogContent style={{ ...cardS, borderRadius: "var(--radius-dialog, 16px)", width: "min(1400px, 95vw)", padding: 0 }} hideClose>
                   {renderMapPanel(Math.round(Math.min(window.innerHeight * 0.78, 780)), undefined, (
                     <DialogClose asChild>
-                      <button type="button" title="Close"
-                        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "var(--radius-chip, 6px)", cursor: "pointer",
-                          border: "1px solid var(--border-subtle)", background: "var(--bg-surface)", color: "var(--text-secondary)" }}>
-                        <X size={13} />
+                      <button type="button" title="Close" aria-label="Close map" className="qb-iconbtn">
+                        <X size={14} aria-hidden="true" />
                       </button>
                     </DialogClose>
                   ))}
@@ -1504,8 +1507,11 @@ export default function QuoteBuilder() {
               </Dialog>
             ))}
           </div>
-          <div style={{ ...cardS, padding: "14px 16px" }}>
-            <h2 style={{ margin: "0 0 8px", fontSize: 16, lineHeight: "24px", fontWeight: 600, fontFamily: "var(--font-sans)", letterSpacing: "normal", color: "var(--text-primary)" }}>Cost breakdown · {vehicleType || "no truck picked"}</h2>
+          <section className="qb-cost" aria-labelledby="qb-cost-title" style={{ ...cardS, padding: "var(--card-pad, 20px)" }}>
+            <div className="qb-cost__head">
+              <h2 id="qb-cost-title" className="qb-cost__title">Cost breakdown</h2>
+              <p className="qb-cost__sub">{vehicleType ? `On your ${vehicleType} rates` : "No truck picked, so company defaults"}</p>
+            </div>
             {billingBlocked && (
               <div style={{
                 padding: 14, marginBottom: ready ? 14 : 0, borderRadius: "var(--radius-nested, 8px)",
@@ -1525,12 +1531,31 @@ export default function QuoteBuilder() {
                 </button>
               </div>
             )}
-            {!billingBlocked && !ready && (
-              <div style={{ padding: "30px 4px", textAlign: "center", color: "var(--text-tertiary)" }}>
-                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)" }}>Add a client, collection, delivery and weight</div>
-                <div style={{ fontSize: 13, lineHeight: "20px", marginTop: 6 }}>Costs and the AI quote appear here automatically.</div>
-              </div>
-            )}
+            {!billingBlocked && !ready && (() => {
+              // Empty state: what pricing still needs, read from the same four
+              // inputs `ready` checks (display only).
+              const clientName = customers.find((c: any) => String(c.id) === String(customerId))?.name;
+              const needs: [string, string | null][] = [
+                ["Client", customerId ? (clientName || "Chosen") : null],
+                ["Collection", pickup && pickupCoords ? pickup : null],
+                ["Delivery", delivery && deliveryCoords ? delivery : null],
+                ["Weight", Number(weight) > 0 ? `${weight} t` : null],
+              ];
+              return (
+                <div className="qb-need">
+                  <ul className="qb-need__list" aria-label="Needed to price this quote">
+                    {needs.map(([k, v]) => (
+                      <li key={k} className={`qb-need__row${v ? " is-done" : ""}`}>
+                        <span className="qb-need__mark" aria-hidden="true">{v ? <Check size={12} strokeWidth={2.5} /> : null}</span>
+                        <span className="qb-need__k">{k}</span>
+                        <span className="qb-need__v">{v || "Needed"}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="qb-need__foot">Fuel, tolls, driver allowance, base rate and a suggested price follow as soon as all four are in.</p>
+                </div>
+              );
+            })()}
             {!billingBlocked && ready && isDemoQuotaExceeded && (
               <div style={{ padding: "20px 4px" }}>
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-danger-text, var(--status-danger))", fontWeight: 600, marginBottom: 6 }}>Demo quota reached</div>
@@ -1562,9 +1587,9 @@ export default function QuoteBuilder() {
                 { key: "driver", l: "Driver allowance", v: driverAllowance, c: "var(--text-tertiary)" },
                 { key: "base", l: `Base rate (${hasVehicleType ? vehicleType : "company default"} · R${baseRatePerKm}/km)`, v: baseCost, c: "var(--accent-primary)" },
               ].map((r, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border-row)", fontSize: 13 }}>
-                  <span style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={dot(r.c)} />{r.key === "fuel" && liveDieselHintText ? (
+                <div key={i} className="qb-cost__row">
+                  <span className="qb-cost__label">
+                    {r.key === "fuel" && liveDieselHintText ? (
                       <span style={{ display: "flex", flexDirection: "column" }}>
                         <span>{r.l}</span>
                         <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{liveDieselHintText}</span>
@@ -1574,8 +1599,8 @@ export default function QuoteBuilder() {
                       <Popover>
                         <PopoverTrigger asChild>
                           <button type="button" title="How this fuel figure was worked out"
-                            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1 }}>
-                            <Info size={11} />
+                            className="qb-info">
+                            <Info size={14} aria-hidden="true" />
                           </button>
                         </PopoverTrigger>
                         <PopoverContent align="start" style={{ width: 280, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
@@ -1638,8 +1663,8 @@ export default function QuoteBuilder() {
                       <Popover>
                         <PopoverTrigger asChild>
                           <button type="button" title="Toll breakdown"
-                            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1 }}>
-                            <Info size={11} />
+                            className="qb-info">
+                            <Info size={14} aria-hidden="true" />
                           </button>
                         </PopoverTrigger>
                         <PopoverContent align="start" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
@@ -1684,8 +1709,8 @@ export default function QuoteBuilder() {
                         <Popover>
                           <PopoverTrigger asChild>
                             <button type="button" title="Cross-border breakdown"
-                              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1 }}>
-                              <Info size={11} />
+                              className="qb-info">
+                              <Info size={14} aria-hidden="true" />
                             </button>
                           </PopoverTrigger>
                           <PopoverContent align="start" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
@@ -1711,33 +1736,31 @@ export default function QuoteBuilder() {
                       );
                     })()}
                   </span>
-                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatCurrency(r.v)}</span>
+                  <span className="qb-cost__value">{formatCurrency(r.v)}</span>
                 </div>
               ))}
               {serviceCharge > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border-row)", fontSize: 13 }}>
-                  <span style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={dot("var(--text-tertiary)")} />Markup (suggested price in use)
-                  </span>
-                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatCurrency(serviceCharge)}</span>
+                <div className="qb-cost__row">
+                  <span className="qb-cost__label">Markup (suggested price in use)</span>
+                  <span className="qb-cost__value">{formatCurrency(serviceCharge)}</span>
                 </div>
               )}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 10, paddingTop: 12, borderTop: "1px solid var(--border-subtle)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, paddingTop: 12 }}>
                 <span style={labelS}>Quote price</span>
                 <span style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, color: "var(--text-primary)" }}>{formatCurrency(total)}</span>
               </div>
               <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 8 }}>{Math.round(distance)} km {legs === 2 ? `one way · ${Math.round(chargeDistance)} km round trip` : "one way"} · live diesel · {hasVehicleType ? `your ${vehicleType} settings` : "your company defaults"}{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
-              <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Tolls</div><input type="number" value={tollManuallyEdited ? editableTollCost : String(tollCost)} onChange={e => { setEditableTollCost(e.target.value); setTollManuallyEdited(true); }} style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
-                <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Driver</div><input type="number" value={driverAllowanceInput} onChange={e => setDriverAllowanceInput(e.target.value)} style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ ...labelS, marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+              <div className="qb-cost__adjust">
+                <div style={{ flex: 1, minWidth: 0 }}><div style={{ ...fieldLabelS, marginBottom: 4 }}><span>Tolls</span></div><input type="number" value={tollManuallyEdited ? editableTollCost : String(tollCost)} onChange={e => { setEditableTollCost(e.target.value); setTollManuallyEdited(true); }} aria-label="Tolls" className="qb-mini" style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
+                <div style={{ flex: 1, minWidth: 0 }}><div style={{ ...fieldLabelS, marginBottom: 4 }}><span>Driver</span></div><input type="number" value={driverAllowanceInput} onChange={e => setDriverAllowanceInput(e.target.value)} aria-label="Driver allowance" className="qb-mini" style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ ...fieldLabelS, marginBottom: 4 }}>
                     <span>R/km</span>
                     <Popover>
                       <PopoverTrigger asChild>
                         <button type="button" title="Where this rate comes from"
-                          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>
-                          <Info size={11} />
+                          className="qb-info">
+                          <Info size={14} aria-hidden="true" />
                         </button>
                       </PopoverTrigger>
                       <PopoverContent align="end" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
@@ -1779,6 +1802,8 @@ export default function QuoteBuilder() {
                     type="number"
                     value={baseRatePerKm}
                     onChange={e => setBaseRatePerKm(e.target.value)}
+                    aria-label="Base rate per km"
+                    className="qb-mini"
                     style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }}
                   />
                   {baseRateSource && (
@@ -1789,12 +1814,12 @@ export default function QuoteBuilder() {
                 </div>
               </div>
             </>)}
-          </div>
+          </section>
       </div>
 
       {/* 3 — AI quote */}
       {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 && (
-        <div style={{ ...cardS, border: "1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border-subtle))", marginBottom: 14 }}>
+        <div style={{ ...cardS, overflow: "hidden", marginBottom: 16 }}>
           {/* still learning — shown first, above the price block, while there's no
               qualifying model at either tier. Shows both tiers' progress so the
               user can see whether it's THEIR data or the platform's that's short. */}
@@ -1842,8 +1867,8 @@ export default function QuoteBuilder() {
                     title={`Trained on ${aiPrediction.training_samples?.toLocaleString?.() ?? aiPrediction.training_samples} ${aiPrediction.model_scope === "user" ? "of your own" : "platform-wide"} closed quotes`}
                     style={{
                       fontSize: 13, lineHeight: "20px", fontWeight: 500, padding: "0 6px", borderRadius: "var(--radius-chip, 6px)", textTransform: "none", letterSpacing: 0,
-                      background: aiPrediction.model_scope === "user" ? "color-mix(in srgb, var(--accent-primary) 18%, transparent)" : "var(--bg-surface-hover)",
-                      color: aiPrediction.model_scope === "user" ? "var(--accent-primary)" : "var(--text-secondary)",
+                      background: "var(--bg-raised)",
+                      color: "var(--text-secondary)",
                     }}
                   >
                     {aiPrediction.model_scope === "user" ? "Personal AI" : "Platform AI"}
@@ -1864,7 +1889,7 @@ export default function QuoteBuilder() {
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
               ) : (<>
                 <div style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, marginTop: 4 }}>{opt?.optimal_margin_pct ? `${Math.round(opt.optimal_margin_pct)}%` : `${marginPct}%`}</div>
-                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-success)", marginTop: 2 }}>{formatCurrency(opt?.expected_profit ?? ((suggestedPrice || total) - directCost))} profit</div>
+                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-success-text, var(--status-success))", marginTop: 2 }}>{formatCurrency(opt?.expected_profit ?? ((suggestedPrice || total) - directCost))} profit</div>
               </>)}
             </div>
             <div style={{ padding: "16px 18px" }}>
@@ -1873,7 +1898,7 @@ export default function QuoteBuilder() {
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
               ) : (<>
                 <div style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, marginTop: 4 }}>{opt?.win_probability_at_optimal != null ? `${Math.round(opt.win_probability_at_optimal * 100)}%` : "—"}</div>
-                <div style={{ marginTop: 6, height: 5, borderRadius: 3, background: "var(--bg-surface-hover)", overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.round((opt?.win_probability_at_optimal || 0) * 100)}%`, background: "var(--accent-primary)" }} /></div>
+                <div style={{ marginTop: 6, height: 5, borderRadius: 3, background: "var(--bg-raised)", overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.round((opt?.win_probability_at_optimal || 0) * 100)}%`, background: "var(--accent-primary)" }} /></div>
               </>)}
             </div>
           </div>
@@ -1896,7 +1921,7 @@ export default function QuoteBuilder() {
       )}
 
       {/* notes: above the price bar so they are filled in before sending */}
-      {ready && <div style={{ marginBottom: 16 }}><div style={{ ...labelS, marginBottom: 5 }}>Notes (optional)</div><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Anything for the client or your team…" style={{ ...inputS, resize: "vertical" }} /></div>}
+      {ready && <div style={{ marginBottom: 16 }}><div style={fieldLabelS}><label htmlFor="qb-notes">Notes (optional)</label></div><textarea id="qb-notes" value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Anything for the client or your team…" style={{ ...inputS, resize: "vertical" }} /></div>}
 
       {/* One price, next to Send. Sticky so Send stays in reach while scrolling. */}
       {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 && (

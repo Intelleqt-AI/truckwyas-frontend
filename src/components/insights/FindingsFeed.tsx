@@ -107,7 +107,7 @@ export default function FindingsFeed() {
             aside={(
               <InfoTip tone="inverse" label="How cash held up is calculated">
                 <p className="it__title">Cash held up</p>
-                <p>Money you have earned but not collected, across the findings below: unsent drafts, open balances and loads with a vehicle that were never closed. Pending loads were never picked up, so they are not counted. Each invoice and load is counted once, even if it is in two findings. Costs and estimates are not included.</p>
+                <p>Money you have earned but not collected, across the findings below: unsent drafts, open balances and loads with a vehicle that were left open. Pending loads were never picked up, so they are not counted. Each invoice and load is counted once, even if it is in two findings. Costs and estimates are not included.</p>
               </InfoTip>
             )}
             figure={randWhole(summary.cash)}

@@ -14,7 +14,10 @@ import { MobileAuthLayout } from "@/components/MobileAuthLayout";
 // one line, each something the product does today (no pricing checklist).
 const PROOF_POINTS = [
   "Quotes priced from your own costs",
-  "Delivered loads invoice themselves",
+  // R8: checked against the backend (core/signals.py _auto_invoice_on_delivery,
+  // AUTO_INVOICE_ON_DELIVERY on by default): marking a load delivered raises
+  // its invoice. It is not e-mailed, so the line says "raised", nothing more.
+  "Invoices raised the moment a load is delivered",
   "See who owes you, and for how long",
 ];
 
@@ -144,7 +147,7 @@ const Login = () => {
           Sign in to your account
         </h1>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-          Enter your credentials to access the dashboard
+          Use the email and password you signed up with
         </div>
       </div>
 

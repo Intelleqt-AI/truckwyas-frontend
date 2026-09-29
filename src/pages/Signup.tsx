@@ -18,19 +18,17 @@ const TAKE_RATE = formatPercent(0.25, 2); // "0,25%"
 const signupSteps = (formIs: "on the right" | "above") => [
   { label: "Create your account", detail: `Name, email and password, in the form ${formIs}` },
   { label: "Verify your email", detail: "We send a 6-digit code, valid for 10 minutes" },
-  { label: "Add card and pay", detail: "The monthly fee, charged via Paystack. Your fleet goes live the moment it clears" },
+  { label: "Add card and pay", detail: "The monthly fee, via Paystack. You're live once it clears" },
 ];
 
-// Same list BillingSettings.tsx shows for an active subscription — kept
-// identical so nothing you're promised here differs from what you see later.
+// R8: four calm items, one column, each something the backend does today
+// (no load or user caps; team invites; API keys). A shorter subset of the
+// BillingSettings list: the plan page can list everything, sign-up need not.
 const PLAN_FEATURES = [
   "Unlimited loads and invoices",
   "Quotes priced from your own costs",
-  "Reports and insights",
-  "Fleet and driver records",
-  "Multi-user access",
-  "API and integrations",
-  "Priority support",
+  "Reports, fleet and driver records",
+  "Your whole team, one account",
 ];
 
 const rules = [
@@ -307,17 +305,15 @@ const Signup = () => {
         ))}
       </div>
 
-      {/* Two columns; a feature too long for half the width takes a whole
-          row (dense packing keeps the others paired), so none wraps to an
-          orphan word ("… your own / costs"). */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridAutoFlow: 'row dense', gap: '8px 16px' }}>
+      {/* R8: one column of four, so the panel reads calmly. */}
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {PLAN_FEATURES.map(f => (
-          <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', gridColumn: f.length > 28 ? '1 / -1' : undefined }}>
+          <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
             <Check size={16} aria-hidden="true" style={{ color: 'var(--text-primary)', flexShrink: 0, marginTop: 2 }} />
             {f}
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
 
       <div style={{ marginTop: 20, fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)' }}>
         Payments secured by Paystack

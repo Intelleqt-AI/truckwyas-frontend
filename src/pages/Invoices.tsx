@@ -612,10 +612,11 @@ export default function Invoices() {
                         </span>
                       </td>
                       <td className={`num m-amount${invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005 ? " fin-cell-2" : ""}`}>
-                        {formatCurrency(amount)}
+                        {/* Lists show whole rands; cents stay on the invoice and in the title (R8). */}
+                        <span title={formatCurrency(amount)}>{wholeRand(amount)}</span>
                         {/* Part-paid: what is still owed, under the invoice total. */}
                         {invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005 && (
-                          <span className="fin-cell-sub">{formatCurrency(invoiceBalance(inv))} due</span>
+                          <span className="fin-cell-sub" title={`${formatCurrency(invoiceBalance(inv))} due`}>{wholeRand(invoiceBalance(inv))} due</span>
                         )}
                       </td>
                       <td className="actions" onClick={(e) => e.stopPropagation()}>

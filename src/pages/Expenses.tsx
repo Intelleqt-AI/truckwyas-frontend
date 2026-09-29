@@ -589,7 +589,7 @@ export default function Expenses() {
                     <td className="m-hide" style={{ whiteSpace: 'nowrap' }}>{catLabel(exp.category)}</td>
                     <td className="m-hide fin-col-mid fin-nowrap">{vehicleLabel(exp)}</td>
                     <td className="m-status"><StatusChip status={status} size="sm" /></td>
-                    <td className="num m-amount">{formatCurrency(amountOf(exp))}</td>
+                    <td className="num m-amount" title={formatCurrency(amountOf(exp))}>{wholeRand(amountOf(exp))}</td>
                     <td className="actions">
                       <RowActions
                         label={`Expense ${exp.expense_number || exp.description || exp.id}`}

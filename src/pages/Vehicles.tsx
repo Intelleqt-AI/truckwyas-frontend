@@ -147,7 +147,8 @@ const daysUntil = (iso?: string | null) => {
 
 /* Status tiles double as the list filter. Definitions (shared with Home's
    "Vehicles idle" note, which counts status Available):
-     On a job        status In use
+     Marked in use   status In use (a status, not work: the note says how
+                     many are on a current order)
      Available       status Available (or Active)
      In maintenance  status Maintenance or Out of service */
 type TileKey = 'job' | 'free' | 'shop';
@@ -158,7 +159,7 @@ const TILE_MATCH: Record<TileKey, (s: string) => boolean> = {
   free: s => s === 'AVAILABLE' || s === 'ACTIVE',
   shop: s => s === 'MAINTENANCE' || s === 'OUT_OF_SERVICE',
 };
-const TILE_LABEL: Record<TileKey, string> = { job: 'On a job', free: 'Available', shop: 'In maintenance' };
+const TILE_LABEL: Record<TileKey, string> = { job: 'Marked in use', free: 'Available', shop: 'In maintenance' };
 
 // The API sends amounts as decimal strings; coerce before formatting.
 const formatZAR = (v: number | string | null | undefined) => {
@@ -295,9 +296,9 @@ export default function Vehicles() {
   const activeLoadByVehicle = data?.activeLoadByVehicle ?? {};
   const deliveredByVehicle = data?.deliveredByVehicle ?? {};
   const revenueOf = (v: Vehicle) => deliveredByVehicle[v.id]?.revenue ?? 0;
-  // A status the open orders contradict: on a job with no order, or free / in the workshop while on one.
+  // A status the open orders contradict: marked in use with no order, or free / in the workshop while on one.
   // Current work only: an order left open (stale, src/lib/staleWork.ts) is
-  // not a job, so it counts neither for "On a job" nor as a reason to be out.
+  // not a job, so it counts neither as current work nor as a reason to be out.
   const currentLoad = (v: Vehicle) => { const l = activeLoadByVehicle[v.id]; return l && !staleWork(l) ? l : null; };
   const mismatch = (v: Vehicle) => (currentLoad(v) != null) !== TILE_MATCH.job(v.status);
   const filtered = tileFilter === 'mismatch' ? vehicles.filter(mismatch) : tileFilter ? vehicles.filter(v => TILE_MATCH[tileFilter](v.status)) : vehicles;
@@ -382,8 +383,8 @@ export default function Vehicles() {
       </>;
     }
     if (TILE_MATCH.job(v.status)) return reviewing
-      ? <StatusChip tone="warning" size="sm" label="On a job · no current order" />
-      : <span className="fleet-doing--mismatch">On a job · no current order</span>;
+      ? <StatusChip tone="warning" size="sm" label="Marked in use · no current order" />
+      : <span className="fleet-doing--mismatch">Marked in use · no current order</span>;
     if (TILE_MATCH.shop(v.status)) return <span>{v.status === 'OUT_OF_SERVICE' ? 'Out of service' : v.last_maintenance_date ? `In the workshop since ${formatDate(v.last_maintenance_date)}` : 'In the workshop'}</span>;
     if (TILE_MATCH.free(v.status)) return <span>{driver ? `Free, ${driver} assigned` : 'Free'}</span>;
     return <span>—</span>;
@@ -453,9 +454,9 @@ export default function Vehicles() {
         <KpiRow className="fleet-kpis fleet-kpis--filter">
           <KpiTile
             {...tileProps('job')}
-            label="On a job"
+            label="Marked in use"
             figure={loading ? skelFigure : <>{onJob.length}<span className="tw-kpi__of"> of {vehicles.length}</span></>}
-            note={loading ? 'Loading' : onJobNoOrder > 0 ? `${onJobNoOrder} with no current order` : onJob.length ? 'All on a current order' : 'No truck is out'}
+            note={loading ? 'Loading' : !onJob.length ? 'None marked in use' : onJobNoOrder === onJob.length ? 'None on a current order' : onJobNoOrder > 0 ? `${onJob.length - onJobNoOrder} on a current order, ${onJobNoOrder} not` : 'All on a current order'}
           />
           <KpiTile
             {...tileProps('free')}
@@ -485,7 +486,7 @@ export default function Vehicles() {
               filters the list. It lives in the toolbar row (reserved while
               loading), so it never pushes the table down when it arrives. */}
           {!loading && !failed && mismatchCount > 0 && (
-            <span className="fleet-review" title={[onJobNoOrder ? `${onJobNoOrder} on a job with no current order` : '', freeOnOrder ? `${freeOnOrder} available but on a current order` : '', shopOnOrder ? `${shopOnOrder} in maintenance but on a current order` : ''].filter(Boolean).join(', ')}>
+            <span className="fleet-review" title={[onJobNoOrder ? `${onJobNoOrder} marked in use with no current order` : '', freeOnOrder ? `${freeOnOrder} available but on a current order` : '', shopOnOrder ? `${shopOnOrder} in maintenance but on a current order` : ''].filter(Boolean).join(', ')}>
               <i className="fleet-review__dot" aria-hidden="true" />
               <span className="fleet-review__text">{mismatchCount} don’t match their orders</span>
               <button type="button" className="fleet-review__btn" aria-pressed={reviewing} onClick={() => setTileFilter(f => (f === 'mismatch' ? null : 'mismatch'))}>

@@ -11,6 +11,7 @@ import { Loader } from "@/components/Loader";
 import { toast } from "@/lib/toast";
 import { Fuel, Columns3, List as ListIcon } from "lucide-react";
 import { boardStage } from "@/components/overview/today";
+import { useAllQuotes } from "@/components/overview/ledger";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { ConvertToBookingModal } from "@/components/ConvertToBookingModal";
@@ -70,11 +71,16 @@ const sentenceCase = (s?: string) =>
 // used to double as quote-pipeline columns too, which let a quote be
 // dragged straight to "Completed" with no Order behind it at all.
 const COLUMNS = ['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED'];
+// The board shows one more column, Expired: derived from the date rule, not
+// a status, so nothing can be dropped on it.
+const BOARD_COLUMNS = [...COLUMNS, 'EXPIRED'];
 const COLUMN_LABELS: Record<string, string> = {
   DRAFT: 'Draft',
   SENT: 'Sent',
   ACCEPTED: 'Accepted',
   DECLINED: 'Declined',
+  // Draft or Sent past its valid-until date (boardStage, R8): not live work.
+  EXPIRED: 'Expired',
   // Not board columns — kept only so a quote from before this change still
   // renders a readable label in the list view instead of the raw code.
   IT: 'In transit',
@@ -111,7 +117,9 @@ function QuoteCardBody({ quote }: { quote: any }) {
       <div className="bk-qcard__foot">
         <span className="bk-qcard__amount" title={formatCurrency(parseFloat(quote.total_amount || '0'))}>{formatMoneyWhole(parseFloat(quote.total_amount || '0'))}</span>
         {/* Only a low price confidence is worth a word on the card; otherwise the date it was made. */}
-        {String(quote.confidence).toUpperCase() === 'LOW'
+        {boardStage(quote) === 'EXPIRED' && quote.valid_until
+          ? <span className="bk-qcard__meta" title={`${String(quote.status).toUpperCase() === 'SENT' ? 'Sent' : 'Draft'}, valid until ${formatDate(quote.valid_until)}`}>Lapsed {formatDateShort(quote.valid_until)}</span>
+          : String(quote.confidence).toUpperCase() === 'LOW'
           ? <span className="bk-qcard__meta">Low confidence</span>
           : quote.created_at ? <span className="bk-qcard__meta">{formatDateShort(quote.created_at)}</span> : null}
       </div>
@@ -167,6 +175,24 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
           Convert to booking
         </button>
       )}
+    </div>
+  );
+}
+
+// An expired quote's card: opens the quote (where "Edit quote" is the next
+// step); it is not dragged, since its column is a date rule, not a status.
+function StaticQuoteCard({ quote, onClick }: { quote: any; onClick: () => void }) {
+  return (
+    <div
+      className="bk-qcard"
+      role="button"
+      tabIndex={0}
+      aria-label={`Quote ${quote.quote_number}, expired`}
+      style={{ cursor: 'pointer' }}
+      onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
+    >
+      <QuoteCardBody quote={quote} />
     </div>
   );
 }
@@ -263,24 +289,8 @@ interface QuotesListProps {
  * there are more than four options, a compact select (R4 phone rule). Both
  * stay mounted and CSS picks one, so nothing shifts when the width changes.
  */
-/** Record numbers like "LOAD-20260310-1004": on narrow rows the prefix and
- *  year are the same on every row, so the phone shows the distinguishing
- *  tail ("…0310-1004"), never a cut-off prefix (R7). Full number in the
- *  title and for screen readers. */
-export const idTail = (n?: string | null) => {
-  const v = String(n || '');
-  const m = v.match(/^[A-Z]+-\d{4}(\d{4}-\d+)$/);
-  return m ? `…${m[1]}` : v;
-};
-export function RecordNo({ value }: { value?: string | null }) {
-  const v = String(value || '');
-  return (
-    <span className="bk-phone-sub" title={v}>
-      <span className="bk-id-long">{v}</span>
-      <span className="bk-id-short">{idTail(v)}</span>
-    </span>
-  );
-}
+export { idTail, RecordNo, RecordId } from './recordNo';
+import { RecordNo } from './recordNo';
 
 export function StatusFilter<V extends string>({ label, value, onChange, options, className, compactOnPhone }: {
   label: string; value: V; onChange: (v: V) => void;
@@ -380,7 +390,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     () => ({ DRAFT: draftQ, SENT: sentQ, ACCEPTED: acceptedQ, DECLINED: declinedQ }),
     [draftQ, sentQ, acceptedQ, declinedQ]
   );
-  const totalQuotesCount = COLUMNS.reduce((sum, col) => sum + flattenColumn(columnQueries[col]).count, 0);
+  const totalQuotesCountRaw = COLUMNS.reduce((sum, col) => sum + flattenColumn(columnQueries[col]).count, 0);
   // A sent quote whose answer was recorded as lost belongs with the declined
   // ones: the board shows it there (with "Marked lost"), and both column
   // counts and totals move with it, so the board never says "Declined 0"
@@ -388,16 +398,56 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   // One stage definition everywhere (R5): the board's, shared with Home.
   const isMarkedLost = (q: any) => String(q.status).toUpperCase() === 'SENT' && boardStage(q) === 'DECLINED';
   const movedLost = flattenColumn(sentQ).items.filter(isMarkedLost);
-  const movedLostTotal = movedLost.reduce((n: number, q: any) => n + (parseFloat(q.total_amount || '0') || 0), 0);
+  const amountOf = (q: any) => parseFloat(q.total_amount || '0') || 0;
+  const movedLostTotal = movedLost.reduce((n: number, q: any) => n + amountOf(q), 0);
+  // R8: a Draft or Sent quote past its valid-until date is Expired (the same
+  // boardStage rule as Home's pipeline). Without a search the exact set comes
+  // from the full quotes list Home already fetches (same cache); with a search
+  // only the loaded cards can be placed.
+  const allQuotesQ = useAllQuotes();
+  const allRows: any[] | null = !debouncedSearch && allQuotesQ.data?.complete ? allQuotesQ.data.rows : null;
+  // Until that list arrives, Draft, Sent and Expired wait together, so cards
+  // don't jump between columns as it lands.
+  const expiryPending = !debouncedSearch && allQuotesQ.isLoading;
+  const isExpired = (q: any) => boardStage(q) === 'EXPIRED';
+  const expiredRows: any[] = allRows
+    ? allRows.filter(isExpired)
+    : [...flattenColumn(draftQ).items, ...flattenColumn(sentQ).items].filter(isExpired);
+  const expiredIn = (st: string) => expiredRows.filter((q: any) => String(q.status).toUpperCase() === st);
+  // Quotes whose backend status is already EXPIRED are on no status query.
+  const extraExpired = expiredIn('EXPIRED').length;
   const boardColumn = (col: string) => {
+    if (col === 'EXPIRED') {
+      const failed = loadFailed(draftQ) || loadFailed(sentQ);
+      return {
+        items: expiredRows, count: expiredRows.length,
+        totalAmount: expiredRows.reduce((n: number, q: any) => n + amountOf(q), 0),
+        hasNextPage: false, isLoading: (expiryPending || (!allRows && (draftQ.isLoading || sentQ.isLoading))) && !failed,
+        isFetchingNextPage: false, fetchNextPage: () => undefined,
+      };
+    }
     const f = flattenColumn(columnQueries[col as keyof typeof columnQueries]);
-    if (!movedLost.length) return f;
-    if (col === 'SENT') return { ...f, items: f.items.filter((q: any) => !isMarkedLost(q)), count: Math.max(0, f.count - movedLost.length), totalAmount: f.totalAmount - movedLostTotal };
-    if (col === 'DECLINED') return { ...f, items: [...f.items, ...movedLost], count: f.count + movedLost.length, totalAmount: f.totalAmount + movedLostTotal };
+    const lapsed = col === 'DRAFT' || col === 'SENT' ? expiredIn(col) : [];
+    const lapsedTotal = lapsed.reduce((n: number, q: any) => n + amountOf(q), 0);
+    const live = (items: any[]) => items.filter((q: any) => !isExpired(q) && !(col === 'SENT' && isMarkedLost(q)));
+    if (col === 'DRAFT' || col === 'SENT') {
+      const lost = col === 'SENT' ? movedLost : [];
+      const items = live(f.items);
+      const count = Math.max(0, f.count - lapsed.length - lost.length);
+      return {
+        ...f, items, count, isLoading: f.isLoading || expiryPending,
+        totalAmount: f.totalAmount - lapsedTotal - (col === 'SENT' ? movedLostTotal : 0),
+        // Every live card may already be loaded even though the backend has
+        // more rows in this status (the rest are expired).
+        hasNextPage: f.hasNextPage && items.length < count,
+      };
+    }
+    if (col === 'DECLINED' && movedLost.length) return { ...f, items: [...f.items, ...movedLost], count: f.count + movedLost.length, totalAmount: f.totalAmount + movedLostTotal };
     return f;
   };
   // A failed column must never read as "No quotes" (and its 0 must not be counted).
   const failedColumns = COLUMNS.filter(col => loadFailed(columnQueries[col]));
+  const totalQuotesCount = totalQuotesCountRaw + extraExpired;
   const retryFailedColumns = () => failedColumns.forEach(col => columnQueries[col].refetch());
 
   // Live update: refetch every column when the backend pushes any quote
@@ -408,6 +458,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       const { detail } = (e as CustomEvent);
       if (typeof detail?.event === 'string' && detail.event.startsWith('quote.')) {
         queryClient.invalidateQueries({ queryKey: ['quotes-column'] });
+        queryClient.invalidateQueries({ queryKey: ['insights-source', 'quotes'] });
       }
     };
     window.addEventListener('tw:live-event', handler);
@@ -510,6 +561,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
         queryClient.invalidateQueries({ queryKey: ['quotes-column', oldColumn] });
         queryClient.invalidateQueries({ queryKey: ['quotes-column', newStatus] });
         queryClient.invalidateQueries({ queryKey: ['quotes-column', null] });
+        queryClient.invalidateQueries({ queryKey: ['insights-source', 'quotes'] });
       },
       onSettled: () => onDone?.(),
     });
@@ -520,18 +572,18 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
 
   // List view reuses a board column's query directly for a specific status,
   // or the separate "All" query (no status filter) for the All tab.
-  const activeListQuery = statusFilter === 'ALL' ? allQ : columnQueries[statusFilter];
+  const activeListQuery = statusFilter === 'ALL' ? allQ : statusFilter === 'EXPIRED' ? draftQ : columnQueries[statusFilter as keyof typeof columnQueries];
   const {
     hasNextPage: listHasNextPage, isLoading: listIsLoading,
     isFetchingNextPage: listIsFetchingNextPage, fetchNextPage: listFetchNextPage,
-  } = flattenColumn(activeListQuery);
+  } = statusFilter === 'ALL' ? flattenColumn(allQ) : boardColumn(statusFilter);
   // The list's per-status rows and counts are the board's columns, so a
   // quote marked lost is under Declined in both views (R5: "Sent 2" twice).
   const listItems = statusFilter === 'ALL' ? flattenColumn(allQ).items : boardColumn(statusFilter).items;
-  const statusOptions = ['ALL', ...COLUMNS].map(status => ({
+  const statusOptions = ['ALL', ...BOARD_COLUMNS].map(status => ({
     value: status,
     label: status === 'ALL' ? 'All' : COLUMN_LABELS[status],
-    count: (status === 'ALL' ? failedColumns.length === 0 : !failedColumns.includes(status))
+    count: (status === 'ALL' ? failedColumns.length === 0 : status === 'EXPIRED' ? !failedColumns.includes('DRAFT') && !failedColumns.includes('SENT') : !failedColumns.includes(status))
       ? (status === 'ALL' ? totalQuotesCount : boardColumn(status).count)
       : undefined,
   }));
@@ -649,10 +701,12 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
               column scrolls its own card list instead of the whole page growing. */}
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
             <div className="bk-kanban">
-              {COLUMNS.map(col => {
+              {BOARD_COLUMNS.map(col => {
                 const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading: colLoading, isFetchingNextPage, fetchNextPage } = boardColumn(col);
-                const colFailed = failedColumns.includes(col);
+                const isExpiredCol = col === 'EXPIRED';
+                const colFailed = isExpiredCol ? failedColumns.includes('DRAFT') && failedColumns.includes('SENT') : failedColumns.includes(col);
                 const isLoading = colLoading && !colFailed;
+                const colQuery = isExpiredCol ? draftQ : columnQueries[col as keyof typeof columnQueries];
                 return (
                 <section key={col} className="bk-col" aria-label={`${COLUMN_LABELS[col]} quotes`}>
                   <div className="bk-col__head">
@@ -668,12 +722,19 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       <LoadError
                         compact
                         what={`${COLUMN_LABELS[col].toLowerCase()} quotes`}
-                        error={columnQueries[col].error ?? columnQueries[col].failureReason}
-                        busy={columnQueries[col].isFetching}
-                        onRetry={() => columnQueries[col].refetch()}
+                        error={colQuery.error ?? colQuery.failureReason}
+                        busy={colQuery.isFetching}
+                        onRetry={() => colQuery.refetch()}
                       />
                     ) : isLoading ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{[0, 1, 2].map(i => <div key={i} className="ops-skel" style={{ height: 84, borderRadius: 8 }} />)}</div>
+                    ) : isExpiredCol ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 2 }}>
+                        {colItems.map((q: any) => (
+                          <StaticQuoteCard key={q.id} quote={q} onClick={() => navigate(`/bookings/quotes/${q.id}`)} />
+                        ))}
+                        {colItems.length === 0 && <div className="bk-col__empty">No expired quotes</div>}
+                      </div>
                     ) : (
                       <DroppableColumn columnId={col} items={colItems} isOver={overColumnId === col}>
                         {colItems.map((q: any) => (
@@ -815,7 +876,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
               <TableSkeleton rows={6} cols={5} label="Loading quotes" />
             )}
             {!listIsLoading && listItems.length === 0 && (
-              <div className="bk-empty"><p className="bk-empty__text">{search ? 'No quotes match your search.' : 'No quotes yet.'}</p></div>
+              <div className="bk-empty"><p className="bk-empty__text">{search ? 'No quotes match your search.' : statusFilter === 'ALL' ? 'No quotes yet.' : `No ${COLUMN_LABELS[statusFilter].toLowerCase()} quotes.`}</p></div>
             )}
             {listHasNextPage && (
               <div style={{ padding: 12, display: 'flex', justifyContent: 'center' }}>

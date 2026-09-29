@@ -91,65 +91,59 @@ export function ProfileSettings() {
     <div className="tw-profile-settings" style={{ maxWidth: 'var(--form-max, 720px)' }}>
       <SettingsPageHeader title="Profile" description="Your name, contact details and preferences" />
 
-      {/* Profile picture */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
-          <h2 style={sectionTitleStyle}>Profile picture</h2>
-        </div>
-        <div style={{ ...sectionBodyStyle, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt="Profile"
-              style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-            />
-          ) : (
-            <div style={{
-              width: 52, height: 52, borderRadius: '50%',
-              background: 'var(--accent-dim)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 600,
-              color: 'var(--avatar-on-dim, var(--accent-primary))', flexShrink: 0,
-            }}>
-              {(form.first_name[0] || '') + (form.last_name[0] || '') || 'AU'}
-            </div>
-          )}
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/gif"
-              style={{ display: 'none' }}
-              onChange={handleAvatarChange}
-              disabled={isDemo}
-            />
-            <button
-              type="button"
-              className="settings-control"
-              style={{
-                ...settingsSecondaryButtonStyle,
-                cursor: (uploadingAvatar || isDemo) ? 'not-allowed' : 'pointer',
-                opacity: (uploadingAvatar || isDemo) ? 0.6 : 1,
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingAvatar || isDemo}
-              title={isDemo ? 'Fixed in demo mode' : undefined}
-            >
-              {uploadingAvatar ? 'Uploading…' : 'Change picture'}
-            </button>
-            <div style={settingsHelpStyle}>
-              JPG, GIF or PNG. Max size 2MB.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Personal information */}
+      {/* Personal information, with the picture as its first row (R8: no one-line card). */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <h2 style={sectionTitleStyle}>Personal information</h2>
         </div>
         <div style={sectionBodyStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', paddingBottom: 20, marginBottom: 20, borderBottom: '1px solid var(--border-subtle)' }}>
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt="Profile"
+                style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+              />
+            ) : (
+              <div style={{
+                width: 52, height: 52, borderRadius: '50%',
+                background: 'var(--accent-dim)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 600,
+                color: 'var(--avatar-on-dim, var(--accent-primary))', flexShrink: 0,
+              }}>
+                {(form.first_name[0] || '') + (form.last_name[0] || '') || 'AU'}
+              </div>
+            )}
+            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+              <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>Picture</div>
+              <div style={{ ...settingsHelpStyle, marginTop: 0 }}>JPG, GIF or PNG, up to 2 MB.</div>
+            </div>
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif"
+                style={{ display: 'none' }}
+                onChange={handleAvatarChange}
+                disabled={isDemo}
+              />
+              <button
+                type="button"
+                className="settings-control"
+                style={{
+                  ...settingsSecondaryButtonStyle,
+                  cursor: (uploadingAvatar || isDemo) ? 'not-allowed' : 'pointer',
+                  opacity: (uploadingAvatar || isDemo) ? 0.6 : 1,
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar || isDemo}
+                title={isDemo ? 'Fixed in demo mode' : undefined}
+              >
+                {uploadingAvatar ? 'Uploading…' : 'Change picture'}
+              </button>
+            </div>
+          </div>
           <div className="tw-profile-fields" style={{ ...gridStyle, marginBottom: 16 }}>
             <div>
               <label htmlFor="profile-first_name" style={labelStyle}>First name</label>

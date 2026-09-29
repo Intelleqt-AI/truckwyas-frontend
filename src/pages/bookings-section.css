@@ -393,9 +393,9 @@
 
 /* Quote pipeline board: four equal columns on desktop; on narrow screens the
    board scrolls sideways instead of crushing the cards. */
-.bk-kanban { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: 1fr; gap: 16px; flex: 1; min-height: 0; }
+.bk-kanban { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: 1fr; gap: 16px; flex: 1; min-height: 0; }
 @media (max-width: 900px) {
-  .bk-kanban { grid-template-columns: repeat(4, minmax(260px, 1fr)); overflow-x: auto; padding-bottom: 8px; }
+  .bk-kanban { grid-template-columns: repeat(5, minmax(260px, 1fr)); overflow-x: auto; padding-bottom: 8px; }
 }
 
 /* Order progress: scrolls locally on phones rather than overlapping labels. */
@@ -658,12 +658,12 @@
 @container (max-width: 520px) {
   .bk-table.cd-orders .bk-amt-long { display: none; }
   .bk-table.cd-orders .bk-amt-short { display: inline; }
-  .bk-table.cd-orders .cd-orders__load { max-width: 11ch; }
+  .bk-table.cd-orders .cd-orders__load { max-width: none; overflow: visible; text-overflow: clip; white-space: nowrap; }
   .bk-table.cd-orders td.bk-col-status { padding-left: 8px; padding-right: 8px; }
 }
 /* Customer detail tables on phones: long record IDs truncate (their title
    holds the full number) so Status and Balance stay in the card. */
-@container (max-width: 520px) { .bk-table .cd-col-id { max-width: 15ch; } }
+@container (max-width: 520px) { .bk-table .cd-col-id { max-width: none; overflow: visible; text-overflow: clip; white-space: nowrap; } }
 .bk-missing .load-error__icon { color: var(--text-tertiary); }
 
 /* ---- Round 7 ---- */
@@ -703,3 +703,24 @@
   .cd-waiting .cd-after { display: none; }
   .cd-waiting .cd-wait-skel { display: block; }
 }
+
+/* ---- Round 8 ---- */
+/* Orders on phones: the stale line rides under the customer (as History),
+   so Status is the chip only and the customer and ID tail get the room.
+   The ID tail is never cut ("…0616-9737"). */
+.bk-table .bk-stale-in-customer { display: none; }
+.bk-table--loads:not(.bk-table--history) .bk-phone-sub .bk-id-short { overflow: visible; text-overflow: clip; }
+@container (max-width: 520px) {
+  .bk-table--loads:not(.bk-table--history) .bk-stale-in-status { display: none; }
+  .bk-table--loads:not(.bk-table--history) .bk-stale-in-customer { display: flex; margin-top: 2px; font: 400 12px/16px var(--font-sans); white-space: nowrap; }
+  .bk-table--loads:not(.bk-table--history) .bk-col-customer { max-width: none; white-space: normal; }
+  .bk-table--loads:not(.bk-table--history) .bk-col-customer.is-truncate { overflow: visible; text-overflow: clip; }
+  .bk-table--loads:not(.bk-table--history) .bk-phone-sub { overflow: visible; text-overflow: clip; white-space: nowrap; }
+  .bk-table--loads:not(.bk-table--history) td.bk-col-status { width: 1%; white-space: nowrap; }
+  .bk-table--loads:not(.bk-table--history) tbody td { height: auto; }
+}
+/* Quote cards in the five-column board (R8): the number never wraps; a
+   "Marked lost" note drops under it when the column is narrow. */
+.bk-qcard__top { flex-wrap: wrap; row-gap: 0; }
+.bk-qcard__id { white-space: nowrap; }
+.bk-qcard__foot { flex-wrap: wrap; row-gap: 0; }

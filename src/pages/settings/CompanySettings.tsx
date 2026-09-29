@@ -308,54 +308,49 @@ export function CompanySettings() {
     <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
       <SettingsPageHeader title="Company details" description="Your business information and branding" />
 
-      {/* Company Logo */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Company logo</h2></div>
-        <div style={{ padding: 'var(--card-pad, 20px)', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
-          <div style={{
-            width: 96, height: 96, flexShrink: 0,
-            border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)',
-            background: 'var(--input-bg)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-          }}>
-            {logoUrl ? (
-              <img src={resolveLogoUrl(logoUrl)} alt="Company logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-            ) : (
-              <span style={{ ...labelStyle, marginBottom: 0, textAlign: 'center' }}>No logo</span>
-            )}
-          </div>
-          <div>
-            <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', marginBottom: 4 }}>
-              Shown on the quotes and invoices you send.
-            </div>
-            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 12 }}>
-              PNG, JPG, GIF or WebP, up to 2 MB
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              onChange={handleLogoSelect}
-              disabled={isDemo}
-              style={{ display: 'none' }}
-            />
-            <button
-              className="settings-control"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingLogo || isDemo}
-              title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ ...settingsSecondaryButtonStyle, opacity: isDemo ? 0.5 : uploadingLogo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : 'pointer' }}
-            >
-              {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace logo' : 'Upload logo'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Business Info */}
+      {/* Business info, with the logo as its first row (R8: no one-line card). */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Business information</h2></div>
         <div style={bodyStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', paddingBottom: 20, marginBottom: 20, borderBottom: '1px solid var(--border-subtle)' }}>
+            <div style={{
+              width: 72, height: 72, flexShrink: 0,
+              border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)',
+              background: 'var(--input-bg)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+            }}>
+              {logoUrl ? (
+                <img src={resolveLogoUrl(logoUrl)} alt="Company logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+              ) : (
+                <span style={{ ...labelStyle, marginBottom: 0, textAlign: 'center' }}>No logo</span>
+              )}
+            </div>
+            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+              <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>Logo</div>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+                Shown on the quotes and invoices you send.<br />PNG, JPG, GIF or WebP, up to 2 MB
+              </div>
+            </div>
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                onChange={handleLogoSelect}
+                disabled={isDemo}
+                style={{ display: 'none' }}
+              />
+              <button
+                className="settings-control"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingLogo || isDemo}
+                title={isDemo ? 'Fixed in demo mode' : undefined}
+                style={{ ...settingsSecondaryButtonStyle, opacity: isDemo ? 0.5 : uploadingLogo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : 'pointer' }}
+              >
+                {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace logo' : 'Upload logo'}
+              </button>
+            </div>
+          </div>
           <div className="cs-grid cs-grid--2" style={{ marginBottom: 16 }}>
             <div>
               <label htmlFor="company-company-name" style={labelStyle}>Company name</label>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { MessageCircle, X, Mic, Square, Send } from "lucide-react";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import "./ai-chat-panel.css";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -66,8 +67,8 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend }: AICh
     <>
       {mounted && (
         <div
+          className="ai-chat-panel"
           style={{
-            position: "fixed", bottom: 92, right: 24, width: 360, maxHeight: "70vh", zIndex: 60,
             display: "flex", flexDirection: "column",
             background: "var(--bg-surface)", border: "1px solid var(--border-subtle)",
             borderRadius: "var(--radius-card)", overflow: "hidden",
@@ -164,22 +165,16 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend }: AICh
         onClick={() => onOpenChange(!open)}
         title="AI assistant"
         aria-label="AI assistant"
-        style={{
-          position: "fixed", bottom: 24, right: 24, width: 52, height: 52, borderRadius: "50%",
-          border: "none", background: "var(--accent-primary)", color: "var(--btn-action-color)",
-          display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-          boxShadow: "var(--shadow-card-hover, var(--shadow-card))", zIndex: 60,
-          transition: `transform ${TRANSITION_MS}ms ease`,
-          transform: open ? "scale(1.05)" : "scale(1)",
-        }}
+        aria-expanded={open}
+        className="ai-launcher"
       >
-        <span style={{ position: "relative", width: 22, height: 22, display: "inline-block" }}>
-          <MessageCircle size={22} style={{
+        <span style={{ position: "relative", width: 20, height: 20, display: "inline-block" }}>
+          <MessageCircle size={20} style={{
             position: "absolute", inset: 0,
             opacity: open ? 0 : 1, transform: open ? "rotate(-45deg) scale(0.6)" : "rotate(0deg) scale(1)",
             transition: `opacity ${TRANSITION_MS}ms ease, transform ${TRANSITION_MS}ms ease`,
           }} />
-          <X size={22} style={{
+          <X size={20} style={{
             position: "absolute", inset: 0,
             opacity: open ? 1 : 0, transform: open ? "rotate(0deg) scale(1)" : "rotate(45deg) scale(0.6)",
             transition: `opacity ${TRANSITION_MS}ms ease, transform ${TRANSITION_MS}ms ease`,

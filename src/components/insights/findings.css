@@ -135,11 +135,8 @@
 .ff-skel--card { min-height: 96px; display: block; }
 
 /* ----------------------------------------------------------- responsive */
-/* Wide screens: two findings per row so the whole feed sits near the fold. */
-@media (min-width: 1700px) {
-  .ff-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--card-gap, 16px); }
-  .fc { grid-template-columns: minmax(168px, 208px) minmax(0, 1fr) auto; grid-template-areas: "fig meta tog" "fig line act" "ev ev ev"; column-gap: 20px; }
-}
+/* Wide screens (R8): one ranked column at every width, so rank reads top to
+   bottom; the cards simply get wider (no two-column zig-zag, no orphan). */
 @media (min-width: 768px) and (max-width: 1365px) {
   .fc { grid-template-columns: minmax(160px, 200px) minmax(0, 1fr) auto; grid-template-areas: "fig meta tog" "fig line act" "ev ev ev"; column-gap: 20px; }
 }

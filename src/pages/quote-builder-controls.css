@@ -9,7 +9,143 @@
 [data-theme="light"] .qb-controls select {
   color-scheme: light;
 }
-.qb-controls input[type="date"] { height: 40px; }
+/* ---- Fields: one height token (--field-h: 40 desktop, 44 phones/touch) --- */
+.qb-controls input[type="date"] { height: var(--field-h, 40px); }
+.qb-controls input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: pointer; }
+.qb-controls input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: 0.85; }
+/* Empty date / placeholder select read as placeholders (tertiary), as the
+   shared Select and date field do. data-empty is set in markup only. */
+.qb-controls input[type="date"][data-empty]::-webkit-datetime-edit { color: var(--text-tertiary); }
+.qb-controls select[data-empty] { color: var(--text-tertiary) !important; }
+.qb-controls select option { color: var(--text-primary); background: var(--bg-overlay); }
+/* Native selects keep their behaviour; only the chrome follows the shared
+   trigger: no OS arrow, 14px tertiary chevron, regular weight. */
+.qb-select { position: relative; }
+.qb-controls .qb-select select {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  padding-right: 36px !important; cursor: pointer;
+  text-overflow: ellipsis; white-space: nowrap; overflow: hidden;
+  font-weight: 400;
+}
+.qb-select__chev { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-tertiary); }
+/* Hover darkens the control edge (inline borders read --border-subtle, which
+   theme.css points at the control token on form elements). */
+.qb-controls input:not([type="checkbox"]):not([type="radio"]):hover,
+.qb-controls select:hover,
+.qb-controls textarea:hover { --border-subtle: var(--border-control-hover); }
+
+/* ---- Describe bar: one composite field, focus ring on the bar --------- */
+.qb-controls .qb-nl:focus-within { border-color: var(--border-control-hover) !important; }
+.qb-controls .qb-nl input:focus-visible { outline: none; }
+.qb-controls .qb-nl:has(input:focus-visible) { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
+.qb-nl__mic { width: var(--field-h, 40px); height: var(--field-h, 40px); padding: 0; flex-shrink: 0; border-radius: 50%; color: var(--text-secondary); }
+.qb-nl__fill { height: var(--field-h, 40px); padding: 0 16px; font-size: 14px; flex-shrink: 0; }
+.qb-nl__mic, .qb-nl__fill { position: relative; }
+.qb-nl__mic::after, .qb-nl__fill::after { content: ''; position: absolute; inset: -2px; }
+
+/* ---- One quiet link style: "New", GPS, "Add stop", suggestions -------- */
+.qb-textbtn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font: 500 13px/20px var(--font-sans); color: var(--text-secondary);
+  text-decoration: none; position: relative;
+}
+.qb-textbtn:hover { color: var(--text-primary); text-decoration: underline; text-underline-offset: 2px; }
+.qb-textbtn:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
+.qb-textbtn--pick { color: var(--text-primary); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+.qb-textbtn--pick:hover { text-decoration-color: currentColor; }
+/* LocationInput's "Enter GPS coordinates" / "Search by address" toggles
+   (inline-styled in the shared component) take the same quiet style here. */
+.qb-controls .qb-loc > div > div > button,
+.qb-controls .qb-loc > div > button {
+  color: var(--text-secondary) !important; font-weight: 500; position: relative;
+}
+.qb-controls .qb-loc > div > div > button:hover,
+.qb-controls .qb-loc > div > button:hover { color: var(--text-primary) !important; text-decoration: underline; text-underline-offset: 2px; }
+/* Quiet round info trigger (popovers in the cost card and suggestions). */
+.qb-info {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--text-tertiary); cursor: pointer; position: relative;
+  vertical-align: middle;
+}
+.qb-info:hover { color: var(--text-primary); background: var(--bg-raised); }
+.qb-info:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 1px; }
+.qb-iconbtn {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 28px; height: 28px; padding: 0; position: relative;
+  border: 1px solid var(--border-default); border-radius: var(--radius-control, 8px);
+  background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;
+}
+.qb-iconbtn:hover { background: var(--bg-surface-hover); color: var(--text-primary); border-color: var(--border-strong); }
+.qb-iconbtn:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
+
+/* ---- Trip: the shared segmented control, sized to the field row ------- */
+.qb-trip { padding: 2px; }
+.qb-trip .tw-seg__opt { height: calc(var(--field-h, 40px) - 4px); font-size: 14px; line-height: 20px; }
+
+/* ---- Map card head: hint left, pick targets right; on phones the hint
+   drops to its own line under the targets (never a 4-line column). ----- */
+.qb-maphead {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: 8px 12px; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--border-subtle);
+}
+.qb-maphead__hint {
+  display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 220px;
+  font: 400 13px/20px var(--font-sans); color: var(--text-secondary);
+}
+.qb-maphead__tools { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.qb-picks .tw-seg__opt { font-size: 13px; line-height: 20px; }
+.qb-hint-touch { display: none; }
+@media (pointer: coarse) {
+  .qb-hint-touch { display: inline; }
+  .qb-hint-mouse { display: none; }
+}
+/* Pick-target marks echo the map pins: collection = accent ring,
+   delivery = ink, stops = neutral. Hollow until that point is set. */
+.qb-pin { width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; border: 1.5px solid var(--text-tertiary); }
+.qb-pin--from.is-set { border: 2.5px solid var(--accent-primary); }
+.qb-pin--to.is-set { border: 0; background: var(--text-primary); }
+.qb-pin--stop.is-set { border-color: var(--text-secondary); background: var(--text-secondary); }
+/* Alternative routes: neutral chips, the chosen one raised. */
+.qb-routeopt {
+  font: 400 13px/20px var(--font-sans); font-variant-numeric: tabular-nums;
+  padding: 5px 10px; border-radius: var(--radius-chip, 6px); cursor: pointer;
+  border: 1px solid var(--border-default); background: var(--bg-surface); color: var(--text-secondary);
+}
+.qb-routeopt:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.qb-routeopt[aria-pressed="true"] { color: var(--text-primary); font-weight: 500; border-color: var(--text-primary); }
+.qb-routeopt:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
+
+/* ---- Cost breakdown card: content height, v3 card header ------------- */
+.qb-cost__head { margin: 0 0 12px; }
+.qb-cost__title { margin: 0; font: 600 15px/22px var(--font-sans); letter-spacing: -0.01em; color: var(--text-primary); }
+.qb-cost__sub { margin: 2px 0 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.qb-cost__row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px;
+  min-height: 40px; padding: 8px 0; box-sizing: border-box;
+  border-bottom: 1px solid var(--border-row); font: 400 13px/20px var(--font-sans);
+}
+.qb-cost__label { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-secondary); }
+.qb-cost__value { font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; }
+.qb-cost__adjust { display: flex; gap: 8px; margin-top: 12px; }
+.qb-controls input.qb-mini { height: 32px; }
+/* Empty state: the four inputs pricing waits for, as rows. */
+.qb-need__list { list-style: none; margin: 0; padding: 0; }
+.qb-need__row {
+  display: grid; grid-template-columns: 20px auto minmax(0, 1fr); align-items: center; gap: 10px;
+  min-height: 40px; border-bottom: 1px solid var(--border-row); font: 400 13px/20px var(--font-sans);
+}
+.qb-need__mark {
+  width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%;
+  border: 1.5px dashed var(--border-strong); display: inline-flex; align-items: center; justify-content: center;
+}
+.qb-need__row.is-done .qb-need__mark { border: 0; background: var(--bg-raised); color: var(--text-primary); }
+.qb-need__k { color: var(--text-primary); font-weight: 500; }
+.qb-need__v { color: var(--text-tertiary); text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qb-need__row.is-done .qb-need__v { color: var(--text-secondary); }
+.qb-need__foot { margin: 12px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
+.qb-savestate { color: var(--text-tertiary); }
 
 /* One content width (DESIGN-PRINCIPLES §11.8): the builder fills main up to
    1600px, left-aligned with the top bar like every other page, instead of a
@@ -51,18 +187,69 @@
 .qb-pricebar__actions .tw-btn { height: 40px; padding: 0 16px; font-size: 14px; }
 .qb-pricebar__actions .tw-btn:disabled { opacity: 0.6; cursor: progress; }
 
-/* The assistant bubble floats bottom-right; lift it clear of the price bar. */
-.qb-has-pricebar button[aria-label="AI assistant"] { bottom: 112px !important; }
+/* ---- Assistant launcher placement (read by components/ai-chat-panel.css).
+   Desktop: bottom-right corner, below the (top-aligned) cost card. With the
+   price bar showing, the bar keeps a clear slot at its right end and the
+   launcher sits in it, so it never covers a figure or a button. ---------- */
+/* 1050: above the map's panes and controls (Leaflet tops out at 1000),
+   below the phone More sheet and the price bar (1100). */
+.qb-controls { --ai-fab-right: 16px; --ai-fab-bottom: 16px; --ai-fab-z: 1050; }
+@media (min-width: 1025px) {
+  /* z above the sticky bar (1100), below dialogs (10000). Bottom 57px keeps
+     the 44px launcher inside the 98px bar both while it is stuck (bottom 12)
+     and at the end of the scroll (bottom 48). */
+  .qb-has-pricebar { --ai-fab-right: 44px; --ai-fab-bottom: 57px; --ai-fab-z: 1101; }
+  .qb-has-pricebar .qb-pricebar { padding-right: 76px; }
+}
+@media (min-width: 1897px) {
+  /* Wider than the 1600px content cap: keep the launcher inside the bar. */
+  .qb-has-pricebar { --ai-fab-right: calc(100vw - 1852px); }
+}
 
 /* ---- Phones and narrow tablets: one column, price bar stays in reach ---- */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Two-row price bar on tablets: same right-hand slot, vertically centred. */
+  .qb-has-pricebar { --ai-fab-right: 44px; --ai-fab-bottom: 66px; --ai-fab-z: 1101; }
+  .qb-has-pricebar .qb-pricebar { padding-right: 76px; }
+}
 @media (max-width: 1024px) {
   .qb-grid--inputs, .qb-grid--details { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .qb-grid--mapcost { grid-template-columns: minmax(0, 1fr) !important; }
   .qb-pricebar { grid-template-columns: auto minmax(0, 1fr); }
   .qb-pricebar__actions { grid-column: 1 / -1; }
 }
+@media (max-width: 768px) {
+  /* Phones: above the bottom tab bar (61px incl. its padding; the safe area
+     is added by the launcher rule), and above the price bar when it shows. */
+  .qb-controls { --ai-fab-bottom: 77px; }
+  .qb-has-pricebar { --ai-fab-bottom: var(--qb-fab-over-bar, 240px); }
+  /* 16px text on phones so iOS doesn't zoom into a field. */
+  .qb-controls input:not([type="checkbox"]):not([type="radio"]),
+  .qb-controls select,
+  .qb-controls textarea { font-size: 16px !important; }
+  .qb-maphead__hint { order: 2; flex-basis: 100%; }
+  .qb-maphead__tools { flex: 1 1 auto; justify-content: space-between; }
+}
+/* Touch floor: every field and mini input is 44px on phones and touch. */
+@media (max-width: 768px), (pointer: coarse) {
+  .qb-controls input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  .qb-controls select { min-height: 44px !important; }
+  .qb-controls input.qb-mini { height: 44px; }
+  .qb-iconbtn::after, .qb-info::after { content: ''; position: absolute; inset: -12px; }
+  .qb-textbtn::after { content: ''; position: absolute; inset: -12px -8px; }
+  /* Label-row "New": the 20px row and 6px gap above a field leave no room
+     below, so the 44px target grows upward (box 36 tall, text on the row). */
+  .qb-textbtn--label { height: 36px; margin-top: -16px; align-items: flex-end; }
+  .qb-textbtn--label::after { inset: -4px -8px -6px; }
+  .qb-controls .qb-nl { margin-bottom: 20px !important; }
+  /* GPS toggle sits 4px under its field: the target grows downward into the
+     row gap (negative margin keeps the layout), text stays on its line. */
+  .qb-controls .qb-loc > div > div > button,
+  .qb-controls .qb-loc > div > button { padding-bottom: 16px !important; margin-bottom: -16px !important; }
+  .qb-controls .qb-loc > div > div > button::after,
+  .qb-controls .qb-loc > div > button::after { content: ''; position: absolute; inset: -4px -8px -8px; }
+}
 @media (max-width: 640px) {
-  .qb-head { flex-wrap: wrap; gap: 12px; }
   .qb-grid--inputs, .qb-grid--details, .qb-grid--ai { grid-template-columns: minmax(0, 1fr) !important; }
   .qb-grid--details > *, .qb-grid--inputs > * { grid-column: auto !important; min-width: 0; }
   .qb-grid--ai > * { border-right: 0 !important; border-bottom: 1px solid var(--border-row); }
@@ -80,5 +267,10 @@
   .qb-pricebar__figure { font-size: 22px; line-height: 28px; }
   .qb-pricebar__sub { flex-basis: 100%; }
   .qb-pricebar__actions .tw-btn { flex: 1 1 0; height: 48px; }
-  .qb-has-pricebar button[aria-label="AI assistant"] { bottom: 236px !important; }
+}
+
+/* Very wide screens: the cost card's foot fits on one line, so the checklist
+   rows take the 44px list rhythm to keep the card within 48px of the map. */
+@media (min-width: 1700px) {
+  .qb-need__row { min-height: 44px; }
 }

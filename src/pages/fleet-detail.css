@@ -197,7 +197,9 @@
 /* ---------------------------------------------------------------- states */
 .fleet-detail .fd-skel { border-radius: 6px; background: var(--bg-surface-hover); }
 .fleet-detail .fd-strip .fd-skel { background: var(--bg-surface-hover); }
-.fleet-detail .fd-missing .load-error__icon { color: var(--text-tertiary); }
+/* Not found (404): the Invoice/Quote pattern. Its own class, so the
+   12px "missing field" row style (.fd-missing) never applies to it. */
+.fleet-detail .fd-notfound .load-error__icon { color: var(--text-tertiary); }
 
 /* ------------------------------------------------------------ responsive */
 /* The loads table sheds its least useful columns as the main column narrows. */
@@ -428,14 +430,27 @@
 .fleet-detail .fd-todo__item.is-danger .fd-todo__title { color: var(--status-danger-text); }
 .fleet-detail .fd-todo__detail { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 
-/* Facts and link cards */
-.fleet-detail .fd-facts .fd-panel__head { margin-bottom: 4px; }
-.fleet-detail .fd-facts .fd-rows + .fd-rows { border-top: 1px solid var(--fd-row-line); }
+/* Facts and link cards. A link card only ever sits in the rail; where the
+   columns need it gone it folds into the facts card as a row (R8), so it is
+   never stretched across the main column. */
 .fleet-detail .fd-linkcard__title { margin-bottom: 8px; }
 .fleet-detail .fd-linkcard__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
 .fleet-detail .fd-linkcard__body { display: flex; flex-direction: column; min-width: 0; }
 .fleet-detail .fd-linkcard__primary { font: 500 14px/20px var(--font-sans); color: var(--text-primary); overflow-wrap: anywhere; }
 .fleet-detail .fd-linkcard__secondary { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fleet-detail .fd-facts .fd-panel__head { margin-bottom: 4px; }
+.fleet-detail .fd-facts .fd-rows + .fd-rows { border-top: 1px solid var(--fd-row-line); }
+/* A folded link card (R8): the facts card's first line, full card width.
+   Label, then the linked record with its one qualifier under it, left-aligned
+   so the name sits next to its label even when the card is wide. */
+.fleet-detail .fd-factlead {
+  display: flex; align-items: flex-start; gap: 16px; padding: 8px 0;
+  border-bottom: 1px solid var(--fd-row-line);
+}
+.fleet-detail .fd-factlead__label { flex: none; width: 112px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-linkfact { display: flex; flex-direction: column; min-width: 0; }
+.fleet-detail .fd-linkfact__main { display: inline-flex; align-items: center; gap: 8px; font: 500 13px/20px var(--font-sans); color: var(--text-primary); overflow-wrap: anywhere; }
+.fleet-detail .fd-linkfact__note { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
 
 /* Loads: optional columns shed as the card narrows (the nearest container
    is the main column on desktop, the card itself once the columns stack). */

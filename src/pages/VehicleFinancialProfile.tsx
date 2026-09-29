@@ -69,8 +69,9 @@ export default function VehicleFinancialProfile() {
   // load, for the fleet's revenue per km (the comparison).
   const ledger = useLedger(['expenses', 'loads']);
 
-  // The driver and facts may drop into the main column so the two columns end
-  // within 48px of each other (R5). Condition always stays in the rail, so it
+  // The facts card may drop into the main column, and the driver card may
+  // fold into it as a row, so the two columns end within 48px of each other
+  // (R5) without a stretched one-line card (R8). Condition always stays in the rail, so it
   // has one layout on every truck (R7).
   const bal = useBalancedColumns({ toMain: ['driver', 'facts'] }, `${id}-${isLoading}-${loadsLoading}-${ledger.loading}`);
   const sideRef = useCallback((n: HTMLElement | null) => { railRef(n); bal.sideRef.current = n; }, [railRef, bal.sideRef]);
@@ -96,7 +97,7 @@ export default function VehicleFinancialProfile() {
   // Error states keep the head ("Vehicle") and the breadcrumb (R7): a 404 says
   // the truck is not there; anything else is a load error with Retry.
   const stateProps = { type: 'Vehicle', crumb: 'Vehicles', crumbTo: '/fleet/vehicles', what: 'this vehicle',
-    missingTitle: 'There is no vehicle at this link', missingHint: 'It may have been removed, or the link is out of date.', backLabel: 'All vehicles' };
+    missingTitle: 'There is no vehicle at this link', missingHint: 'It may have been deleted, or the link is wrong.', backLabel: 'All vehicles' };
   if (isError && !isNotFound(loadError)) return (
     <RecordState kind="error" {...stateProps} error={loadError} busy={vehicleQuery.isFetching} onRetry={() => refetch()} />
   );
@@ -268,18 +269,34 @@ export default function VehicleFinancialProfile() {
   // Said once, here (R7): the driver on the open order is marked inactive.
   const openDriverInactive = !!openLoad?.driver && String(((Array.isArray(driversData) ? driversData : driversData?.results) || [])
     .find((d: any) => d.id === openLoad.driver)?.status || '').toUpperCase() === 'INACTIVE';
-  const driverCard = driverId && driverName ? (
-    <LinkCard title="Driver" className="fd-o-driver"
-      primary={<Link className="fd-inline-link" to={`/fleet/drivers/${driverId}`}>{driverName}</Link>}
-      secondary="Assigned to this truck" />
-  ) : openLoad && openDriver ? (
-    <LinkCard title="Driver" className="fd-o-driver"
-      primary={openLoad.driver ? <Link className="fd-inline-link" to={`/fleet/drivers/${openLoad.driver}`}>{openDriver}</Link> : openDriver}
-      secondary={openDriverInactive ? 'Marked inactive · no regular driver' : 'On the open order · no regular driver'} />
-  ) : noLoads ? null : (
-    <LinkCard title="Driver" className="fd-o-driver" primary={<span className="fd-muted">No driver assigned</span>}
-      action={<button type="button" className="fd-ghost" onClick={openEdit}>Assign</button>} />
-  );
+  // The driver: a small card in the rail; where the columns need it out of
+  // the rail it folds into the Vehicle card as a row (R8), never a one-line
+  // card stretched across the main column.
+  const driverFolded = bal.inMain('driver');
+  const driverParts: { primary: JSX.Element; secondary?: string; action?: JSX.Element } | null = noLoads ? null : driverId && driverName ? {
+    primary: <Link className="fd-inline-link" to={`/fleet/drivers/${driverId}`}>{driverName}</Link>,
+    secondary: 'Assigned to this truck',
+  } : openLoad && openDriver ? {
+    primary: openLoad.driver ? <Link className="fd-inline-link" to={`/fleet/drivers/${openLoad.driver}`}>{openDriver}</Link> : <>{openDriver}</>,
+    secondary: openDriverInactive ? 'Marked inactive · no regular driver' : 'On the open order · no regular driver',
+  } : {
+    primary: <span className="fd-muted">{driverFolded ? 'None assigned' : 'No driver assigned'}</span>,
+    action: <button type="button" className={driverFolded ? 'fd-ghost fd-ghost--row' : 'fd-ghost'} onClick={openEdit} aria-label="Assign a driver">Assign</button>,
+  };
+  const driverCard = driverParts && !driverFolded ? (
+    <LinkCard title="Driver" className="fd-o-driver" primary={driverParts.primary} secondary={driverParts.secondary} action={driverParts.action} />
+  ) : null;
+  // Folded: the card's first line, across the full card width (label, then
+  // the name with its qualifier under it), not one cell of the facts grid.
+  const driverLead = driverParts && driverFolded ? (
+    <div className="fd-factlead">
+      <span className="fd-factlead__label">Driver</span>
+      <span className="fd-linkfact">
+        <span className="fd-linkfact__main">{driverParts.primary}{driverParts.action}</span>
+        {driverParts.secondary && driverParts.secondary !== 'Assigned to this truck' ? <span className="fd-linkfact__note">{driverParts.secondary}</span> : null}
+      </span>
+    </div>
+  ) : null;
 
   // A truck with no loads: one "Getting started" card (its first load, its
   // driver, then the compliance to-dos) in place of three empty cards. The
@@ -293,7 +310,7 @@ export default function VehicleFinancialProfile() {
   // facts card lists only what the head does not (year returns on phones,
   // where the subtitle drops it).
   const factsCard = (
-    <FactsCard className="fd-o-facts" wide={bal.inMain('facts')} title="Vehicle" facts={[
+    <FactsCard className="fd-o-facts" wide={bal.inMain('facts')} title="Vehicle" lead={driverLead} facts={[
                 { label: 'VIN', value: vehicle.vin, mono: true, add: openEdit },
                 { label: 'Year', value: vehicle.year, phoneOnly: true },
                 { label: 'Fuel', value: vehicle.fuel_type ? formatStatus(vehicle.fuel_type) : null },
@@ -373,13 +390,12 @@ export default function VehicleFinancialProfile() {
             </Panel>
           )}
 
-          {bal.inMain('driver') && driverCard}
           {bal.inMain('facts') && factsCard}
         </div>
 
         <aside ref={sideRef} className="fd-side">
           {!noLoads && <ComplianceCard className="fd-o-todo" items={todos} />}
-          {!bal.inMain('driver') && driverCard}
+          {driverCard}
           {!bal.inMain('facts') && factsCard}
           {conditionCard}
         </aside>

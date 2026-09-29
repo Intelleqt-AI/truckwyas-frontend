@@ -445,8 +445,12 @@ export default function Bookings() {
         // Phones: Change status lives in the title row's ⋯ menu, so the
         // line says where to find it (R7).
         const viaStatus = <>Change status<span className="bk-phone-note"> in the ⋯ menu</span></>;
+        // An Assigned load whose driver is marked inactive can't be started:
+        // say only what is possible (R8).
         const staleAct = load.status === 'LOADING'
           ? <>Mark it in transit or cancel it via {viaStatus}</>
+          : load.status === 'ASSIGNED' && driverInactive
+            ? (billingBlocked ? <>Reassign it or cancel it via {viaStatus}</> : <>Reassign it with Edit or cancel it via {viaStatus}</>)
           : ['PENDING', 'ASSIGNED'].includes(load.status) && !billingBlocked
             ? <>{staleAction(load)} with Edit or {viaStatus}</>
             : <>{staleAction(load)} via {viaStatus}</>;

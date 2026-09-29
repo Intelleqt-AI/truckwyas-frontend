@@ -162,3 +162,13 @@ export function useAllQuotes() {
     ...RETRY,
   });
 }
+
+/** Every vehicle (all pages), shared with Insights' vehicles source: Home's idle row. */
+export function useAllVehicles() {
+  return useQuery({
+    queryKey: ['insights-source', 'vehicles'],
+    queryFn: () => fetchAllPages<any>('api/v1/vehicles/'),
+    staleTime: STALE,
+    ...RETRY,
+  });
+}

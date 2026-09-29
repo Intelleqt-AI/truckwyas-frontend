@@ -75,7 +75,7 @@
 .insights-stats > div { display: flex; align-items: baseline; gap: 8px; }
 .insights-stats dt { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
 .insights-stats dd { margin: 0; font: 600 16px/24px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); }
-.insights-stats__note { margin-left: 8px; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
+.insights-stats__note, .insights-stats dd.insights-stats__note { margin: 0; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
 .insights-stats--head { margin: 0 0 12px; padding: 0 0 12px; border-top: 0; border-bottom: 1px solid var(--border-row); }
 
 /* Empty, error and loading states: one line and one action. */
@@ -109,4 +109,13 @@
   .ic-kpis.insights-kpis { --ic-cols: 2; }
   .insights-kpis .ic-kpi__value { font-size: 22px; line-height: 28px; }
   .insights-stats { gap: 4px 24px; }
+  /* R8: the Fleet head stats as a clean list on phones: label left, figure
+     right, the note on its own line under the label (no ragged wrap). */
+  .insights-stats--head { flex-direction: column; flex-wrap: nowrap; gap: 0; padding-bottom: 8px; }
+  .insights-stats--head > div {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 0 12px; padding: 4px 0;
+  }
+  .insights-stats--head dt { grid-column: 1; grid-row: 1; }
+  .insights-stats--head dd { grid-column: 2; grid-row: 1; text-align: right; }
+  .insights-stats--head dd.insights-stats__note { grid-column: 1 / -1; grid-row: 2; text-align: left; }
 }

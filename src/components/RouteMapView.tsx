@@ -275,6 +275,7 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
       deliveryMarkerRef.current?.remove(); deliveryMarkerRef.current = null;
       routeLineRef.current?.remove(); routeLineRef.current = null;
       routeCasingRef.current?.remove(); routeCasingRef.current = null;
+      map.getContainer().classList.remove('tw-map--estimated');
       stopMarkersRef.current.forEach((m) => m.remove());
       stopMarkersRef.current = [];
     };
@@ -295,13 +296,16 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
       const [start, end] = [points[0], points[points.length - 1]];
       // Line first, pins after, so the pins sit above it. Solid = the exact
       // route (accent, 4px on a 7px casing that reads on any tile); dashed =
-      // a preview line (muted, dashed), same semantics as before.
-      if (!dashed) {
-        routeCasingRef.current = L.polyline(points, { className: 'tw-route-casing', color: '#ffffff', weight: 7, opacity: 0.9, interactive: false }).addTo(map);
-      }
+      // an estimated route, same semantics as before, now accent dashes on a
+      // soft casing (≥ 3:1 on light and dark tiles) with an "Estimated route"
+      // chip (map.css, .tw-map--estimated) so a booked load doesn't look broken.
+      routeCasingRef.current = L.polyline(points, dashed
+        ? { className: 'tw-route-casing tw-route-casing--preview', color: '#ffffff', weight: 7, opacity: 0.75, interactive: false }
+        : { className: 'tw-route-casing', color: '#ffffff', weight: 7, opacity: 0.9, interactive: false }).addTo(map);
       routeLineRef.current = L.polyline(points, dashed
-        ? { className: 'tw-route--preview', color: '#636A75', weight: 3, opacity: 0.95, dashArray: '6 7', lineCap: 'round' }
+        ? { className: 'tw-route--preview', color: '#2563EB', weight: 4, opacity: 1, dashArray: '8 7', lineCap: 'round' }
         : { className: 'tw-route', color: '#2563EB', weight: 4, opacity: 1 }).addTo(map);
+      map.getContainer().classList.toggle('tw-map--estimated', dashed);
       pickupMarkerRef.current = L.marker(start, { icon: pinIcon(L, 'pickup') })
         .bindTooltip(`Pickup: ${pickup || 'Collection'}`, { direction: 'top' }).addTo(map);
       deliveryMarkerRef.current = L.marker(end, { icon: pinIcon(L, 'delivery') })
@@ -311,7 +315,21 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
       // zoom "blink" on every route selection.
       const fitKey = `${start.join()}|${end.join()}`;
       if (fittedKeyRef.current !== fitKey) {
-        map.fitBounds(L.latLngBounds(points), { padding: [40, 40] });
+        // Fit padding clears the overlaid controls (R8): the zoom buttons on
+        // the left (32px, 44px on touch), the expand button on the right, the
+        // 30px drop-off pin above its point, and the attribution chip (and the
+        // "Estimated route" chip, bottom left) below.
+        // Quarter-step zoom for this fit only, so a long route fills the map
+        // instead of snapping a whole level out; capped for short routes.
+        const box = map.getContainer().getBoundingClientRect();
+        const zc = map.getContainer().querySelector('.leaflet-control-zoom')?.getBoundingClientRect();
+        const eb = map.getContainer().parentElement?.querySelector(':scope > .tw-map-btn')?.getBoundingClientRect();
+        const left = zc && zc.width ? Math.ceil(zc.right - box.left) + 14 : 40;
+        const right = eb && eb.width ? Math.ceil(box.right - eb.left) + 14 : 40;
+        const snap = map.options.zoomSnap;
+        map.options.zoomSnap = 0.25;
+        map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [left, 36], paddingBottomRight: [right, dashed ? 36 : 24], maxZoom: 12 });
+        map.options.zoomSnap = snap;
         fittedKeyRef.current = fitKey;
       }
     };

@@ -470,3 +470,7 @@
 .fleet-page .fleet-stale-narrow .fleet-doing__dot { margin-right: 6px; }
 .fleet-page .fleet-table .fleet-only-narrow:has(.fleet-stale-narrow) { overflow: visible; }
 .fleet-page .fleet-stale-narrow.fleet-stale-link { color: var(--accent-primary); font-weight: 500; }
+/* R8: the phone "Left open" link is itself a 44px target (not only a
+   pseudo-element on coarse pointers); the negative margins keep the row
+   height unchanged. */
+.fleet-page .fleet-stale-narrow.fleet-stale-link { min-height: 44px; margin-top: -14px; margin-bottom: -14px; padding-right: 4px; }

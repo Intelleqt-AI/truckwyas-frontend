@@ -56,7 +56,8 @@ export default function DriverProfile() {
   // list; every load, for the fleet's revenue per km (the comparison).
   const ledger = useLedger(['vehicles', 'loads']);
 
-  // The truck, contact and licence cards may drop into the main column when
+  // The contact and licence cards may drop into the main column, and the
+  // truck card may fold into the licence card as a row (R8), when
   // the rail would otherwise run far past it (R5 column balance).
   const bal = useBalancedColumns({ toMain: ['truck', 'contact', 'facts'] }, `${driverId}-${isLoading}-${loadsLoading}-${ledger.loading}`);
   const sideRef = useCallback((n: HTMLElement | null) => { railRef(n); bal.sideRef.current = n; }, [railRef, bal.sideRef]);
@@ -64,7 +65,7 @@ export default function DriverProfile() {
   // Error states keep the head ("Driver") and the breadcrumb (R7): a 404 says
   // the driver is not there; anything else is a load error with Retry.
   const stateProps = { type: 'Driver', crumb: 'Drivers', crumbTo: '/fleet/drivers', what: 'this driver',
-    missingTitle: 'There is no driver at this link', missingHint: 'They may have been removed, or the link is out of date.', backLabel: 'All drivers' };
+    missingTitle: 'There is no driver at this link', missingHint: 'It may have been deleted, or the link is wrong.', backLabel: 'All drivers' };
   if (isError && !isNotFound(loadError)) return (
     <RecordState kind="error" {...stateProps} error={loadError} busy={driverQuery.isFetching} onRetry={() => refetch()} />
   );
@@ -180,18 +181,34 @@ export default function DriverProfile() {
   // (the one the Now line names, said the same way: "On LOAD-… with CA 789
   // TUV"), else none. Only a truck on the vehicle record is "theirs".
   const openPlate = openLoad ? plateOf(openLoad) : null;
-  const truckCard = truck ? (
-    <LinkCard title="Truck" className="fd-o-driver"
-      primary={<Link className="fd-inline-link" to={`/fleet/vehicles/${truck.id}`}>{truck.plate || `Vehicle ${truck.id}`}</Link>}
-      secondary={[truck.make, truck.model].filter(Boolean).join(' ') || 'Assigned to this driver'} />
-  ) : openLoad && openPlate ? (
-    <LinkCard title="Truck" className="fd-o-driver"
-      primary={openLoad.vehicle ? <Link className="fd-inline-link" to={`/fleet/vehicles/${openLoad.vehicle}`}>{openPlate}</Link> : openPlate}
-      secondary="On the open order · no regular truck" />
-  ) : (
-    <LinkCard title="Truck" className="fd-o-driver" primary={<span className="fd-muted">No truck assigned</span>}
-      action={<button type="button" className="fd-ghost" onClick={edit}>Assign</button>} />
+  // The truck: a small card in the rail; where the columns need it out of
+  // the rail it folds into the licence card as a row (R8), never a one-line
+  // card stretched across the main column.
+  const truckFolded = bal.inMain('truck');
+  const makeModel = truck ? [truck.make, truck.model].filter(Boolean).join(' ') : '';
+  const truckParts: { primary: JSX.Element; secondary?: string; action?: JSX.Element } = truck ? {
+    primary: <Link className="fd-inline-link" to={`/fleet/vehicles/${truck.id}`}>{truck.plate || `Vehicle ${truck.id}`}</Link>,
+    secondary: makeModel || (truckFolded ? undefined : 'Assigned to this driver'),
+  } : openLoad && openPlate ? {
+    primary: openLoad.vehicle ? <Link className="fd-inline-link" to={`/fleet/vehicles/${openLoad.vehicle}`}>{openPlate}</Link> : <>{openPlate}</>,
+    secondary: 'On the open order · no regular truck',
+  } : {
+    primary: <span className="fd-muted">{truckFolded ? 'None assigned' : 'No truck assigned'}</span>,
+    action: <button type="button" className={truckFolded ? 'fd-ghost fd-ghost--row' : 'fd-ghost'} onClick={edit} aria-label="Assign a truck">Assign</button>,
+  };
+  const truckCard = truckFolded ? null : (
+    <LinkCard title="Truck" className="fd-o-driver" primary={truckParts.primary} secondary={truckParts.secondary} action={truckParts.action} />
   );
+  // Folded: the card's first line, across the full card width.
+  const truckLead = truckFolded ? (
+    <div className="fd-factlead">
+      <span className="fd-factlead__label">Truck</span>
+      <span className="fd-linkfact">
+        <span className="fd-linkfact__main">{truckParts.primary}{truckParts.action}</span>
+        {truckParts.secondary ? <span className="fd-linkfact__note">{truckParts.secondary}</span> : null}
+      </span>
+    </div>
+  ) : null;
 
   const contactCard = (
     <FactsCard className="fd-o-contact" wide={bal.inMain('contact')} title="Contact" facts={[
@@ -202,7 +219,7 @@ export default function DriverProfile() {
     ]} />
   );
   const factsCard = (
-    <FactsCard className="fd-o-facts" wide={bal.inMain('facts')} title="Licence and record" facts={[
+    <FactsCard className="fd-o-facts" wide={bal.inMain('facts')} title={truckFolded ? 'Truck and licence' : 'Licence and record'} lead={truckLead} facts={[
       { label: 'Licence number', value: driver.license_number, mono: true, add: edit },
       { label: 'Province', value: driver.license_state },
       { label: 'Violations', value: String(driver.violation_count ?? 0) },
@@ -257,14 +274,13 @@ export default function DriverProfile() {
               <LoadsTable loads={loads} />
             </Panel>
           )}
-          {bal.inMain('truck') && truckCard}
           {bal.inMain('contact') && contactCard}
           {bal.inMain('facts') && factsCard}
         </div>
 
         <aside ref={sideRef} className="fd-side">
           <ComplianceCard className="fd-o-todo" items={todos} />
-          {!bal.inMain('truck') && truckCard}
+          {truckCard}
           {!bal.inMain('contact') && contactCard}
           {!bal.inMain('facts') && factsCard}
         </aside>

@@ -45,23 +45,30 @@
 }
 
 /* ------------------------------------------------------------------ rail */
-.cp-rail {
-  align-self: start;          /* sized to its list, never stretched */
-  max-height: 100%;
+/* R8: a sidebar, not a floating card. It spans the chat's full height with
+   its list at the top, on the page background (no card box to sit empty),
+   and a hairline on its right edge ties it to the chat. */
+.cp-layout > .cp-rail {
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--border-subtle);
+  border-radius: 0;
+  box-shadow: none;
 }
 .cp-rail__head {
   display: flex; align-items: center; gap: 8px;
-  padding: var(--card-pad) var(--card-pad) 12px;
+  min-height: 56px; padding: 8px 20px 8px 12px;
 }
 .cp-rail__count {
   font: 500 var(--text-label)/16px var(--font-sans);
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
 }
-.cp-rail__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 8px 8px; overscroll-behavior: contain; }
+.cp-rail__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 12px 8px 0; overscroll-behavior: contain; }
 
 .cp-convs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .cp-convs__empty { margin: 0; padding: 4px 12px 12px; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
@@ -121,7 +128,8 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 24px var(--card-pad);
+  --cp-scroll-pad-y: 24px;
+  padding: var(--cp-scroll-pad-y) var(--card-pad);
   display: flex;
   flex-direction: column;
 }
@@ -193,8 +201,16 @@
 }
 .cp-msg__body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding-top: 3px; }
 .cp-answer { width: 100%; font: 400 14px/22px var(--font-sans); color: var(--text-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
-/* When the reply was written (R7): a quiet line above the answer, 4px from it. */
-.cp-msg__meta { margin: 0 0 -8px; font: 400 var(--text-label, 12px)/16px var(--font-sans); color: var(--text-tertiary); }
+/* The day a stretch of the conversation was written (R8): said once per day,
+   centred between hairlines, instead of an age on every reply. */
+.cp-day {
+  display: flex; align-items: center; gap: 12px; margin: 0;
+  font: 500 var(--text-label, 12px)/16px var(--font-sans); color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  /* Stays in view while a long thread is scrolled, so the day is never half hidden. */
+  position: sticky; top: calc(-1 * var(--cp-scroll-pad-y, 24px)); z-index: 1; padding: 8px 0; background: var(--bg-surface);
+}
+.cp-day::before, .cp-day::after { content: ''; flex: 1 1 0; height: 1px; background: var(--border-row); }
 /* Record IDs (INV-20260412-1017) never break mid-token (Markdown.tsx wraps them). */
 .cp-answer .cp-id { white-space: nowrap; }
 .cp-answer .cp-md > :last-child { margin-bottom: 0 !important; }
@@ -306,10 +322,10 @@
      without making main scroll. */
   .copilot-page { height: calc(100% + 20px); margin-bottom: -20px; }
   .cp-layout { grid-template-columns: minmax(0, 1fr); }
-  .cp-rail { display: none; }
+  .cp-layout > .cp-rail { display: none; }
   .cp-chats-btn { display: inline-flex; }
   .cp-chat__head { min-height: 60px; padding: 8px 8px 8px var(--card-pad); }
-  .cp-scroll { padding: 16px var(--card-pad); }
+  .cp-scroll { --cp-scroll-pad-y: 16px; padding: var(--cp-scroll-pad-y) var(--card-pad); }
   .cp-empty__title { font-size: 18px; line-height: 24px; }
   .cp-suggest { grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 16px; }
   .cp-suggest > li { grid-column: auto !important; }

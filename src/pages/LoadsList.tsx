@@ -66,12 +66,13 @@ const missingVehicle = (l: { vehicle_info?: string; vehicle?: number | null; sta
 // row's one amber mark is the stale dot under Status (R6).
 const assignedLabel = (l: { driver_name?: string; vehicle_info?: string; vehicle?: number | null; status: string }) => {
   const bits = [l.driver_name, plateOf(l.vehicle_info)].filter(Boolean);
-  if (missingVehicle(l)) return <span className="bk-muted">{bits.length ? `${bits.join(' · ')} · no vehicle` : 'No vehicle'}</span>;
-  return bits.length ? bits.join(' · ') : <span className="bk-muted">Not assigned</span>;
+  // One wording for a missing vehicle on Orders (R8): "No vehicle".
+  if (missingVehicle(l) || (!plateOf(l.vehicle_info) && l.vehicle == null)) return <span className="bk-muted">{bits.length ? `${bits.join(' · ')} · no vehicle` : 'No vehicle'}</span>;
+  return bits.join(' · ');
 };
 
 // No vehicle on an order that is still open, in any status (R5: the tile
-// counts the same rows the table marks "Not assigned" or "No vehicle").
+// counts the same rows the table marks "No vehicle").
 const hasNoVehicle = (l: { vehicle_info?: string; vehicle?: number | null }) =>
   !plateOf(l.vehicle_info) && l.vehicle == null;
 
@@ -240,7 +241,19 @@ export default function LoadsList() {
           </tr>
         </thead>
         <tbody>
-          {data.map((load) => (
+          {data.map((load) => {
+            // Stale work (R6, shared rule): "since <date> (N days)" with one
+            // amber dot; the action sits in the title and for screen readers.
+            // Phones (R8) show it under the customer, as History does, so the
+            // Status column is the chip only and the customer is not squeezed.
+            const staleFlag = (where: 'status' | 'customer') => {
+              const st = showInvoiceAction ? null : staleWork(load);
+              if (!st) return null;
+              const words = staleLabel(st);
+              const full = `Still ${formatStatus(load.status).toLowerCase()}${st.overdue ? ', past its delivery date' : ''} ${words.text}. Open it to ${staleStep(load).charAt(0).toLowerCase()}${staleStep(load).slice(1)}.`;
+              return <span className={`bk-status-flag bk-status-flag--stale bk-stale-in-${where}`} title={full}><span className="sr-only">{full}</span><span aria-hidden="true" className="bk-stale-long">{words.text}</span><span aria-hidden="true" className="bk-stale-short">{shortStale(st.since, words.days) ?? words.text}</span></span>;
+            };
+            return (
             <tr
               key={load.id}
               className="is-clickable"
@@ -252,6 +265,7 @@ export default function LoadsList() {
                 {load.customer_name || '—'}
                 {/* Phones: the load number rides under the customer (its column folds away). */}
                 <RecordNo value={load.load_number} />
+                {staleFlag('customer')}
               </td>
               <td className={`bk-col-route${showInvoiceAction ? ' is-truncate' : ' bk-route-cell'}`} title={`${load.pickup_location} to ${load.delivery_location}`}>
                 {showInvoiceAction ? routeText(load) : (
@@ -272,16 +286,7 @@ export default function LoadsList() {
               {showInvoiceAction && <td className="is-date is-nowrap bk-col-date">{load.actual_delivered_at || load.delivery_date ? formatDate(load.actual_delivered_at || load.delivery_date!) : '—'}</td>}
               <td className="bk-col-status">
                 <StatusChip status={load.status} size="sm" />
-                {(() => {
-                  // Stale work (R6, shared rule): "since <date> (N days)" with
-                  // one amber dot; the action sits in the title and for
-                  // screen readers.
-                  const st = showInvoiceAction ? null : staleWork(load);
-                  if (!st) return null;
-                  const words = staleLabel(st);
-                  const full = `Still ${formatStatus(load.status).toLowerCase()}${st.overdue ? ', past its delivery date' : ''} ${words.text}. Open it to ${staleStep(load).charAt(0).toLowerCase()}${staleStep(load).slice(1)}.`;
-                  return <span className="bk-status-flag bk-status-flag--stale" title={full}><span className="sr-only">{full}</span><span aria-hidden="true" className="bk-stale-long">{words.text}</span><span aria-hidden="true" className="bk-stale-short">{shortStale(st.since, words.days) ?? words.text}</span></span>;
-                })()}
+                {staleFlag('status')}
               </td>
               <td className="is-money" title={formatCurrency(parseFloat(load.total_amount || '0'))}>
                 {/* Lists show whole rands at every width; cents stay on the invoice (R7). */}
@@ -305,7 +310,8 @@ export default function LoadsList() {
                 )}
               </td>}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
       {data.length === 0 && (
@@ -492,7 +498,7 @@ export default function LoadsList() {
             (() => {
               const total = completedLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0);
               return {
-                label: 'Completed revenue',
+                label: 'Delivered revenue',
                 value: wholeRand(total),
                 title: formatCurrency(total),
                 note: plural(completedLoads.length, 'load', 'loads'),

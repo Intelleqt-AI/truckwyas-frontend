@@ -159,3 +159,11 @@ table.admin-table .ops-skel-tr td { padding: 12px 16px; height: 45px; box-sizing
   .adm-user-role-inline { display: inline; font-weight: 400; color: var(--text-secondary); }
   table.admin-table .adm-status-sub.adm-user-sub { max-width: calc(100vw - 136px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* Admin overview, Newest companies (R8): name, what they have done, date. */
+.admin-home .ah-new__row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; column-gap: 16px; }
+.admin-home .ah-new__act { font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; }
+@media (max-width: 480px) {
+  .admin-home .ah-new__row { grid-template-columns: minmax(0, 1fr) auto; }
+  .admin-home .ah-new__act { display: none; }
+}

@@ -426,7 +426,7 @@ export function RecordState({ kind, type, crumb, crumbTo, what, error, busy, onR
       {kind === 'error' ? (
         <LoadError what={what} error={error} busy={busy} onRetry={onRetry ?? (() => {})} />
       ) : (
-        <div className="load-error fd-missing" role="status">
+        <div className="load-error fd-notfound" role="status">
           <FileSearch className="load-error__icon" size={20} aria-hidden="true" />
           <div className="load-error__text">
             <p className="load-error__title">{missingTitle}</p>

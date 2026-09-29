@@ -14,16 +14,17 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDate, formatMoneyWhole } from '@/lib/formatters';
-import { X } from "lucide-react";
+import { FileSearch, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BlockSkeleton, TilesSkeleton } from '@/components/fleet-detail/ContentSkeleton';
-import { usePipeline } from '@/components/overview/today';
+import { boardStage, usePipeline } from '@/components/overview/today';
 import { useLedger, isOpen, num, todayISO, daysBetween } from '@/components/reports/data';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import { fetchAllPages } from '@/components/insights/findings';
 import { staleWork, staleLabel } from './bookings-stale';
+import { RecordId } from './recordNo';
 
 type OpenLoad = {
   id: number; customer?: number | null; status: string; load_number: string; total_amount?: string;
@@ -155,11 +156,15 @@ export default function CustomerDetail() {
   if (!customer) return (
     <div className="bk-detail bookings-typography">
       <SectionHeader title="Customer not found" back={{ to: '/customers', label: 'Customers' }} />
-      <div className="bk-card">
-        <div className="bk-empty" style={{ padding: 16 }}>
-          <p className="bk-empty__text">This customer may have been removed, or the link is out of date.</p>
-          <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate("/customers")}>View customers</button>
+      {/* Not found (404): the head and back link stay; the message and its
+          one action share a row (the Invoice and Quote pattern, R8). */}
+      <div className="load-error bk-missing" role="status">
+        <FileSearch className="load-error__icon" size={20} aria-hidden="true" />
+        <div className="load-error__text">
+          <p className="load-error__title">There is no customer at this link</p>
+          <p className="load-error__hint">It may have been deleted, or the link is wrong.</p>
         </div>
+        <button type="button" className="tw-btn load-error__retry" onClick={() => navigate("/customers")}>All customers</button>
       </div>
     </div>
   );
@@ -172,7 +177,7 @@ export default function CustomerDetail() {
   const basis = quotesOnServer > totalQuotes ? `the latest ${totalQuotes} of ${quotesOnServer} quotes` : `${totalQuotes} ${totalQuotes === 1 ? "quote" : "quotes"}`;
   const WON = ["ACCEPTED", "IT", "COMPLETED"];
   const wonQuotes = quotes.filter((q: any) => WON.includes(String(q.status || "").toUpperCase()));
-  const sentQuotes = quotes.length - pipeline.drafts;
+  const sentQuotes = quotes.length - pipeline.draftsAll;
   const totalRevenue = wonQuotes.reduce((s: number, q: any) => s + parseFloat(q.total_amount || q.quote_price || "0"), 0);
   const isActive = customer.is_active !== false && customer.status !== "INACTIVE";
 
@@ -424,7 +429,7 @@ export default function CustomerDetail() {
                   const late = isOpen(inv) && inv.due_date && inv.due_date.slice(0, 10) < today;
                   return (
                     <tr key={inv.id} className="is-clickable" {...rowLink(() => navigate(`/finance/invoices/${inv.id}`))} onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
-                      <td className="is-id is-truncate cd-col-id" title={inv.invoice_number}>{inv.invoice_number}</td>
+                      <td className="is-id is-truncate cd-col-id"><RecordId value={inv.invoice_number} /></td>
                       <td className="is-date bk-col-opt">{inv.issue_date ? formatDate(inv.issue_date) : "Not issued"}</td>
                       <td className="is-num bk-col-narrow" title={formatZAR(num(inv.total_amount))}>{wholeRand(num(inv.total_amount))}</td>
                       <td className="is-date bk-col-phone cd-due">
@@ -478,7 +483,7 @@ export default function CustomerDetail() {
                     onClick={() => navigate(`/bookings/quotes/${q.id}`)}
                   >
                     <td className="is-id is-truncate cd-col-id">
-                      {q.quote_number || `#${q.id}`}
+                      {q.quote_number ? <RecordId value={q.quote_number} /> : `#${q.id}`}
                     </td>
                     <td className="is-truncate bk-col-route" colSpan={2} title={`${q.pickup_location || "—"} → ${q.delivery_location || "—"}`}>
                       {q.pickup_location || "—"} → {q.delivery_location || "—"}
@@ -493,7 +498,10 @@ export default function CustomerDetail() {
                         : q.outcome === 'rejected' && String(q.status).toUpperCase() === 'SENT'
                           // Same reading as the Quotes board: a lost answer sits with the declined ones.
                           ? <StatusChip status="LOST" label="Marked lost" size="sm" />
-                          : <StatusChip status={q.status} size="sm" />}
+                          // Past its valid-until date: Expired, as on the board and Home (R8).
+                          : boardStage(q) === 'EXPIRED'
+                            ? <StatusChip status="EXPIRED" label="Expired" size="sm" />
+                            : <StatusChip status={q.status} size="sm" />}
                     </td>
                     <td className="is-money" title={q.total_amount || q.quote_price ? formatZAR(parseFloat(q.total_amount || q.quote_price)) : undefined}>
                       {q.total_amount || q.quote_price ? wholeRand(parseFloat(q.total_amount || q.quote_price)) : "—"}
@@ -542,7 +550,7 @@ export default function CustomerDetail() {
                     const to = String(l.delivery_location || '').split(',')[0].trim() || l.delivery_city || '—';
                     return (
                       <tr key={l.id} className="is-clickable" {...rowLink(() => navigate(`/bookings/${l.id}`))} onClick={() => navigate(`/bookings/${l.id}`)}>
-                        <td className="is-id is-truncate cd-orders__load" title={l.load_number}>{l.load_number}</td>
+                        <td className="is-id is-truncate cd-orders__load"><RecordId value={l.load_number} /></td>
                         <td className="is-truncate bk-col-route" colSpan={3} title={`${l.pickup_location} to ${l.delivery_location}`}>{from} → {to}</td>
                         <td className="bk-col-status">
                           <StatusChip status={l.status} size="sm" />

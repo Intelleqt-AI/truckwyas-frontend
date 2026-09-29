@@ -289,7 +289,7 @@ export default function Overview() {
 
   // Active loads and the 28-day bars use every load (all pages), not page 1.
   // R7: "active" means open AND current. Open loads past their delivery date
-  // or open more than 30 days (src/lib/staleWork.ts) are "not closed": they
+  // or open more than 30 days (src/lib/staleWork.ts) are "left open": they
   // are counted beside the figure, never in it (the Needs you row lists them).
   // Wait for the full ledger so the figure never changes after paint.
   const loadsReady = !!ledger.data || !!ledger.error;
@@ -449,7 +449,7 @@ export default function Overview() {
             <h2 className="td-kpi__label">
               Active loads
               <InfoTip align="end">
-                Open loads that are on schedule: not past their delivery date and open 30 days or less. Loads past that are counted as not closed, never as active; Needs you lists them. Bars show loads booked per day, last 28 days.
+                Open loads that are on schedule: not past their delivery date and open 30 days or less. Loads past that are counted as left open, never as active; Needs you lists them. Bars show loads booked per day, last 28 days.
                 {!loading && !vehiclesFailed && totalVehicles > 0 && data?.vehiclesComplete && ` ${availableVehicles} of ${totalVehicles} trucks are available now.`}
               </InfoTip>
             </h2>
@@ -460,10 +460,10 @@ export default function Overview() {
             <MicroBars values={heatmapData} ariaLabel={`Loads booked per day, last 28 days: ${loads28} in total`} />
           </div>
           <div className="td-kpi__meta">
-            {/* "0 · 11 not closed": the stale loads are said beside the figure,
+            {/* "0 · 11 left open": the stale loads are said beside the figure,
                 not in it. Phones keep the short form so the note never clips. */}
             {loadsReady && !loadsFailed && (notClosedCount > 0
-              ? <span>{notClosedCount} not closed<span className="td-hide-sm"> · {loads28 === 0 ? "none" : loads28} booked in 28 days</span></span>
+              ? <span>{notClosedCount} left open<span className="td-hide-sm"> · {loads28 === 0 ? "none" : loads28} booked in 28 days</span></span>
               : <span>{loads28 === 0 ? "None booked" : `${loads28} booked`} in<span className="td-hide-sm"> the last</span> 28 days</span>)}
           </div>
         </section>
@@ -631,7 +631,7 @@ export default function Overview() {
               <div className="tw-card__titles">
                 <h2 id="td-pipe-title" className="tw-card__title">
                   Quote pipeline
-                  <InfoTip align="end">Draft, Sent, Accepted, Declined and Expired are the Quotes board columns (a quote marked lost counts as Declined; a draft or sent quote past its valid-until date is Expired and not counted as live). On the road counts in-transit loads still on schedule; in-transit loads past their delivery date are said under that row as not closed. Win rate is accepted as a share of every quote sent{pipeline.sentEver > 0 ? `: ${pipeline.accepted} of ${pipeline.sentEver}` : ""}.</InfoTip>
+                  <InfoTip align="end">Draft, Sent, Accepted, Declined and Expired are the Quotes board columns (a quote marked lost counts as Declined; a draft or sent quote past its valid-until date is Expired and not counted as live). On the road counts in-transit loads still on schedule; in-transit loads past their delivery date are said under that row as left open. Win rate is accepted as a share of every quote sent{pipeline.sentEver > 0 ? `: ${pipeline.accepted} of ${pipeline.sentEver}` : ""}.</InfoTip>
                 </h2>
                 <p className="tw-card__sub">
                   {quotesAll.isLoading && loading ? "Quotes by stage"

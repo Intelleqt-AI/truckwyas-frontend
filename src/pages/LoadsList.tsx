@@ -376,7 +376,7 @@ export default function LoadsList() {
   }
 
   return (
-    <div className="bookings-typography" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className={`bookings-typography${activeTab === 'quotes' && quoteView === 'list' ? ' bk-qlist-page' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ flexShrink: 0 }}>
         <SectionHeader
           eyebrow="Bookings"
@@ -394,7 +394,7 @@ export default function LoadsList() {
 
       {/* QUOTES TAB — fills remaining viewport height; QuotesList scrolls its own areas internally */}
       {activeTab === 'quotes' && (
-        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div className="bk-qlist-fill" style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <QuotesList embedded={true} search={quoteSearch} onSearchChange={setQuoteSearch} view={quoteView} onViewChange={setQuoteView} />
         </div>
       )}

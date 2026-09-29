@@ -79,10 +79,19 @@ export default function QuoteDetail() {
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
   const stickyRail = useStickyRail<HTMLDivElement>();
+  const quoteQuery = useQuery({
+    queryKey: ['quote', id],
+    queryFn: () => fetchData(`api/v1/quotes/${id}/`),
+    // A 404 is an answer, not a failure: no retry, straight to "not found".
+    retry: (count, err) => (err as { status?: number } | null)?.status !== 404 && count < 1,
+  });
+  const { data: quote, isLoading, error } = quoteQuery;
   // Columns end within 48px (R6): the route map takes up the difference.
-  // Still long at the smallest map: the customer's contact facts move to the rail.
-  const [contactInRail, setContactInRail] = useState(false);
-  const fill = useMapFill({ base: 200, min: 160, max: 440, onStuck: () => setContactInRail(true) });
+  // The customer always sits in the Job card, on drafts and sent quotes
+  // alike (R9): one layout for one record type. A quote with no map shows a
+  // short note in the map's place, which may shrink further than a map.
+  const hasMapCoords = !!(quote?.pickup_lat || quote?.delivery_lat);
+  const fill = useMapFill({ base: 200, min: quote && !hasMapCoords ? 88 : 160, max: 440 });
   const railRef = useCallback((node: HTMLDivElement | null) => { fill.sideRef.current = node; stickyRail(node); }, [stickyRail, fill.sideRef]);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [emailStatus, setEmailStatus] = useState<{ sent: boolean; address: string | null; reason?: string | null } | null>(null);
@@ -100,13 +109,6 @@ export default function QuoteDetail() {
   // Sending (button or status change to Sent) emails the customer: preview first.
   const [sendPreview, setSendPreview] = useState<'button' | 'status' | null>(null);
 
-  const quoteQuery = useQuery({
-    queryKey: ['quote', id],
-    queryFn: () => fetchData(`api/v1/quotes/${id}/`),
-    // A 404 is an answer, not a failure: no retry, straight to "not found".
-    retry: (count, err) => (err as { status?: number } | null)?.status !== 404 && count < 1,
-  });
-  const { data: quote, isLoading, error } = quoteQuery;
   const quoteFailed = loadFailed(quoteQuery);
   const quoteError = (quoteQuery.error ?? quoteQuery.failureReason) as { status?: number } | null;
 
@@ -342,7 +344,8 @@ export default function QuoteDetail() {
   const placeShort = (city?: string, loc?: string) => (city || '').trim() || String(loc || '').split(',')[0].trim();
   const routeFrom = placeShort(quote.pickup_city, quote.pickup_location);
   const routeTo = placeShort(quote.delivery_city, quote.delivery_location);
-  const showWinChance = !!quote.win_probability && (quote.status === 'DRAFT' || quote.status === 'SENT');
+  // No chance to win on a dead offer (R9): expired quotes show none.
+  const showWinChance = !!quote.win_probability && (quote.status === 'DRAFT' || quote.status === 'SENT') && boardStage(quote) !== 'EXPIRED';
   const routeSummary = routeFrom && routeTo ? `${routeFrom} → ${routeTo}` : '';
   const contact = (quote.customer_name || '').trim();
   const showContact = !!contact && contact.toLowerCase() !== company.toLowerCase();
@@ -465,15 +468,13 @@ export default function QuoteDetail() {
         <div ref={fill.mainRef as React.RefObject<HTMLDivElement>} className="qd-main">
           <section className="bk-card" aria-labelledby="qd-job-title">
             <div className="bk-card__head"><h2 className="bk-card__title" id="qd-job-title">Job</h2></div>
-            {!contactInRail && <>
-              <dl className="qd-facts">
-                {fact('Customer', company || 'Not recorded')}
-                {showContact && fact('Contact', contact)}
-                {quote.customer_email && <div className="qd-fact qd-fact--email"><dt className="bk-fact__label">Email</dt><dd className="bk-fact__value"><span className="qd-email">{breakableEmail(quote.customer_email)}</span></dd></div>}
-                {quote.customer_phone && fact('Phone', quote.customer_phone)}
-              </dl>
-              <hr className="qd-rule" />
-            </>}
+            <dl className="qd-facts">
+              {fact('Customer', company || 'Not recorded')}
+              {showContact && fact('Contact', contact)}
+              {quote.customer_email && <div className="qd-fact qd-fact--email"><dt className="bk-fact__label">Email</dt><dd className="bk-fact__value"><span className="qd-email">{breakableEmail(quote.customer_email)}</span></dd></div>}
+              {quote.customer_phone && fact('Phone', quote.customer_phone)}
+            </dl>
+            <hr className="qd-rule" />
             <div className="qd-route-row">
               <div>
                 <div className="bk-fact__label" style={{ marginBottom: 8 }}>{isRound ? 'Leg 1, outbound' : 'Route'}</div>
@@ -594,27 +595,22 @@ export default function QuoteDetail() {
             </div>
           </section>
 
-          {contactInRail && (
-            <section className="bk-card" aria-labelledby="qd-contact-title">
-              <div className="bk-card__head"><h2 className="bk-card__title" id="qd-contact-title">Customer</h2></div>
-              {[
-                { label: 'Customer', value: company || 'Not recorded' },
-                ...(showContact ? [{ label: 'Contact', value: contact }] : []),
-                ...(quote.customer_email ? [{ label: 'Email', value: <span className="qd-email">{breakableEmail(quote.customer_email)}</span> }] : []),
-                ...(quote.customer_phone ? [{ label: 'Phone', value: quote.customer_phone }] : []),
-              ].map((r: { label: string; value: React.ReactNode }) => (
-                <div key={r.label} className="bk-kv">
-                  <span className="bk-kv__label">{r.label}</span>
-                  <span className="bk-kv__value">{r.value}</span>
-                </div>
-              ))}
-            </section>
-          )}
-
           {(effectiveShareUrl || ((quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome)) && (
             <section className="bk-card" aria-labelledby="qd-customer-title">
               <h2 className="bk-card__title" id="qd-customer-title" style={{ marginBottom: 12 }}>With the customer</h2>
-              {effectiveShareUrl && (
+              {effectiveShareUrl && lapsed && (
+                // The customer's link stopped working at the valid-until date,
+                // so there is nothing to copy or share (R9).
+                <div style={{ marginBottom: 16 }}>
+                  <p className="bk-help" style={{ margin: '0 0 12px' }}>
+                    The link to this quote expired on {formatDate(quote.valid_until)}, so the customer can no longer open it.
+                  </p>
+                  <button type="button" className="bk-btn bk-btn--secondary bk-btn--block" onClick={() => navigate(`/bookings/quotes/${id}/edit`)}>
+                    Send an updated quote
+                  </button>
+                </div>
+              )}
+              {effectiveShareUrl && !lapsed && (
                 <div style={{ marginBottom: 16 }}>
                   <div className="qd-link" title={effectiveShareUrl}>{effectiveShareUrl}</div>
                   {effectiveEmailStatus && (

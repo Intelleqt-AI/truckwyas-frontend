@@ -249,7 +249,7 @@ export function perfFigures(perf: Perf, opts: { revenueLabel: string; thin: bool
         label: 'Margin after truck costs',
         value: 'No approved costs',
         quiet: true,
-        note: <span className={`fd-perf__if${after < 0 ? ' is-loss' : ''}`}>{randWhole(after)} if the {randWhole(perf.pending)} pending is approved</span>,
+        note: <span className="fd-perf__if"><span className={after < 0 ? 'fd-perf__if-figure is-loss' : 'fd-perf__if-figure'}>{randWhole(after)}</span> if the {randWhole(perf.pending)} pending is approved</span>,
       });
     } else {
       const margin = perf.revenue - perf.costs;
@@ -261,7 +261,7 @@ export function perfFigures(perf: Perf, opts: { revenueLabel: string; thin: bool
         label: 'Margin after truck costs',
         value: randWhole(margin),
         note: perf.pending > 0
-          ? <span className={`fd-perf__if${after < 0 ? ' is-loss' : ''}`}>{randWhole(after)} if the {randWhole(perf.pending)} pending is approved</span>
+          ? <span className="fd-perf__if"><span className={after < 0 ? 'fd-perf__if-figure is-loss' : 'fd-perf__if-figure'}>{randWhole(after)}</span> if the {randWhole(perf.pending)} pending is approved</span>
           : `After ${randWhole(perf.costs)} approved costs`,
       });
     }

@@ -247,9 +247,11 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-tint-hover)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
-              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* The row is a flex box, which never ellipsises its own text:
+                  the label gets an inner span that does, full text in title. */}
+              <span title={s.label} style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
                 {s.is_recent && <span title="Used before" aria-label="Used before" style={{ flexShrink: 0, display: 'inline-flex', color: 'var(--text-secondary)' }}><History size={14} aria-hidden="true" /></span>}
-                {s.label}
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
               </span>
               {s.cross_border && (
                 <span

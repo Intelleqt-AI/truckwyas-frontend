@@ -24,6 +24,14 @@
 .ai-launcher:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
 .ai-launcher[aria-expanded="true"] { color: var(--text-primary); }
 .ai-launcher:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
+/* In-flow variant: the host places the launcher in a slot of its own layout
+   (an icon button in a toolbar), so it never floats over other controls. */
+.ai-launcher--inline {
+  position: relative; right: auto; bottom: auto; z-index: auto;
+  flex-shrink: 0; box-shadow: none;
+  border-color: var(--border-default); background: var(--bg-surface);
+}
+.ai-launcher--inline::after { inset: -2px; }
 
 .ai-chat-panel {
   position: fixed;

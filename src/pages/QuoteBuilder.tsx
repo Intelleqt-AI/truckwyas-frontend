@@ -8,7 +8,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, patchData, fetchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatNumber, formatDateTime, normaliseFigures } from "@/lib/formatters";
+import { DatePicker } from "@/components/ui/date-picker";
 import { resolveDieselPrice, dieselBasisNote, liveDieselHint } from "@/lib/dieselPrice";
 import { LocationInput, type LocationCoords } from "@/components/LocationInput";
 import { RouteMapView } from "@/components/RouteMapView";
@@ -208,6 +209,25 @@ interface RouteData {
   stops_count?: number;
 }
 
+// ---- display-only formatting (render strings only; never read back into
+// state or any calculation) ----
+/** Vehicle capacity at render: "20 t", "7,5 t" (house style, not "20.00t"). */
+const capLabel = (c: unknown) => `${formatNumber(Number(c), { maximumFractionDigits: 1 })}\u00a0t`;
+/** One-decimal figure in house style: "32,6". */
+const oneDp = (n: number) => formatNumber(n, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+/** True below a width (presentation only: picks a shorter placeholder). */
+function useNarrow(maxPx: number) {
+  const q = `(max-width: ${maxPx}px)`;
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia(q).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(q);
+    const on = () => setNarrow(mq.matches);
+    on(); mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [q]);
+  return narrow;
+}
+
 export default function QuoteBuilder() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -317,6 +337,17 @@ export default function QuoteBuilder() {
   // AIChatPanel) instead of a one-shot toast with no way to reply to it.
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
+  // Presentation only: where the assistant's launcher button is placed. It is
+  // an ordinary icon button in the Describe bar, and moves into the price bar
+  // while that bar shows, so it never floats over a field or the bar.
+  // The slot is picked in a passive effect (same pass as the other mount
+  // effects), and the Describe bar's slot reserves its box, so the launcher
+  // arriving never moves anything.
+  const nlChatSlotRef = useRef<HTMLSpanElement | null>(null);
+  const barChatSlotRef = useRef<HTMLSpanElement | null>(null);
+  const [chatSlot, setChatSlot] = useState<HTMLSpanElement | null>(null);
+  useEffect(() => { setChatSlot(barChatSlotRef.current ?? nlChatSlotRef.current); });
+  const narrowNl = useNarrow(640);
   // In-progress "create this client/vehicle type" mini-conversation (see
   // backend/core/services/quote_entity_chat.py) — round-tripped every turn
   // since the endpoint is otherwise stateless. declinedEntities remembers
@@ -1288,8 +1319,11 @@ export default function QuoteBuilder() {
     </div>
   );
 
+  // Same condition the price bar renders on (display only).
+  const showPriceBar = !billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0;
+
   return (
-    <div className={`qi-form qb-controls${!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 ? " qb-has-pricebar" : ""}`}>
+    <div className={`qi-form qb-controls${showPriceBar ? " qb-has-pricebar" : ""}`}>
       {/* header */}
       {/* Same page head as every page (layout only): H1 on the title row,
           one grey line under it, actions on the right. */}
@@ -1301,7 +1335,7 @@ export default function QuoteBuilder() {
         back={isEditing ? { to: `/bookings/quotes/${editId}`, label: "Quote" } : { to: "/bookings/quotes", label: "Quotes" }}
         description={
           <span className="qb-savestate" aria-live="polite">
-            {saving ? "Saving…" : lastSavedAt ? `Saved in this browser at ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Auto-saves in this browser"}
+            {saving ? "Saving…" : lastSavedAt ? `Saved in this browser at ${formatDateTime(lastSavedAt).split(", ")[1]}` : "Auto-saves in this browser"}
           </span>
         }
         actions={
@@ -1347,9 +1381,9 @@ export default function QuoteBuilder() {
           </div>
         ) : (
           <>
-            <MessageCircle size={16} color="var(--text-tertiary)" aria-hidden="true" style={{ flexShrink: 0 }} />
+            <MessageCircle size={16} color="var(--text-tertiary)" aria-hidden="true" className="qb-nl__icon" style={{ flexShrink: 0 }} />
             <input value={nlText} onChange={e => setNlText(e.target.value)} onKeyDown={e => e.key === "Enter" && submitNL()}
-              placeholder="Describe it, e.g. “20t steel, JHB to Cape Town, flatbed, Tuesday”" aria-label="Describe the load" style={{ ...inputS, border: "none", background: "transparent", paddingLeft: 4, minWidth: 0 }} />
+              placeholder={narrowNl ? "Describe the load" : "Describe it, e.g. “20t steel, JHB to Cape Town, flatbed, Tuesday”"} aria-label="Describe the load" style={{ ...inputS, border: "none", background: "transparent", paddingLeft: 4, minWidth: 0 }} />
             <button type="button" onClick={voice.start} title="Record voice" aria-label="Record voice"
               className="tw-btn qb-nl__mic">
               <Mic size={16} />
@@ -1357,6 +1391,8 @@ export default function QuoteBuilder() {
             <button type="button" onClick={() => submitNL()} disabled={nlBusy || !nlText.trim()} className="tw-btn qb-nl__fill">{nlBusy ? "Reading…" : "Fill"}</button>
           </>
         )}
+        {/* Assistant launcher slot (filled by AIChatPanel via a portal). */}
+        {!showPriceBar && <span ref={nlChatSlotRef} className="qb-chatslot qb-chatslot--nl" />}
       </div>
 
       {/* 1 — inputs */}
@@ -1410,7 +1446,7 @@ export default function QuoteBuilder() {
             <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS} aria-label="Vehicle type">
               <option value="">Not decided yet</option>
               {vehicleTypes.map((v: any) => (
-                <option key={v.id || v.name} value={v.name}>{v.name}{Number(v.capacity) > 0 ? ` (${v.capacity}t)` : ""}</option>
+                <option key={v.id || v.name} value={v.name}>{v.name}{Number(v.capacity) > 0 ? ` (${capLabel(v.capacity)})` : ""}</option>
               ))}
               {/* The options above only cover types with a vehicle free today.
                   A suggested or already-saved type outside that set still has to
@@ -1420,15 +1456,24 @@ export default function QuoteBuilder() {
                 .filter((n, i, a) => a.indexOf(n) === i)
                 .map((n) => {
                   const v = allVehicleTypes.find((x: any) => x.name === n);
-                  return <option key={n} value={n}>{n}{Number(v?.capacity) > 0 ? ` (${v.capacity}t)` : ""}</option>;
+                  return <option key={n} value={n}>{n}{Number(v?.capacity) > 0 ? ` (${capLabel(v.capacity)})` : ""}</option>;
                 })}
             </select>
             <ChevronDown size={14} className="qb-select__chev" aria-hidden="true" />
             </div>
           </div>
-          <div><div style={fieldLabelS}><span>Pickup date</span></div><input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)} style={inputS} data-empty={pickupDate ? undefined : ""} aria-label="Pickup date" /></div>
-          <div><div style={fieldLabelS}><span>Delivery date</span></div><input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} style={inputS} data-empty={deliveryDate ? undefined : ""} aria-label="Delivery date" /></div>
-          <div><div style={fieldLabelS}><span>Valid until</span></div><input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} style={inputS} data-empty={validUntil ? undefined : ""} aria-label="Valid until" /></div>
+          {/* The app's shared DatePicker: it hands back the same "yyyy-MM-dd"
+              string the native date input did, straight to the same setter. */}
+          {([
+            ["qb-date-pickup", "Pickup date", pickupDate, setPickupDate],
+            ["qb-date-delivery", "Delivery date", deliveryDate, setDeliveryDate],
+            ["qb-date-valid", "Valid until", validUntil, setValidUntil],
+          ] as const).map(([id, label, value, set]) => (
+            <div key={id} role="group" aria-labelledby={id} className="qb-date">
+              <div style={fieldLabelS}><span id={id}>{label}</span></div>
+              <DatePicker value={value} onChange={set} style={{ minHeight: "var(--field-h, 40px)", boxSizing: "border-box" }} />
+            </div>
+          ))}
           {/* Spans the grid: sits directly under the Vehicle type field but
               gets the full form width, so the options stay on one line.
               Rendered only when there is something to show, so an empty row
@@ -1442,7 +1487,7 @@ export default function QuoteBuilder() {
               {/* Label sits on the same line as the options: it's a lead-in, not
                   a field heading, so it keeps the form's spacing tight. */}
               <span style={{ ...labelS, textTransform: "none", letterSpacing: "normal" }}>
-                Suggested for this {weight}t load:
+                Suggested for this {capLabel(weight)} load:
               </span>
               {suggestions.map((x) => (
                 <span key={x.vt.id || x.vt.name} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -1451,7 +1496,7 @@ export default function QuoteBuilder() {
                     onClick={() => applyVehicleType(x.vt.name)}
                     className="qb-textbtn qb-textbtn--pick"
                   >
-                    {x.vt.name} ({x.cap}t)
+                    {x.vt.name} ({capLabel(x.cap)})
                   </button>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -1535,20 +1580,22 @@ export default function QuoteBuilder() {
               // Empty state: what pricing still needs, read from the same four
               // inputs `ready` checks (display only).
               const clientName = customers.find((c: any) => String(c.id) === String(customerId))?.name;
-              const needs: [string, string | null][] = [
+              // Third item: text typed but no suggestion picked yet (pricing
+              // waits for a picked match, so the row asks for one).
+              const needs: [string, string | null, string?][] = [
                 ["Client", customerId ? (clientName || "Chosen") : null],
-                ["Collection", pickup && pickupCoords ? pickup : null],
-                ["Delivery", delivery && deliveryCoords ? delivery : null],
+                ["Collection", pickup && pickupCoords ? pickup : null, pickup],
+                ["Delivery", delivery && deliveryCoords ? delivery : null, delivery],
                 ["Weight", Number(weight) > 0 ? `${weight} t` : null],
               ];
               return (
                 <div className="qb-need">
                   <ul className="qb-need__list" aria-label="Needed to price this quote">
-                    {needs.map(([k, v]) => (
-                      <li key={k} className={`qb-need__row${v ? " is-done" : ""}`}>
+                    {needs.map(([k, v, typed]) => (
+                      <li key={k} className={`qb-need__row${v ? " is-done" : typed ? " is-typed" : ""}`}>
                         <span className="qb-need__mark" aria-hidden="true">{v ? <Check size={12} strokeWidth={2.5} /> : null}</span>
                         <span className="qb-need__k">{k}</span>
-                        <span className="qb-need__v">{v || "Needed"}</span>
+                        <span className="qb-need__v" title={v || typed || undefined}>{v || (typed ? "Typed · pick a match" : "Needed")}</span>
                       </li>
                     ))}
                   </ul>
@@ -1581,18 +1628,18 @@ export default function QuoteBuilder() {
             )}
             {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && !calculatingRoute && (<>
               {[
-                { key: "fuel", l: `Fuel: ${fuelConsumption.toFixed(1)} L/100km @ R${Number(fuelPricePerL).toFixed(2)}/L${fuelZoneNote}${fuelBasisNote}`, v: fuelCost, c: "var(--status-danger)" },
+                { key: "fuel", l: `Fuel: ${oneDp(fuelConsumption)} L/100 km @ ${formatCurrency(fuelPricePerL)}/L${fuelZoneNote}${fuelBasisNote}`, v: fuelCost, c: "var(--status-danger)" },
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
                 ...(crossBorderCost > 0 ? [{ key: "cb", l: "Cross-border / weighbridge", v: crossBorderCost, c: "#2BB6A6" }] : []),
                 { key: "driver", l: "Driver allowance", v: driverAllowance, c: "var(--text-tertiary)" },
-                { key: "base", l: `Base rate (${hasVehicleType ? vehicleType : "company default"} · R${baseRatePerKm}/km)`, v: baseCost, c: "var(--accent-primary)" },
+                { key: "base", l: `Base rate (${hasVehicleType ? vehicleType : "company default"} · ${formatCurrency(baseRatePerKm)}/km)`, v: baseCost, c: "var(--accent-primary)" },
               ].map((r, i) => (
                 <div key={i} className="qb-cost__row">
                   <span className="qb-cost__label">
                     {r.key === "fuel" && liveDieselHintText ? (
                       <span style={{ display: "flex", flexDirection: "column" }}>
                         <span>{r.l}</span>
-                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{liveDieselHintText}</span>
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{normaliseFigures(liveDieselHintText)}</span>
                       </span>
                     ) : r.l}
                     {r.key === "fuel" && (
@@ -1612,10 +1659,10 @@ export default function QuoteBuilder() {
                                 : `No truck is picked, so this uses ${fuelBasisVT?.name}, the most economical type in your fleet that can carry ${weight}t.`}
                             </div>
                             {[
-                              ["Truck used", `${fuelBasisVT?.name ?? "—"} (${fuelRefCapacityTons}t)`],
-                              ["Its rated burn", `${fuelConsumptionRef.toFixed(1)} L/100km at ${fuelRefCapacityTons}t`],
-                              ["This load", `${weight || 0}t`],
-                              ["Weight effect", `${(fuelSensitivity * 100).toFixed(1)}% per tonne`],
+                              ["Truck used", `${fuelBasisVT?.name ?? "—"} (${capLabel(fuelRefCapacityTons)})`],
+                              ["Its rated burn", `${oneDp(fuelConsumptionRef)} L/100 km at ${capLabel(fuelRefCapacityTons)}`],
+                              ["This load", capLabel(weight || 0)],
+                              ["Weight effect", `${oneDp(fuelSensitivity * 100)}% per tonne`],
                             ].map(([k, v]) => (
                               <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0" }}>
                                 <span style={{ color: "var(--text-tertiary)" }}>{k}</span>
@@ -1624,21 +1671,21 @@ export default function QuoteBuilder() {
                             ))}
                             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--border-subtle)", fontWeight: 600 }}>
                               <span>Burn for this load</span>
-                              <span style={{ fontVariantNumeric: "tabular-nums" }}>{fuelConsumption.toFixed(1)} L/100km</span>
+                              <span style={{ fontVariantNumeric: "tabular-nums" }}>{oneDp(fuelConsumption)} L/100 km</span>
                             </div>
                           </>) : (
                             <div style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 10 }}>
                               Nothing in your fleet has a rated capacity to work from, so this uses a
-                              standard {fuelConsumption.toFixed(1)} L/100km with no adjustment for weight.
+                              standard {oneDp(fuelConsumption)} L/100 km with no adjustment for weight.
                               Set a capacity on your vehicle types to price this properly.
                             </div>
                           )}
                           <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border-row)" }}>
                             {[
-                              ["Distance", `${Math.round(chargeDistance)} km${legs === 2 ? " (round trip)" : ""}`],
-                              ["Diesel used", `${Math.round(chargeDistance * fuelConsumption / 100)} L`],
-                              ["Diesel price", `R${Number(fuelPricePerL).toFixed(2)}/L${fuelZoneNote.replace(' · ', ' ')}`],
-                              ...(liveDieselHintText ? [["Live diesel", liveDieselHintText.replace(/^Live diesel: /, '')]] : []),
+                              ["Distance", `${formatNumber(Math.round(chargeDistance))} km${legs === 2 ? " (round trip)" : ""}`],
+                              ["Diesel used", `${formatNumber(Math.round(chargeDistance * fuelConsumption / 100))} L`],
+                              ["Diesel price", `${formatCurrency(fuelPricePerL)}/L${fuelZoneNote.replace(' · ', ' ')}`],
+                              ...(liveDieselHintText ? [["Live diesel", normaliseFigures(liveDieselHintText.replace(/^Live diesel: /, ''))]] : []),
                             ].map(([k, v]) => (
                               <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0" }}>
                                 <span style={{ color: "var(--text-tertiary)" }}>{k}</span>
@@ -1749,7 +1796,7 @@ export default function QuoteBuilder() {
                 <span style={labelS}>Quote price</span>
                 <span style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, color: "var(--text-primary)" }}>{formatCurrency(total)}</span>
               </div>
-              <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 8 }}>{Math.round(distance)} km {legs === 2 ? `one way · ${Math.round(chargeDistance)} km round trip` : "one way"} · live diesel · {hasVehicleType ? `your ${vehicleType} settings` : "your company defaults"}{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
+              <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 8 }}>{formatNumber(Math.round(distance))} km {legs === 2 ? `one way · ${formatNumber(Math.round(chargeDistance))} km round trip` : "one way"} · live diesel · {hasVehicleType ? `your ${vehicleType} settings` : "your company defaults"}{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
               <div className="qb-cost__adjust">
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ ...fieldLabelS, marginBottom: 4 }}><span>Tolls</span></div><input type="number" value={tollManuallyEdited ? editableTollCost : String(tollCost)} onChange={e => { setEditableTollCost(e.target.value); setTollManuallyEdited(true); }} aria-label="Tolls" className="qb-mini" style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ ...fieldLabelS, marginBottom: 4 }}><span>Driver</span></div><input type="number" value={driverAllowanceInput} onChange={e => setDriverAllowanceInput(e.target.value)} aria-label="Driver allowance" className="qb-mini" style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
@@ -1777,7 +1824,7 @@ export default function QuoteBuilder() {
                           <span style={{ color: "var(--text-tertiary)" }}>Company default</span>
                           <span style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
                             {Number(companyProfile?.default_base_rate_per_km) > 0
-                              ? `R${Number(companyProfile.default_base_rate_per_km).toFixed(2)}`
+                              ? formatCurrency(companyProfile.default_base_rate_per_km)
                               : "not set"}
                           </span>
                         </div>
@@ -1786,7 +1833,7 @@ export default function QuoteBuilder() {
                             <span style={{ color: "var(--text-tertiary)" }}>{vehicleType}</span>
                             <span style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
                               {Number(selectedVT?.base_rate) > 0
-                                ? `R${Number(selectedVT.base_rate).toFixed(2)}`
+                                ? formatCurrency(selectedVT.base_rate)
                                 : "not set"}
                             </span>
                           </div>
@@ -1871,7 +1918,7 @@ export default function QuoteBuilder() {
                       color: "var(--text-secondary)",
                     }}
                   >
-                    {aiPrediction.model_scope === "user" ? "Personal AI" : "Platform AI"}
+                    {aiPrediction.model_scope === "user" ? "From your quotes" : "From platform quotes"}
                   </span>
                 )}
               </div>
@@ -1955,6 +2002,8 @@ export default function QuoteBuilder() {
           <div className="qb-pricebar__actions">
             <button type="button" className="tw-btn" onClick={() => save(false)} disabled={saving}>Save as draft</button>
             <button type="button" className="tw-btn tw-btn--primary" onClick={openSendPreview} disabled={saving}>Send quote</button>
+            {/* Assistant launcher slot while the bar shows (see nlChatSlotRef). */}
+            <span ref={barChatSlotRef} className="qb-chatslot" />
           </div>
         </section>
       )}
@@ -1979,7 +2028,7 @@ export default function QuoteBuilder() {
         );
       })()}
 
-      <AIChatPanel messages={chatMessages} busy={nlBusy} open={chatOpen} onOpenChange={setChatOpen} onSend={(t, lang) => submitNL(t, lang)} />
+      <AIChatPanel messages={chatMessages} busy={nlBusy} open={chatOpen} onOpenChange={setChatOpen} onSend={(t, lang) => submitNL(t, lang)} launcherSlot={chatSlot} />
     </div>
   );
 }

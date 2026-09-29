@@ -1,21 +1,25 @@
-/* Quote builder only: native date/select chrome follows the active theme so
-   the calendar and chevron icons stay visible on dark surfaces. Presentation
-   only; values and handlers untouched. */
-[data-theme="dark"] .qb-controls input[type="date"],
-[data-theme="dark"] .qb-controls select {
-  color-scheme: dark;
+/* Quote builder only: native select chrome follows the active theme so the
+   chevron and option list stay legible on dark surfaces. Presentation only. */
+[data-theme="dark"] .qb-controls select { color-scheme: dark; }
+[data-theme="light"] .qb-controls select { color-scheme: light; }
+/* ---- Dates: the shared DatePicker, sized to the field row (--field-h: 40
+   desktop, 44 phones/touch). Same pattern as New invoice's date field: one
+   inset hairline, a full-height calendar button. ------------------------- */
+.qb-controls .qb-date .tw-date-field {
+  height: var(--field-h, 40px); box-sizing: border-box;
+  border: 0 !important; box-shadow: inset 0 0 0 1px var(--border-subtle);
 }
-[data-theme="light"] .qb-controls input[type="date"],
-[data-theme="light"] .qb-controls select {
-  color-scheme: light;
+.qb-controls .qb-date .tw-date-field:hover { box-shadow: inset 0 0 0 1px var(--border-control-hover); }
+.qb-controls .qb-date .tw-date-field > input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+  height: var(--field-h, 40px); min-height: 0 !important; box-sizing: border-box; padding: 9px 11px !important;
 }
-/* ---- Fields: one height token (--field-h: 40 desktop, 44 phones/touch) --- */
-.qb-controls input[type="date"] { height: var(--field-h, 40px); }
-.qb-controls input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: pointer; }
-.qb-controls input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: 0.85; }
-/* Empty date / placeholder select read as placeholders (tertiary), as the
-   shared Select and date field do. data-empty is set in markup only. */
-.qb-controls input[type="date"][data-empty]::-webkit-datetime-edit { color: var(--text-tertiary); }
+.qb-controls .qb-date .tw-date-field > button {
+  align-self: stretch; margin: 0; height: var(--field-h, 40px); min-width: var(--field-h, 40px);
+  justify-content: center; border-radius: 0 var(--radius-control, 8px) var(--radius-control, 8px) 0 !important;
+}
+.qb-controls .qb-date .tw-date-field > button:hover { color: var(--text-primary) !important; }
+/* Placeholder select reads as a placeholder (tertiary), as the shared
+   Select does. data-empty is set in markup only. */
 .qb-controls select[data-empty] { color: var(--text-tertiary) !important; }
 .qb-controls select option { color: var(--text-primary); background: var(--bg-overlay); }
 /* Native selects keep their behaviour; only the chrome follows the shared
@@ -41,6 +45,14 @@
 .qb-nl__mic { width: var(--field-h, 40px); height: var(--field-h, 40px); padding: 0; flex-shrink: 0; border-radius: 50%; color: var(--text-secondary); }
 .qb-nl__fill { height: var(--field-h, 40px); padding: 0 16px; font-size: 14px; flex-shrink: 0; }
 .qb-nl__mic, .qb-nl__fill { position: relative; }
+/* Assistant launcher slots (Describe bar, price bar): the slot itself makes
+   no box, so an empty slot adds no gap; the launcher inside is a normal
+   in-flow icon button (ai-chat-panel.css .ai-launcher--inline). */
+.qb-chatslot { display: contents; }
+/* Describe bar: the slot keeps the launcher's box from the first paint. */
+.qb-chatslot--nl { display: inline-flex; flex-shrink: 0; width: var(--field-h, 40px); height: var(--field-h, 40px); }
+.qb-nl .ai-launcher--inline { width: var(--field-h, 40px); height: var(--field-h, 40px); }
+.qb-pricebar__actions .ai-launcher--inline { width: 40px; height: 40px; align-self: center; }
 .qb-nl__mic::after, .qb-nl__fill::after { content: ''; position: absolute; inset: -2px; }
 
 /* ---- One quiet link style: "New", GPS, "Add stop", suggestions -------- */
@@ -52,8 +64,8 @@
 }
 .qb-textbtn:hover { color: var(--text-primary); text-decoration: underline; text-underline-offset: 2px; }
 .qb-textbtn:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
-.qb-textbtn--pick { color: var(--text-primary); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
-.qb-textbtn--pick:hover { text-decoration-color: currentColor; }
+/* Suggested truck: a quiet text button like the rest (underline on hover). */
+.qb-textbtn--pick { color: var(--text-primary); }
 /* LocationInput's "Enter GPS coordinates" / "Search by address" toggles
    (inline-styled in the shared component) take the same quiet style here. */
 .qb-controls .qb-loc > div > div > button,
@@ -144,6 +156,9 @@
 .qb-need__k { color: var(--text-primary); font-weight: 500; }
 .qb-need__v { color: var(--text-tertiary); text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qb-need__row.is-done .qb-need__v { color: var(--text-secondary); }
+/* Typed but no suggestion picked yet: hollow mark, secondary text. */
+.qb-need__row.is-typed .qb-need__mark { border-style: solid; border-color: var(--text-tertiary); }
+.qb-need__row.is-typed .qb-need__v { color: var(--text-secondary); }
 .qb-need__foot { margin: 12px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
 .qb-savestate { color: var(--text-tertiary); }
 
@@ -187,30 +202,27 @@
 .qb-pricebar__actions .tw-btn { height: 40px; padding: 0 16px; font-size: 14px; }
 .qb-pricebar__actions .tw-btn:disabled { opacity: 0.6; cursor: progress; }
 
-/* ---- Assistant launcher placement (read by components/ai-chat-panel.css).
-   Desktop: bottom-right corner, below the (top-aligned) cost card. With the
-   price bar showing, the bar keeps a clear slot at its right end and the
-   launcher sits in it, so it never covers a figure or a button. ---------- */
+/* ---- Assistant panel placement (read by components/ai-chat-panel.css).
+   The launcher is an in-flow button (Describe bar, or the price bar while it
+   shows); only the opened panel floats. It opens bottom-right, and above
+   the sticky price bar when that shows, so it never sits on the bar. ----- */
 /* 1050: above the map's panes and controls (Leaflet tops out at 1000),
    below the phone More sheet and the price bar (1100). */
 .qb-controls { --ai-fab-right: 16px; --ai-fab-bottom: 16px; --ai-fab-z: 1050; }
 @media (min-width: 1025px) {
-  /* z above the sticky bar (1100), below dialogs (10000). Bottom 57px keeps
-     the 44px launcher inside the 98px bar both while it is stuck (bottom 12)
-     and at the end of the scroll (bottom 48). */
+  /* z above the sticky bar (1100), below dialogs (10000); the panel's
+     bottom edge (57 + 56px) clears the 98px bar stuck 12px from the edge. */
   .qb-has-pricebar { --ai-fab-right: 44px; --ai-fab-bottom: 57px; --ai-fab-z: 1101; }
-  .qb-has-pricebar .qb-pricebar { padding-right: 76px; }
 }
 @media (min-width: 1897px) {
-  /* Wider than the 1600px content cap: keep the launcher inside the bar. */
+  /* Wider than the 1600px content cap: align the panel with the bar's end. */
   .qb-has-pricebar { --ai-fab-right: calc(100vw - 1852px); }
 }
 
 /* ---- Phones and narrow tablets: one column, price bar stays in reach ---- */
 @media (min-width: 769px) and (max-width: 1024px) {
-  /* Two-row price bar on tablets: same right-hand slot, vertically centred. */
+  /* Two-row price bar on tablets: the panel opens above it. */
   .qb-has-pricebar { --ai-fab-right: 44px; --ai-fab-bottom: 66px; --ai-fab-z: 1101; }
-  .qb-has-pricebar .qb-pricebar { padding-right: 76px; }
 }
 @media (max-width: 1024px) {
   .qb-grid--inputs, .qb-grid--details { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
@@ -267,6 +279,9 @@
   .qb-pricebar__figure { font-size: 22px; line-height: 28px; }
   .qb-pricebar__sub { flex-basis: 100%; }
   .qb-pricebar__actions .tw-btn { flex: 1 1 0; height: 48px; }
+  .qb-pricebar__actions .ai-launcher--inline { width: 48px; height: 48px; }
+  /* Phones: the Describe bar drops its decorative icon to give the field room. */
+  .qb-nl__icon { display: none; }
 }
 
 /* Very wide screens: the cost card's foot fits on one line, so the checklist

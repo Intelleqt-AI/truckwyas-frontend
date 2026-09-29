@@ -223,9 +223,10 @@ export function ProfileSettings() {
           </div>
         </div>
       </div>
-      {/* Page-level save sits below the last card, as on Notifications and
-          Company details — it saves every card on this page. */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      {/* One save pattern across Settings (R9): the sticky save bar, as on
+          Company details. It saves every card on this page. */}
+      <div className="cs-savebar">
+        <span className="cs-savebar__note">{saved ? 'Saved.' : 'Applies to your account only.'}</span>
         <button
           className="btn-action settings-control"
           onClick={handleSave}

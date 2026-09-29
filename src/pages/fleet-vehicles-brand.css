@@ -474,3 +474,11 @@
    pseudo-element on coarse pointers); the negative margins keep the row
    height unchanged. */
 .fleet-page .fleet-stale-narrow.fleet-stale-link { min-height: 44px; margin-top: -14px; margin-bottom: -14px; padding-right: 4px; }
+/* R9: in the table's last row the link's 44px box ran 5px past the card,
+   whose overflow clipped it (39px hit). There the box starts 6px higher
+   (margins -20/-8) and the text drops back by the same 12px of top padding,
+   so the words and the row height stay exactly where they were. */
+.fleet-page .fleet-table tbody > tr:last-child .fleet-stale-narrow.fleet-stale-link { margin-top: -20px; margin-bottom: -8px; padding-top: 12px; }
+/* R9: the Available note's long form ("3 hold an order left open") drops to
+   "3 left open" on phones, where the tile is too narrow for it. */
+@media (max-width: 520px) { .fleet-page .fleet-kpis .fleet-kpi-long { display: none; } }

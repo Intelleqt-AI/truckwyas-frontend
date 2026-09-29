@@ -346,7 +346,7 @@ export default function Bookings() {
         <FileSearch className="load-error__icon" size={20} aria-hidden="true" />
         <div className="load-error__text">
           <p className="load-error__title">There is no order at this link</p>
-          <p className="load-error__hint">It may have been removed, or the link is wrong.</p>
+          <p className="load-error__hint">It may have been deleted, or the link is wrong.</p>
         </div>
         <button type="button" className="tw-btn load-error__retry" onClick={() => navigate('/bookings/orders')}>All orders</button>
       </div>
@@ -386,6 +386,7 @@ export default function Bookings() {
   const assignmentLocked = !['PENDING', 'ASSIGNED'].includes(load.status);
   const hasInvoice = !!invoiceId;
   const allowedNextStatuses = VALID_TRANSITIONS[load.status] || [];
+  const noVehicleFlag = !load.vehicle && ['LOADING', 'IN_TRANSIT'].includes(load.status) && !editingAssignment;
 
   return (
     <>
@@ -477,8 +478,12 @@ export default function Bookings() {
             <p className="bk-stale" role="status">
               <span className="bk-dot bk-dot--warning" aria-hidden="true" />
               <span>
-                Still {titleCase(load.status).toLowerCase()}{stale.overdue ? ', past its delivery date' : ''}{' '}
-                <b>{staleLabel(stale).text}</b>. {staleAct}.
+                {/* Overdue: the delivery date is already on the route, so
+                    the line gives the day count only (R9). */}
+                Still {titleCase(load.status).toLowerCase()},{' '}
+                {stale.overdue
+                  ? <><b>{staleLabel(stale).days}</b> past its delivery date</>
+                  : <>open <b>{staleLabel(stale).text}</b></>}. {staleAct}.
               </span>
             </p>
           )}
@@ -554,7 +559,8 @@ export default function Bookings() {
               <p className="bk-help">
                 {!load.vehicle
                   ? assignmentLocked
-                    ? 'No vehicle on this order, so there is no live position.'
+                    // The Assignment flag already names the missing vehicle (R9).
+                    ? 'No live position for this order.'
                     : 'Live position shows once a vehicle is assigned.'
                   : !vehicleDetail?.ctrlfleet_vehicle_code
                     ? 'The assigned vehicle is not linked to CtrlFleet, so there is no live tracking.'
@@ -581,21 +587,38 @@ export default function Bookings() {
           {/* Financials */}
           <section className="bk-card" aria-labelledby="bk-fin-title">
             <div className="bk-card__head"><h2 className="bk-card__title" id="bk-fin-title">Financials</h2></div>
-            {[
-              { label: 'Base rate', value: formatCurrency(parseFloat(load.rate || '0')) },
+            {(() => {
+              // The shown lines must add up to the total (R9). When the stored
+              // total carries charges not broken down on the order, say so in
+              // one muted line instead of leaving a gap.
+              const rate = parseFloat(load.rate || '0') || 0;
+              const fuel = parseFloat(load.fuel_surcharge || '0') || 0;
+              const extra = parseFloat(load.additional_charges || '0') || 0;
+              const total = parseFloat(load.total_amount || '0') || 0;
+              const gap = Math.round((total - (rate + fuel + extra)) * 100) / 100;
+              const rows: { label: React.ReactNode; key?: string; value: string; muted?: boolean }[] = [
+              { label: 'Base rate', value: formatCurrency(rate) },
               {
                 label: <>Base rate per km <InfoTip>Base rate divided by distance, before surcharges.</InfoTip></>,
                 key: 'per-km',
                 value: parseFloat(load.distance || '0') > 0 ? formatMoney(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)) : 'Not recorded',
               },
-              { label: 'Fuel surcharge', value: formatCurrency(parseFloat(load.fuel_surcharge || '0')) },
-              { label: 'Additional charges', value: formatCurrency(parseFloat(load.additional_charges || '0')) },
-            ].map((r: { label: React.ReactNode; key?: string; value: string }) => (
-              <div key={r.key ?? String(r.label)} className="bk-kv">
-                <span className="bk-kv__label">{r.label}</span>
-                <span className={`bk-kv__value${r.value === 'Not recorded' ? ' bk-muted' : ''}`}>{r.value}</span>
-              </div>
-            ))}
+              { label: 'Fuel surcharge', value: formatCurrency(fuel) },
+              { label: 'Additional charges', value: formatCurrency(extra) },
+              ];
+              if (Math.abs(gap) > 0.5) rows.push({
+                key: 'not-itemised',
+                label: <>Not itemised <InfoTip>The order total includes charges not broken down here.</InfoTip></>,
+                value: formatCurrency(gap),
+                muted: true,
+              });
+              return rows.map(r => (
+                <div key={r.key ?? String(r.label)} className={`bk-kv${r.muted ? ' bk-muted' : ''}`}>
+                  <span className="bk-kv__label">{r.label}</span>
+                  <span className={`bk-kv__value${r.muted || r.value === 'Not recorded' ? ' bk-muted' : ''}`}>{r.value}</span>
+                </div>
+              ));
+            })()}
             <div className="bk-kv bk-kv--total">
               <span className="bk-kv__label">Total</span>
               <span className="bk-kv__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</span>
@@ -630,9 +653,9 @@ export default function Bookings() {
             )}
 
             {/* An order on the move with no vehicle is not a normal state: say so once, calmly. */}
-            {!load.vehicle && ['LOADING', 'IN_TRANSIT'].includes(load.status) && !editingAssignment && (
+            {noVehicleFlag && (
               <div className="bk-assign__flag">
-                <StatusChip tone="warning" size="sm" label={`${load.status === 'IN_TRANSIT' ? 'In transit' : 'Loading'} · no vehicle assigned`} />
+                <StatusChip tone="warning" size="sm" label={`${load.status === 'IN_TRANSIT' ? 'In transit' : 'Loading'} · no vehicle${load.driver_name ? '' : ' or driver'} assigned`} />
                 <p className="bk-help">
                   {load.status === 'LOADING'
                     ? 'To add the vehicle, move it back to Assigned via Change status; that asks for one.'
@@ -644,7 +667,10 @@ export default function Bookings() {
               [
                 { label: 'Vehicle', value: load.vehicle_info || 'Not assigned', node: vehicleValue(load.vehicle_info) },
                 { label: 'Driver', value: load.driver_name || 'Not assigned', node: load.driver_name && driverInactive ? <>{load.driver_name} <span className="bk-muted">· marked inactive</span></> : undefined },
-              ].map((r: { label: string; value: string; node?: React.ReactNode }) => (
+              ]
+                // The flag above already says what is missing (R9): say it once.
+                .filter(r => !(noVehicleFlag && r.value === 'Not assigned'))
+                .map((r: { label: string; value: string; node?: React.ReactNode }) => (
                 <div key={r.label} className="bk-kv">
                   <span className="bk-kv__label">{r.label}</span>
                   <span className={`bk-kv__value${r.value === 'Not assigned' ? ' bk-muted' : ''}`}>{r.node ?? r.value}</span>

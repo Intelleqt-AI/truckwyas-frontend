@@ -158,7 +158,7 @@ const STATUS_WORDS: Record<string, string> = { IN_TRANSIT: 'in transit', LOADING
 /**
  * Home's stale-work row (R6): the same loads Orders, Findings and the fleet
  * pages flag (src/lib/staleWork.ts), so the counts agree everywhere.
- * "11 loads not closed" · "Oldest since 2 Jan 2026 (270 days)" (status mix in the tooltip).
+ * "11 loads left open" · "Oldest since 2 Jan 2026 (270 days)" (status mix in the tooltip).
  */
 export function staleSignal(loads: any[], today: Date = new Date()): (SignalRow & { actionUrl: string }) | null {
   const stale = staleLoads(loads, today);
@@ -170,7 +170,7 @@ export function staleSignal(loads: any[], today: Date = new Date()): (SignalRow 
   const oldest = staleLabel(staleWork(stale[0], today)!);
   return {
     kind: 'fleet',
-    title: `${n} ${n === 1 ? 'load' : 'loads'} not closed`,
+    title: `${n} ${n === 1 ? 'load' : 'loads'} left open`,
     // One line in the side column; the mix of statuses is in the tooltip.
     detail: n === 1 ? `Open ${oldest.text}` : `Oldest ${oldest.text}`,
     detailTitle: `Open loads past their delivery date or open more than 30 days: ${mix}. The oldest has been open ${oldest.text}.`,

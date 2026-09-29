@@ -660,6 +660,9 @@
   .bk-table.cd-orders .bk-amt-short { display: inline; }
   .bk-table.cd-orders .cd-orders__load { max-width: none; overflow: visible; text-overflow: clip; white-space: nowrap; }
   .bk-table.cd-orders td.bk-col-status { padding-left: 8px; padding-right: 8px; }
+  /* R9: Amount ends at the card padding like every other right edge. */
+  .bk-table.cd-orders tr > :first-child { padding-right: 8px; }
+  .bk-table.cd-orders tr > :last-child { padding-left: 8px; }
 }
 /* Customer detail tables on phones: long record IDs truncate (their title
    holds the full number) so Status and Balance stay in the card. */
@@ -724,3 +727,16 @@
 .bk-qcard__top { flex-wrap: wrap; row-gap: 0; }
 .bk-qcard__id { white-space: nowrap; }
 .bk-qcard__foot { flex-wrap: wrap; row-gap: 0; }
+
+/* Quotes list on phones (R9): the list flows with the page instead of
+   scrolling inside a card, so "Load 10 more" is reached by scrolling the
+   page. The board keeps its own column scrolls. */
+@media (max-width: 767px) {
+  .bk-qlist-page,
+  .bk-qlist-page .bk-qlist-fill {
+    height: auto !important;
+    flex: none !important;
+    overflow: visible !important;
+  }
+  .bk-qlist-page .bk-table-wrap.bk-qlist-fill { overflow-x: auto !important; overflow-y: visible !important; }
+}

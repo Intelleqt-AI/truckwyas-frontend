@@ -32,7 +32,7 @@ import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 import { DELIVERED } from '@/components/reports/data';
 import { capacityTonnes } from '@/components/fleet-detail/parts';
-import { staleWork, staleLabel } from '@/lib/staleWork';
+import { isOpenLoad, staleWork, staleLabel } from '@/lib/staleWork';
 
 interface Vehicle {
   id: number;
@@ -214,6 +214,16 @@ async function loadFleet(q: string) {
     if (!had || (staleWork(had) && !staleWork(l))) activeLoadByVehicle[l.vehicle] = l;
   }
 
+  // Home's idle rule (overview/signals.ts idleSignal): every open load
+  // (Pending included) per truck, so the Available note counts the same
+  // trucks "holding an order left open" as Home does.
+  const openByVehicle: Record<number, { current: boolean }> = {};
+  for (const l of loadRows) {
+    if (l.vehicle == null || !isOpenLoad(l)) continue;
+    const k = Number(l.vehicle);
+    openByVehicle[k] = { current: (openByVehicle[k]?.current ?? false) || !staleWork(l) };
+  }
+
   // Delivered work on the Reports definition (delivered, invoiced, completed,
   // paid), from every load: the same total as History and Reports. Rows show
   // each truck's share; loads with no vehicle recorded belong to no row.
@@ -228,7 +238,7 @@ async function loadFleet(q: string) {
     row.revenue += amt; row.loads += 1;
   }
 
-  return { vehicles, overview, insights, vehicleTypes, drivers, activeLoadByVehicle, delivered, deliveredByVehicle };
+  return { vehicles, overview, insights, vehicleTypes, drivers, activeLoadByVehicle, openByVehicle, delivered, deliveredByVehicle };
 }
 
 export default function Vehicles() {
@@ -342,6 +352,23 @@ export default function Vehicles() {
   const hasOrder = (v: Vehicle) => currentLoad(v) != null;
   const onJobNoOrder = onJob.filter(v => !hasOrder(v)).length;
   const freeOnOrder = free.filter(hasOrder).length;
+  // Available but still holding an order left open (stale, src/lib/staleWork.ts):
+  // not free to take a load in practice. The same count as Home's idle row
+  // ("3 hold an order left open", overview/signals.ts idleSignal).
+  const openByVehicle = data?.openByVehicle ?? {};
+  const freeHolding = free.filter(v => openByVehicle[v.id] && !openByVehicle[v.id].current).length;
+  const holdingText = freeHolding === 0 ? '' : freeHolding === free.length
+    ? (freeHolding === 1 ? 'It holds an order left open' : 'All hold an order left open')
+    : `${freeHolding} ${freeHolding === 1 ? 'holds' : 'hold'} an order left open`;
+  const freeNoteText = !free.length ? 'Every truck is busy' : [
+    freeOnOrder > 0 ? `${freeOnOrder} on a current order` : '',
+    holdingText,
+  ].filter(Boolean).join(' · ') || 'Free to take a load';
+  // Phones keep the short form ("3 left open", the rows' own words) so the
+  // note never ends in an ellipsis; the full sentence is the tooltip.
+  const freeNote = freeOnOrder === 0 && freeHolding > 0 && freeHolding < free.length
+    ? <span title={freeNoteText}>{freeHolding} <span className="fleet-kpi-long">{freeHolding === 1 ? 'holds' : 'hold'} an order </span>left open</span>
+    : freeNoteText;
   const outOfService = shop.filter(v => v.status === 'OUT_OF_SERVICE').length;
   const shopOnOrder = shop.filter(hasOrder).length;
   const mismatchCount = onJobNoOrder + freeOnOrder + shopOnOrder;
@@ -462,7 +489,7 @@ export default function Vehicles() {
             {...tileProps('free')}
             label="Available"
             figure={loading ? skelFigure : free.length}
-            note={loading ? 'Loading' : freeOnOrder > 0 ? `${freeOnOrder} on a current order` : free.length ? 'Free to take a load' : 'Every truck is busy'}
+            note={loading ? 'Loading' : freeNote}
           />
           <KpiTile
             {...tileProps('shop')}

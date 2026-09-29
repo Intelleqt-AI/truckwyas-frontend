@@ -23,6 +23,14 @@
 .qd-facts dd { margin: 0; }
 .qd-fact { min-width: 0; }
 .qd-fact--wide { grid-column: 1 / -1; }
+/* R9: the customer always sits in the Job card. In a narrow main column
+   (1280 with the sidebar open) the auto grid drops to three columns and the
+   customer and cargo rows each wrap, so the Job card outgrew the rail; four
+   tighter columns keep each on one row. */
+.qd-main { container: qd-main / inline-size; }
+@container qd-main (min-width: 540px) and (max-width: 700px) {
+  .qd-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 16px; }
+}
 .qd-rule { border: 0; height: 1px; background: var(--border-row); margin: 20px 0; }
 .qd-route-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px 24px; }
 /* Emails wrap at "@" and dots (<wbr>), never inside a word. */
@@ -91,7 +99,8 @@
    the Job card's first fact below. */
 @media (max-width: 768px) { .qd-desc-route { display: none; } }
 .bk-card.qd-map--empty { display: flex; align-items: center; justify-content: center; padding: var(--card-pad, 20px); text-align: center; box-sizing: border-box; }
-.bk-card.qd-map--empty .bk-help { max-width: 40ch; margin: 0; }
+.bk-card.qd-map--empty { min-height: min-content; }
+.bk-card.qd-map--empty .bk-help { max-width: 60ch; margin: 0; }
 @media (max-width: 1000px) { .bk-card.qd-map--empty { height: auto !important; } }
 /* The empty map slot reads as a map area (tinted), not a blank white card. */
 .bk-card.qd-map--empty { background: var(--bg-deep, var(--bg-surface-hover)); border-style: dashed; }

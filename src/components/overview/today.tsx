@@ -201,7 +201,7 @@ export function usePipeline(quotes: any[], loads: any[] = []) {
       if (s === 'EXPIRED' && st === 'SENT') expiredSent += 1;
     }
     // R7: "On the road" is current work only. In-transit loads past their
-    // delivery date (or open > 30 days, src/lib/staleWork.ts) are "not closed",
+    // delivery date (or open > 30 days, src/lib/staleWork.ts) are "left open",
     // counted separately so the card can say so instead of calling them active.
     const inTransit = loads.filter((l) => String(l?.status || '').toUpperCase() === 'IN_TRANSIT');
     const staleInTransit = inTransit.filter((l) => staleWork(l)).length;
@@ -211,7 +211,7 @@ export function usePipeline(quotes: any[], loads: any[] = []) {
       { key: 'sent', label: 'Sent', count: by.SENT },
       { key: 'won', label: 'Accepted', count: by.ACCEPTED },
       // Stale in-transit loads are said under this row, never counted in it.
-      { key: 'moving', label: 'On the road', count: onTheRoad, note: staleInTransit > 0 ? `${staleInTransit} past ${staleInTransit === 1 ? 'its' : 'their'} delivery date, not closed` : undefined },
+      { key: 'moving', label: 'On the road', count: onTheRoad, note: staleInTransit > 0 ? `${staleInTransit} past ${staleInTransit === 1 ? 'its' : 'their'} delivery date, left open` : undefined },
       { key: 'lost', label: 'Declined', count: by.DECLINED },
       ...(by.EXPIRED > 0 ? [{ key: 'expired', label: 'Expired', count: by.EXPIRED }] : []),
     ];

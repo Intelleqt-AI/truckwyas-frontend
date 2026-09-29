@@ -118,7 +118,7 @@ function QuoteCardBody({ quote }: { quote: any }) {
         <span className="bk-qcard__amount" title={formatCurrency(parseFloat(quote.total_amount || '0'))}>{formatMoneyWhole(parseFloat(quote.total_amount || '0'))}</span>
         {/* Only a low price confidence is worth a word on the card; otherwise the date it was made. */}
         {boardStage(quote) === 'EXPIRED' && quote.valid_until
-          ? <span className="bk-qcard__meta" title={`${String(quote.status).toUpperCase() === 'SENT' ? 'Sent' : 'Draft'}, valid until ${formatDate(quote.valid_until)}`}>Lapsed {formatDateShort(quote.valid_until)}</span>
+          ? <span className="bk-qcard__meta" title={`${String(quote.status).toUpperCase() === 'SENT' ? 'Sent' : 'Draft'}, valid until ${formatDate(quote.valid_until)}`}>Expired {formatDateShort(quote.valid_until)}</span>
           : String(quote.confidence).toUpperCase() === 'LOW'
           ? <span className="bk-qcard__meta">Low confidence</span>
           : quote.created_at ? <span className="bk-qcard__meta">{formatDateShort(quote.created_at)}</span> : null}
@@ -594,7 +594,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   const currentStatus = statusOptions.find(o => o.value === statusFilter) ?? statusOptions[0];
 
   return (
-    <div className="bookings-typography" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+    <div className="bookings-typography bk-qlist-fill" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* Header — hidden when embedded in Bookings tabs */}
       {!embedded && (
         <div style={{ marginBottom: 24, flexShrink: 0 }}>
@@ -783,7 +783,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
         /* List view — quotes table, backed by the same per-status paginated
            queries as the board (plus a 5th "All" query with no status
            filter) — switching tabs reuses whatever's already loaded. */
-        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <div className="bk-qlist-fill" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
           {loadFailed(activeListQuery) ? (
             <LoadError
@@ -793,7 +793,12 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
               onRetry={() => activeListQuery.refetch()}
             />
           ) : (
-          <div className="bk-table-wrap" style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+          (() => {
+          // Columns with nothing in them on any row step aside (R9).
+          const anyOutcome = listItems.some((q: any) => q.outcome === 'accepted' || q.outcome === 'rejected');
+          const anyAction = listItems.some((q: any) => q.status === 'ACCEPTED');
+          return (
+          <div className="bk-table-wrap bk-qlist-fill" style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
             <table className="table-heading-roles bk-table">
               <thead>
                 <tr style={{ position: 'sticky', top: 0, zIndex: 1 }}>
@@ -801,10 +806,10 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                   <th scope="col">Customer</th>
                   <th scope="col" className="bk-col-route">Route</th>
                   <th scope="col">Status</th>
-                  <th scope="col" className="bk-col-phone">Outcome</th>
+                  {anyOutcome && <th scope="col" className="bk-col-phone">Outcome</th>}
                   <th scope="col" className="bk-col-phone">Created</th>
                   <th scope="col" className="is-num">Amount</th>
-                  <th scope="col" className="is-num bk-col-action"><span className="sr-only">Action</span></th>
+                  {anyAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Action</span></th>}
                 </tr>
               </thead>
               <tbody>
@@ -836,11 +841,11 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                           : <StatusChip status={quote.status === 'IT' ? 'IN_TRANSIT' : quote.status} label={COLUMN_LABELS[quote.status]} size="sm" />;
                       })()}
                     </td>
-                    <td className="bk-col-phone">
+                    {anyOutcome && <td className="bk-col-phone">
                       {quote.outcome === 'accepted' && <StatusChip status="WON" size="sm" />}
                       {quote.outcome === 'rejected' && <StatusChip status="LOST" size="sm" />}
                       {(!quote.outcome || quote.outcome === 'pending') && <span>—</span>}
-                    </td>
+                    </td>}
                     <td className="is-date bk-col-phone">
                       {quote.created_at ? formatDate(quote.created_at) : '—'}
                     </td>
@@ -848,7 +853,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       {/* Lists show whole rands; the quote itself carries the cents (R7). */}
                       {formatMoneyWhole(parseFloat(quote.total_amount || '0'))}
                     </td>
-                    <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
+                    {anyAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
                       {quote.status === 'ACCEPTED' && loadByQuoteId.has(String(quote.id)) && (
                         <button
                           type="button"
@@ -867,7 +872,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                           Convert to booking
                         </button>
                       )}
-                    </td>
+                    </td>}
                   </tr>
                 ))}
               </tbody>
@@ -891,6 +896,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
               </div>
             )}
           </div>
+          );
+          })()
           )}
         </div>
       )}

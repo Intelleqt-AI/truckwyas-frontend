@@ -489,8 +489,11 @@
 /* Performance notes stack one fact per line; the pending-cost consequence
    reads in normal text, in danger only when it turns the margin negative. */
 .fleet-detail .fd-perf__note { display: flex; flex-direction: column; gap: 2px; }
-.fleet-detail .fd-perf__if { color: var(--text-secondary); }
-.fleet-detail .fd-perf__if.is-loss { color: var(--status-danger-text); }
+/* R9: the consequence line reads at 13px in the neutral secondary colour;
+   only the figure itself ("−R 1 416") carries the danger colour. */
+.fleet-detail .fd-perf__if { font-size: 13px; line-height: 18px; color: var(--text-secondary); }
+.fleet-detail .fd-perf__if-figure { font-weight: 500; font-variant-numeric: tabular-nums; }
+.fleet-detail .fd-perf__if-figure.is-loss { color: var(--status-danger-text); }
 .fleet-detail .fd-perf__fig.is-quiet .fd-perf__value { font: 500 15px/28px var(--font-sans); letter-spacing: 0; color: var(--text-secondary); }
 
 /* Monthly trend: trailing empty months trimmed, said once under the bars. */
@@ -545,6 +548,12 @@
   .fleet-detail .fd-ghost::after { display: none; }
   .fleet-detail .fd-ghost--row { height: 44px; margin: -8px 0; position: relative; z-index: 1; }
   .fleet-detail .fd-ghost--row::before { inset: 8px 0; }
+  /* R9: rows are 36px apart, so two missing facts in a row (Odometer, Last
+     maintenance) overlapped their 44px Adds and the later one covered the
+     first (46x36 hit). A row carrying an Add is 44px on touch, so each Add
+     owns its full 44 without overlapping a neighbour. */
+  .fleet-detail .fd-row:has(> dd > .fd-ghost--row) { min-height: 44px; }
+  .fleet-detail .fd-row > dd > .fd-ghost--row { margin: 0; }
   .fd-info__btn { width: 44px; height: 44px; margin: -12px -12px; }
 }
 

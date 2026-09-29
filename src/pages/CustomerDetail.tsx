@@ -339,16 +339,17 @@ export default function CustomerDetail() {
             { label: "Owed now", value: ledger.data ? (owed > 0 ? formatZAR(owed) : "Nothing owed") : ledger.error ? "Could not load" : "…" },
             {
               label: "Credit limit",
-              tip: "Entered on this customer's record by your team (Edit customer). It feeds the payment risk profile; invoices above it are not blocked.",
+              // Its source in one visible line (R5), not only behind a tip.
               value: customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : "Not set",
+              note: customer.credit_limit ? "Set by your team; not enforced" : undefined,
             },
             { label: "Invoices", value: theirInvoices.length ? `${theirInvoices.length} issued` : ledger.data ? "None yet" : "…" },
             { label: "Last quote", value: sortedQuotes[0]?.created_at ? formatDate(sortedQuotes[0].created_at) : "None yet" },
             { label: "Customer since", value: customer.created_at ? formatDate(customer.created_at) : "Not recorded" },
-          ].map((r: { label: string; value: string; tip?: string }) => (
-            <div key={r.label} className="bk-kv">
+          ].map((r: { label: string; value: string; tip?: string; note?: string }) => (
+            <div key={r.label} className={r.note ? 'bk-kv cd-kv--noted' : 'bk-kv'}>
               <span className="bk-kv__label">{r.label}{r.tip && <InfoTip label={`Where the ${r.label.toLowerCase()} comes from`}>{r.tip}</InfoTip>}</span>
-              <span className="bk-kv__value">{r.value}</span>
+              <span className="bk-kv__value">{r.value}{r.note && <span className="cd-kv__note">{r.note}</span>}</span>
             </div>
           ))}
           {/* Status lives with the account, not as a loose button in the head. */}

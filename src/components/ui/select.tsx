@@ -15,7 +15,6 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     className={cn("tw-select-trigger", className)}
     style={{
-      display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
       width: "100%",

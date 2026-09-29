@@ -28,6 +28,8 @@ import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import { fleetMenuItems, useFleetPhoneHead } from '@/components/fleet-detail/fleetHead';
+import { DELIVERED, useLedger } from '@/components/reports/data';
 
 interface Driver {
   id: number;
@@ -103,6 +105,9 @@ export default function Drivers() {
   // viewing/filtering/search stay fully live.
   const isDemo = !!authUser?.is_demo;
   const [statusFilter, setStatusFilter] = useState('All');
+  const phoneHead = useFleetPhoneHead();
+  // Every load (the History ledger), for the Completed loads tile.
+  const ledger = useLedger(['loads']);
   const [search, setSearch] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -270,7 +275,12 @@ export default function Drivers() {
   const activeCount = overview?.active_drivers ?? drivers.filter(d => d.status === 'ACTIVE').length;
   const inactiveCount = drivers.filter(d => d.status === 'INACTIVE').length;
   const onLeaveCount = drivers.filter(d => d.status === 'ON_LEAVE').length;
-  const completedLoads = drivers.reduce((sum, d) => sum + (Number(d.total_trips) || 0), 0);
+  // Completed loads from the same load ledger as History, so the tile can say
+  // how many delivered loads carry no driver (History 16 = 12 + 4). Falls back
+  // to the drivers' own trip counts if the ledger cannot be read.
+  const ledgerDelivered = ledger.data ? ledger.data.loads.filter((l: any) => DELIVERED.has(String(l.status || '').toUpperCase())) : null;
+  const noDriverLoads = ledgerDelivered ? ledgerDelivered.filter((l: any) => l.driver == null).length : 0;
+  const completedLoads = ledgerDelivered ? ledgerDelivered.length - noDriverLoads : drivers.reduce((sum, d) => sum + (Number(d.total_trips) || 0), 0);
   const now = Date.now();
   const withExpiry = drivers.filter(d => d.license_expiry).map(d => ({ d, t: new Date(d.license_expiry as string).getTime() }));
   const expired = withExpiry.filter(x => x.t < now);
@@ -293,6 +303,7 @@ export default function Drivers() {
         eyebrow="Fleet"
         title="Fleet"
         tabs={FLEET_TABS}
+        menuItems={fleetMenuItems({ phone: phoneHead, openActivity: () => navigate('/fleet/heatmap'), openImport: () => navigate('/fleet/vehicles?import=1'), importLabel: 'Import vehicles from Excel', importDisabled: isDemo })}
         actions={
           <button data-fleet-control
             className="btn-action"
@@ -318,9 +329,9 @@ export default function Drivers() {
           <KpiTile
             aria-label="Completed loads"
             label="Completed loads"
-            aside={<InfoTip>Loads delivered or invoiced with a driver recorded, all time. Delivered loads with no driver are not counted here.</InfoTip>}
-            figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : completedLoads}
-            note={loading ? 'Loading' : 'All time'}
+            aside={<InfoTip>Loads delivered or invoiced with a driver recorded, all time. {ledgerDelivered ? `History counts ${ledgerDelivered.length} delivered loads; ${noDriverLoads ? `${noDriverLoads} of them have no driver recorded, so they are not here.` : 'every one has a driver.'}` : 'Delivered loads with no driver are not counted here.'}</InfoTip>}
+            figure={loading || ledger.loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : completedLoads}
+            note={loading || ledger.loading ? 'Loading' : ledgerDelivered && noDriverLoads ? `${noDriverLoads} of ${ledgerDelivered.length} had no driver` : 'All time'}
           />
           {(() => {
             const hasExpired = expired.length > 0;

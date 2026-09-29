@@ -333,7 +333,8 @@
 }
 /* Phone: Fleet's head matches Bookings' (one 40px primary action). The
    desktop-only tools (Excel import, heatmap link) step aside. */
-@media (max-width: 720px) {
+@media (max-width: 768px) {
+  /* They move to the head's "⋯" (menuItems, R5). */
   .fleet-page .section-header__actions .fleet-header-secondary { display: none; }
   .fleet-page .section-header__actions button[data-fleet-control] { min-height: var(--control-h, 44px); }
 }
@@ -428,3 +429,24 @@
 .fleet-page .fleet-months__track { background: none; border-bottom: 1px solid var(--border-subtle); border-radius: 0; }
 /* The count row is as tall as the Review button from the first paint, so the flag never moves the table. */
 .fleet-page .fleet-toolbar__count { min-height: 32px; }
+
+/* ---- Round 5 ---- */
+/* Touch: Review and the status filter are 44px to the finger. The Review
+   box grows (measurable) while its outline stays drawn at 32. */
+@media (pointer: coarse) {
+  .fleet-page .fleet-review__btn { height: 44px; margin: -6px 0; border-color: transparent; background: none; isolation: isolate; }
+  .fleet-page .fleet-review__btn::before {
+    content: ''; position: absolute; inset: 6px 0; z-index: -1; pointer-events: none;
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-control, 8px);
+  }
+  .fleet-page .fleet-review__btn::after { display: none; }
+  .fleet-page .fleet-toolbar .tw-seg__opt { min-height: 44px; }
+}
+/* Activity, pickups by month: each count sits on its own bar top. The fill
+   scale leaves 20px of headroom in the track so the tallest count fits. */
+.fleet-page .fleet-months__track { overflow: visible; }
+.fleet-page .fleet-months__fill { height: calc((100% - 20px) * var(--v, 0)); }
+.fleet-page .fleet-months__track .fleet-months__count {
+  position: absolute; left: 0; right: 0; text-align: center;
+  bottom: calc((100% - 20px) * var(--v, 0) + 3px); line-height: 16px;
+}

@@ -120,3 +120,17 @@ table.admin-table .ops-skel-tr td { padding: 12px 16px; height: 45px; box-sizing
   .adm-toolbar__controls > * { width: 100% !important; min-width: 0 !important; }
   .adm-toolbar__controls .adm-toolbar__search { width: 100% !important; }
 }
+
+/* R5 Admin users: even rows. The name holds one line (full name in its
+   title), the email truncates with its title; the phone sub-line stays. */
+@media (min-width: 521px) {
+  table.admin-table td.adm-user-name { white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+}
+/* R5 phones: "New user" is a compact action on the card's title row; search
+   and the status filter take the full width below it. */
+@media (max-width: 520px) {
+  .adm-toolbar:has(.adm-toolbar__new) .adm-toolbar__controls { display: contents !important; }
+  .adm-toolbar:has(.adm-toolbar__new) .adm-toolbar__title { flex: 1 1 auto; min-width: 0; }
+  .adm-toolbar .adm-toolbar__controls > .adm-toolbar__new { order: 1; width: auto !important; flex: 0 0 auto; }
+  .adm-toolbar:has(.adm-toolbar__new) .adm-toolbar__controls > :not(.adm-toolbar__new) { order: 2; flex: 1 1 100%; width: 100% !important; }
+}

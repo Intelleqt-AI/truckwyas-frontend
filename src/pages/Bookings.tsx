@@ -20,6 +20,7 @@ import { StatusMenu } from '@/components/fleet-detail/StatusMenu';
 import { BlockSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import { staleSince } from './bookings-stale';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   PENDING: 'neutral',
@@ -380,6 +381,13 @@ export default function Bookings() {
       {(() => {
         const STEPS = ['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED'];
         const currentIdx = STEPS.indexOf(load.status);
+        // Passed Assigned without a vehicle (the app's rule for Assigned):
+        // the step is shown as skipped, not done (R5).
+        const assignedSkipped = currentIdx >= 1 && !load.vehicle;
+        // Stale work (R5): still Assigned, Loading or In transit past the
+        // delivery date, or older than 30 days. Same loads Home and Findings
+        // call out; one neutral line with one amber dot.
+        const stale = staleSince(load);
         return (
           <section className="bk-card bk-progress" aria-label="Order progress">
           {/* One grid column per step: the dot sits at the column centre and
@@ -390,14 +398,25 @@ export default function Bookings() {
             {STEPS.map((step, stepIdx) => {
               const isActive = stepIdx === currentIdx;
               const isPast = stepIdx <= currentIdx;
+              const skipped = step === 'ASSIGNED' && assignedSkipped;
               return (
-                <li key={step} aria-current={isActive ? 'step' : undefined} className={`bk-step${isPast ? ' is-done' : ''}${isActive ? ' is-current' : ''}`}>
+                <li key={step} aria-current={isActive ? 'step' : undefined} className={`bk-step${isPast ? ' is-done' : ''}${isActive ? ' is-current' : ''}${skipped ? ' is-skipped' : ''}`} title={skipped ? 'Skipped: no vehicle or driver was assigned' : undefined}>
                   <span className="bk-step__dot" aria-hidden="true" />
-                  <span className="bk-step__label">{titleCase(step)}</span>
+                  <span className="bk-step__label">{titleCase(step)}{skipped && <span className="sr-only"> (skipped, nothing assigned)</span>}</span>
                 </li>
               );
             })}
           </ol>
+          {stale && (
+            <p className="bk-stale" role="status">
+              <span className="bk-dot bk-dot--warning" aria-hidden="true" />
+              <span>
+                {stale.pastDue
+                  ? <>Still {titleCase(load.status).toLowerCase()} since delivery was due on <b>{formatDate(stale.iso)} ({stale.days} days)</b> — close or reassign.</>
+                  : <>{titleCase(load.status)} since <b>{formatDate(stale.iso)} ({stale.days} days)</b> — close or reassign.</>}
+              </span>
+            </p>
+          )}
           {billingBlocked && (
             <p className="bk-help bk-help--danger bk-progress__note" title={subscriptionStatusDetail(authUser?.subscription_status)}>
               Status changes are blocked.{' '}

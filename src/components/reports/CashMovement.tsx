@@ -109,6 +109,7 @@ export default function CashMovement({ d, companyName }: { d: Ledger; companyNam
         caption={view === 'book' ? 'Cash book' : 'Cash movement by month'}
         stickyFirst={view !== 'book'}
         fit={view !== 'book'}
+        compactPhone
         pinLast={view !== 'book'}
         stack={view === 'book' ? { date: 0, title: 2, ref: 1, plus: 3, minus: 4, balance: 5, balanceLabel: 'Running' } : undefined}
         footer={receipts.length > 0 ? (

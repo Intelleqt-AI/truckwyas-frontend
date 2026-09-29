@@ -105,6 +105,43 @@ export const latest = (loads: any[]) => [...loads].sort((a, b) => String(loadDat
 /** Whole days since a date (0 today). */
 export const daysSince = (iso?: string | null) => { const d = daysUntil(iso); return d === null ? null : -d; };
 
+/** An open order older than this (from its pickup, else its creation) is stale work. */
+export const STALE_AFTER_DAYS = 30;
+
+/**
+ * Stale work (R5): an order still Assigned, Loading or In transit past its
+ * delivery date, or older than 30 days. It is labelled "since <date> (N days)
+ * — close or reassign", never presented as current work. Null when current.
+ */
+export function staleWork(load: any): { since: string; days: number } | null {
+  if (!load || !isOpenLoad(load)) return null;
+  const startIso = load.pickup_date || load.created_at || null;
+  const age = daysSince(startIso);
+  const late = daysSince(load.delivery_date);
+  // Past its delivery date: it has been overdue since then. Else open too long: since it started.
+  if (late !== null && late > 0) return { since: dateText(load.delivery_date) || '', days: late };
+  if (age !== null && age > STALE_AFTER_DAYS) return { since: dateText(startIso) || '', days: age };
+  return null;
+}
+
+/**
+ * Fleet revenue per km over the same 12 months, from every delivered load
+ * with a distance (the loaded Reports ledger). Null without enough data.
+ */
+export function fleetPerKm(allLoads: any[] | null | undefined, now = new Date()): number | null {
+  if (!allLoads) return null;
+  const from = windowStart(now);
+  let km = 0; let rev = 0;
+  for (const l of allLoads) {
+    if (!isDelivered(l)) continue;
+    const iso = loadDate(l); if (!iso) continue;
+    const d = new Date(iso); if (Number.isNaN(d.getTime()) || d < from || d > now) continue;
+    const dist = num(l.distance); if (dist <= 0) continue;
+    km += dist; rev += num(l.total_amount);
+  }
+  return km > 0 ? rev / km : null;
+}
+
 // ------------------------------------------------------------------ head
 
 /** Initials avatar for a person's record (in the Contact card; the H1 keeps the page's x). */
@@ -114,13 +151,13 @@ export function Avatar({ name }: { name: string }) {
 }
 
 /** One line under the head: what the truck or driver is doing right now. */
-export function NowLine({ children, flag, action }: { children: ReactNode; flag?: string; action?: ReactNode }) {
+export function NowLine({ children, flag, action, dot }: { children: ReactNode; flag?: string; action?: ReactNode; dot?: boolean }) {
   return (
     <section className="fd-now fd-card-now" aria-label="Doing now">
       <span className="fd-now__label">Now</span>
       <span className="fd-now__text">
         {flag && <UiStatusChip tone="warning" size="sm" label={flag} />}
-        <span className="fd-now__sentence">{children}</span>
+        <span className="fd-now__sentence">{dot && <i className="fd-now__dot" aria-hidden="true" />}{children}</span>
       </span>
       {action && <span className="fd-now__action">{action}</span>}
     </section>
@@ -134,7 +171,7 @@ export const LoadLink = ({ load }: { load: any }) => (
 
 // ----------------------------------------------------------- performance
 
-export interface PerfFigure { label: string; value: ReactNode; note?: ReactNode; lead?: boolean }
+export interface PerfFigure { label: string; value: ReactNode; note?: ReactNode; lead?: boolean; quiet?: boolean }
 
 /**
  * Performance for a record: the lead figure in the accent, the others quiet,
@@ -151,7 +188,7 @@ export function PerformanceCard({ figures, perf, basis, thinLine, empty, classNa
       <div className="fd-panel__head">
         <div className="fd-panel__titles">
           <h2 className="fd-panel__title">Performance <InfoTip label="how performance is worked out">{basis}</InfoTip></h2>
-          <p className="fd-panel__sub">{empty ? 'No delivered loads yet' : thinLine ?? 'Last 12 months'}</p>
+          {!empty && <p className="fd-panel__sub">{thinLine ?? 'Last 12 months'}</p>}
         </div>
       </div>
       {empty ? (
@@ -163,7 +200,7 @@ export function PerformanceCard({ figures, perf, basis, thinLine, empty, classNa
         <>
           <dl className="fd-perf__figs" style={{ ['--figs' as any]: shown.length }}>
             {shown.map((f) => (
-              <div key={f.label} className={`fd-perf__fig${f.lead ? ' is-lead' : ''}`}>
+              <div key={f.label} className={`fd-perf__fig${f.lead ? ' is-lead' : ''}${f.quiet ? ' is-quiet' : ''}`}>
                 <dt>{f.label}</dt>
                 <dd>
                   <span className="fd-perf__value">{f.value}</span>
@@ -172,7 +209,9 @@ export function PerformanceCard({ figures, perf, basis, thinLine, empty, classNa
               </div>
             ))}
           </dl>
-          {monthsWithRevenue(perf.months) >= 2 && (
+          {/* A chart needs at least 3 months with revenue; below that the
+              sub line names the months (R5: no chart for < 3 points). */}
+          {monthsWithRevenue(perf.months) >= 3 && (
             <div className="fd-perf__trend">
               <MonthlyBars data={perf.months} caption="Delivered revenue by month" height={112} />
             </div>
@@ -183,22 +222,63 @@ export function PerformanceCard({ figures, perf, basis, thinLine, empty, classNa
   );
 }
 
-/** Figures shared by the vehicle and driver cards. */
-export function perfFigures(perf: Perf, opts: { revenueLabel: string; thin: boolean; costs?: boolean }): PerfFigure[] {
+/** "2 delivered loads · Jan and Jun 2026": the compact line that stands in for a chart of < 3 months. */
+export function perfLine(perf: Perf): string {
+  const n = perf.delivered.length;
+  const months = perf.months.filter((m) => m.revenue > 0);
+  const head = `${plural(n, 'delivered load')}, last 12 months`;
+  if (months.length === 0 || months.length >= 3) return head;
+  const years = new Set(months.map((m) => m.key.slice(0, 4)));
+  const names = years.size === 1
+    ? `${months.map((m) => m.short).join(' and ')} ${months[0].key.slice(0, 4)}`
+    : months.map((m) => m.label).join(' and ');
+  return `${plural(n, 'delivered load')} · ${names}`;
+}
+
+/** Figures shared by the vehicle and driver cards. `fleetKm` is the fleet's revenue per km for comparison. */
+export function perfFigures(perf: Perf, opts: { revenueLabel: string; thin: boolean; costs?: boolean; costsKnown?: boolean; fleetKm?: number | null }): PerfFigure[] {
   const n = perf.delivered.length;
   const figs: PerfFigure[] = [
     { label: opts.revenueLabel, value: randWhole(perf.revenue), note: opts.thin ? undefined : plural(n, 'load'), lead: true },
   ];
-  if (opts.costs) {
-    figs.push({
-      label: 'Margin after truck costs',
-      value: perf.margin !== null ? randWhole(perf.margin) : null,
-      note: perf.margin !== null
-        ? <>Less {randWhole(perf.costs)} costs{perf.pending > 0 ? <> · {randWhole(perf.pending)} pending</> : null}</>
-        : undefined,
-    });
+  if (opts.costs && opts.costsKnown) {
+    if (perf.costCount === 0 && perf.pendingCount === 0) {
+      figs.push({ label: 'Margin after truck costs', value: 'No costs logged', quiet: true, note: 'On this truck in the last 12 months' });
+    } else if (perf.costCount === 0) {
+      // Only pending costs: no margin to show yet, only what approval would leave.
+      const after = perf.revenue - perf.pending;
+      figs.push({
+        label: 'Margin after truck costs',
+        value: 'No approved costs',
+        quiet: true,
+        note: <span className={`fd-perf__if${after < 0 ? ' is-loss' : ''}`}>{randWhole(after)} if the {randWhole(perf.pending)} pending is approved</span>,
+      });
+    } else {
+      const margin = perf.revenue - perf.costs;
+      const after = margin - perf.pending;
+      figs.push({
+        label: 'Margin after truck costs',
+        value: randWhole(margin),
+        note: <>
+          {perf.pending > 0 && (
+            <span className={`fd-perf__if${after < 0 ? ' is-loss' : ''}`}>
+              {randWhole(after)} if the {randWhole(perf.pending)} pending is approved
+            </span>
+          )}
+          <span>After {randWhole(perf.costs)} approved costs</span>
+        </>,
+      });
+    }
   }
-  figs.push({ label: 'Revenue per km', value: perf.perKm !== null ? randCents(perf.perKm) : null, note: perf.km > 0 ? `Over ${kmText(perf.km)}` : undefined });
+  let kmNote: ReactNode = perf.km > 0 ? `Over ${kmText(perf.km)}` : undefined;
+  if (perf.perKm !== null && opts.fleetKm) {
+    const diff = perf.perKm - opts.fleetKm;
+    const cmp = Math.abs(diff) / opts.fleetKm < 0.03
+      ? `In line with the fleet's ${randCents(opts.fleetKm)}`
+      : `${randCents(Math.abs(diff))} ${diff < 0 ? 'below' : 'above'} the fleet's ${randCents(opts.fleetKm)}`;
+    kmNote = <><span>{kmNote}</span><span>{cmp}</span></>;
+  }
+  figs.push({ label: 'Revenue per km', value: perf.perKm !== null ? randCents(perf.perKm) : null, note: kmNote });
   if (!opts.thin) figs.push({ label: 'Days on a job', value: formatNumber(perf.days), note: 'Pickup to delivery' });
   return figs;
 }
@@ -209,17 +289,17 @@ export function perfFigures(perf: Perf, opts: { revenueLabel: string; thin: bool
 export const ACTION_BELOW = 40;
 export const band = (n: number) => (n >= 80 ? 'Good' : n >= 60 ? 'Fair' : n >= ACTION_BELOW ? 'Low' : 'Needs action');
 
-/** A 0-100 meter with ticks at 40, 60 and 80. Neutral fill; danger only below the action threshold. */
+/** A 0-100 meter. Neutral fill; danger only below the action threshold. No tick gaps (they read as data breaks). */
 export function Meter({ value, size = 'sm' }: { value: number; size?: 'sm' | 'lg' }) {
   const v = Math.max(0, Math.min(100, value));
   return (
     <span className={`fd-meter fd-meter--${size}`} aria-hidden="true">
       <span className={`fd-meter__fill${v < ACTION_BELOW ? ' is-action' : ''}`} style={{ width: `${v}%` }} />
-      {[ACTION_BELOW, 60, 80].map((t) => <span key={t} className="fd-meter__tick" style={{ left: `${t}%` }} />)}
     </span>
   );
 }
 
+/** Condition: the overall score in the sub line, then one compact row per part (label, meter, score, band). */
 export function ConditionCard({ overall, parts, info, className }: {
   overall: number | null; parts: { label: string; score: number | null; note?: ReactNode }[]; info: ReactNode; className?: string;
 }) {
@@ -229,31 +309,27 @@ export function ConditionCard({ overall, parts, info, className }: {
       <div className="fd-panel__head">
         <div className="fd-panel__titles">
           <h2 className="fd-panel__title">Condition <InfoTip label="condition scores">{info}</InfoTip></h2>
-          <p className="fd-panel__sub">{overall ? 'Out of 100' : 'Not scored yet. Scores need maintenance, fuel or uptime data.'}</p>
+          <p className="fd-panel__sub">
+            {overall
+              ? <>Overall <span className="fd-condition__overall-n">{overall}</span> of 100 · <span className={overall < ACTION_BELOW ? 'fd-condition__band is-action' : undefined}>{band(overall)}</span></>
+              : 'Not scored yet. Scores need maintenance, fuel or uptime data.'}
+          </p>
         </div>
       </div>
-      {overall ? (
-        <>
-          <div className="fd-condition__overall" role="img" aria-label={`Overall ${overall} out of 100, ${band(overall)}`}>
-            <span className="fd-condition__score">{overall}</span>
-            <span className={`fd-condition__band${overall < ACTION_BELOW ? ' is-action' : ''}`}>{band(overall)}</span>
-            <Meter value={overall} size="lg" />
-          </div>
-          {scored.length > 0 && (
-            <ul className="fd-condition__parts">
-              {scored.map((p) => (
-                <li key={p.label} className="fd-condition__part" aria-label={`${p.label} ${p.score} out of 100, ${band(p.score!)}`}>
-                  <span className="fd-condition__label">
-                    {p.label}
-                    {p.note && <span className="fd-condition__note">{p.note}</span>}
-                  </span>
-                  <Meter value={p.score!} />
-                  <span className={`fd-condition__n${p.score! < ACTION_BELOW ? ' is-action' : ''}`}>{p.score}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
+      {overall && scored.length > 0 ? (
+        <ul className="fd-condition__parts">
+          {scored.map((p) => (
+            <li key={p.label} className="fd-condition__part" aria-label={`${p.label} ${p.score} out of 100, ${band(p.score!)}`}>
+              <span className="fd-condition__label">
+                {p.label}
+                {p.note && <span className="fd-condition__note">{p.note}</span>}
+              </span>
+              <Meter value={p.score!} />
+              <span className={`fd-condition__n${p.score! < ACTION_BELOW ? ' is-action' : ''}`}>{p.score}</span>
+              <span className={`fd-condition__band${p.score! < ACTION_BELOW ? ' is-action' : ''}`}>{band(p.score!)}</span>
+            </li>
+          ))}
+        </ul>
       ) : null}
     </section>
   );
@@ -282,15 +358,18 @@ export function dateToDo(key: string, what: string, iso: string | null | undefin
 }
 
 /** What the owner acts on: overdue and due-soon first, then missing records with an Add, then what is fine. */
-export function ComplianceCard({ items, className }: { items: ToDo[]; className?: string }) {
-  const sorted = [...items].sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone]);
-  const todo = items.filter((i) => i.tone !== 'ok').length;
+export function ComplianceCard({ items, className, title = 'Compliance', sub, lead = [] }: {
+  items: ToDo[]; className?: string; title?: string; sub?: ReactNode; lead?: ToDo[];
+}) {
+  // `lead` items (e.g. a new truck's first steps) stay first, in their order.
+  const sorted = [...lead, ...[...items].sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone])];
+  const todo = sorted.filter((i) => i.tone !== 'ok').length;
   return (
-    <section className={`fd-panel fd-todo ${className ?? ''}`} aria-label="Compliance">
+    <section className={`fd-panel fd-todo ${className ?? ''}`} aria-label={title}>
       <div className="fd-panel__head">
         <div className="fd-panel__titles">
-          <h2 className="fd-panel__title">Compliance</h2>
-          <p className="fd-panel__sub">{todo === 0 ? 'Nothing due' : plural(todo, 'thing', 'things') + ' to do'}</p>
+          <h2 className="fd-panel__title">{title}</h2>
+          <p className="fd-panel__sub">{sub ?? (todo === 0 ? 'Nothing due' : plural(todo, 'thing', 'things') + ' to do')}</p>
         </div>
       </div>
       <ul className="fd-todo__list">
@@ -313,15 +392,17 @@ export function ComplianceCard({ items, className }: { items: ToDo[]; className?
 
 // ----------------------------------------------------------------- facts
 
-export interface Fact { label: string; value: ReactNode; mono?: boolean; add?: () => void }
+export interface Fact { label: string; value: ReactNode; mono?: boolean; add?: () => void; phoneOnly?: boolean }
 
 /** Label/value facts. A missing fact the owner can fill shows an Add; one they cannot is left out. */
-export function FactsCard({ title, facts, className, addLabel = 'Add', children, lead }: {
+export function FactsCard({ title, facts, className, addLabel = 'Add', children, lead, wide }: {
   title: string; facts: Fact[]; className?: string; addLabel?: string; children?: ReactNode; lead?: ReactNode;
+  /** Two columns of rows (the card sits in the wide main column; desktop only, so phone-only rows are left out). */
+  wide?: boolean;
 }) {
-  const rows = facts.filter((f) => (f.value !== null && f.value !== undefined && f.value !== '') || f.add);
+  const rows = facts.filter((f) => ((f.value !== null && f.value !== undefined && f.value !== '') || f.add) && !(wide && f.phoneOnly));
   return (
-    <section className={`fd-panel fd-facts ${className ?? ''}`} aria-label={title}>
+    <section className={`fd-panel fd-facts${wide ? ' fd-facts--wide' : ''} ${className ?? ''}`} aria-label={title}>
       <div className="fd-panel__head">
         <div className="fd-panel__titles"><h2 className="fd-panel__title">{title}</h2></div>
       </div>
@@ -332,7 +413,7 @@ export function FactsCard({ title, facts, className, addLabel = 'Add', children,
           {rows.map((f) => {
             const missing = f.value === null || f.value === undefined || f.value === '';
             return (
-              <div key={f.label} className="fd-row">
+              <div key={f.label} className={`fd-row${f.phoneOnly ? ' fd-show-phone' : ''}`}>
                 <dt>{f.label}</dt>
                 <dd className={f.mono && !missing ? 'fd-mono' : undefined}>
                   {missing

@@ -5,8 +5,9 @@ import { SkeletonRows } from '@/components/fleet-detail/ContentSkeleton';
 import StaleDataNotice from '@/components/data/StaleDataNotice';
 import './table-heading-roles.css';
 import { Plus, Truck as EmptyFleetIcon } from 'lucide-react';
-import { useState, useRef, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef, type ReactNode } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { fleetMenuItems, useFleetPhoneHead } from '@/components/fleet-detail/fleetHead';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -234,6 +235,16 @@ export default function Vehicles() {
   const [sortBy, setSortBy] = useState('revenue');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const phoneHead = useFleetPhoneHead();
+  // Drivers' phone "⋯" sends "Import vehicles from Excel" here with ?import=1.
+  const [importParams, setImportParams] = useSearchParams();
+  useEffect(() => {
+    if (importParams.get('import') !== '1') return;
+    const next = new URLSearchParams(importParams); next.delete('import');
+    setImportParams(next, { replace: true });
+    if (!isDemo) setShowImport(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importParams]);
   const [selected, setSelected] = useState<number[]>([]);
   const toggleOne = (id: number, on: boolean) =>
     setSelected(prev => (on ? [...prev, id] : prev.filter(x => x !== id)));
@@ -386,6 +397,7 @@ export default function Vehicles() {
         eyebrow="Fleet"
         title="Fleet"
         tabs={FLEET_TABS}
+        menuItems={fleetMenuItems({ phone: phoneHead, openActivity: () => navigate('/fleet/heatmap'), openImport: () => setShowImport(true), importDisabled: isDemo })}
         actions={<>
           <button data-fleet-control className="fleet-header-secondary" onClick={() => navigate('/fleet/heatmap')}>Activity</button>
           <button data-fleet-control

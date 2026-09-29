@@ -22,6 +22,7 @@ import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { SkeletonRows, TilesSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import { staleSince } from './bookings-stale';
 
 interface Load {
   id: number;
@@ -39,6 +40,9 @@ interface Load {
   delivery_city?: string;
   vehicle?: number | null;
   driver?: number | null;
+  delivery_date?: string;
+  actual_delivered_at?: string | null;
+  created_at?: string;
 }
 
 // Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
@@ -63,6 +67,19 @@ const assignedLabel = (l: { driver_name?: string; vehicle_info?: string; vehicle
   const bits = [l.driver_name, plateOf(l.vehicle_info)].filter(Boolean);
   return bits.length ? bits.join(' · ') : <span className="bk-muted">Not assigned</span>;
 };
+
+// No vehicle on an order that is still open, in any status (R5: the tile
+// counts the same rows the table marks "Not assigned" or "No vehicle").
+const hasNoVehicle = (l: { vehicle_info?: string; vehicle?: number | null }) =>
+  !plateOf(l.vehicle_info) && l.vehicle == null;
+
+// Stale work (R5): an order still Assigned, Loading or In transit past its
+// delivery date, or older than 30 days, is not current work. The row says
+// so in one quiet line; the full sentence sits in the title.
+const longDate = (iso: string) => new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+
+// Newest first: delivered date, else due date, else pickup.
+const whenOf = (l: Load) => Date.parse(l.actual_delivered_at || l.delivery_date || l.pickup_date || l.created_at || '') || 0;
 
 // Cities read as a route; the full addresses stay in the tooltip.
 const placeOf = (loc?: string, city?: string) => String(loc || '').split(',')[0].trim() || (city || '').trim() || '—';
@@ -158,7 +175,7 @@ export default function LoadsList() {
   useAutoRefresh(refetch);
 
   const activeLoads = loads.filter(l => ACTIVE_STATUSES.includes(l.status));
-  const historyLoads = loads.filter(l => HISTORY_STATUSES.includes(l.status));
+  const historyLoads = loads.filter(l => HISTORY_STATUSES.includes(l.status)).sort((a, b) => whenOf(b) - whenOf(a) || b.id - a.id);
 
   const matchesText = (l: Load, q: string) => {
     if (!q) return true;
@@ -233,6 +250,14 @@ export default function LoadsList() {
               <td className="bk-col-status">
                 <StatusChip status={load.status} size="sm" />
                 {missingVehicle(load) && <span className="bk-status-flag">No vehicle</span>}
+                {(() => {
+                  const st = showInvoiceAction ? null : staleSince(load);
+                  if (!st) return null;
+                  const full = st.pastDue
+                    ? `Still ${formatStatus(load.status).toLowerCase()} since delivery was due on ${longDate(st.iso)} (${st.days} days). Close or reassign it.`
+                    : `${formatStatus(load.status)} since ${longDate(st.iso)} (${st.days} days). Close or reassign it.`;
+                  return <span className="bk-status-flag bk-status-flag--stale" title={full}><span className="sr-only">{full}</span><span aria-hidden="true">{st.pastDue ? `${st.days} days overdue` : `Open ${st.days} days`}</span></span>;
+                })()}
               </td>
               <td className="is-money">
                 {formatCurrency(parseFloat(load.total_amount || '0'))}
@@ -297,7 +322,7 @@ export default function LoadsList() {
   );
   const wholeRand = (n: number) => formatMoneyWhole(n);
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-  const pendingCount = activeLoads.filter(l => l.status === 'PENDING').length;
+  const noVehicleCount = activeLoads.filter(hasNoVehicle).length;
   const deliveredNotInvoiced = historyLoads.filter(l => l.status === 'DELIVERED').length;
   const completedLoads = historyLoads.filter(l => l.status !== 'CANCELLED');
 
@@ -349,18 +374,22 @@ export default function LoadsList() {
           {loading ? <TilesSkeleton count={3} /> : activeLoads.length > 0 ? summary([
             {
               label: 'Need a vehicle',
-              value: pendingCount,
-              note: pendingCount > 0 ? 'Assign a vehicle' : 'All have a vehicle',
-              tip: 'Pending orders with no vehicle assigned yet.',
-              attention: pendingCount > 0,
+              value: noVehicleCount,
+              note: noVehicleCount > 0 ? 'Assign a vehicle' : 'All have a vehicle',
+              tip: 'Active orders with no vehicle, in any status, including loads already in transit.',
+              attention: noVehicleCount > 0,
             },
             (() => {
-              const more = activeLoads.filter(l => l.status === 'LOADING' || l.status === 'ASSIGNED').length;
+              // Named by status (R5), so the note never reads as the same
+              // loads as the figure ("4 · 4 loading or assigned").
+              const loadingN = activeLoads.filter(l => l.status === 'LOADING').length;
+              const assignedN = activeLoads.filter(l => l.status === 'ASSIGNED').length;
+              const parts = [loadingN ? `${loadingN} loading` : '', assignedN ? `${assignedN} assigned` : ''].filter(Boolean);
               return {
                 label: 'In transit',
                 value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length,
-                note: more ? `${more} loading or assigned` : 'None loading or assigned',
-                tip: 'Orders with status In transit. Loading and assigned orders are counted in the note.',
+                note: parts.length ? parts.join(', ') : 'None loading or assigned',
+                tip: 'Orders with status In transit. The note counts the other orders that are Loading or Assigned, not these.',
               };
             })(),
             (() => {
@@ -418,7 +447,8 @@ export default function LoadsList() {
             {
               label: 'Invoiced',
               value: historyLoads.filter(l => l.status === 'INVOICED').length,
-              note: `${plural(historyLoads.filter(l => l.status === 'CANCELLED').length, 'load', 'loads')} cancelled`,
+              // Only facts about invoiced loads (R5): their value, not cancellations.
+              note: `${wholeRand(historyLoads.filter(l => l.status === 'INVOICED').reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0))} billed`,
             },
             (() => {
               const total = completedLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0);

@@ -84,6 +84,7 @@ export default function ProfitLoss({ d, companyName }: { d: Ledger; companyName?
         caption={`Profit and loss, ${periodText(period)}`}
         footer={t.check}
         fit
+        compactPhone
         pinLast={!t.showPrior}
         cue={t.showPrior ? ['Back', 'More columns'] : undefined}
       />

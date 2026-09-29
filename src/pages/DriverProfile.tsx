@@ -1,5 +1,5 @@
 import './fleet-detail.css';
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
@@ -7,9 +7,10 @@ import {
   DetailMessage, DetailSkeleton, Panel, RecordHeader, StatusChip, StatusControl, dateText, formatStatus, isNotFound, plural,
 } from '@/components/fleet-detail/parts';
 import {
-  Avatar, ComplianceCard, FactsCard, LinkCard, LoadLink, NowLine, PerformanceCard,
-  dateToDo, daysSince, isDelivered, isOpenLoad, latest, perfFigures, performance, type ToDo,
+  ComplianceCard, FactsCard, LinkCard, LoadLink, NowLine, PerformanceCard,
+  dateToDo, daysSince, fleetPerKm, isDelivered, isOpenLoad, latest, perfFigures, perfLine, performance, staleWork, type ToDo,
 } from '@/components/fleet-detail/record';
+import { useBalancedColumns } from '@/components/fleet-detail/useBalancedColumns';
 import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
 import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
 import { useLedger } from '@/components/reports/data';
@@ -51,8 +52,14 @@ export default function DriverProfile() {
     enabled: !!driverId,
   });
 
-  // The truck assigned to this driver (vehicle.driver), from the shared vehicles list.
-  const ledger = useLedger(['vehicles']);
+  // The truck assigned to this driver (vehicle.driver), from the shared vehicles
+  // list; every load, for the fleet's revenue per km (the comparison).
+  const ledger = useLedger(['vehicles', 'loads']);
+
+  // The truck, contact and licence cards may drop into the main column when
+  // the rail would otherwise run far past it (R5 column balance).
+  const bal = useBalancedColumns({ toMain: ['truck', 'contact', 'facts'] }, `${driverId}-${isLoading}-${loadsLoading}-${ledger.loading}`);
+  const sideRef = useCallback((n: HTMLElement | null) => { railRef(n); bal.sideRef.current = n; }, [railRef, bal.sideRef]);
 
   if (isError && !isNotFound(loadError)) return (
     <div style={{ display: 'grid', gap: 16 }}>
@@ -108,7 +115,19 @@ export default function DriverProfile() {
   const openOrders = <button type="button" className="fd-ghost" onClick={() => navigate('/bookings/orders')}>Open orders</button>;
   const verb: Record<string, string> = { IN_TRANSIT: 'Driving', LOADING: 'Loading', ASSIGNED: 'Assigned to' };
   let now: JSX.Element;
-  if (openLoad) {
+  const stale = staleWork(openLoad);
+  if (openLoad && stale) {
+    // Stale work (R5): an order left open is not current work. Neutral text, one amber dot.
+    const plate = plateOf(openLoad);
+    now = (
+      <NowLine dot action={<Link className="fd-ghost" to={`/bookings/${openLoad.id}`}>Open order</Link>}>
+        {status !== 'ACTIVE' ? <><strong>Marked {formatStatus(status).toLowerCase()}</strong>, still on </> : <>Still on </>}
+        <LoadLink load={openLoad} />
+        {plate ? <> ({plate}{openLoad.delivery_city ? ` to ${openLoad.delivery_city}` : ''})</> : openLoad.delivery_city ? <> to {openLoad.delivery_city}</> : null}
+        {' '}since {stale.since} ({plural(stale.days, 'day')}) — close or reassign
+      </NowLine>
+    );
+  } else if (openLoad) {
     const to = openLoad.delivery_city || openLoad.delivery_location;
     const plate = plateOf(openLoad);
     now = (
@@ -143,11 +162,11 @@ export default function DriverProfile() {
   ].filter(Boolean) as ToDo[];
 
   // ---- Performance
-  const figures = perfFigures(perf, { revenueLabel: 'Revenue driven', thin });
+  const figures = perfFigures(perf, { revenueLabel: 'Revenue driven', thin, fleetKm: fleetPerKm(ledger.data?.loads) });
   if (timed.length > 0) figures.push({ label: 'On time', value: `${Math.round((onTime / timed.length) * 100)}%`, note: `${onTime} of ${timed.length} timed` });
   const basis = <>
     Delivered and invoiced loads this driver drove, counted in the month of delivery, over the last 12 months (the Reports definition).
-    {' '}Revenue per km uses loads with a distance. Days on a job count calendar days from pickup to delivery.
+    {' '}Revenue per km uses loads with a distance; the fleet figure is every delivered load with a distance over the same months. Days on a job count calendar days from pickup to delivery.
     {' '}On time needs an actual delivery time{timed.length === 0 ? ', and none is recorded yet, so it is not shown' : ''}.
     {partial ? ` Based on the latest ${loads.length} of ${loadsTotal} loads.` : ''}
     {perf.older > 0 ? ` ${plural(perf.older, 'older delivered load')} fall outside the 12 months.` : ''}
@@ -162,23 +181,35 @@ export default function DriverProfile() {
     setUpdating(false);
   };
 
-  const meta = [
-    driver.license_number ? `Licence ${driver.license_number}` : '',
-    driver.experience_years ? `${plural(Number(driver.experience_years), 'year')} driving` : '',
-  ].filter(Boolean).join(' · ');
+  // Years of service are said once, here (R5: a fact appears once per page).
+  const meta = driver.hire_date && dateText(driver.hire_date) ? `Driving for you since ${dateText(driver.hire_date)}` : '';
 
+  // The truck on the vehicle record. An open order's truck is not "theirs":
+  // the Now line names it, and this card says plainly that none is assigned.
   const truckCard = truck ? (
     <LinkCard title="Truck" className="fd-o-driver"
       primary={<Link className="fd-inline-link" to={`/fleet/vehicles/${truck.id}`}>{truck.plate || `Vehicle ${truck.id}`}</Link>}
       secondary={[truck.make, truck.model].filter(Boolean).join(' ') || 'Assigned to this driver'} />
-  ) : openLoad?.vehicle ? (
-    <LinkCard title="Truck" className="fd-o-driver"
-      primary={<Link className="fd-inline-link" to={`/fleet/vehicles/${openLoad.vehicle}`}>{plateOf(openLoad) || `Vehicle ${openLoad.vehicle}`}</Link>}
-      secondary={<>On {openLoad.load_number}, not assigned to them</>}
-      action={<button type="button" className="fd-ghost" onClick={edit}>Assign</button>} />
   ) : (
     <LinkCard title="Truck" className="fd-o-driver" primary={<span className="fd-muted">No truck assigned</span>}
       action={<button type="button" className="fd-ghost" onClick={edit}>Assign</button>} />
+  );
+
+  const contactCard = (
+    <FactsCard className="fd-o-contact" wide={bal.inMain('contact')} title="Contact" facts={[
+      { label: 'Phone', value: phone ? <a className="fd-inline-link" href={`tel:${phone.replace(/\s+/g, '')}`}>{phone}</a> : null, add: edit },
+      { label: 'Email', value: email ? <a className="fd-inline-link fd-break" href={`mailto:${email}`}>{email}</a> : null, add: edit },
+      { label: 'Address', value: ud.address || null },
+      { label: 'Emergency contact', value: [driver.emergency_contact, driver.emergency_phone].filter(Boolean).join(' · ') || null, add: edit },
+    ]} />
+  );
+  const factsCard = (
+    <FactsCard className="fd-o-facts" wide={bal.inMain('facts')} title="Licence and record" facts={[
+      { label: 'Licence number', value: driver.license_number, mono: true, add: edit },
+      { label: 'Province', value: driver.license_state },
+      { label: 'Violations', value: String(driver.violation_count ?? 0) },
+      { label: 'Accidents', value: String(driver.accident_history ?? 0) },
+    ]} />
   );
 
   return (
@@ -198,53 +229,36 @@ export default function DriverProfile() {
       {now}
 
       <div className="fd-record">
-        <div className="fd-main">
+        <div className="fd-main" ref={bal.mainRef}>
           <PerformanceCard
             className="fd-o-perf"
             perf={perf}
             figures={figures}
             basis={basis}
-            thinLine={thin ? <>{plural(deliveredCount, 'load')} so far. Figures build as they drive.</> : undefined}
+            thinLine={perfLine(perf)}
             empty={deliveredCount === 0 ? {
               text: loads.length > 0
-                ? <>{plural(loads.length, 'load')} on record, none delivered in the last 12 months.</>
-                : <>Assign {firstName || name} to a load to track their work.</>,
+                ? <>No delivered loads in the last 12 months{perf.older > 0 ? ` (${plural(perf.older, 'earlier load')})` : ''}.</>
+                : <>No loads yet. Assign {firstName || name} to a load to track their work.</>,
               action: loads.length === 0 ? <button type="button" className="fd-ghost" onClick={() => navigate('/bookings/orders')}>Open orders</button> : undefined,
             } : undefined}
           />
 
           {loads.length > 0 && (
-            <Panel title="Loads" sub={plural(loadsTotal, 'load')} flush className="fd-o-loads">
+            <Panel title="Loads" sub={loadsTotal > 1 ? plural(loadsTotal, 'load') : undefined} flush className="fd-o-loads">
               <LoadsTable loads={loads} />
             </Panel>
           )}
+          {bal.inMain('truck') && truckCard}
+          {bal.inMain('contact') && contactCard}
+          {bal.inMain('facts') && factsCard}
         </div>
 
-        <aside ref={railRef} className="fd-side">
+        <aside ref={sideRef} className="fd-side">
           <ComplianceCard className="fd-o-todo" items={todos} />
-          {truckCard}
-          <FactsCard className="fd-o-contact" title="Contact" lead={
-            <div className="fd-person">
-              <Avatar name={name} />
-              <span className="fd-person__text">
-                <span className="fd-person__name">{name}</span>
-                <span className="fd-person__sub">{driver.hire_date ? `Driving for you since ${dateText(driver.hire_date)}` : 'Driver'}</span>
-              </span>
-            </div>
-          } facts={[
-            { label: 'Phone', value: phone ? <a className="fd-inline-link" href={`tel:${phone.replace(/\s+/g, '')}`}>{phone}</a> : null, add: edit },
-            { label: 'Email', value: email ? <a className="fd-inline-link fd-break" href={`mailto:${email}`}>{email}</a> : null, add: edit },
-            { label: 'Address', value: ud.address || null },
-            { label: 'Emergency contact', value: [driver.emergency_contact, driver.emergency_phone].filter(Boolean).join(' · ') || null, add: edit },
-          ]} />
-          <FactsCard className="fd-o-facts" title="Driver" facts={[
-            { label: 'Licence number', value: driver.license_number, mono: true, add: edit },
-            { label: 'Province', value: driver.license_state },
-            { label: 'Hire date', value: dateText(driver.hire_date) },
-            { label: 'Experience', value: driver.experience_years ? plural(Number(driver.experience_years), 'year') : null },
-            { label: 'Violations', value: String(driver.violation_count ?? 0) },
-            { label: 'Accidents', value: String(driver.accident_history ?? 0) },
-          ]} />
+          {!bal.inMain('truck') && truckCard}
+          {!bal.inMain('contact') && contactCard}
+          {!bal.inMain('facts') && factsCard}
         </aside>
       </div>
     </div>

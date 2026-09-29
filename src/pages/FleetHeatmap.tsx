@@ -206,7 +206,7 @@ export default function FleetHeatmap() {
       <div className="fleet-activity">
       <KpiRow className="fleet-activity__kpis">
         <KpiTile label="Loads" figure={loads.length} note={withPickup.length === loads.length ? 'All have a pickup date' : `${withPickup.length} with a pickup date`} />
-        <KpiTile label="Busiest day" figure={withPickup.length ? DAYS_LONG[busiestDay] : '—'} note={withPickup.length ? `${byWeekday[busiestDay]} ${byWeekday[busiestDay] === 1 ? 'pickup' : 'pickups'}, the most of any day` : 'No pickups yet'} />
+        <KpiTile label="Busiest day" figure={withPickup.length ? DAYS_LONG[busiestDay] : '—'} note={withPickup.length ? `${byWeekday[busiestDay]} ${byWeekday[busiestDay] === 1 ? 'pickup' : 'pickups'}, the most` : 'No pickups yet'} />
         <KpiTile label="Routes run" figure={Object.keys(routeMap).length} note={unrouted ? `${unrouted} ${unrouted === 1 ? 'load has' : 'loads have'} no route` : 'Every load has a route'} />
         <KpiTile label="Order value" aside={<InfoTip align="end">Sum of the order totals of every load, all time, as entered on the order.</InfoTip>} figure={formatMoneyWhole(totalValue)} note="All loads, all time" />
       </KpiRow>
@@ -307,9 +307,10 @@ export default function FleetHeatmap() {
           <ol className="fleet-months__bars" style={{ ['--months' as any]: shownMonths.length }}>
             {shownMonths.map((mo, i) => (
               <li key={`${mo.y}-${mo.m}`} className="fleet-months__col" aria-label={`${mo.label} ${mo.y}: ${mo.count} ${mo.count === 1 ? 'pickup' : 'pickups'}, ${formatMoneyWhole(mo.revenue)}`}>
-                <span className="fleet-months__count">{mo.count}</span>
-                <span className="fleet-months__track" aria-hidden="true">
-                  <span className={`fleet-months__fill${i === busiestMonth && mo.count ? ' is-top' : ''}`} style={{ height: `${(mo.count / maxMonth) * 100}%` }} />
+                {/* The count rides on its bar's top (R5), in the track's headroom. */}
+                <span className="fleet-months__track" style={{ ['--v' as any]: maxMonth ? mo.count / maxMonth : 0 }}>
+                  <span aria-hidden="true" className={`fleet-months__fill${i === busiestMonth && mo.count ? ' is-top' : ''}`} />
+                  <span className="fleet-months__count" aria-hidden="true">{mo.count}</span>
                 </span>
                 <span className="fleet-months__label">{mo.label}</span>
                 <span className="fleet-months__money">{mo.revenue ? formatMoneyCompact(mo.revenue) : '—'}</span>

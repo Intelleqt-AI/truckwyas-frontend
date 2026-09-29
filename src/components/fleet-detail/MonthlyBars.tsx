@@ -7,8 +7,13 @@ import { plural, randWhole, type MonthPoint } from './parts';
  * months with no loads show only the baseline (a real zero, not a gap).
  * Hover or arrow keys snap to a month; the table twin carries every value.
  */
-export function MonthlyBars({ data, caption, height = 150 }: { data: MonthPoint[]; caption: string; height?: number }) {
+export function MonthlyBars({ data: all, caption, height = 150 }: { data: MonthPoint[]; caption: string; height?: number }) {
   const [ref, W] = useWidth<HTMLDivElement>(640);
+  // Trailing months with no loads are trimmed (R5); the note says since when.
+  let last = all.length - 1;
+  while (last > 0 && !all[last].loads) last -= 1;
+  const data = all.slice(0, last + 1);
+  const trimmed = all.length - data.length;
   const svgRef = useRef<SVGSVGElement>(null);
   const { tip, show, hide } = useTip();
   const [active, setActive] = useState<number | null>(null);
@@ -26,7 +31,6 @@ export function MonthlyBars({ data, caption, height = 150 }: { data: MonthPoint[
   const bw = Math.max(4, Math.min(28, step * 0.56));
   const y = (v: number) => padT + (1 - v / top) * plotH;
   const cx = (i: number) => padL + i * step + step / 2;
-  const narrow = W < 420;
 
   const showAt = (i: number) => {
     setActive(i);
@@ -79,20 +83,18 @@ export function MonthlyBars({ data, caption, height = 150 }: { data: MonthPoint[
                 width={bw}
                 height={Math.max(1, y(0) - yt)}
                 rx={Math.min(3, bw / 2)}
-                fill={VIZ.accent}
-                opacity={active != null && active !== i ? 0.45 : 1}
+                fill={active === i ? VIZ.accent : VIZ.neutralStrong}
               />
             );
           })}
           {active != null && <rect x={cx(active) - step / 2} y={padT} width={step} height={plotH} fill="var(--text-primary)" opacity={0.04} pointerEvents="none" />}
-          {data.map((d, i) => (narrow && i % 2 === 1 && i !== n - 1) ? null : (
-            <text key={d.key} x={cx(i)} y={H - 4} textAnchor="middle" className={i === n - 1 ? 'viz-strong' : undefined}>
-              {narrow ? d.short.slice(0, 1) : d.short}
-            </text>
+          {data.map((d, i) => (step < 30 && i % 2 === 1 && i !== n - 1) ? null : (
+            <text key={d.key} x={cx(i)} y={H - 4} textAnchor="middle">{d.short}</text>
           ))}
         </svg>
         <Tip tip={tip} width={W} />
       </div>
+      {trimmed > 0 && <p className="fd-bars__note">No delivered loads since {data[data.length - 1].label}</p>}
       <TableTwin
         table={{
           caption,

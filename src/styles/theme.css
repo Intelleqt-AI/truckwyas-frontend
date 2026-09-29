@@ -153,14 +153,15 @@
   --focus-ring: rgba(106, 166, 255, 0.35);
   --focus-outline: var(--accent-primary);
 
-  /* Emphasis tile (one per page): dark is a raised, faintly blue surface. */
-  --emphasis-bg: #16233A;
-  --emphasis-border: #25406B;
-  --emphasis-fg: #EDEFF2;
-  --emphasis-fg-muted: #A9B9D3;
+  /* Emphasis tile (one per page), R5: same treatment as light. Neutral card
+     surface and border; only the figure carries accent ink. No navy fill. */
+  --emphasis-bg: var(--bg-surface);
+  --emphasis-border: var(--border-subtle);
+  --emphasis-fg: #6AA6FF;
+  --emphasis-fg-muted: #B4BAC3;
   --emphasis-track: rgba(106, 166, 255, 0.18);
   --emphasis-fill: #6AA6FF;
-  --emphasis-focus: #FFFFFF;
+  --emphasis-focus: #6AA6FF;
 
   /* Alert box */
   --alert-bg: var(--status-info-bg);
@@ -379,9 +380,8 @@
   --focus-ring: rgba(37, 99, 235, 0.28);
   --focus-outline: var(--accent-primary);
 
-  /* Emphasis tile (R3): calm like dark. A raised, faintly blue surface with
-     the figure in accent ink; never a saturated slab. */
-  /* R4: neutral card surface and border; only the figure carries accent ink. */
+  /* Emphasis tile: neutral card surface and border; only the figure carries
+     accent ink. Dark uses the identical treatment (R5). */
   --emphasis-bg: var(--bg-surface);
   --emphasis-border: var(--border-subtle);
   --emphasis-fg: #1D4ED8;
@@ -1491,3 +1491,6 @@ textarea,
   --border-default: var(--border-control);
   --border-active: var(--border-control-hover);
 }
+/* Display lives here, not inline, so page rules can hide a trigger
+   (e.g. a phone-only filter select at desktop widths). */
+.tw-select-trigger { display: flex; }

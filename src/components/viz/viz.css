@@ -3,7 +3,7 @@
      money in / revenue / a profit     accent   --chart-series-1 (solid)
      costs, comparison, context        neutral  --chart-muted, hatched with --chart-hatch
      a loss (negative result only)     red      --status-danger
-     lateness / age                    neutral -> accent (later = more accent)
+     lateness / age                    neutral ramp; only the oldest band is accent
 
    Orange is not a chart colour. Red never means "a cost" or "below average".
    Every mark is >= 3:1 on the card in both themes; text never wears a chart colour.
@@ -26,13 +26,14 @@
   --viz-surface: var(--bg-surface);
   --viz-wash-warm: color-mix(in srgb, var(--status-danger) 10%, transparent);
   --viz-wash-accent: var(--accent-dim);
-  /* Lateness ramp: not yet due is the neutral, the oldest band is the accent, the
-     bands between step toward it, so the oldest money stands out. Built from the two chart roles, so
-     it reads the same way in light and dark (no navy in light, no pastel in dark). */
+  /* Lateness ramp (R5, calmer): every band but the oldest is a neutral grey,
+     stepping from the muted chart grey to the stronger tertiary grey as it ages;
+     only the oldest band wears the accent. No blue-on-blue two-tone. Both ends
+     are >= 3:1 on the card in both themes, so every step between is too. */
   --viz-ord-1: var(--chart-muted);
-  --viz-ord-2: color-mix(in srgb, var(--viz-accent) 15%, var(--chart-muted));
-  --viz-ord-3: color-mix(in srgb, var(--viz-accent) 30%, var(--chart-muted));
-  --viz-ord-4: color-mix(in srgb, var(--viz-accent) 45%, var(--chart-muted));
+  --viz-ord-2: color-mix(in srgb, var(--viz-neutral-strong) 33%, var(--chart-muted));
+  --viz-ord-3: color-mix(in srgb, var(--viz-neutral-strong) 66%, var(--chart-muted));
+  --viz-ord-4: var(--viz-neutral-strong);
   --viz-ord-5: var(--viz-accent);
 
   position: relative;
@@ -112,7 +113,8 @@
 .viz-spark__axis { display: flex; justify-content: space-between; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); margin-top: 4px; }
 
 /* ---- Ageing strip ---- */
-.viz-strip { display: flex; gap: 2px; height: 16px; border-radius: 4px; overflow: hidden; }
+/* Thin (8px): a part-to-whole bar is context, never the loudest mark on a page. */
+.viz-strip { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; }
 .viz-strip--thin { height: 8px; border-radius: 4px; }
 .viz-strip__seg { position: relative; min-width: 2px; display: flex; align-items: center; justify-content: center; font: 600 12px/16px var(--font-sans); font-variant-numeric: tabular-nums; outline: none; }
 .viz-strip__seg:hover { box-shadow: inset 0 0 0 2px var(--viz-surface); }

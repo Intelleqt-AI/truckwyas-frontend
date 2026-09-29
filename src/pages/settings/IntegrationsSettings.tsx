@@ -581,7 +581,7 @@ export function IntegrationsSettings() {
               onChange={(e) => setCartrackBaseUrl(e.target.value)}
               placeholder="https://fleetapi-za.cartrack.com"
               className="settings-control"
-              style={{ ...integrationInputStyle, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+              style={integrationInputStyle}
             />
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 12 }}>
               Region-specific. Get your base URL and credentials from Fleetweb &gt; Settings &gt; API Settings.
@@ -799,7 +799,7 @@ export function IntegrationsSettings() {
               type="password"
               placeholder="CtrlFleet API key"
               className="settings-control"
-              style={{ ...integrationInputStyle, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+              style={integrationInputStyle}
             />
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 12 }}>
               Get your API key from your CtrlFleet account. Connecting matches your vehicles to CtrlFleet's by licence plate.
@@ -934,7 +934,7 @@ export function IntegrationsSettings() {
               onChange={(e) => setNewWebhookUrl(e.target.value)}
               placeholder="https://your-app.com/webhooks/truckwys"
               className="settings-control"
-              style={{ ...integrationInputStyle, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+              style={integrationInputStyle}
             />
             <div style={{ marginBottom: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)' }}>
               Select events

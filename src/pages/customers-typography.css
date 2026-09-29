@@ -24,7 +24,7 @@
 /* R3: one money column. The overdue part is a quiet second line only when it says something. */
 .customers-typography .cu-owed__sub { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; }
 .customers-typography .cu-owed { vertical-align: middle; }
-.customers-typography .cu-owed__late { color: var(--status-danger-text); }
+.customers-typography .cu-owed__dot { display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--status-danger-dot); vertical-align: 2px; }
 .customers-typography .cu-owed__head { display: inline-flex; align-items: center; gap: 4px; }
 /* Even rows: every row takes the two-line height, so a partly overdue
    balance never makes its row taller than the rest. */
@@ -34,3 +34,9 @@
 .customers-typography .bk-table .bk-col-customer { max-width: 34ch; }
 @container (max-width: 520px) { .customers-typography .bk-table .bk-col-customer { max-width: 20ch; } }
 /* Phone: Add customer stays on the title row; Import moves into the head's "⋯" menu (SectionHeader). */
+
+/* R5, phones: the customer name wraps to two lines instead of truncating
+   (it has the room Owed does not need). */
+@container (max-width: 520px) {
+  .customers-typography .bk-table .bk-col-customer.is-truncate { max-width: none; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; min-width: 12ch; }
+}

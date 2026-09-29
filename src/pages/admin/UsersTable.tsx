@@ -1,7 +1,7 @@
 import '@/pages/table-heading-roles.css';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
-import { formatDateTime } from '@/lib/formatters';
+import { formatDate, formatDateTime } from '@/lib/formatters';
 import '@/pages/admin/admin-brand.css';
 import '@/pages/bookings-section.css';
 import { useEffect, useState } from 'react';
@@ -60,8 +60,10 @@ const ROLE_LABELS: Record<Role, string> = {
 const roleLabel = (role: string) =>
   Object.prototype.hasOwnProperty.call(ROLE_LABELS, role) ? ROLE_LABELS[role as Role] : role;
 
+// Date only in the cell (the time stays in its title), so the row keeps
+// one line at 1440.
 const fmt = (dateStr?: string | null) =>
-  dateStr ? formatDateTime(dateStr) : 'Never';
+  dateStr ? formatDate(dateStr) : 'Never';
 
 interface AdminUserRow {
   id: number | string;
@@ -206,7 +208,7 @@ export default function UsersTable() {
   return (
     <div className="card" style={cardStyle}>
       <div className="adm-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Users {data ? `(${data.count})` : ''}</h2>
+        <h2 className="adm-toolbar__title" style={{ ...sectionTitleStyle, marginBottom: 0 }}>Users {data ? `(${data.count})` : ''}</h2>
         <div className="adm-toolbar__controls" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             className="admin-control adm-toolbar__search"
@@ -226,7 +228,7 @@ export default function UsersTable() {
               <SelectItem value="inactive">Inactive</SelectItem>
             </SelectContent>
           </Select>
-          <button className="btn-action admin-control" style={{ height: 36, minHeight: 36, borderRadius: 'var(--radius-control)' }} onClick={() => setShowCreate(s => !s)}>
+          <button className="btn-action admin-control adm-toolbar__new" style={{ height: 36, minHeight: 36, borderRadius: 'var(--radius-control)' }} onClick={() => setShowCreate(s => !s)}>
             {showCreate ? 'Cancel' : 'New user'}
           </button>
         </div>
@@ -265,7 +267,7 @@ export default function UsersTable() {
         <TableSkeleton rows={8} cols={6} label="Loading users" />
       ) : (
         <div className="admin-scroll-region" role="region" aria-label="Users" tabIndex={0} style={{ overflowX: 'auto', opacity: isFetching ? 0.7 : 1 }}>
-          <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="table-heading-roles admin-table adm-users-table" style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
                 <th style={thStyle}>Name</th>
@@ -282,19 +284,19 @@ export default function UsersTable() {
                 const rowPending = pending?.id === u.id ? pending.kind : null;
                 return (
                   <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.55 }}>
-                    <td style={tdStyle}>
+                    <td className="adm-user-name" style={tdStyle}>
                       {u.name || '—'}
                       {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)' }}>Superuser</span>}
                       {/* Phones: email and role ride under the name (their columns fold away). */}
                       <div className="adm-status-sub adm-owner">{String(u.email || '').split('@')[0]}{String(u.email || '').includes('@') && <><wbr />@{String(u.email).split('@').slice(1).join('@')}</>}{u.role ? ` · ${roleLabel(u.role)}` : ''}</div>
                     </td>
                     <td className="adm-col-phone" style={{ ...tdStyle, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.email}>{u.email}</td>
-                    <td className="adm-col-phone" style={tdStyle}>{u.company_name || '—'}</td>
+                    <td className="adm-col-phone" style={{ ...tdStyle, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.company_name || undefined}>{u.company_name || '—'}</td>
                     <td className="adm-col-phone" style={tdStyle}>{roleLabel(u.role)}</td>
                     <td style={tdStyle}>
                       <StatusChip status={u.is_active ? 'ACTIVE' : 'INACTIVE'} size="sm" />
                     </td>
-                    <td className="adm-col-low" style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmt(u.last_login)}</td>
+                    <td className="adm-col-low" style={{ ...tdStyle, whiteSpace: 'nowrap' }} title={u.last_login ? formatDateTime(u.last_login) : undefined}>{fmt(u.last_login)}</td>
                     <td style={actionTdStyle}>
                       <RowActions
                         label={u.name || u.email}

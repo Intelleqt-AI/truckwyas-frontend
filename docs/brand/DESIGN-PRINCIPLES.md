@@ -88,9 +88,10 @@ All values live in `src/styles/theme.css`, in the `:root, [data-theme="dark"]` b
   - Link text is `--link` (`#1D4ED8` / `#7DB2FF`).
   - A selected tint is `--accent-dim` (`#EFF5FF` / 10% blue, never a solid navy).
 - **One emphasis tile per page**, reading only the `--emphasis-*` tokens:
-  - **Light** (R4) is the plain card: the normal card surface (`--bg-surface`, white) and border (`--border-subtle`), with only the figure in accent ink `#1D4ED8`. Muted text is `#434A55`, and a meter inside it is a `#2563EB` fill on a 14% blue track. No tinted fill, never a saturated blue slab.
-  - **Dark** is a raised, faintly blue surface: `#16233A` with a `#25406B` border, `#EDEFF2` text, `#A9B9D3` muted text, and a `#6AA6FF` fill. Never a glowing blue block.
-  - **Focus** inside the tile uses `--emphasis-focus` (`#1D4ED8` light, white dark).
+  - **Both themes use the same treatment (R5):** the plain card, i.e. the normal card surface (`--bg-surface`) and border (`--border-subtle`), with only the figure in accent ink. No tinted or navy fill, never a saturated blue slab, in either theme.
+  - **Light:** figure `#1D4ED8`, muted text `#434A55`, meter `#2563EB` on a 14% blue track.
+  - **Dark:** figure `#6AA6FF`, muted text `#B4BAC3` (= `--text-secondary`), meter `#6AA6FF` on an 18% blue track.
+  - **Focus** inside the tile uses `--emphasis-focus` (`#1D4ED8` light, `#6AA6FF` dark).
 - **Active navigation** is a filled pill.
   - Light: ink `#0E1116` with white text.
   - Dark: `#262A31` with `#EDEFF2` text, weight 500.
@@ -151,10 +152,10 @@ Every pair the palette ships was computed with the WCAG relative-luminance formu
 | Danger button hover | `#FFFFFF` / `#B91C1C` | 6.47 | `#FFFFFF` / `#C4262C` | 5.74 | 4.5 |
 | Notification badge | `#FFFFFF` / `#C81E1E` | 5.74 | `#FFFFFF` / `#D93036` | 4.74 | 4.5 |
 | Accent hover as text on card | `#1D4ED8` / `#FFFFFF` | 6.70 | `#86B7FF` / `#131518` | 8.91 | 4.5 |
-| Emphasis figure | `#1D4ED8` / `#F4F7FE` | 6.25 | `#EDEFF2` / `#16233A` | 13.65 | 4.5 |
-| Emphasis muted text | `#434A55` / `#F4F7FE` | 8.34 | `#A9B9D3` / `#16233A` | 7.91 | 4.5 |
-| Emphasis focus ring | `#1D4ED8` / `#F4F7FE` | 6.25 | `#FFFFFF` / `#16233A` | 15.72 | 3 |
-| Emphasis progress fill vs tile | `#2563EB` / `#F4F7FE` | 4.82 | `#6AA6FF` / `#16233A` | 6.37 | 3 |
+| Emphasis figure | `#1D4ED8` / `#FFFFFF` | 6.70 | `#6AA6FF` / `#131518` | 7.41 | 4.5 |
+| Emphasis muted text | `#434A55` / `#FFFFFF` | 8.94 | `#B4BAC3` / `#131518` | 9.36 | 4.5 |
+| Emphasis focus ring | `#1D4ED8` / `#FFFFFF` | 6.70 | `#6AA6FF` / `#131518` | 7.41 | 3 |
+| Emphasis progress fill vs tile | `#2563EB` / `#FFFFFF` | 5.17 | `#6AA6FF` / `#131518` | 7.41 | 3 |
 | Nav active text | `#FFFFFF` / `#0E1116` | 18.91 | `#EDEFF2` / `#262A31` | 12.50 | 4.5 |
 | "Soon" on active nav | `#C3C8D0` / `#0E1116` | 11.25 | `#B4BAC3` / `#262A31` | 7.37 | 4.5 |
 | Tooltip text | `#FFFFFF` / `#0E1116` | 18.91 | `#0B0C0E` / `#EDEFF2` | 16.99 | 4.5 |
@@ -225,7 +226,7 @@ The shell (`src/components/shell/`) and the primitives at the end of `src/styles
 
 1. **Head.** Use `SectionHeader` (28/34 600 title, one grey subtitle line, neutral tab underline) or `.tw-page-head` + `.tw-title` + `.tw-subtitle`; both render the same geometry. Subtitle is one line, at most 8 words. No eyebrow row and no breadcrumb row above the H1: a detail page's way back goes on the subtitle line (`SectionHeader back={{ to, label }}`). Delete any paragraph under the title.
 2. **Cards.** `.tw-card` (12px radius, 20px padding). Head: `.tw-card__head` > `.tw-card__titles` > `.tw-card__title` (+ `<InfoTip>` from `components/ui/InfoTip`) and `.tw-card__sub`. Tables go in `.tw-card--flush` with the head padded.
-3. **Numbers.** Big figure `.tw-figure` (32px, whole rands on tiles, cents in the `title` attribute and tables). Change: `.tw-delta` with a trend glyph and a named period ("+8% vs prior 30 days"). Max four tiles per row; at most one inverted `--emphasis-bg` tile per page.
+3. **Numbers.** Big figure `.tw-figure` (32px, whole rands on tiles, cents in the `title` attribute and tables). Change: `.tw-delta` with a trend glyph and a named period ("+8% vs prior 30 days"). Max four tiles per row; at most one `--emphasis-*` tile per page (a plain card with an accent figure).
 4. **Controls.** `.tw-btn` (outline), `.tw-btn--primary` (ink, one per page), `.tw-btn--ghost`; `<Segmented>` / `.tw-seg` for every filter and period (§11.4); `<StatusChip>` for every status (§12); `.tw-chip` only for a scope label ("Last 20 quotes").
 5. **Words.** Apply §9. Every "Each month shows…" or "This list holds…" sentence moves into an `InfoTip` or is deleted.
 6. **No page-level colours.** Use tokens only (`--bg-*`, `--text-*`, `--border-*`, `--accent-primary`, `--btn-primary-*`, `--status-*-text/-dot`, `--chart-*`, `--emphasis-*`). Do not redefine tokens per page or per shell; the global values are AA in both themes.

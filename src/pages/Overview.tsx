@@ -417,7 +417,8 @@ export default function Overview() {
             <MicroBars values={heatmapData} ariaLabel={`Loads booked per day, last 28 days: ${loads28} in total`} />
           </div>
           <div className="td-kpi__meta">
-            {loadsReady && !loadsFailed && <span>{loads28 === 0 ? "None booked in the last 28 days" : `${loads28} booked in the last 28 days`}</span>}
+            {/* Phones: the short form, so the note never clips (it may still wrap to a second line). */}
+            {loadsReady && !loadsFailed && <span>{loads28 === 0 ? "None booked" : `${loads28} booked`} in<span className="td-hide-sm"> the last</span> 28 days</span>}
           </div>
         </section>
       </div>
@@ -585,7 +586,7 @@ export default function Overview() {
               <div className="tw-card__titles">
                 <h2 id="td-pipe-title" className="tw-card__title">
                   Quote pipeline
-                  <InfoTip align="end">Draft, Sent, Accepted and Declined are the Quotes board columns (a quote marked lost counts as Declined). On the road is the Orders tab's In transit count. Win rate is accepted as a share of every quote sent.</InfoTip>
+                  <InfoTip align="end">Draft, Sent, Accepted and Declined are the Quotes board columns (a quote marked lost counts as Declined). On the road is the Orders tab's In transit count. Win rate is accepted as a share of every quote sent{pipeline.sentEver > 0 ? `: ${pipeline.accepted} of ${pipeline.sentEver}` : ""}.</InfoTip>
                 </h2>
                 <p className="tw-card__sub">
                   {quotesAll.isLoading && loading ? "Quotes by stage"
@@ -606,9 +607,9 @@ export default function Overview() {
             ) : (
               <>
                 <PipelineBars stages={pipeline.stages} />
-                <dl className="td-stats td-stats--two">
+                {/* One fact once: the rate. The counts behind it ("6 of 9") are in the card's tip. */}
+                <dl className="td-stats td-stats--one">
                   <div><dt>Win rate</dt><dd>{pipeline.winRate != null ? formatPercent(pipeline.winRate, 0) : "—"}</dd></div>
-                  <div><dt>Accepted of sent</dt><dd>{pipeline.sentEver > 0 ? `${pipeline.accepted} of ${pipeline.sentEver}` : "—"}</dd></div>
                 </dl>
               </>
             )}

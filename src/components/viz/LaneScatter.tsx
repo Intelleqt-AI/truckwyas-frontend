@@ -11,7 +11,7 @@ import { Legend, TableTwin, Tip, TipRow, VIZ, num0, overlaps, textBox, type Box,
  * Hover finds the nearest lane, so small points never need a precise aim.
  *
  * The y-axis is scaled to the evidence: the evidenced lanes and the average
- * set the range (with headroom), so one thin-data outlier cannot squash the
+ * set the range (10% headroom), so one thin-data outlier cannot squash the
  * lanes that matter into the bottom of the plot. A thin lane above the range
  * is left off the plot; one line under it counts those lanes and opens the
  * table, which lists every lane. Only evidenced lanes are labelled.
@@ -39,9 +39,13 @@ export function LaneScatter({ points, overallPerKm, minTrips, height: heightProp
   const evidenced = points.filter((p) => !p.thin);
   // Scale to the evidenced lanes and the average; fall back to every lane when none is evidenced.
   const evMax = evidenced.length > 0 ? Math.max(...evidenced.map((p) => p.perKm), overallPerKm ?? 0) : Math.max(...ys, overallPerKm ?? 0);
-  const allMax = Math.max(...ys, overallPerKm ?? 0, 1);
-  const yt = niceTicks(0, Math.max(Math.min(allMax * 1.1, evMax * 1.15), 1), 5);
-  const yTop = yt[yt.length - 1];
+  // R5: the top is the highest evidenced lane (or the average) plus 10% headroom,
+  // rounded up to half a tick step; it is not pushed up to the next whole tick,
+  // which left the top of the plot empty. Thin lanes above it are counted under the plot.
+  const want0 = Math.max(evMax * 1.1, 1);
+  const step0 = (() => { const t = niceTicks(0, want0, 5); return t.length > 1 ? t[1] - t[0] : want0; })();
+  const yTop = Math.ceil(want0 / (step0 / 2) - 1e-9) * (step0 / 2);
+  const yt = niceTicks(0, yTop, 5).filter((t) => t <= yTop + 1e-9);
   const offScale = points.filter((p) => p.perKm > yTop);
   const yLabel = (v: number) => rand(v, v % 1 === 0 ? 0 : 1);
   const axisW = Math.max(...yt.map((t) => yLabel(t).length)) * 7 + 10;

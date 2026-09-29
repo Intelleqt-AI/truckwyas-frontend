@@ -388,12 +388,16 @@ export default function QuoteDetail() {
       <SectionHeader
         title={quote.quote_number}
         back={{ to: '/bookings/quotes', label: 'Quotes' }}
-        titleAdornment={<><StatusChip status={quote.status} label={STATUS_LABEL[quote.status]} />
+        // Phones (R5): the chips move to the start of the subtitle so the
+        // title row holds the quote number and the one primary action.
+        titleAdornment={<span className="qd-head-chips"><StatusChip status={quote.status} label={STATUS_LABEL[quote.status]} />
             {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && <StatusChip status="WON" />}
-            {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <StatusChip status="LOST" />}</>}
+            {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <StatusChip status="LOST" />}</span>}
         // The subtitle reads as the job: customer, then the route (never the
         // customer's own city, which read as a destination).
-        description={<>{[company, routeSummary, isRound ? 'Round trip' : ''].filter(Boolean).join(' · ')}</>}
+        description={<><span className="qd-desc-chips"><StatusChip status={quote.status} label={STATUS_LABEL[quote.status]} size="sm" />
+            {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && <StatusChip status="WON" size="sm" />}
+            {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <StatusChip status="LOST" size="sm" />}</span>{[company, routeSummary, isRound ? 'Round trip' : ''].filter(Boolean).join(' · ')}</>}
         actions={<>
           <StatusMenu
             subject={quote.quote_number}
@@ -409,14 +413,16 @@ export default function QuoteDetail() {
             Edit quote
           </button>
           {quote.status === 'ACCEPTED' ? (
-            <button type="button" className="bk-btn bk-btn--primary" onClick={handleConvertToLoad} disabled={convertToLoadMutation.isPending}>
-              {convertToLoadMutation.isPending ? 'Converting…' : 'Convert to booking'}
+            <button type="button" className="bk-btn bk-btn--primary" onClick={handleConvertToLoad} disabled={convertToLoadMutation.isPending} aria-label={convertToLoadMutation.isPending ? undefined : 'Convert to booking'}>
+              {convertToLoadMutation.isPending ? 'Converting…' : <span className="qd-label-long" data-short="Convert">Convert to booking</span>}
             </button>
           ) : (
-            <button type="button" className="bk-btn bk-btn--primary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending}>
+            <button type="button" className="bk-btn bk-btn--primary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending} aria-label={sendToCustomerMutation.isPending ? undefined : (quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer')}>
               {sendToCustomerMutation.isPending
                 ? (quote.status === 'SENT' ? 'Resending…' : 'Generating…')
-                : (quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer')}
+                // Phones: the short label keeps it on the title row (R5); the
+                // full label stays as its accessible name.
+                : <span className="qd-label-long" data-short={quote.status === 'SENT' ? 'Resend' : 'Send'}>{quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer'}</span>}
             </button>
           )}
         </>}

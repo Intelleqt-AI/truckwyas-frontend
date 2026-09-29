@@ -10,12 +10,20 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InfoTip } from '@/components/ui/InfoTip';
 
+/** "INV-20260929-4821": the INV-YYYYMMDD-n format the rest of TruckWys
+ *  uses (INV-20260405-1029), dated today. Only a suggestion; editable. */
+function suggestNumber(now = new Date()) {
+  const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  return `INV-${ymd}-${(now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) % 9000 + 1000}`;
+}
+
 export default function CreateInvoice() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
     customer: '',
-    invoice_number: `INV-${Date.now().toString().slice(-6)}`,
+    // Same shape as every other invoice number: INV-<issue date>-<n>.
+    invoice_number: suggestNumber(),
     amount: '',
     due_date: '',
     description: '',
@@ -38,13 +46,12 @@ export default function CreateInvoice() {
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
 
-  const today = new Date();
-  today.setHours(23, 59, 59, 999);
-
+  // A due date is normally in the future (payment terms). It used to be capped
+  // at today, which made every hand-made invoice overdue on creation.
   const dueDateValid = (() => {
     if (!form.due_date) return false;
     const d = new Date(form.due_date);
-    return !isNaN(d.getTime()) && d <= today;
+    return !isNaN(d.getTime());
   })();
 
   const canSubmit = !!form.customer && !!form.amount && parseFloat(form.amount) > 0 && dueDateValid;
@@ -73,10 +80,17 @@ export default function CreateInvoice() {
       <SectionHeader
         title="New invoice"
         back={{ to: '/finance/invoices', label: 'Invoices' }}
-        description="For one-off charges. Loads invoice themselves."
+        description="One-off charges. Loads bill themselves."
+        actions={
+          // Phones: the rail (and its button) is below the form, so the one
+          // primary also sits on the title row. Wider screens use the rail.
+          <button type="submit" form="create-invoice-form" className="tw-btn tw-btn--primary fin-phone-only" disabled={!canSubmit || mutation.isPending}>
+            {mutation.isPending ? 'Creating…' : 'Create invoice'}
+          </button>
+        }
       />
 
-      <form onSubmit={handleSubmit}>
+      <form id="create-invoice-form" onSubmit={handleSubmit}>
         <div className="fin-create-grid">
           <section className="card" aria-labelledby="create-invoice-details">
             <div className="fin-panel-head">
@@ -112,7 +126,7 @@ export default function CreateInvoice() {
                 </div>
                 <div className="fin-date-field">
                   <div className="fin-label">Due date</div>
-                  <DatePicker value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} maxDate={today} />
+                  <DatePicker value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} />
                 </div>
               </div>
               <div>

@@ -9,7 +9,9 @@ import { fetchData, patchData, postData } from "@/lib/Api";
 import { formatCurrency, formatDate, formatDateShort, formatMoneyWhole } from "@/lib/formatters";
 import { Loader } from "@/components/Loader";
 import { toast } from "@/lib/toast";
-import { Fuel } from "lucide-react";
+import { Fuel, Columns3, List as ListIcon } from "lucide-react";
+import { boardStage } from "@/components/overview/today";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { ConvertToBookingModal } from "@/components/ConvertToBookingModal";
 import { useAuth } from "@/lib/AuthContext";
@@ -362,7 +364,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   // ones: the board shows it there (with "Marked lost"), and both column
   // counts and totals move with it, so the board never says "Declined 0"
   // while a lost quote sits under Sent. Only loaded cards can move.
-  const isMarkedLost = (q: any) => q.outcome === 'rejected' && String(q.status).toUpperCase() === 'SENT';
+  // One stage definition everywhere (R5): the board's, shared with Home.
+  const isMarkedLost = (q: any) => String(q.status).toUpperCase() === 'SENT' && boardStage(q) === 'DECLINED';
   const movedLost = flattenColumn(sentQ).items.filter(isMarkedLost);
   const movedLostTotal = movedLost.reduce((n: number, q: any) => n + (parseFloat(q.total_amount || '0') || 0), 0);
   const boardColumn = (col: string) => {
@@ -498,9 +501,24 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   // or the separate "All" query (no status filter) for the All tab.
   const activeListQuery = statusFilter === 'ALL' ? allQ : columnQueries[statusFilter];
   const {
-    items: listItems, hasNextPage: listHasNextPage, isLoading: listIsLoading,
+    hasNextPage: listHasNextPage, isLoading: listIsLoading,
     isFetchingNextPage: listIsFetchingNextPage, fetchNextPage: listFetchNextPage,
   } = flattenColumn(activeListQuery);
+  // The list's per-status rows and counts are the board's columns, so a
+  // quote marked lost is under Declined in both views (R5: "Sent 2" twice).
+  const listItems = statusFilter === 'ALL' ? flattenColumn(allQ).items : boardColumn(statusFilter).items;
+  const statusOptions = ['ALL', ...COLUMNS].map(status => ({
+    value: status,
+    label: status === 'ALL' ? 'All' : COLUMN_LABELS[status],
+    count: (status === 'ALL' ? failedColumns.length === 0 : !failedColumns.includes(status))
+      ? (status === 'ALL' ? totalQuotesCount : boardColumn(status).count)
+      : undefined,
+  }));
+  // Phones: one toolbar row (search, status select, view toggle) so the
+  // first quote starts high on the screen.
+  const isPhone = useIsMobile(767);
+  const statusText = (o: { label: string; count?: number }) => (o.count != null ? `${o.label} (${o.count})` : o.label);
+  const currentStatus = statusOptions.find(o => o.value === statusFilter) ?? statusOptions[0];
 
   return (
     <div className="bookings-typography" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -529,16 +547,40 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           type="search"
           className="bk-search"
           aria-label="Search quotes"
-          placeholder="Search quotes, customers, routes"
+          placeholder={isPhone ? 'Search quotes' : 'Search quotes, customers, routes'}
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <Segmented
-          label="Quote view"
-          value={view}
-          onChange={setView}
-          options={[{ value: 'board', label: 'Board' }, { value: 'list', label: 'List' }]}
-        />
+        {isPhone ? (
+          <>
+            {view === 'list' && (
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger aria-label="Filter quotes by status" className="bk-toolbar__status">
+                  <SelectValue>{statusText(currentStatus)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{statusText(o)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            <button
+              type="button"
+              className="bk-view-toggle"
+              aria-label={view === 'list' ? 'Show as board' : 'Show as list'}
+              title={view === 'list' ? 'Show as board' : 'Show as list'}
+              onClick={() => setView(view === 'list' ? 'board' : 'list')}
+            >
+              {view === 'list' ? <Columns3 size={18} aria-hidden="true" /> : <ListIcon size={18} aria-hidden="true" />}
+            </button>
+          </>
+        ) : (
+          <Segmented
+            label="Quote view"
+            value={view}
+            onChange={setView}
+            options={[{ value: 'board', label: 'Board' }, { value: 'list', label: 'List' }]}
+          />
+        )}
         <span className="bk-toolbar__end">
           {view === 'board' && !billingBlocked ? 'Drag a card to change its status' : ''}
           {failedColumns.length === 0 && <>{view === 'board' && !billingBlocked ? ' · ' : ''}{totalQuotesCount} {totalQuotesCount === 1 ? 'quote' : 'quotes'}</>}
@@ -650,21 +692,17 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
            queries as the board (plus a 5th "All" query with no status
            filter) — switching tabs reuses whatever's already loaded. */
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          {/* Status filters */}
-          <div style={{ marginBottom: 16, flexShrink: 0, maxWidth: '100%', overflowX: 'auto' }}>
-            <StatusFilter
-              label="Filter quotes by status"
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={['ALL', ...COLUMNS].map(status => ({
-                value: status,
-                label: status === 'ALL' ? 'All' : COLUMN_LABELS[status],
-                count: (status === 'ALL' ? failedColumns.length === 0 : !failedColumns.includes(status))
-                  ? (status === 'ALL' ? totalQuotesCount : flattenColumn(columnQueries[status]).count)
-                  : undefined,
-              }))}
-            />
-          </div>
+          {/* Status filters (phones: in the toolbar row above) */}
+          {!isPhone && (
+            <div style={{ marginBottom: 16, flexShrink: 0, maxWidth: '100%', overflowX: 'auto' }}>
+              <StatusFilter
+                label="Filter quotes by status"
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={statusOptions}
+              />
+            </div>
+          )}
 
           {loadFailed(activeListQuery) ? (
             <LoadError
@@ -709,7 +747,13 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                     </td>
                     <td className="is-truncate bk-col-route" title={routeOf(quote)}>{routeOf(quote)}</td>
                     <td>
-                      <StatusChip status={quote.status === 'IT' ? 'IN_TRANSIT' : quote.status} label={COLUMN_LABELS[quote.status]} size="sm" />
+                      {/* The board's stage: a sent quote marked lost reads Declined here too. */}
+                      {(() => {
+                        const stage = boardStage(quote);
+                        return stage
+                          ? <StatusChip status={stage} label={COLUMN_LABELS[stage]} size="sm" />
+                          : <StatusChip status={quote.status === 'IT' ? 'IN_TRANSIT' : quote.status} label={COLUMN_LABELS[quote.status]} size="sm" />;
+                      })()}
                     </td>
                     <td className="bk-col-phone">
                       {quote.outcome === 'accepted' && <StatusChip status="WON" size="sm" />}

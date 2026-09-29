@@ -2,7 +2,7 @@ import './insights-page-brand.css';
 import { localDateISO } from '@/lib/dates';
 import { useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import SectionHeader from '@/components/layout/SectionHeader';
+import SectionHeader, { useTabStrip } from '@/components/layout/SectionHeader';
 import { Segmented } from '@/components/ui/Segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import InsightCard from '@/components/insights/InsightCard';
@@ -91,6 +91,7 @@ export default function Insights() {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const periodState: PeriodState = { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo };
+  const tabsRef = useTabStrip(tab);
 
   return (
     <div className="insights-page-brand">
@@ -99,7 +100,7 @@ export default function Insights() {
       <SectionHeader title="Insights" description={TABS.find(t => t.id === tab)!.subtitle} />
 
       {/* The shared section tab row (section-header.css): one tab height on every tabbed page. */}
-      <nav className="section-header__tabs insights-tabs" aria-label="Insights sections">
+      <nav ref={tabsRef} className="section-header__tabs insights-tabs" aria-label="Insights sections">
         {TABS.map(t => (
           <button key={t.id} type="button" data-label={t.label} className={`section-header__tab insights-brand-tab${tab === t.id ? ' is-active' : ''}`} aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>
             {t.label}
@@ -354,7 +355,7 @@ function FleetTab() {
     <Stack>
       <InsightCard
         title="Revenue by truck"
-        description="Revenue recorded against each truck"
+        description="All time, as recorded on each truck's profile"
         info={`Revenue recorded on each truck's profile. Trip counts and costs are not included, so compare with care.${partial}`}
       >
         {/* Fleet counts are attributes, not decisions: one line in the card, not three tiles. */}

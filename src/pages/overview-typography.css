@@ -163,6 +163,13 @@
 .td-recent__head { padding: var(--card-pad) var(--card-pad) 0; margin-bottom: 8px; }
 .td-recent__tools { display: flex; align-items: center; gap: 4px; }
 .td-recent__skel { margin: 0 var(--card-pad) var(--card-pad); }
+/* Loading placeholders hold the loaded height (R5: no layout shift when data lands):
+   Latest work = header row + 5 rows; chart = the 300px plot; Needs you = 5 rows;
+   pipeline = 5 stage bars + the stats line. */
+.td-recent .td-recent__skel { height: calc(33px + 5 * 48px - var(--card-pad) + 8px); }
+.td-chart-card > .ov-skel-block { height: 300px; }
+.td-needs > .ov-skel-block { height: 300px; }
+.td-pipe-card > .ov-skel-block { height: 195px; }
 .td-recent__empty { padding: 0 var(--card-pad) var(--card-pad); }
 .ov-table-wrap { overflow-x: auto; }
 .ov-table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 20px; font-variant-numeric: tabular-nums; }
@@ -198,6 +205,7 @@
 
 .td-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 16px 0 0; padding-top: 16px; border-top: 1px solid var(--border-row); }
 .td-stats--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.td-stats--one { grid-template-columns: minmax(0, 1fr); }
 .td-stats > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .td-stats dt { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; }
 .td-stats dd { margin: 0; font: 600 18px/24px var(--font-sans); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
@@ -240,6 +248,9 @@
   .td-kpis { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--card-gap); }
   .overview-typography .td-kpi .overview-kpi-menu-trigger { display: none; }
   .td-kpi__value { font-size: 22px; line-height: 34px; letter-spacing: -0.02em; }
+  /* A note that still does not fit wraps to a second line (never "…"); the tile grows rather than clipping it. */
+  .td-kpi { height: auto; min-height: var(--kpi-height, 106px); }
+  .td-kpi__meta { height: auto; min-height: 16px; white-space: normal; overflow: visible; }
   .overview-typography .td-kpi__label { overflow: hidden; text-overflow: ellipsis; }
   .td-kpi__body .td-micro, .td-kpi__strip { display: none; }
   .td-hide-sm { display: none; }
@@ -249,4 +260,5 @@
   .td-recent__tools { justify-content: space-between; }
   .td-sub { display: block; }
   .td-table td { height: 56px; }
+  .td-recent .td-recent__skel { height: calc(33px + 5 * 56px - var(--card-pad) + 8px); }
 }

@@ -3,8 +3,8 @@ import { Tip, TipRow, VIZ, boxIn, plural, rand, useTip, useWidth } from './core'
 
 /**
  * "Where is my cash stuck?" A single 100% strip from not-yet-due to the
- * oldest band, on the lateness ramp (neutral for not yet due, stepping to the
- * accent for the oldest band; viz.css), with each band's amount and share
+ * oldest band, on the lateness ramp (neutral greys that darken with age, and
+ * the accent only for the oldest band; viz.css), with each band's amount and share
  * labelled directly beneath. The strip carries no text of its own: the labels
  * beneath hold every figure, so nothing sits on a coloured fill. With `scaleTo` it becomes a
  * thin per-row bar whose total length encodes the row's amount against the

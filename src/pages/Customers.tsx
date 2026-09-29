@@ -154,30 +154,43 @@ export default function Customers() {
   // is the part of that past its due date.
   const ledger = useLedger(['invoices']);
   const today = todayISO();
-  const owedBy = new Map<number, { owed: number; overdue: number }>();
+  const owedBy = new Map<number, { owed: number; overdue: number; oldestDue?: string }>();
   for (const inv of ledger.data?.invoices ?? []) {
     if (inv.customer == null || !isOpen(inv)) continue;
     const row = owedBy.get(inv.customer) ?? { owed: 0, overdue: 0 };
     row.owed += num(inv.balance);
-    if (inv.due_date && inv.due_date.slice(0, 10) < today) row.overdue += num(inv.balance);
+    const due = inv.due_date?.slice(0, 10);
+    if (due && due < today) {
+      row.overdue += num(inv.balance);
+      if (!row.oldestDue || due < row.oldestDue) row.oldestDue = due;
+    }
     owedBy.set(inv.customer, row);
   }
+  // Material (R5): a customer's overdue part is at least a tenth of everything
+  // overdue and over 30 days late. Only those rows carry the small danger
+  // dot; every amount itself stays in ink, so the column never reads as an alarm.
+  const totalOverdue = [...owedBy.values()].reduce((n, r) => n + r.overdue, 0);
+  const daysLate = (iso?: string) => iso ? Math.floor((Date.parse(today) - Date.parse(iso)) / 86_400_000) : 0;
+  const isMaterial = (r?: { overdue: number; oldestDue?: string }) =>
+    !!r && r.overdue >= 0.005 && totalOverdue > 0 && r.overdue / totalOverdue >= 0.1 && daysLate(r.oldestDue) > 30;
   // Some balance is partly late: every row then takes the two-line height.
   const anyPartlyLate = [...owedBy.values()].some(r => r.overdue >= 0.005 && Math.abs(r.overdue - r.owed) >= 0.005);
-  // One money column: Owed. When all of it is late the figure itself turns the
-  // danger text colour (no extra line); only a partly late balance gets a
-  // second line with the overdue part, because only then does it differ.
-  const owedCell = (row: { owed: number; overdue: number } | undefined) => {
+  // One money column: Owed, in ink. A partly late balance gets a quiet second
+  // line with the overdue part; a material overdue balance gets one small dot.
+  const owedCell = (row: { owed: number; overdue: number; oldestDue?: string } | undefined) => {
     if (!ledger.data) return <span className="bk-muted">{ledger.error ? 'Not loaded' : '…'}</span>;
     const owed = row?.owed ?? 0;
     const overdue = row?.overdue ?? 0;
     if (owed < 0.005) return <span className="bk-muted">—</span>;
+    const flag = isMaterial(row)
+      ? <span className="cu-owed__dot" title={`Overdue: ${formatCurrency(overdue)}, oldest ${daysLate(row!.oldestDue)} days late`}><span className="sr-only">Overdue, oldest {daysLate(row!.oldestDue)} days late: </span></span>
+      : null;
     if (overdue >= 0.005 && Math.abs(overdue - owed) < 0.005) {
-      return <span className="cu-owed__late" title="All overdue">{formatCurrency(owed)}<span className="sr-only">, all overdue</span></span>;
+      return <span title={flag ? undefined : 'All overdue'}>{flag}{formatCurrency(owed)}{!flag && <span className="sr-only">, all overdue</span>}</span>;
     }
     return (
       <>
-        {formatCurrency(owed)}
+        {flag}{formatCurrency(owed)}
         {overdue >= 0.005 && <span className="cu-owed__sub">{formatCurrency(overdue)} overdue</span>}
       </>
     );
@@ -343,7 +356,7 @@ export default function Customers() {
               <th scope="col" className="bk-col-opt">Email</th>
               <th scope="col" className="bk-col-city">City</th>
               <th scope="col" className="bk-col-terms bk-col-narrow">Terms</th>
-              <th scope="col" className="is-num bk-col-money"><span className="cu-owed__head">Owed<InfoTip align="end">Unpaid invoice balances, incl. VAT. Red means all of it is past its due date; a second line shows the overdue part when only some is late.</InfoTip></span></th>
+              <th scope="col" className="is-num bk-col-money"><span className="cu-owed__head">Owed<InfoTip align="end">Unpaid invoice balances, incl. VAT. A red dot marks a customer whose overdue part is at least a tenth of everything overdue and over 30 days late. A second line shows the overdue part when only some is late.</InfoTip></span></th>
               {anyInactive && <th scope="col">Status</th>}
               <th scope="col" className="is-num"><span className="sr-only">Actions</span></th>
             </tr>

@@ -67,3 +67,21 @@
 /* Phone: the shared head keeps the primary on the title row and moves
    Change status and Edit quote into its "⋯" menu (SectionHeader), so the
    tools card no longer needs its own Edit copy. */
+
+/* ---- Round 5: phone head ---- */
+/* The status chips sit on the title row on wider screens and at the start of
+   the subtitle on phones, so "Send" stays on the title row (not in "⋯"). */
+.qd-head-chips { display: inline-flex; align-items: center; gap: 8px; }
+.qd-desc-chips { display: none; }
+@media (max-width: 768px) {
+  .qd-head-chips { display: none; }
+  .qd-desc-chips { display: inline-flex; gap: 4px; vertical-align: 1px; margin-right: 8px; }
+  /* Short visible label; the full one stays the text (menus, screen readers). */
+  .qd-label-long { display: inline-flex; align-items: center; font-size: 0; line-height: 0; }
+  .qd-label-long::after { content: attr(data-short); font-size: 14px; line-height: 20px; }
+}
+/* The quote number takes the long-ID size (24px, as the shared head's level 4)
+   so "Send" fits beside it on a 390 phone instead of moving into "⋯". */
+@media (max-width: 480px) {
+  .qd .section-header .section-header__title { font-size: 24px; letter-spacing: -0.02em; }
+}

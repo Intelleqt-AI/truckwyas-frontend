@@ -303,11 +303,14 @@ function HoldingBack({ eligible, unpaidCount }: { eligible: Q<EligibilityRespons
       // Every failing check hits every checked invoice: identical 100% bars say nothing, so name the checks instead.
       const allFailAll = rows.length > 0 && rows.every((r) => r.count === checkedCount);
       // The pass count and the invoice list toggle sit in the card head, beside the title.
+      // When every checked invoice fails every check, the lead below says so; the pass count would say it twice.
       aside = (
         <>
-          <p className="fp-muted">
-            {clear} of {plural(checkedCount, 'checked invoice')} {clear === 1 ? 'passes' : 'pass'} every check.
-          </p>
+          {!allFailAll && (
+            <p className="fp-muted">
+              {clear} of {plural(checkedCount, 'checked invoice')} {clear === 1 ? 'passes' : 'pass'} every check.
+            </p>
+          )}
           {blocked.length > 0 && (
             <button
               type="button"
@@ -331,7 +334,8 @@ function HoldingBack({ eligible, unpaidCount }: { eligible: Q<EligibilityRespons
           ) : allFailAll ? (
             <div className="fp-allfail">
               <p className="fp-allfail__lead">
-                {checkedCount === 1 ? 'The checked invoice' : `All ${checkedCount} checked invoices`} ({formatMoneyWhole(checkedValue)}) {rows.length === 1 ? 'fail this check' : `fail ${rows.length === 2 ? 'both' : 'all'} of these checks`}:
+                {/* The count is in the note above when it is shown, so the lead does not repeat it. */}
+                {checkedCount === 1 ? 'The checked invoice' : checkedNote ? 'Every checked invoice' : `All ${checkedCount} checked invoices`} ({formatMoneyWhole(checkedValue)}) {checkedCount === 1 || checkedNote ? 'fails' : 'fail'} {rows.length === 1 ? 'this check' : `${rows.length === 2 ? 'both' : 'all'} of these checks`}:
               </p>
               <ul className="fp-allfail__list">
                 {rows.map((r) => <li key={r.key}>{r.label}</li>)}

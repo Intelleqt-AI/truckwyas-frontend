@@ -62,7 +62,7 @@ export function RevenueCostBars({ months }: { months: MonthPoint[] }) {
   const { tip, show, hide } = useTip();
   const [hover, setHover] = useState<number | null>(null);
 
-  const H = 264;
+  const H = 300; // R5: the card ends level with Needs you (5 rows) beside it
   const padL = 52;
   const padB = 28;
   const padT = 8;

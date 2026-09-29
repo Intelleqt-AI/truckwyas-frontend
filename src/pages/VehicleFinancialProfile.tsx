@@ -1,5 +1,5 @@
 import './fleet-detail.css';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, patchData } from '@/lib/Api';
@@ -10,8 +10,9 @@ import {
 } from '@/components/fleet-detail/parts';
 import {
   ComplianceCard, ConditionCard, FactsCard, LinkCard, LoadLink, NowLine, PerformanceCard,
-  daysSince, isDelivered, isOpenLoad, latest, perfFigures, performance, dateToDo, type ToDo,
+  daysSince, fleetPerKm, isDelivered, isOpenLoad, latest, perfFigures, perfLine, performance, dateToDo, staleWork, type ToDo,
 } from '@/components/fleet-detail/record';
+import { useBalancedColumns } from '@/components/fleet-detail/useBalancedColumns';
 import { formatNumber, formatPercent, formatWeight, sentenceCaseLabel } from '@/lib/formatters';
 import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
 import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
@@ -64,8 +65,14 @@ export default function VehicleFinancialProfile() {
     enabled: !!id,
   });
 
-  // Costs logged on this truck, from the same expense ledger as the P&L.
-  const ledger = useLedger(['expenses']);
+  // Costs logged on this truck, from the same expense ledger as the P&L; every
+  // load, for the fleet's revenue per km (the comparison).
+  const ledger = useLedger(['expenses', 'loads']);
+
+  // Condition may move into the rail, or the driver and facts into the main column,
+  // so the two columns end within 48px of each other (R5).
+  const bal = useBalancedColumns({ toMain: ['driver', 'facts'], toSide: ['condition'] }, `${id}-${isLoading}-${loadsLoading}-${ledger.loading}`);
+  const sideRef = useCallback((n: HTMLElement | null) => { railRef(n); bal.sideRef.current = n; }, [railRef, bal.sideRef]);
 
   const { data: vtData } = useQuery({
     queryKey: ['vehicle-types'],
@@ -175,7 +182,19 @@ export default function VehicleFinancialProfile() {
   const idleDays = lastDelivered ? daysSince(lastDelivered.delivery_date || lastDelivered.pickup_date) : null;
   const openOrders = <button type="button" className="fd-ghost" onClick={() => navigate('/bookings/orders')}>Open orders</button>;
   let now: JSX.Element;
-  if (openLoad) {
+  const stale = staleWork(openLoad);
+  if (openLoad && stale) {
+    // Stale work (R5): an order left open is not current work. Neutral text, one amber dot.
+    const driverName = vehicle.driver_name || openLoad.driver_name;
+    now = (
+      <NowLine dot action={<Link className="fd-ghost" to={`/bookings/${openLoad.id}`}>Open order</Link>}>
+        {status !== 'IN_USE' ? <><strong>Marked {formatStatus(status).toLowerCase()}</strong>, still on </> : <>Still on </>}
+        <LoadLink load={openLoad} />
+        {driverName || openLoad.delivery_city ? <> ({[driverName, openLoad.delivery_city ? `to ${openLoad.delivery_city}` : ''].filter(Boolean).join(' ')})</> : null}
+        {' '}since {stale.since} ({plural(stale.days, 'day')}) — close or reassign
+      </NowLine>
+    );
+  } else if (openLoad) {
     const to = openLoad.delivery_city || openLoad.delivery_location;
     const driverName = vehicle.driver_name || openLoad.driver_name;
     const flag = status === 'AVAILABLE' ? 'Marked available' : status === 'MAINTENANCE' || status === 'OUT_OF_SERVICE' ? `Marked ${formatStatus(status).toLowerCase()}` : undefined;
@@ -206,7 +225,7 @@ export default function VehicleFinancialProfile() {
       </NowLine>
     );
   } else {
-    now = <NowLine>Available, no loads yet</NowLine>;
+    now = <NowLine>{status === 'IN_USE' ? 'Marked in use, no loads yet' : 'Available, no loads yet'}</NowLine>;
   }
 
   // ---- Compliance: what the owner acts on.
@@ -233,12 +252,12 @@ export default function VehicleFinancialProfile() {
   // ---- Performance
   const basis = <>
     Delivered and invoiced loads on this truck, counted in the month of delivery, over the last 12 months (the Reports definition).
-    {' '}Margin after truck costs: revenue less approved expenses logged on this truck (fuel, tolls, maintenance, insurance) in the same months; expenses waiting for approval are listed, not deducted, as in the P&L.
-    {' '}Revenue per km uses loads with a distance. Days on a job count calendar days from pickup to delivery.
+    {' '}Margin after truck costs: revenue less approved expenses logged on this truck (fuel, tolls, maintenance, insurance) in the same months; expenses waiting for approval are not deducted, as in the P&L, and the line under the margin shows what it becomes if they are approved.
+    {' '}Revenue per km uses loads with a distance; the fleet figure is every delivered load with a distance over the same months. Days on a job count calendar days from pickup to delivery.
     {partial ? ` Based on the latest ${loads.length} of ${loadsTotal} loads.` : ''}
     {perf.older > 0 ? ` ${plural(perf.older, 'older delivered load')} fall outside the 12 months.` : ''}
   </>;
-  const figures = perfFigures(perf, { revenueLabel: 'Revenue', thin, costs: true });
+  const figures = perfFigures(perf, { revenueLabel: 'Revenue', thin, costs: true, costsKnown: expenses !== null, fleetKm: fleetPerKm(ledger.data?.loads) });
 
   // ---- Condition
   const overall = Number(vehicle.ai_health_score) || null;
@@ -247,38 +266,57 @@ export default function VehicleFinancialProfile() {
   // ---- Driver
   const driverId = vehicle.driver ?? null;
   const driverName = vehicle.driver_name || null;
+  const noLoads = loads.length === 0;
+  // The driver on the vehicle record. An open order's driver is not "its"
+  // driver: the Now line names them; this card says none is assigned.
   const driverCard = driverId && driverName ? (
     <LinkCard title="Driver" className="fd-o-driver"
       primary={<Link className="fd-inline-link" to={`/fleet/drivers/${driverId}`}>{driverName}</Link>}
       secondary="Assigned to this truck" />
-  ) : openLoad?.driver_name ? (
-    <LinkCard title="Driver" className="fd-o-driver"
-      primary={openLoad.driver ? <Link className="fd-inline-link" to={`/fleet/drivers/${openLoad.driver}`}>{openLoad.driver_name}</Link> : openLoad.driver_name}
-      secondary={<>On {openLoad.load_number}, not assigned to the truck</>}
-      action={<button type="button" className="fd-ghost" onClick={openEdit}>Assign</button>} />
-  ) : (
+  ) : noLoads ? null : (
     <LinkCard title="Driver" className="fd-o-driver" primary={<span className="fd-muted">No driver assigned</span>}
       action={<button type="button" className="fd-ghost" onClick={openEdit}>Assign</button>} />
   );
 
-  // With no loads the main column is short: the facts sit there, two columns wide.
+  // A truck with no loads: one "Getting started" card (its first load, its
+  // driver, then the compliance to-dos) in place of three empty cards. The
+  // rail and the facts stay where they are on every other truck.
+  const firstSteps: ToDo[] = noLoads ? [
+    { key: 'first-load', tone: 'missing', title: 'First load', detail: 'Performance fills in once it delivers', action: { label: 'Open orders', onClick: () => navigate('/bookings/orders') } },
+    ...(!(driverId && driverName) ? [{ key: 'driver', tone: 'missing' as const, title: 'Driver', detail: 'Not assigned', action: { label: 'Assign', onClick: openEdit, aria: 'Assign a driver' } }] : []),
+  ] : [];
+
+  // Head subtitle already says make and model, type, year and payload: the
+  // facts card lists only what the head does not (year returns on phones,
+  // where the subtitle drops it).
   const factsCard = (
-    <FactsCard className={`fd-o-facts${loads.length === 0 ? ' fd-facts--wide' : ''}`} title="Vehicle" facts={[
-                { label: 'Registration', value: vehicle.plate, mono: true },
+    <FactsCard className="fd-o-facts" wide={bal.inMain('facts')} title="Vehicle" facts={[
                 { label: 'VIN', value: vehicle.vin, mono: true, add: openEdit },
-                { label: 'Make and model', value: makeModel || null, add: openEdit },
-                { label: 'Type', value: sentenceCaseLabel(vehicle.vehicle_type_name) || null },
-                { label: 'Year', value: vehicle.year, add: openEdit },
-                { label: 'Payload', value: tonnes ? formatWeight(tonnes) : null, add: openEdit },
+                { label: 'Year', value: vehicle.year, phoneOnly: true },
                 { label: 'Fuel', value: vehicle.fuel_type ? formatStatus(vehicle.fuel_type) : null },
                 {
                   label: 'Fuel use',
                   value: lPerKm ? <>{formatNumber(lPerKm, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L/km{defaultFuel ? <span className="fd-row__note fd-muted">default</span> : null}</> : null,
                 },
                 { label: 'Odometer', value: Number(vehicle.mileage) ? kmText(parseFloat(vehicle.mileage)) : null, add: openEdit },
-                { label: 'Last maintenance', value: dateText(vehicle.last_maintenance_date) },
+                { label: 'Last maintenance', value: dateText(vehicle.last_maintenance_date), add: openEdit },
+                ...(!makeModel ? [{ label: 'Make and model', value: null, add: openEdit }] : []),
+                ...(!tonnes ? [{ label: 'Payload', value: null, add: openEdit }] : []),
               ]} />
   );
+
+  const conditionCard = (overall || !noLoads) ? (
+    <ConditionCard
+      className="fd-o-condition"
+      overall={overall}
+      info={<>Rule-based, not a prediction: maintenance 35%, uptime 25%, fuel use 25% and age 15%, each out of 100. A factor with no data scores a neutral value. 80 or more is good, 60 to 79 fair, 40 to 59 low; below 40 needs action.</>}
+      parts={[
+        { label: 'Maintenance', score: Number(vehicle.maintenance_score) || null },
+        { label: 'Fuel efficiency', score: Number(vehicle.fuel_efficiency_score) || null },
+        { label: 'Uptime', score: Number(vehicle.uptime_score) || null, note: uptimePct ? `${uptimePct} of the time` : undefined },
+      ]}
+    />
+  ) : null;
 
   return (
     <div className="fleet-detail">
@@ -297,44 +335,44 @@ export default function VehicleFinancialProfile() {
       {now}
 
       <div className="fd-record">
-        <div className="fd-main">
-          <PerformanceCard
-            className="fd-o-perf"
-            perf={perf}
-            figures={figures}
-            basis={basis}
-            thinLine={thin ? <>{plural(deliveredCount, 'load')} so far. Figures build as it runs.</> : undefined}
-            empty={deliveredCount === 0 ? {
-              text: loads.length > 0
-                ? <>{plural(loads.length, 'load')} on this truck, none delivered in the last 12 months.</>
-                : <>Assign {title} to a load to see what it earns.</>,
-              action: loads.length === 0 ? <button type="button" className="fd-ghost" onClick={() => navigate('/bookings/orders')}>Open orders</button> : undefined,
-            } : undefined}
-          />
+        <div className="fd-main" ref={bal.mainRef}>
+          {noLoads ? (
+            <ComplianceCard
+              className="fd-o-todo"
+              title="Getting started"
+              sub="No loads yet"
+              lead={firstSteps}
+              items={todos}
+            />
+          ) : (
+            <PerformanceCard
+              className="fd-o-perf"
+              perf={perf}
+              figures={figures}
+              basis={basis}
+              thinLine={perfLine(perf)}
+              empty={deliveredCount === 0 ? {
+                text: <>No delivered loads in the last 12 months{perf.older > 0 ? ` (${plural(perf.older, 'earlier load')})` : ''}.</>,
+              } : undefined}
+            />
+          )}
 
-          {loads.length > 0 && (
-            <Panel title="Loads" sub={plural(loadsTotal, 'load')} flush className="fd-o-loads">
+          {!noLoads && (
+            <Panel title="Loads" sub={loadsTotal > 1 ? plural(loadsTotal, 'load') : undefined} flush className="fd-o-loads">
               <LoadsTable loads={loads} />
             </Panel>
           )}
 
-          <ConditionCard
-            className="fd-o-condition"
-            overall={overall}
-            info={<>Rule-based, not a prediction: maintenance 35%, uptime 25%, fuel use 25% and age 15%, each out of 100. A factor with no data scores a neutral value. 80 or more is good, 60 to 79 fair, 40 to 59 low; below 40 needs action.</>}
-            parts={[
-              { label: 'Maintenance', score: Number(vehicle.maintenance_score) || null },
-              { label: 'Fuel efficiency', score: Number(vehicle.fuel_efficiency_score) || null },
-              { label: 'Uptime', score: Number(vehicle.uptime_score) || null, note: uptimePct ? `${uptimePct} of the time` : undefined },
-            ]}
-          />
-          {loads.length === 0 && factsCard}
+          {bal.inMain('condition') && conditionCard}
+          {bal.inMain('driver') && driverCard}
+          {bal.inMain('facts') && factsCard}
         </div>
 
-        <aside ref={railRef} className="fd-side">
-          <ComplianceCard className="fd-o-todo" items={todos} />
-          {driverCard}
-          {loads.length > 0 && factsCard}
+        <aside ref={sideRef} className="fd-side">
+          {!noLoads && <ComplianceCard className="fd-o-todo" items={todos} />}
+          {!bal.inMain('driver') && driverCard}
+          {!bal.inMain('facts') && factsCard}
+          {!bal.inMain('condition') && conditionCard}
         </aside>
       </div>
 

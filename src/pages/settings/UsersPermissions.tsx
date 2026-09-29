@@ -113,10 +113,14 @@ export function UsersPermissions() {
   // role is visible. Roles are shown exactly as the API returns them; this
   // page never changes a role except through "Change role".
   const [driverEmails, setDriverEmails] = useState<Set<string>>(new Set());
+  // The table waits for the drivers too (R5): the Admin-driver note and the
+  // "Also a driver" lines then arrive with the rows, so nothing shifts later.
+  const [driversReady, setDriversReady] = useState(false);
   useEffect(() => {
     fetchAllPages<any>('api/v1/drivers/')
       .then(r => setDriverEmails(new Set(r.rows.map((d: any) => String(d.user_details?.email || d.email || '').toLowerCase()).filter(Boolean))))
-      .catch(() => setDriverEmails(new Set()));
+      .catch(() => setDriverEmails(new Set()))
+      .finally(() => setDriversReady(true));
   }, []);
 
   const loadPendingInvites = () => {
@@ -311,7 +315,7 @@ export function UsersPermissions() {
         )}
 
         {/* A driver with full admin rights is worth knowing about; say it once, calmly. */}
-        {!loading && adminDrivers > 0 && (
+        {!loading && driversReady && adminDrivers > 0 && (
           <p className="st-note">
             <span className="bk-dot bk-dot--warning" aria-hidden="true" />
             {adminDrivers} {adminDrivers === 1 ? 'driver has' : 'drivers have'} the Admin role, with billing and user access.
@@ -319,7 +323,7 @@ export function UsersPermissions() {
         )}
 
         {/* Table */}
-        {loading ? (
+        {loading || !driversReady ? (
           // Real head plus placeholder rows at the final row height (65px, avatar
           // and two lines), so the cards below do not move when users arrive.
           <table className="table-heading-roles settings-table" aria-busy="true" aria-label="Loading team members">

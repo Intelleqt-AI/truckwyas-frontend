@@ -568,3 +568,35 @@
 /* History toolbar on phones: the four-option seg always takes its own line,
    so the count arriving ("0" to "17 records") never re-wraps the row. */
 @media (max-width: 767px) { .bk-hist-toolbar .tw-toolbar__end { flex-basis: 100%; } }
+
+/* ---- Round 5: stale work and honest progress ---- */
+/* Stale work (an open order past its delivery date or older than 30 days):
+   neutral text plus one amber dot, never a second amber line. */
+.bk-table .bk-status-flag--stale { color: var(--text-secondary); font-weight: 400; display: flex; align-items: center; gap: 6px; }
+.bk-table .bk-status-flag--stale::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--status-warning-dot); flex-shrink: 0; }
+.bk-stale { flex-basis: 100%; display: flex; align-items: flex-start; gap: 8px; margin: 0; padding-top: 12px; border-top: 1px solid var(--border-row); font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.bk-stale .bk-dot { margin-top: 6px; }
+.bk-stale b { font-weight: 500; color: var(--text-primary); }
+/* A step the order passed without doing it (Assigned with no vehicle): hollow,
+   dashed dot and quiet label; the line through it stays drawn. */
+.bk-step.is-skipped .bk-step__dot { background: var(--bg-surface); border: 2px dashed var(--text-tertiary); }
+.bk-step.is-skipped .bk-step__label { color: var(--text-tertiary); }
+/* Quotes on phones (R5): search, status select and a view toggle share one
+   toolbar row; the count lives in the select ("All (25)"). */
+.bk-view-toggle { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: var(--control-h, 44px); height: var(--control-h, 44px); padding: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-control, 8px); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; }
+.bk-view-toggle:hover { color: var(--text-primary); border-color: var(--border-active); }
+.bk-view-toggle:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+@media (max-width: 767px) {
+  .bk-toolbar:has(.bk-view-toggle) { flex-wrap: nowrap; gap: 8px; margin-bottom: 12px; }
+  .bk-toolbar:has(.bk-view-toggle) .bk-search { flex: 1 1 0; width: auto; min-width: 0; }
+  .bk-toolbar:has(.bk-view-toggle) .bk-toolbar__end { display: none; }
+  .bk-toolbar .bk-toolbar__status { flex: 0 1 136px; width: 136px; min-width: 0; height: var(--control-h, 44px); }
+}
+/* Customer detail (R5): a value's source in one quiet line under it. */
+.bk-kv.cd-kv--noted { align-items: flex-start; }
+.bk-kv .cd-kv__note { display: block; margin-top: 2px; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: normal; text-align: right; }
+/* R5: the stale line under Status needs ~130px; the route gives it up, so
+   Amount stays in view at 1440 without a side scroll. */
+@container (min-width: 1041px) { .bk-table--loads .bk-col-route { max-width: 30ch; } }
+.bk-table .bk-status-flag--stale { white-space: nowrap; }
+@container (max-width: 520px) { .bk-table .bk-status-flag--stale { white-space: normal; align-items: baseline; } .bk-table .bk-status-flag--stale::before { transform: translateY(-1px); } }

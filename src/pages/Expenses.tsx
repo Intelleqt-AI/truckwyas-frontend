@@ -397,6 +397,13 @@ export default function Expenses() {
     return { key, amount: sumOf(list), count: list.length };
   });
   const maxMonthlyAmount = Math.max(1, ...monthlyTrend.map(m => m.amount));
+  // Phones label only the highest and the latest month (the others are in
+  // each bar's title and name); two neighbours would touch, so the highest wins.
+  const labelled = (() => {
+    const last = monthlyTrend.length - 1;
+    const top = monthlyTrend.reduce((b, m, i) => (m.amount > monthlyTrend[b].amount ? i : b), 0);
+    return new Set(last < 0 ? [] : last - top === 1 ? [top] : [top, last]);
+  })();
   const latestKey = withSpend[withSpend.length - 1];
   const latestList = latestKey != null ? spend.filter(e => inMonth(e, latestKey)) : [];
   const prevList = latestKey != null ? spend.filter(e => inMonth(e, latestKey - 1)) : [];
@@ -509,7 +516,7 @@ export default function Expenses() {
               {monthlyTrend.map((m, i) => (
                 <div
                   key={m.key}
-                  className={`fin-months__col${m.key === nowKey ? ' is-current' : ''}`}
+                  className={`fin-months__col${m.key === nowKey ? ' is-current' : ''}${labelled.has(i) ? ' is-labelled' : ''}`}
                   role="listitem"
                   aria-label={`${monthText(m.key)}: ${formatCurrency(m.amount)} across ${plural(m.count, 'expense')}`}
                   title={`${monthText(m.key)} · ${formatCurrency(m.amount)} · ${plural(m.count, 'expense')}`}

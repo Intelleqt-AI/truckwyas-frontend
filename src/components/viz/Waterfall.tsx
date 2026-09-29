@@ -75,6 +75,9 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, va
   const wrap = steps.some((s) => textW(s.label, catPx) > band - 6);
   const lines = (label: string) => {
     if (!wrap || !label.includes(' ')) return [label];
+    // "Dec 2025": month over year; the year shortens to "’25" when even that is wider than the band.
+    const my = label.match(/^(\S+) (\d{4})$/);
+    if (my) return [my[1], textW(my[2], catPx) > band - 6 ? `’${my[2].slice(2)}` : my[2]];
     const mid = label.length / 2;
     const cut = [...label.matchAll(/ /g)].map((m) => m.index!).sort((p, q) => Math.abs(p - mid) - Math.abs(q - mid))[0];
     return [label.slice(0, cut), label.slice(cut + 1)];
@@ -85,6 +88,24 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, va
   const bw = Math.max(12, Math.min(64, band * 0.42));
   const cx = (i: number) => axisW + band * i + band / 2;
   const zeroY = y(0);
+
+  // Step (x-axis) labels never collide: on a narrow chart a label is drawn only
+  // when it clears the ones already kept by 6px. Totals, the first and the last
+  // step always keep theirs; the rest are kept in order, so a crowded month axis
+  // reads every other month. A dropped label is still in the tooltip and table.
+  const cats = steps.map((s, i) => {
+    const ls = lines(s.label);
+    const w = Math.max(...ls.map((t) => textW(t, catPx)));
+    const x = Math.max(w / 2 + 1, Math.min(W - w / 2 - 1, cx(i)));
+    return { lines: ls, x, x0: x - w / 2, x1: x + w / 2 };
+  });
+  const catKeep = new Set<number>();
+  const catPri = steps.map((s, i) => ({ i, p: s.kind === 'total' || i === 0 || i === steps.length - 1 ? 0 : 1 }))
+    .sort((a, b) => a.p - b.p || a.i - b.i);
+  catPri.forEach(({ i }) => {
+    const c = cats[i];
+    if ([...catKeep].every((k) => c.x1 + 6 <= cats[k].x0 || c.x0 >= cats[k].x1 + 6)) catKeep.add(i);
+  });
 
   const deltas = steps.map((s, i) => ({ s, i })).filter(({ s }) => s.kind === 'delta' && s.value !== 0);
   const maxUp = deltas.reduce<number | null>((b, d) => (d.s.value > 0 && (b == null || d.s.value > steps[b].value) ? d.i : b), null);
@@ -223,9 +244,8 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, va
               : `M${x - bw / 2},${y0} V${y1 - r} Q${x - bw / 2},${y1} ${x - bw / 2 + r},${y1} H${x + bw / 2 - r} Q${x + bw / 2},${y1} ${x + bw / 2},${y1 - r} V${y0} Z`;
             const next = i < steps.length - 1 ? cx(i + 1) : null;
             const lab = placed[i];
-            const catLines = lines(s.label);
-            const catW = Math.max(...catLines.map((t) => textW(t, catPx)));
-            const catX = Math.max(catW / 2 + 1, Math.min(W - catW / 2 - 1, x));
+            const catLines = cats[i].lines;
+            const catX = cats[i].x;
             return (
               <g key={s.label + i}>
                 {next != null && <line x1={x + bw / 2} x2={next - bw / 2} y1={y1} y2={y1} className="viz-connector" />}
@@ -242,9 +262,11 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, va
                   <text x={lab.x} y={lab.y} textAnchor="middle" className={lab.inside ? 'viz-on-mark' : 'viz-strong viz-halo'}>{lab.text}</text>
                 )}
                 {b.empty && <text x={x} y={y0 - 8} textAnchor="middle" className="viz-muted">{EMPTY_MARK}</text>}
-                <text x={catX} y={height - (catLines.length > 1 ? 22 : 8)} textAnchor="middle" className={s.kind === 'total' ? 'viz-strong' : undefined} style={catPx !== 12 ? { fontSize: catPx } : undefined}>
-                  {catLines.map((t, k) => <tspan key={k} x={catX} dy={k === 0 ? 0 : 14}>{t}</tspan>)}
-                </text>
+                {catKeep.has(i) && (
+                  <text x={catX} y={height - (catLines.length > 1 ? 22 : 8)} textAnchor="middle" className={s.kind === 'total' ? 'viz-strong' : undefined} style={catPx !== 12 ? { fontSize: catPx } : undefined}>
+                    {catLines.map((t, k) => <tspan key={k} x={catX} dy={k === 0 ? 0 : 14}>{t}</tspan>)}
+                  </text>
+                )}
                 {/* Pointer only: the SVG is one labelled image and "Show as table" is the keyboard route to every value. */}
                 <rect className="viz-hit" x={x - band / 2} y={0} width={band} height={height} aria-hidden="true"
                   onPointerEnter={(e) => open(i, e.currentTarget)} />

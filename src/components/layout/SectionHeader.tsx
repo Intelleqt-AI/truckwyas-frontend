@@ -194,6 +194,44 @@ function useHeadActionsFit(phone: boolean, deps: unknown[]) {
   return { headRef, rowRef, slotRef, overflowItems };
 }
 
+
+/**
+ * Tab strip overflow (R5): when a tabs row is wider than its box (phones), the
+ * clipped edge gets a fade (data-fade="start" | "end" | "both", drawn in
+ * section-header.css) and the active tab is scrolled fully into view, clear of
+ * the fade. Returns a callback ref for the <nav>; `activeKey` is anything that
+ * changes when the active tab does.
+ */
+export function useTabStrip(activeKey: unknown) {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (!el) return;
+    const update = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      const start = max > 1 && el.scrollLeft > 1;
+      const end = max > 1 && el.scrollLeft < max - 1;
+      const v = start && end ? 'both' : start ? 'start' : end ? 'end' : '';
+      if (v) el.dataset.fade = v; else delete el.dataset.fade;
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    return () => { el.removeEventListener('scroll', update); ro?.disconnect(); };
+  }, [el]);
+  useLayoutEffect(() => {
+    if (!el || el.scrollWidth <= el.clientWidth + 1) return;
+    const a = el.querySelector<HTMLElement>('.is-active');
+    if (!a) return;
+    const FADE = 32;
+    const n = el.getBoundingClientRect();
+    const r = a.getBoundingClientRect();
+    if (r.right > n.right - FADE) el.scrollLeft += r.right - (n.right - FADE);
+    else if (r.left < n.left + FADE) el.scrollLeft -= (n.left + FADE) - r.left;
+  }, [el, activeKey]);
+  return setEl;
+}
+
 /**
  * THE page head. One geometry on every page (tokens in theme.css):
  * H1 28/34 600 at --page-head-top from the top of <main>, a reserved
@@ -220,6 +258,7 @@ export default function SectionHeader({ eyebrow, title, description, actions, me
   const { headRef, rowRef, slotRef, overflowItems } = useHeadActionsFit(phone, [actions, shownTitle, titleAdornment]);
   const extra = menuItems ?? [];
   const hasSlot = !!actions || extra.length > 0;
+  const tabsRef = useTabStrip(pathname);
   return (
     <header ref={headRef} className={`section-header tw-page-head-block${showTabs ? ' has-tabs' : ''}${extra.length ? ' has-menu' : ''}`}>
       <div className="section-header__top">
@@ -256,7 +295,7 @@ export default function SectionHeader({ eyebrow, title, description, actions, me
         ) : null}
       </div>
       {showTabs && (
-        <nav className="section-header__tabs" aria-label={`${eyebrow ?? shownTitle} sections`}>
+        <nav ref={tabsRef} className="section-header__tabs" aria-label={`${eyebrow ?? shownTitle} sections`}>
           {tabs!.map((t) => (
             <NavLink
               key={t.to}
@@ -287,8 +326,9 @@ export function SectionTabs<T extends string>({ label, tabs, value, onChange }: 
   value: T;
   onChange: (id: T) => void;
 }) {
+  const tabsRef = useTabStrip(value);
   return (
-    <nav className="section-header__tabs section-tabs" aria-label={label}>
+    <nav ref={tabsRef} className="section-header__tabs section-tabs" aria-label={label}>
       {tabs.map((t) => (
         <button
           key={t.id}

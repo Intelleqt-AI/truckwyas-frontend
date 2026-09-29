@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BellRing, Banknote, Send } from "lucide-react";
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -301,18 +302,32 @@ export default function InvoiceDetail() {
   const vatRateText = taxRate != null ? (() => { const r = taxRate > 0 && taxRate <= 1 ? taxRate * 100 : taxRate; return formatPercent(r, Number.isInteger(Math.round(r * 100) / 100) ? 0 : 1); })() : null;
 
 
+  // In date order. An invoice added to TruckWys after it was issued or sent
+  // (imported, or captured late) says so, instead of "Created" appearing
+  // after "Sent to customer" as if the dates disagreed.
+  const at = (d?: string | null) => { const t = d ? new Date(d).getTime() : NaN; return isNaN(t) ? null : t; };
+  const createdAt = at(invoice.created_at);
+  const earlierFact = [at(invoice.sent_at), at(invoice.issue_date)].filter((t): t is number => t != null);
+  const dayOf = (t: number) => Math.floor(t / 86_400_000);
+  const recordedLate = createdAt != null && earlierFact.some(t => dayOf(createdAt) > dayOf(t));
   const activity = [
-    { label: 'Created', value: safeDate(invoice.created_at) },
-    { label: 'Sent to customer', value: invoice.sent_at ? safeDate(invoice.sent_at) : 'Not sent' },
-    ...(invoice.viewed_at ? [{ label: 'Viewed by customer', value: safeDate(invoice.viewed_at) }] : []),
+    recordedLate
+      ? { label: 'Recorded in TruckWys', value: `${safeDate(invoice.created_at)}, after it was ${invoice.sent_at ? 'sent' : 'issued'}`, at: createdAt }
+      : { label: 'Created', value: safeDate(invoice.created_at), at: createdAt },
+    { label: 'Sent to customer', value: invoice.sent_at ? safeDate(invoice.sent_at) : 'Not sent', at: at(invoice.sent_at) },
+    ...(invoice.viewed_at ? [{ label: 'Viewed by customer', value: safeDate(invoice.viewed_at), at: at(invoice.viewed_at) }] : []),
     {
       label: 'Reminders',
       value: invoice.reminder_count
         ? `${invoice.reminder_count} sent, last on ${safeDate(invoice.last_reminder_at)}`
         : 'None sent',
+      at: invoice.reminder_count ? at(invoice.last_reminder_at) : null,
     },
-    ...(invoice.paid_at ? [{ label: 'Paid', value: safeDate(invoice.paid_at) }] : []),
-  ];
+    ...(invoice.paid_at ? [{ label: 'Paid', value: safeDate(invoice.paid_at), at: at(invoice.paid_at) }] : []),
+  ]
+    // Dated events in order; undated facts ("Not sent", "None sent") last, as listed.
+    .map((r, i) => ({ ...r, i }))
+    .sort((a, b) => (a.at == null ? 1 : 0) - (b.at == null ? 1 : 0) || (a.at != null && b.at != null ? a.at - b.at : 0) || a.i - b.i);
 
   // Past due: chasing is the job, so the reminder is the primary action.
   const primary = canRemind ? 'remind' : canSend ? 'send' : canRecordPayment ? 'pay' : null;
@@ -333,7 +348,7 @@ export default function InvoiceDetail() {
   ];
 
   return (
-    <div className="fin-page">
+    <div className="fin-page fin-page--invoice">
       {toast && (
         <div className={`fin-toast${toast.isError ? ' fin-toast--error' : ''}`} role={toast.isError ? 'alert' : 'status'}>
           {toast.msg}
@@ -356,33 +371,30 @@ export default function InvoiceDetail() {
 
       <SectionHeader
         title={invoice.invoice_number}
-        titleAdornment={<StatusChip status={status} />}
+        titleAdornment={<span className="fin-head-chip"><StatusChip status={status} /></span>}
         back={{ to: '/finance/invoices', label: 'Invoices' }}
         description={<>
+          {/* Phones: the status sits here, so the ID and the primary share the title row. */}
+          <span className="fin-head-chip--sub"><StatusChip status={status} size="sm" /><span aria-hidden="true" className="section-header__sep" style={{ marginLeft: 6 }}>·</span></span>
           {invoice.customer_name}
           {/* The number itself says it is a load ("LOAD-…"). */}
-          {invoice.load_number && <>{' · '}<span className="fin-id" title="Load">{invoice.load_number}</span></>}
+          {/* Phones: when the charges line already names the load, it is not repeated here. */}
+          {invoice.load_number && <span className={itemised ? undefined : 'fin-hide-phone'}>{' · '}<span className="fin-id" title="Load">{invoice.load_number}</span></span>}
         </>}
         actions={<>
           {/* One primary action; everything else sits behind one menu. */}
           {primary === 'remind' ? (
-            <button type="button" className="tw-btn tw-btn--primary" onClick={() => setPreview('reminder')} disabled={sendingReminder}>
-              {sendingReminder ? 'Sending…' : 'Send reminder'}
-            </button>
+            <HeadAction icon={<BellRing size={16} strokeWidth={1.75} aria-hidden="true" />} label={sendingReminder ? 'Sending…' : 'Send reminder'} short={sendingReminder ? 'Sending…' : 'Remind'}
+              onClick={() => setPreview('reminder')} disabled={sendingReminder} />
           ) : primary === 'send' ? (
-            <button type="button" className="tw-btn tw-btn--primary" onClick={() => setPreview('invoice')} disabled={sending}>
-              {sending ? 'Sending…' : status === 'VIEWED' ? 'Resend to customer' : 'Send to customer'}
-            </button>
+            <HeadAction icon={<Send size={16} strokeWidth={1.75} aria-hidden="true" />}
+              label={sending ? 'Sending…' : status === 'VIEWED' ? 'Resend to customer' : 'Send to customer'}
+              short={sending ? 'Sending…' : status === 'VIEWED' ? 'Resend' : 'Send'}
+              onClick={() => setPreview('invoice')} disabled={sending} />
           ) : primary === 'pay' ? (
-            <button
-              type="button"
-              onClick={() => setShowPaymentForm(true)}
-              className="tw-btn tw-btn--primary"
-              disabled={showPaymentForm}
-              aria-expanded={showPaymentForm}
-              aria-controls="record-payment">
-              Record payment
-            </button>
+            <HeadAction icon={<Banknote size={16} strokeWidth={1.75} aria-hidden="true" />} label="Record payment" short="Record payment"
+              onClick={() => setShowPaymentForm(true)} disabled={showPaymentForm}
+              extra={{ 'aria-expanded': showPaymentForm, 'aria-controls': 'record-payment' }} />
           ) : (
             <button type="button" className="tw-btn" onClick={handleDownloadPDF} disabled={downloading}>
               {downloading ? 'Downloading…' : 'Download PDF'}
@@ -650,5 +662,22 @@ export default function InvoiceDetail() {
         </aside>
       </div>
     </div>
+  );
+}
+
+/** The invoice head's one primary. Phones show a short label ("Send",
+ *  "Remind") so it stays on the title row beside the invoice number; the
+ *  full label stays its accessible name and its label in "⋯". The leading
+ *  icon is only drawn when SectionHeader falls back to an icon button. */
+function HeadAction({ icon, label, short, onClick, disabled, extra }: {
+  icon: React.ReactNode; label: string; short: string; onClick: () => void; disabled?: boolean;
+  extra?: React.ButtonHTMLAttributes<HTMLButtonElement> & { 'aria-expanded'?: boolean; 'aria-controls'?: string };
+}) {
+  return (
+    <button type="button" className="tw-btn tw-btn--primary fin-act" onClick={onClick} disabled={disabled}
+      aria-label={label} data-short={short} {...extra}>
+      {icon}
+      <span className="fin-act__long">{label}</span>
+    </button>
   );
 }

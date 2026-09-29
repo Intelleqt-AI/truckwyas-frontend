@@ -1060,8 +1060,12 @@ table.fin-table tfoot tr.fin-doc__grand td { font-size: 16px; line-height: 24px;
 /* Form fields are --field-h (40; 44 on touch and phones), buttons in a form
    rail match them. The shared date picker input included. */
 .fin-page .fin-form input.fin-control { min-height: var(--field-h, 40px); height: var(--field-h, 40px); box-sizing: border-box; }
-.fin-page .fin-form .fin-date-field .tw-date-field { height: var(--field-h, 40px); box-sizing: border-box; }
-.fin-page .fin-form .fin-date-field .tw-date-field > input { height: 100%; min-height: 0; }
+/* The date input itself is --field-h (the wrapper's 1px border was taking
+   2px off it): the border is drawn as an inset ring instead. */
+.fin-page .fin-form .fin-date-field .tw-date-field { height: var(--field-h, 40px); box-sizing: border-box; border: 0 !important; box-shadow: inset 0 0 0 1px var(--border-control); }
+.fin-page .fin-form .fin-date-field .tw-date-field:focus-within { box-shadow: inset 0 0 0 1px var(--accent-primary); }
+.fin-page .fin-form .fin-date-field .tw-date-field > input { height: var(--field-h, 40px); min-height: 0; box-sizing: border-box; }
+.fin-page .fin-form .fin-date-field .tw-date-field > button { align-self: stretch; margin: 1px 1px 1px 0; }
 .fin-page .fin-rail .fin-rail-btn { height: var(--field-h, 40px); font-size: 14px; }
 
 /* ==== Round 4: invoice document ====
@@ -1098,4 +1102,31 @@ table.fin-table.fin-doc__table .fin-mobile-only { display: none; }
   .fin-page .tw-toolbar.fin-toolbar:has(.inv-status-menu) > .tw-toolbar__meta { flex: 1 1 100%; }
   .fin-page .tw-toolbar.fin-toolbar > .inv-search { flex: 1 1 0; min-width: 0; }
   .inv-status-menu .inv-status-select.tw-select-trigger { width: 100%; height: var(--control-h, 44px); min-height: var(--control-h, 44px); padding: 0 10px 0 12px; font-size: 14px; }
+}
+
+/* ==== Round 5: invoice heads on phones ====
+   The invoice number is an ID: it never breaks. On phones it is set at 22px
+   (a step below the SectionHeader long-ID size) and the status chip moves to the line
+   under it, so the one primary action ("Send to customer", "Send reminder",
+   "Record payment") stays on the title row beside "⋯" with a short label;
+   its full label stays its accessible name and its "⋯" menu label. */
+.fin-head-chip--sub { display: none; }
+@media (max-width: 768px) {
+  .fin-page--invoice .section-header__title { font-size: 22px; letter-spacing: -0.02em; white-space: nowrap; overflow-wrap: normal; word-break: keep-all; }
+  .fin-page--invoice .section-header__title-row > .fin-head-chip { display: none; }
+  .fin-page--invoice .fin-head-chip--sub { display: inline-flex; align-items: center; height: 20px; vertical-align: top; }
+  .fin-page--invoice .fin-hide-phone { display: none; }
+  .fin-act .fin-act__long { display: none; }
+  .fin-act::before { content: attr(data-short); }
+  .fin-act[data-sh-icon]::before { content: none; }
+}
+.fin-act:not([data-sh-icon]) > svg { display: none; }
+@media (min-width: 769px) {
+  .fin-phone-only { display: none !important; }
+  .section-header__actions:has(> .fin-phone-only:only-child) { display: none; }
+}
+/* Expenses "Spend by month" on phones: value labels only on the highest
+   and the latest month, so neighbouring figures never touch. */
+@media (max-width: 640px) {
+  .fin-months__col:not(.is-labelled) > .fin-months__val { visibility: hidden; }
 }

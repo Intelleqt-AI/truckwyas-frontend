@@ -131,6 +131,22 @@
   scrollbar-width: none;
 }
 .section-header__tabs::-webkit-scrollbar { display: none; }
+/* Overflowing strip (phones, R5): fade the clipped edge so the cut-off tab
+   reads as "more this way"; useTabStrip() sets data-fade and scrolls the
+   active tab clear of the fade. Keyboard focus also stops clear of it. */
+.section-header__tabs { scroll-padding-inline: 32px; }
+.section-header__tabs[data-fade="end"] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+          mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+.section-header__tabs[data-fade="start"] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 32px);
+          mask-image: linear-gradient(to right, transparent, #000 32px);
+}
+.section-header__tabs[data-fade="both"] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+          mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+}
 .section-header__tab {
   position: relative;
   display: inline-flex;

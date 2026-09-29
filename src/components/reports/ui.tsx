@@ -6,7 +6,7 @@ import { Segmented } from '@/components/ui/Segmented';
 import { KpiRow, KpiStats, KpiTile } from '@/components/ui/KpiTile';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import LoadError from '@/components/data/LoadError';
-import { formatDistance } from '@/lib/formatters';
+import { formatCompact, formatDistance } from '@/lib/formatters';
 import {
   PERIODS, day, downloadCsv, int, money, moneyBare, pct, resolvePeriod, slug,
   type CsvCell, type Period, type PeriodId,
@@ -282,8 +282,10 @@ export interface Statement { columns: Col[]; rows: SRow[] }
 
 /** Display density of a fitted statement: 0 full ("R 38 550,00"), 1 tighter
  *  cells, 2 no currency sign (the table says "in rand"), 3 whole rands at
- *  12px. The table steps up only as far as it needs to fit its card. */
-type Density = 0 | 1 | 2 | 3;
+ *  12px. The table steps up only as far as it needs to fit its card.
+ *  4 is phones only (compactPhone month statements): "R 12,3k" figures in
+ *  equal month columns that snap whole, the exact amount in the title. */
+type Density = 0 | 1 | 2 | 3 | 4;
 
 function cell(v: CsvCell, type: ColType = 'text', density: Density = 0) {
   if (v === '') return '';
@@ -293,6 +295,7 @@ function cell(v: CsvCell, type: ColType = 'text', density: Density = 0) {
   switch (type) {
     case 'money': {
       const x = Math.abs(v) < 0.005 ? 0 : v;
+      if (density >= 4) return x === 0 ? '0' : formatCompact(x);
       return density >= 2 ? moneyBare(x, density >= 3) : money(x);
     }
     case 'int': return int(v);
@@ -371,8 +374,13 @@ function StackList({ table, stack, caption }: { table: Statement; stack: Stack; 
   );
 }
 
-export function StatementTable({ table, caption, stickyFirst = true, footer, fit = false, pinLast = false, cue = ['Earlier months', 'Later months'] as [string, string] | null, stack }: {
+export function StatementTable({ table, caption, stickyFirst = true, footer, fit = false, pinLast = false, compactPhone = false, cue = ['Earlier months', 'Later months'] as [string, string] | null, stack }: {
   table: Statement; caption: string; stickyFirst?: boolean; footer?: ReactNode;
+  /** Phones (fit month statements): compact figures ("R 12,3k", exact in the
+   *  title) in equal columns sized so a whole number of months (at least 3
+   *  on a 390 phone) sits between the pinned label and Total, and the
+   *  sideways scroll snaps month by month: no figure is ever cut mid-number. */
+  compactPhone?: boolean;
   /** Phones: show the statement as a stacked list instead of a sideways-scrolling table. */
   stack?: Stack;
   /** Month statements: tighten cells (then drop the currency sign, then the
@@ -408,6 +416,48 @@ export function StatementTable({ table, caption, stickyFirst = true, footer, fit
     }
   }, [stickyFirst, pinLast]);
 
+  // Compact phone statements: equal month columns, a whole number of them
+  // between the pinned label and Total. The spare pixels go to the label
+  // column, so every snap position shows whole months only.
+  const sizeColumns = useCallback(() => {
+    const el = scroller.current;
+    const t = el?.querySelector('table');
+    if (!el || !t) return;
+    const set = (k: string, v: string | null) => {
+      if (t.style.getPropertyValue(k) === (v ?? '')) return;
+      if (v == null) t.style.removeProperty(k); else t.style.setProperty(k, v);
+    };
+    const clear = () => { set('--fr-col-w', null); set('--fr-lab-w', null); };
+    if (!t.classList.contains('fr-table--d4')) { clear(); return; }
+    const heads = [...t.querySelectorAll<HTMLTableCellElement>('thead th')];
+    const count = heads.length - 1 - (pinLast ? 1 : 0);
+    if (count < 1) { clear(); return; }
+    // Natural width of the widest month figure (content plus padding),
+    // measured from the text so the set widths do not feed back into it.
+    const rg = document.createRange();
+    let natural = 0;
+    for (const tr of t.querySelectorAll<HTMLTableRowElement>('tr:not(.fr-row--section)')) {
+      const cells = [...tr.children].slice(1, pinLast ? -1 : undefined);
+      for (const c of cells) {
+        rg.selectNodeContents(c);
+        const cs = getComputedStyle(c);
+        natural = Math.max(natural, Math.ceil(rg.getBoundingClientRect().width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)));
+      }
+    }
+    // Three months at least: the label column (96px) gives up width, to
+    // 80px where labels wrap to a third line, before a month is lost.
+    const lab = 96, minLab = 80;
+    const tot = pinLast ? heads[heads.length - 1].offsetWidth : 0;
+    const room = el.clientWidth - tot;
+    let n = Math.max(1, Math.floor((room - lab) / natural));
+    if (n < 3 && Math.floor((room - minLab) / natural) >= 3) n = 3;
+    if (n >= count) { clear(); return; }
+    const avail = room - lab >= n * natural ? room - lab : room - minLab;
+    const cw = Math.floor(avail / n);
+    set('--fr-col-w', `${cw}px`);
+    set('--fr-lab-w', `${room - n * cw}px`);
+  }, [pinLast]);
+
   // Fit: before paint, step the density up until the table fits (or the
   // tightest step is reached). A new table or a new width starts again at 0.
   // The table always opens at the start of the range (scrollLeft 0).
@@ -416,9 +466,12 @@ export function StatementTable({ table, caption, stickyFirst = true, footer, fit
     if (!el) return;
     if (fit) {
       const w = el.clientWidth;
-      if (dense.sig !== sig || dense.w !== w) { setDense({ sig, w, level: 0 }); return; }
-      if (el.scrollWidth > w + 1 && dense.level < 3) { setDense({ sig, w, level: (dense.level + 1) as Density }); return; }
+      const phone = compactPhone && stickyFirst && typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches;
+      if (dense.sig !== sig || dense.w !== w) { setDense({ sig, w, level: phone ? 4 : 0 }); return; }
+      if (phone !== (dense.level === 4)) { setDense({ sig, w, level: phone ? 4 : 0 }); return; }
+      if (!phone && el.scrollWidth > w + 1 && dense.level < 3) { setDense({ sig, w, level: (dense.level + 1) as Density }); return; }
     }
+    sizeColumns();
     readEdges();
   });
   useLayoutEffect(() => {
@@ -442,10 +495,11 @@ export function StatementTable({ table, caption, stickyFirst = true, footer, fit
     if (!el) return;
     const pinned = (stickyFirst ? parseFloat(el.parentElement?.style.getPropertyValue('--fr-pin-l') || '0') : 0)
       + (pinLast ? parseFloat(el.parentElement?.style.getPropertyValue('--fr-pin-r') || '0') : 0);
-    el.scrollBy({ left: dir * Math.max(80, (el.clientWidth - pinned) * 0.8), behavior: 'smooth' });
+    // Compact columns snap, so a page is exactly the months in view.
+    el.scrollBy({ left: dir * Math.max(80, (el.clientWidth - pinned) * (level === 4 ? 1 : 0.8)), behavior: 'smooth' });
   };
   const tableCls = ['fr-table', stickyFirst ? 'fr-table--sticky' : '', pinLast ? 'fr-table--pin-last' : '', level ? `fr-table--d${level}` : ''].filter(Boolean).join(' ');
-  const units = level >= 3 ? 'Amounts in rand, rounded to the nearest rand. Export CSV has the cents.' : level >= 2 ? 'Amounts in rand.' : null;
+  const units = level >= 4 ? 'Amounts in rand, rounded to the nearest R 100 (R 12,3k is R 12 300). Export CSV in the ⋯ menu has the exact amounts.' : level >= 3 ? 'Amounts in rand, rounded to the nearest rand. Export CSV has the cents.' : level >= 2 ? 'Amounts in rand.' : null;
 
   return (
     <section className={`tw-card tw-card--flush fr-statement${scrolls ? ' is-scrolling' : ''}${stack ? ' has-stack' : ''}`} aria-label={caption}>
@@ -467,7 +521,7 @@ export function StatementTable({ table, caption, stickyFirst = true, footer, fit
             <thead>
               <tr>
                 {columns.map((c, i) => (
-                  <th key={i} scope="col" className={[c.type && c.type !== 'text' && c.type !== 'date' ? 'is-num' : '', c.phone === false ? 'fr-col--wide' : ''].filter(Boolean).join(' ') || undefined}>{c.label}</th>
+                  <th key={i} scope="col" className={[c.type && c.type !== 'text' && c.type !== 'date' ? 'is-num' : '', c.phone === false ? 'fr-col--wide' : ''].filter(Boolean).join(' ') || undefined}>{level === 4 && /^\S+ \d{4}$/.test(c.label) ? <>{c.label.split(' ')[0]}<br />{c.label.split(' ')[1]}</> : c.label}</th>
                 ))}
               </tr>
             </thead>

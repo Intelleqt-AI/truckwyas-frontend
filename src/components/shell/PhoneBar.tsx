@@ -109,12 +109,6 @@ export function PhoneBar({ allowed, canAccessSettings, canAsk, open, setOpen, th
             })}
             <div className="tw-sheet__group">
               <div className="tw-nav__group-label">Account</div>
-              {canAsk && (
-                <Link to="/copilot" className={`tw-nav__item${underPrefix(pathname, '/copilot') ? ' is-active' : ''}`}>
-                  <Search className="tw-nav__icon" aria-hidden="true" strokeWidth={1.75} />
-                  <span className="tw-nav__label">Ask Copilot</span>
-                </Link>
-              )}
               {canAccessSettings && (
                 <Link to="/settings" className={`tw-nav__item${underPrefix(pathname, '/settings') ? ' is-active' : ''}`}>
                   <Settings className="tw-nav__icon" aria-hidden="true" strokeWidth={1.75} />

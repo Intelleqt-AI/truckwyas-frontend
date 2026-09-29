@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Search, Moon, ChevronDown, Settings as SettingsIcon, CreditCard, LogOut } from 'lucide-react';
+import { Search, Moon, Sun, ChevronDown, Settings as SettingsIcon, CreditCard, LogOut } from 'lucide-react';
 import OverflowMenu, { type MenuItem } from '@/components/ui/OverflowMenu';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LiveEvents } from '@/components/LiveEvents';
@@ -236,7 +236,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
               type="text"
               className="tw-topsearch__input"
               aria-label="Ask Copilot"
-              placeholder="Ask about your business"
+              placeholder="Ask Copilot about your business"
               value={agentQuery}
               onChange={e => setAgentQuery(e.target.value)}
               onKeyDown={e => {
@@ -267,6 +267,11 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
             </button>
           )}
           <NotificationBell />
+          <button type="button" className="tw-icon-btn tw-top__theme" onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            title={theme === 'dark' ? 'Light theme' : 'Dark theme'}>
+            {theme === 'dark' ? <Sun size={18} strokeWidth={1.75} /> : <Moon size={18} strokeWidth={1.75} />}
+          </button>
           <div className="os-profile-anchor tw-profile">
             <OverflowMenu
               label={`Account: ${userName}`}

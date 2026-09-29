@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import {
-  House, FileText, Receipt, ChartNoAxesColumn, FileBarChart, Users, Truck, Zap, ShieldCheck,
+  House, MessageSquareText, FileText, Receipt, ChartNoAxesColumn, FileBarChart, Users, Truck, Zap, ShieldCheck,
 } from 'lucide-react';
 
 /**
@@ -36,6 +36,7 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'home',
     items: [
       { id: 'today', key: '/', label: 'Home', to: '/', match: [], icon: House },
+      { id: 'copilot', key: '/copilot', label: 'Copilot', to: '/copilot', match: ['/copilot'], icon: MessageSquareText },
     ],
   },
   {

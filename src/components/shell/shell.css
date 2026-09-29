@@ -379,6 +379,8 @@
   .tw-top__mark { display: block; height: 20px; overflow: hidden; }
   .tw-top__mark img { height: 20px; width: auto; display: block; }
   .tw-top .tw-topsearch { display: none !important; }
+  /* Phones switch theme from the More sheet and the account menu. */
+  .tw-top__theme { display: none; }
   .tw-top__ask { display: grid; }
   .tw-icon-btn, .tw-top .dashboard-notification-trigger { width: 44px; height: 44px; min-width: 44px !important; min-height: 44px !important; }
   .tw-profile { margin-left: 0; }

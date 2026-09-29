@@ -155,7 +155,9 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
       onClick={onClick}
     >
       <QuoteCardBody quote={quote} />
-      {quote.status === 'ACCEPTED' && convertedLoad && (
+      {/* Any quote with a linked booking offers it, whatever its own status
+          (legacy In-transit quotes sit in the Accepted column too). */}
+      {convertedLoad && (
         <button
           type="button"
           className="bk-btn bk-btn--secondary bk-btn--block bk-qcard__action"
@@ -804,7 +806,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           (() => {
           // Columns with nothing in them on any row step aside (R9).
           const anyOutcome = listItems.some((q: any) => q.outcome === 'accepted' || q.outcome === 'rejected');
-          const anyAction = listItems.some((q: any) => q.status === 'ACCEPTED');
+          const anyAction = listItems.some((q: any) => q.status === 'ACCEPTED' || loadByQuoteId.has(String(q.id)));
           return (
           <div className="bk-table-wrap bk-qlist-fill" style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
             <table className="table-heading-roles bk-table">
@@ -862,7 +864,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       {formatMoneyWhole(parseFloat(quote.total_amount || '0'))}
                     </td>
                     {anyAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
-                      {quote.status === 'ACCEPTED' && loadByQuoteId.has(String(quote.id)) && (
+                      {loadByQuoteId.has(String(quote.id)) && (
                         <button
                           type="button"
                           className="bk-btn bk-btn--secondary bk-btn--sm"

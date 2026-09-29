@@ -125,3 +125,11 @@
 }
 /* Touch floor: the booking link's box grows to 44px without moving the line. */
 .qd-booked .bk-link { display: inline-block; padding: 12px 0; margin: -12px 0; }
+
+/* ---- Round 12 ---- */
+/* Info tips inside the price card sit on the text line (Not itemised, margin). */
+.qd .bk-kv__label .tw-info,
+.qd-margin-na .tw-info { vertical-align: -5px; margin-left: 2px; }
+.qd-margin-na { white-space: nowrap; }
+/* Touch: the margin tip's 48px hit area clears the booking link's 44px box. */
+@media (pointer: coarse) { .qd-sub:has(.tw-info) + .qd-booked { margin-top: 20px; } }

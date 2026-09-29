@@ -1,9 +1,12 @@
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import SendPreviewDialog, { type SendPreviewRow } from '@/components/SendPreviewDialog';
 import { quoteLapsed } from '@/components/overview/today';
 
 export interface QuotePreviewData {
+  /** Saved quotes: lets an expired quote's preview lead to its edit form. */
+  id?: number | string | null;
   quote_number?: string | null;
   customer_name?: string | null;
   /** `undefined` while unknown, `null`/'' when the customer has no email on file. */
@@ -38,6 +41,7 @@ export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send 
   onCancel: () => void;
 }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const company = (user?.company_name as string | undefined) || 'TruckWys';
   const email = quote.customer_email === undefined ? undefined : (quote.customer_email ? String(quote.customer_email) : null);
   const amount = quote.total_amount == null || quote.total_amount === '' ? null : Number(quote.total_amount);
@@ -48,6 +52,12 @@ export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send 
   // allowed, but the customer's link would open on an expired offer, so the
   // preview says so right above the Send button (R11).
   const expired = quoteLapsed(quote);
+  // Expired (R12): "Edit quote" is the main button and sending steps down to
+  // "Send anyway" (same handler). A saved quote opens its edit form; the
+  // quote form itself (no id yet) just closes the preview back onto the form.
+  const editAction = expired
+    ? { label: 'Edit quote', onClick: () => { if (quote.id != null && quote.id !== '') { onCancel(); navigate(`/bookings/quotes/${quote.id}/edit`); } else onCancel(); } }
+    : undefined;
 
   const rows: SendPreviewRow[] = [
     ...(quote.quote_number ? [{ label: 'Quote', value: quote.quote_number }] : []),
@@ -73,8 +83,9 @@ export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send 
         The email links to the quote so they can accept or decline it online.
       </> : 'The email links to the quote so they can accept or decline it online.'}
       noEmailHint="No email will go out. The quote is marked as sent and you can share its link yourself."
-      noEmailConfirmLabel="Mark as sent"
-      confirmLabel={confirmLabel}
+      noEmailConfirmLabel={expired ? "Mark sent anyway" : "Mark as sent"}
+      confirmLabel={expired ? 'Send anyway' : confirmLabel}
+      preferredAction={editAction}
       sending={sending}
       onConfirm={onConfirm}
       onCancel={onCancel}

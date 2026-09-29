@@ -25,6 +25,7 @@ import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
 import { StatusMenu, type StatusOption } from '@/components/fleet-detail/StatusMenu';
 import { BlockSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { loadsQuery, mapLoadsByQuoteId } from './QuotesList';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   DRAFT: 'neutral',
@@ -348,7 +349,6 @@ export default function QuoteDetail() {
 
   // One figure system: "R 28 662,00", "55,0%", "12 000 kg", "1 234 km".
   const total = parseFloat(quote.total_amount || '0');
-  const marginText = quote.margin_percentage != null && quote.margin_percentage !== '' ? formatPercent(quote.margin_percentage, 1) : null;
   const isRound = quote.trip_type === 'ROUND_TRIP';
   // Company first; the contact name only when it is a different person.
   const company = (quote.customer_company || '').trim() || quote.customer_name || '';
@@ -394,7 +394,12 @@ export default function QuoteDetail() {
   const loadStateOnly = !booked && (quote.status === 'IT' || quote.status === 'COMPLETED');
   const needsEdit = !booked && openStatus && (lapsed || (quote.status === 'DRAFT' && !!fuelAlert?.has_alert));
   const sendLabel = quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer';
-  const headChip = (size?: 'sm') => lapsed
+  // Booked (R12): the chip follows the booking, so it can never contradict
+  // the "Booked as" line (legacy quotes still carry In transit themselves).
+  const bookingLabel = booking?.status ? statusMeta(booking.status).label : null;
+  const headChip = (size?: 'sm') => booked
+    ? <span title={`Quote ${STATUS_LABEL[quote.status] || quote.status}; booked as ${booking!.load_number || 'a load'}`}><StatusChip status={booking!.status || 'BOOKED'} label={bookingLabel ? `Booked · ${bookingLabel}` : 'Booked'} size={size} /></span>
+    : lapsed
     ? <span title={`${STATUS_LABEL[quote.status]}, past its valid-until date`}><StatusChip status="EXPIRED" label="Expired" size={size} /></span>
     : <StatusChip status={quote.status} label={STATUS_LABEL[quote.status]} size={size} />;
   const fact = (term: string, value: React.ReactNode, wide = false) => (
@@ -427,6 +432,17 @@ export default function QuoteDetail() {
     ...(isRound && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0
       ? [{ label: `Return leg (${quote.return_cargo ? 'with cargo' : 'empty'})`, value: parseFloat(quote.return_base_rate) }] : []),
   ];
+  // The lines must add up to the total (R12, as on Booking detail): a stored
+  // total that carries charges not broken down here gets its own line.
+  const linesSum = priceRows.reduce((a, r) => a + (Number.isFinite(r.value) ? r.value : 0), 0);
+  const notItemised = Math.round((total - linesSum) * 100) / 100;
+  const hasGap = Math.abs(notItemised) > 0.5;
+  // Margin only when the costs behind it are itemised: no unexplained gap and
+  // more than a bare base rate. Otherwise a stored 0 reads as "0,0% margin".
+  const costsItemised = !hasGap && priceRows.some(r => r.label !== 'Base rate' && r.value > 0);
+  const marginSet = quote.margin_percentage != null && quote.margin_percentage !== '';
+  const marginText = marginSet && costsItemised ? formatPercent(quote.margin_percentage, 1) : null;
+  const marginUnknown = !marginText && (marginSet || hasGap);
   const statusOptions: StatusOption[] = [
     { value: 'DRAFT', label: 'Draft', hint: 'Not offered to the customer yet' },
     // An expired quote can still be marked Sent (the preview warns), but the
@@ -450,12 +466,12 @@ export default function QuoteDetail() {
         // Phones (R5): the chips move to the start of the subtitle so the
         // title row holds the quote number and the one primary action.
         titleAdornment={<span className="qd-head-chips">{headChip()}
-            {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && <StatusChip status="WON" />}
+            {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && !booked && <StatusChip status="WON" />}
             {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <StatusChip status="LOST" />}</span>}
         // The subtitle reads as the job: customer, then the route (never the
         // customer's own city, which read as a destination).
         description={<><span className="qd-desc-chips">{headChip('sm')}
-            {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && <StatusChip status="WON" size="sm" />}
+            {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && !booked && <StatusChip status="WON" size="sm" />}
             {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <StatusChip status="LOST" size="sm" />}</span>{company}{routeSummary && <span className="qd-desc-route">{company ? ' · ' : ''}{routeSummary}</span>}</>}
         actions={<>
           <StatusMenu
@@ -478,7 +494,9 @@ export default function QuoteDetail() {
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate(`/bookings/quotes/${id}/edit`)} aria-label="Edit quote">
               <span className="qd-label-long" data-short="Edit">Edit quote</span>
             </button>
-          </>) : (
+          </>) : booked ? null : (
+          // Booked (R12): editing the quote would not change the booking, so a
+          // converted quote offers no Edit (nor Delete, in the tools card).
           <button type="button" className="bk-btn bk-btn--secondary qd-head-edit" onClick={() => navigate(`/bookings/quotes/${id}/edit`)}>
             Edit quote
           </button>
@@ -587,7 +605,9 @@ export default function QuoteDetail() {
             // No coordinates (older quotes): say so in the map's place, at the
             // height that keeps the two columns ending together (R6).
             <section className="bk-card qd-map qd-map--empty" aria-label="Route map" style={{ height: fill.height }}>
-              <p className="bk-help">No map for this quote: its addresses have no map position. Edit the quote and pick them on the map to add one.</p>
+              <p className="bk-help">{booked
+                ? 'No map for this quote: its addresses have no map position.'
+                : 'No map for this quote: its addresses have no map position. Edit the quote and pick them on the map to add one.'}</p>
             </section>
           )}
         </div>
@@ -599,6 +619,9 @@ export default function QuoteDetail() {
             <div className="qd-total">{formatMoney(total)}</div>
             <div className="qd-sub">
               {marginText && <span>{marginText} margin</span>}
+              {marginUnknown && (
+                <span className="qd-margin-na">— margin <InfoTip label="Why no margin">The costs behind this price aren't itemised, so its margin can't be worked out.</InfoTip></span>
+              )}
               {showWinChance && (
                 // Stored 0 to 100 already; do not multiply again.
                 <span title="Estimated chance of winning at this price">{Math.round(Number(quote.win_probability))}% chance to win</span>
@@ -631,6 +654,11 @@ export default function QuoteDetail() {
               {priceRows.map(r => (
                 <div key={r.label} className="bk-kv"><span className="bk-kv__label">{r.label}</span><span className="bk-kv__value">{formatMoney(r.value)}</span></div>
               ))}
+              {/* Normal weight: when it is a large share of the total it is the
+                  line a reader most needs to see (as on Booking detail). */}
+              {hasGap && (
+                <div className="bk-kv"><span className="bk-kv__label">Not itemised <InfoTip label="About this line">Set on the quote; its total includes charges not broken down here.</InfoTip></span><span className="bk-kv__value">{formatMoney(notItemised)}</span></div>
+              )}
             </div>
             <div className="qd-price-rows">
               {quote.valid_until && (
@@ -726,9 +754,9 @@ export default function QuoteDetail() {
           {/* Secondary tools in one quiet card (phones also get Edit here, so
               the head keeps two controls on one line). */}
           <div className="bk-card qd-tools">
-            <button type="button" className="bk-btn bk-btn--quiet qd-tools-edit" onClick={() => navigate(`/bookings/quotes/${id}/edit`)}>
+            {!booked && <button type="button" className="bk-btn bk-btn--quiet qd-tools-edit" onClick={() => navigate(`/bookings/quotes/${id}/edit`)}>
               Edit quote
-            </button>
+            </button>}
             <button
               type="button"
               onClick={() => {
@@ -751,14 +779,14 @@ export default function QuoteDetail() {
                 Send to customer
               </button>
             )}
-            <button
+            {!booked && <button
               type="button"
               className="bk-btn bk-btn--quiet-danger"
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? 'Deleting…' : 'Delete quote'}
-            </button>
+            </button>}
           </div>
         </div>
       </div>

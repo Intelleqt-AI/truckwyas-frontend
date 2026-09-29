@@ -29,6 +29,10 @@ interface SendPreviewDialogProps {
   /** Shown instead of the Send button's action when nothing can be sent. */
   noEmailHint?: ReactNode;
   sending?: boolean;
+  /** A better next step than sending (e.g. "Edit quote" on an expired quote).
+   *  When set, it is the primary button and the send button steps down to
+   *  secondary; the send handler itself is unchanged. */
+  preferredAction?: { label: string; onClick: () => void };
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -41,7 +45,7 @@ interface SendPreviewDialogProps {
  */
 export default function SendPreviewDialog({
   title, to, toName, toError, subject, rows, note, confirmLabel, noEmailConfirmLabel, noEmailHint,
-  sending = false, onConfirm, onCancel,
+  sending = false, preferredAction, onConfirm, onCancel,
 }: SendPreviewDialogProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -115,12 +119,17 @@ export default function SendPreviewDialog({
           <button type="button" className="tw-btn" onClick={onCancel} disabled={sending}>Cancel</button>
           <button
             type="button"
-            className="tw-btn tw-btn--primary"
+            className={preferredAction ? 'tw-btn' : 'tw-btn tw-btn--primary'}
             onClick={onConfirm}
             disabled={blocked || sending}
           >
             {label}
           </button>
+          {preferredAction && (
+            <button type="button" className="tw-btn tw-btn--primary" onClick={preferredAction.onClick} disabled={sending}>
+              {preferredAction.label}
+            </button>
+          )}
         </div>
       </div>
     </div>,

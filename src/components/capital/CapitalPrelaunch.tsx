@@ -55,6 +55,14 @@ const BUCKET_LABELS: Record<string, string> = {
   '61-90': '61 to 90 days late',
   '90+': 'More than 90 days late',
 };
+// Short labels for the strip (one line at 390); the full words are its title and tooltip.
+const BUCKET_SHORT: Record<string, string> = {
+  current: 'Not yet due',
+  '1-30': '1–30 days',
+  '31-60': '31–60 days',
+  '61-90': '61–90 days',
+  '90+': '90+ days',
+};
 const BUCKET_ORDER = ['current', '1-30', '31-60', '61-90', '90+'];
 
 // ---- Eligibility ----------------------------------------------------------
@@ -151,7 +159,7 @@ function WaitingCash({ aging, timing, listOpen }: { aging: Q<AgingReport>; timin
     const { total_outstanding: total, total_invoice_count: count, customer_count: customers } = data.summary;
     const buckets = BUCKET_ORDER.map((key) => {
       const b = data.buckets?.find((x) => x.bucket_name === key);
-      return { key, label: BUCKET_LABELS[key], amount: Number(b?.total_amount ?? 0), count: Number(b?.invoice_count ?? 0) };
+      return { key, label: BUCKET_SHORT[key], fullLabel: BUCKET_LABELS[key], amount: Number(b?.total_amount ?? 0), count: Number(b?.invoice_count ?? 0) };
     });
     // Basis note, only when this figure differs from the invoice list (Home, Invoices, Debtors).
     const extraCount = listOpen ? listOpen.count - Number(count) : 0;
@@ -221,7 +229,7 @@ function WaitingCash({ aging, timing, listOpen }: { aging: Q<AgingReport>; timin
               buckets={buckets}
               oldestMark
               hideEmptyLabels
-              ariaLabel={`Unpaid balance by how late it is: ${buckets.filter((b) => b.amount > 0).map((b) => `${b.label} ${formatMoneyWhole(b.amount)}`).join(', ')}`}
+              ariaLabel={`Unpaid balance by how late it is: ${buckets.filter((b) => b.amount > 0).map((b) => `${b.fullLabel} ${formatMoneyWhole(b.amount)}`).join(', ')}`}
             />
           </div>
           {customerRows.length > 0 && (

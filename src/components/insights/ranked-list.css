@@ -96,3 +96,10 @@
   .rl-label__text { white-space: normal; overflow-wrap: anywhere; }
   .rl-meta { white-space: normal; }
 }
+
+/* R7: 44px touch targets without changing the drawn size (same recipe as
+   theme.css .tw-hit): an invisible ::after grows each text control to 44x44. */
+@media (pointer: coarse) {
+  .rl-more, .rl-unranked__toggle { position: relative; }
+  .rl-more::after, .rl-unranked__toggle::after { content: ''; position: absolute; inset: min(0px, calc(50% - 22px)); }
+}

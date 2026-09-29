@@ -1179,6 +1179,39 @@ code, pre, kbd, samp, .tw-code {
   }
 }
 
+/* GLOBAL TOUCH FLOOR (R7, DESIGN-PRINCIPLES §11.6): on coarse pointers every
+   link, button, tab, menu item and segmented option gets a hit area of at
+   least 44x44 without changing its drawn size. The target is an invisible
+   absolutely positioned ::after centred on the control, so it never grows a
+   table row, a line of prose or a toolbar. Zero specificity (:where) means any
+   component rule that already uses ::after (tab width reservation, sm buttons,
+   tips) or sets its own position wins untouched.
+   Opt out: add .tw-no-hit to the control or to any ancestor (e.g. a dense
+   picker whose neighbours would steal each other's taps). Map internals
+   (Leaflet, MapLibre) are left to the map library. */
+@media (pointer: coarse) {
+  :where(a[href], button, summary, [role="button"], [role="link"], [role="tab"],
+    [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], .tw-seg__opt):where(
+    :not(.tw-no-hit, .tw-no-hit *, .leaflet-container *, .maplibregl-map *, .section-header__tab, .rdp-day, .rdp-button, input, select, textarea)) {
+    position: relative;
+  }
+  :where(a[href], button, summary, [role="button"], [role="link"], [role="tab"],
+    [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], .tw-seg__opt):where(
+    :not(.tw-no-hit, .tw-no-hit *, .leaflet-container *, .maplibregl-map *, .section-header__tab, .rdp-day, .rdp-button, input, select, textarea))::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc(50% - 22px));
+  }
+  /* A control nested in a larger one (a tip inside a clickable KPI tile, a
+     link inside a clickable card) stays above its parent's target. */
+  :where(a[href], button, [role="button"], [role="link"]) :where(a[href], button, [role="button"], [role="link"], .tw-info) { z-index: 1; }
+  /* Tabs and segmented options are also never narrower than a fingertip
+     ("All" was 39px wide, the Fleet tab 37px). Menu items are drawn 44 tall. */
+  [role="tab"], .section-header__tab, .tw-seg__opt { min-width: 44px; }
+  .tw-menu__item, .tw-rowact-menu__item,
+  [role="menu"] [role="menuitem"], [role="menu"] [role="menuitemcheckbox"], [role="menu"] [role="menuitemradio"] { min-height: 44px !important; }
+}
+
 /* ===========================================================================
    V3 PRIMITIVES (docs/brand/DESIGN-PRINCIPLES.md §3, §4, §9)
    Shared building blocks for every page. Pages compose these instead of
@@ -1453,8 +1486,18 @@ code, pre, kbd, samp, .tw-code {
 .tw-kpi-stats__label { display: flex; align-items: center; gap: 6px; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; }
 .tw-kpi-stats__figure { margin: 0; font: 600 20px/28px var(--font-sans); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; }
 .tw-kpi-stats__note { margin: 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+/* One or two figures (R7): the card sizes to its stats, each stat to its
+   content, so there is no empty tail. Phones: full width, two-up (below). */
+.tw-kpi-stats--fit { width: fit-content; max-width: 100%; box-sizing: border-box; }
+.tw-kpi-stats--fit .tw-kpi-stats__list { flex-wrap: nowrap; }
+.tw-kpi-stats--fit .tw-kpi-stats__item { flex: 0 1 auto; min-width: 0; padding: 0 40px; }
+.tw-kpi-stats--fit .tw-kpi-stats__item:first-child { padding-left: 0; }
+.tw-kpi-stats--fit .tw-kpi-stats__item:last-child { padding-right: 8px; }
 @media (max-width: 767px) {
-  .tw-kpi-stats__item { flex: 1 1 calc(50% - 1px); min-width: 0; }
+  .tw-kpi-stats--fit { width: auto; }
+  .tw-kpi-stats--fit .tw-kpi-stats__list { flex-wrap: wrap; }
+  .tw-kpi-stats__item, .tw-kpi-stats--fit .tw-kpi-stats__item { flex: 1 1 calc(50% - 1px); min-width: 0; }
+  .tw-kpi-stats--fit .tw-kpi-stats__item, .tw-kpi-stats--fit .tw-kpi-stats__item:last-child { padding: 0 var(--card-pad); }
   .tw-kpi-stats__item:nth-child(odd) { padding-left: 0; border-left: 0; }
   .tw-kpi-stats__item:nth-child(even) { padding-right: 0; }
 }

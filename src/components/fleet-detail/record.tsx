@@ -111,6 +111,7 @@ export const daysSince = (iso?: string | null) => { const d = daysUntil(iso); re
    rule (src/lib/staleWork.ts) and one per-km basis (src/lib/revenuePerKm.ts),
    so the Vehicles list, these pages, Orders, Home and Findings agree. */
 export { STALE_AFTER_DAYS, staleWork, staleLabel, staleAction } from '@/lib/staleWork';
+import { staleLabel, staleAction, type Stale } from '@/lib/staleWork';
 
 /** The fleet's revenue per km over the last 12 months (the shared basis), with its window. */
 export function fleetPerKm(allLoads: any[] | null | undefined, now = new Date()): FleetKm | null {
@@ -141,6 +142,25 @@ export function NowLine({ children, flag, action, dot }: { children: ReactNode; 
     </section>
   );
 }
+
+/**
+ * The Now line for an order left open (R7): one short fact, e.g. "Order to
+ * Durban left open since 2 Jan 2026 (270 days)". The order's own page holds
+ * the step (start, reassign, mark delivered or cancel), named on the button.
+ */
+export function staleSentence(load: any, stale: Stale): ReactNode {
+  const to = load?.delivery_city || load?.delivery_location;
+  return <>Order{to ? <> to {to}</> : null} left open <span className="fd-nowrap">{staleLabel(stale).text}</span></>;
+}
+
+/** The one action on a stale Now line: open the order, where it can be closed. */
+export const StaleOrderButton = ({ load }: { load: any }) => {
+  const step = staleAction(load);
+  const ref = load?.load_number || 'the order';
+  return (
+    <Link className="fd-ghost" to={`/bookings/${load.id}`} title={`${step} on ${ref}`} aria-label={`Open order ${ref}: ${step.toLowerCase()}`}>Open order</Link>
+  );
+};
 
 /** A load reference that opens the booking. */
 export const LoadLink = ({ load }: { load: any }) => (
@@ -254,7 +274,11 @@ export function perfFigures(perf: Perf, opts: { revenueLabel: string; thin: bool
     const diff = perf.perKm - f;
     kmNote = Math.abs(diff) / f < 0.03
       ? `In line with the fleet's ${randCents(f)} over ${opts.fleetKm.window}`
-      : `${randCents(Math.abs(diff))} ${diff < 0 ? 'below' : 'above'} the fleet's ${randCents(f)} over ${opts.fleetKm.window}`;
+      : <>
+        {/* Narrow cards keep it to two lines (R7): the fleet's figure moves to the tip, the window stays. */}
+        <span className="fd-perf__wide">{randCents(Math.abs(diff))} {diff < 0 ? 'below' : 'above'} the fleet's {randCents(f)} over {opts.fleetKm.window}</span>
+        <span className="fd-perf__narrow" title={`Fleet ${randCents(f)} per km over ${opts.fleetKm.window}`}>{randCents(Math.abs(diff))} {diff < 0 ? 'below' : 'above'} the fleet ({opts.fleetKm.window})</span>
+      </>;
   }
   figs.push({ label: 'Revenue per km', value: perf.perKm !== null ? randCents(perf.perKm) : null, note: kmNote });
   if (!opts.thin) figs.push({ label: 'Days on a job', value: formatNumber(perf.days), note: 'Pickup to delivery' });

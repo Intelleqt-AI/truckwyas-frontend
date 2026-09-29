@@ -11,7 +11,7 @@
 
 import { formatMoney, formatMoneyWhole, formatPercent } from '@/lib/formatters';
 import { saDateISO, saDaysBetween } from '@/lib/dates';
-import { STALE_AFTER_DAYS, staleLabel, staleLoads, staleWork } from '@/lib/staleWork';
+import { STALE_AFTER_DAYS, staleAction, staleLabel, staleLoads, staleWork } from '@/lib/staleWork';
 import { fetchData } from '@/lib/Api';
 import { resolvePeriod, periodText, type Ledger } from '@/components/reports/data';
 import { marginFromLedger } from './margin-ledger';
@@ -92,7 +92,7 @@ export interface FindingInputs {
 }
 
 export type Severity = 'high' | 'medium' | 'low';
-export type Category = 'Get paid' | 'Know your margin' | 'Quote better' | 'Bill your work' | 'Cash ahead';
+export type Category = 'Get paid' | 'Know your margin' | 'Quote better' | 'Bill your work' | 'Clear old orders' | 'Cash ahead';
 
 export interface EvidenceRow {
   id: string;
@@ -107,7 +107,7 @@ export interface EvidenceRow {
 
 export interface Finding {
   id: string;
-  kind: 'never_sent' | 'stopped_paying' | 'never_chased' | 'short_paid' | 'no_pod' | 'pending_costs' | 'diesel' | 'open_loads' | 'expired_quotes' | 'cash_shortfall';
+  kind: 'never_sent' | 'stopped_paying' | 'never_chased' | 'short_paid' | 'no_pod' | 'pending_costs' | 'diesel' | 'open_loads' | 'pending_loads' | 'expired_quotes' | 'cash_shortfall';
   category: Category;
   severity: Severity;
   confidence: 'high' | 'medium' | 'low';
@@ -419,33 +419,59 @@ export function computeFindings(input: FindingInputs, now = new Date()): Finding
   // 8. Loads never closed (R6: the one stale-work rule, src/lib/staleWork.ts) --
   // The same loads Orders, Home and the fleet pages flag: open (Pending,
   // Assigned, Loading, In transit) and past the delivery date or open more
-  // than 30 days. The count is every such load, so it matches Home.
+  // than 30 days. Together the two cards below count every such load, so they
+  // match Home. R7: only loads that already have a vehicle (Assigned, Loading,
+  // In transit) can still be delivered and invoiced, so only they are "cash
+  // held up". A Pending load was never picked up: it can only be assigned or
+  // cancelled, so it gets its own card with that action and no cash value.
   if (input.loads) {
     const stale = staleLoads(input.loads.rows, today);
-    const total = stale.reduce((s, l) => s + num(l.total_amount), 0);
-    if (stale.length && total >= THRESHOLD) {
+    const isPending = (l: LoadRec) => (l.status || '').toUpperCase() === 'PENDING';
+    const billable = stale.filter(l => !isPending(l));
+    const pending = stale.filter(isPending);
+    const evidenceOf = (rows: LoadRec[]) => rows.map(l => {
+      const st = staleWork(l, today)!;
+      return {
+        id: `load-${l.id}`, ref: l.load_number, label: l.customer_name,
+        note: st.overdue ? `due ${st.since}, ${st.days} days ago` : `open since ${st.since} (${st.days} days)`, amount: num(l.total_amount), href: `/bookings/${l.id}`,
+      };
+    });
+    const total = billable.reduce((s, l) => s + num(l.total_amount), 0);
+    if (billable.length && total >= THRESHOLD) {
       const by = new Map<string, number>();
-      stale.forEach(l => { const k = (l.status || '').toUpperCase(); by.set(k, (by.get(k) || 0) + 1); });
-      const words: Record<string, string> = { IN_TRANSIT: 'in transit', LOADING: 'loading', ASSIGNED: 'assigned', PENDING: 'pending' };
-      const mix = ['IN_TRANSIT', 'LOADING', 'ASSIGNED', 'PENDING'].filter(k => by.get(k)).map(k => `${by.get(k)} ${words[k]}`).join(', ');
-      const oldest = staleLabel(staleWork(stale[0], today)!);
+      billable.forEach(l => { const k = (l.status || '').toUpperCase(); by.set(k, (by.get(k) || 0) + 1); });
+      const words: Record<string, string> = { IN_TRANSIT: 'in transit', LOADING: 'loading', ASSIGNED: 'assigned' };
+      const mix = ['IN_TRANSIT', 'LOADING', 'ASSIGNED'].filter(k => by.get(k)).map(k => `${by.get(k)} ${words[k]}`).join(', ');
+      const oldest = staleLabel(staleWork(billable[0], today)!);
       out.push({
         id: 'open_loads', kind: 'open_loads', category: 'Bill your work', basis: 'Measured', confidence: 'medium',
         severity: 'medium',
         amount: total,
         headline: 'Loads never closed',
-        line: `${plural(stale.length, 'load')} still open (${mix}); the oldest ${oldest.text}.`,
+        line: `${plural(billable.length, 'load')} left open (${mix}); the oldest ${oldest.text}.`,
         action: { label: 'Close and invoice loads', href: '/bookings/orders' },
-        method: `Open loads (Pending, Assigned, Loading or In transit) past their delivery date, or open more than ${STALE_AFTER_DAYS} days: the same rule as Orders, Home and the fleet pages. If they were delivered, mark them delivered and invoice them; if not, cancel them. Value is the load total, excluding VAT.` + (input.loads.complete ? '' : ' Not every load could be loaded.'),
-        evidence: stale.map(l => {
-          const st = staleWork(l, today)!;
-          return {
-            id: `load-${l.id}`, ref: l.load_number, label: l.customer_name,
-            note: st.overdue ? `due ${st.since}, ${st.days} days ago` : `open since ${st.since} (${st.days} days)`, amount: num(l.total_amount), href: `/bookings/${l.id}`,
-          };
-        }),
+        method: `Loads with a vehicle (Assigned, Loading or In transit) past their delivery date, or open more than ${STALE_AFTER_DAYS} days: the same rule as Orders, Home and the fleet pages. If they were delivered, mark them delivered and invoice them; if not, cancel them. Value is the load total, excluding VAT. Pending loads were never picked up, so they are not counted here.` + (input.loads.complete ? '' : ' Not every load could be loaded.'),
+        evidence: evidenceOf(billable),
         evidenceNoun: ['load', 'loads'],
-        invoiceIds: [], loadIds: stale.map(l => l.id), cash: true,
+        invoiceIds: [], loadIds: billable.map(l => l.id), cash: true,
+      });
+    }
+    const pendingTotal = pending.reduce((s, l) => s + num(l.total_amount), 0);
+    if (pending.length && pendingTotal >= THRESHOLD) {
+      const oldest = staleLabel(staleWork(pending[0], today)!);
+      // "Assign a vehicle or cancel it" (staleAction), said of every load in the card.
+      const act = staleAction(pending[0]).replace(/ it$/, pending.length === 1 ? ' it' : ' them');
+      out.push({
+        id: 'pending_loads', kind: 'pending_loads', category: 'Clear old orders', basis: 'Measured', confidence: 'medium',
+        severity: 'low',
+        amount: pendingTotal,
+        headline: pending.length === 1 ? 'Order never picked up' : 'Orders never picked up',
+        line: `${plural(pending.length, 'pending load')} past ${pending.length === 1 ? 'its dates' : 'their dates'}; the oldest ${oldest.text}.`,
+        action: { label: act, href: '/bookings/orders' },
+        method: `Pending loads (no vehicle yet) past their delivery date, or open more than ${STALE_AFTER_DAYS} days: the same rule as Orders, Home and the fleet pages. They were never picked up, so there is nothing to invoice: assign a vehicle or cancel each one. Value is the order total, excluding VAT. Not money owed, so it is not counted in cash held up.` + (input.loads.complete ? '' : ' Not every load could be loaded.'),
+        evidence: evidenceOf(pending),
+        evidenceNoun: ['load', 'loads'],
+        invoiceIds: [], loadIds: [], cash: false,
       });
     }
   }

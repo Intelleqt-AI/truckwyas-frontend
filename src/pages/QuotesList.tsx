@@ -109,7 +109,7 @@ function QuoteCardBody({ quote }: { quote: any }) {
       <div className="bk-qcard__customer" title={quote.customer_name || ''}>{quote.customer_name || '—'}</div>
       <div className="bk-qcard__route" title={routeOf(quote)}>{routeOf(quote)}</div>
       <div className="bk-qcard__foot">
-        <span className="bk-qcard__amount">{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
+        <span className="bk-qcard__amount" title={formatCurrency(parseFloat(quote.total_amount || '0'))}>{formatMoneyWhole(parseFloat(quote.total_amount || '0'))}</span>
         {/* Only a low price confidence is worth a word on the card; otherwise the date it was made. */}
         {String(quote.confidence).toUpperCase() === 'LOW'
           ? <span className="bk-qcard__meta">Low confidence</span>
@@ -263,11 +263,32 @@ interface QuotesListProps {
  * there are more than four options, a compact select (R4 phone rule). Both
  * stay mounted and CSS picks one, so nothing shifts when the width changes.
  */
-export function StatusFilter<V extends string>({ label, value, onChange, options, className }: {
+/** Record numbers like "LOAD-20260310-1004": on narrow rows the prefix and
+ *  year are the same on every row, so the phone shows the distinguishing
+ *  tail ("…0310-1004"), never a cut-off prefix (R7). Full number in the
+ *  title and for screen readers. */
+export const idTail = (n?: string | null) => {
+  const v = String(n || '');
+  const m = v.match(/^[A-Z]+-\d{4}(\d{4}-\d+)$/);
+  return m ? `…${m[1]}` : v;
+};
+export function RecordNo({ value }: { value?: string | null }) {
+  const v = String(value || '');
+  return (
+    <span className="bk-phone-sub" title={v}>
+      <span className="bk-id-long">{v}</span>
+      <span className="bk-id-short">{idTail(v)}</span>
+    </span>
+  );
+}
+
+export function StatusFilter<V extends string>({ label, value, onChange, options, className, compactOnPhone }: {
   label: string; value: V; onChange: (v: V) => void;
   options: { value: V; label: string; count?: number }[]; className?: string;
+  /** Use the phone select even with four options, so the count fits beside it. */
+  compactOnPhone?: boolean;
 }) {
-  const compact = options.length > 4;
+  const compact = compactOnPhone || options.length > 4;
   const current = options.find(o => o.value === value) ?? options[0];
   const text = (o: { label: string; count?: number }) => (o.count != null ? `${o.label} (${o.count})` : o.label);
   return (
@@ -742,7 +763,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                     <td className="is-primary bk-col-customer" title={quote.customer_name || ''}>
                       {quote.customer_name || '—'}
                       {/* Phones: the quote number rides under the customer (its column folds away). */}
-                      <span className="bk-phone-sub" title={quote.quote_number}>{quote.quote_number}</span>
+                      <RecordNo value={quote.quote_number} />
                     </td>
                     <td className="is-truncate bk-col-route" title={routeOf(quote)}>{routeOf(quote)}</td>
                     <td>
@@ -762,8 +783,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                     <td className="is-date bk-col-phone">
                       {quote.created_at ? formatDate(quote.created_at) : '—'}
                     </td>
-                    <td className="is-money">
-                      {formatCurrency(parseFloat(quote.total_amount || '0'))}
+                    <td className="is-money" title={formatCurrency(parseFloat(quote.total_amount || '0'))}>
+                      {/* Lists show whole rands; the quote itself carries the cents (R7). */}
+                      {formatMoneyWhole(parseFloat(quote.total_amount || '0'))}
                     </td>
                     <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
                       {quote.status === 'ACCEPTED' && loadByQuoteId.has(String(quote.id)) && (

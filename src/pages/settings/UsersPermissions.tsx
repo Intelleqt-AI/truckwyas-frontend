@@ -327,7 +327,7 @@ export function UsersPermissions() {
           // Real head plus placeholder rows at the final row height (65px, avatar
           // and two lines), so the cards below do not move when users arrive.
           <table className="table-heading-roles settings-table" aria-busy="true" aria-label="Loading team members">
-            <thead><tr>{['User', 'Role', 'Status', 'Last active', ''].map(h => <th key={h || 'a'} scope="col" className={h === 'Role' || h === 'Last active' ? 'st-col-phone' : undefined}>{h}</th>)}</tr></thead>
+            <thead><tr>{['User', 'Role', 'Status', 'Last active', ''].map(h => <th key={h || 'a'} scope="col" className={h === 'Role' || h === 'Last active' || h === 'Status' ? 'st-col-phone' : undefined}>{h}</th>)}</tr></thead>
             <tbody>
               {Array.from({ length: 12 }, (_, i) => (
                 <tr key={i} aria-hidden="true" style={{ borderBottom: '1px solid var(--border-row)', height: 65 }}>
@@ -346,7 +346,7 @@ export function UsersPermissions() {
             <thead>
               <tr>
                 {['User', 'Role', 'Status', 'Last active', ''].map(h => (
-                  <th key={h || 'actions'} scope="col" className={h === 'Role' || h === 'Last active' ? 'st-col-phone' : undefined} style={{ textAlign: (h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
+                  <th key={h || 'actions'} scope="col" className={h === 'Role' || h === 'Last active' || h === 'Status' ? 'st-col-phone' : undefined} style={{ textAlign: (h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
@@ -374,8 +374,14 @@ export function UsersPermissions() {
                       </div>
                     )}
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{u.name}</div>
-                      <div className="st-email" title={u.email} style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{/* A break opportunity before "@", so a wrapped email splits there, not mid-word. */}{String(u.email || '').split('@')[0]}{String(u.email || '').includes('@') && <><wbr />@{String(u.email).split('@').slice(1).join('@')}</>}</div>
+                      <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
+                        {u.name}
+                        {/* Phones (R7): Role and Status fold away, so the role (and any
+                            status other than Active) rides beside the name and the
+                            email keeps a whole line. */}
+                        <span className="st-phone-inline"> · {[roleDisplay(u.role), String(u.status).toUpperCase() === 'ACTIVE' ? '' : statusDisplay(u.status)].filter(Boolean).join(' · ')}</span>
+                      </div>
+                      <div className="st-email" title={u.email} style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{u.email}</div>
                     </div>
                   </div>
                 </td>
@@ -385,7 +391,7 @@ export function UsersPermissions() {
                     <span style={{ display: 'block', fontSize: 12, lineHeight: '16px', color: 'var(--text-tertiary)' }}>Also a driver</span>
                   )}
                 </td>
-                <td>
+                <td className="st-col-phone">
                   <StatusChip status={u.status} label={statusDisplay(u.status)} size="sm" />
                 </td>
                 <td className="st-col-phone" style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>

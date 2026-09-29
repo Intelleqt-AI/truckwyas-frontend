@@ -5,7 +5,7 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { useStickyRail } from "@/components/fleet-detail/useStickyRail";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { useState, useRef, useCallback } from "react";
-import { Upload, X } from "lucide-react";
+import { FileSearch, Upload, X } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, postData, patchData } from "@/lib/Api";
@@ -117,6 +117,15 @@ export default function Bookings() {
     queryFn: () => fetchData(`api/v1/vehicles/${load.vehicle}/`),
     enabled: !!load?.vehicle,
   });
+  // The driver's own status: an inactive driver still on this order is said
+  // once, on the Driver row (R7).
+  const { data: driverDetail } = useQuery({
+    queryKey: ['driver', String(load?.driver ?? '')],
+    queryFn: () => fetchData(`api/v1/drivers/${load.driver}/`),
+    enabled: !!load?.driver,
+    retry: false,
+  });
+  const driverInactive = !!load?.driver && driverDetail?.status === 'INACTIVE';
   const [syncingLocation, setSyncingLocation] = useState(false);
   const handleSyncLocation = async () => {
     setSyncingLocation(true);
@@ -312,7 +321,7 @@ export default function Bookings() {
   if (loadFailedNow && loadError?.status !== 404) return (
     <div className="bk-detail bookings-typography">
       <SectionHeader title="Order" back={{ to: '/bookings/orders', label: 'Orders' }} />
-      <LoadError what="this load" error={loadError} busy={loadQuery.isFetching} onRetry={() => loadQuery.refetch()} />
+      <LoadError what="this order" error={loadError} busy={loadQuery.isFetching} onRetry={() => loadQuery.refetch()} />
     </div>
   );
 
@@ -329,14 +338,17 @@ export default function Bookings() {
     </div>
   );
 
+  // Not found (404): head and back link stay; message and action share a row.
   if (!load) return (
     <div className="bk-detail bookings-typography">
       <SectionHeader title="Order not found" back={{ to: '/bookings/orders', label: 'Orders' }} />
-      <div className="bk-card">
-        <div className="bk-empty" style={{ padding: 16 }}>
-          <p className="bk-empty__text">This order may have been removed, or the link is out of date.</p>
-          <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate('/bookings/orders')}>View orders</button>
+      <div className="load-error bk-missing" role="status">
+        <FileSearch className="load-error__icon" size={20} aria-hidden="true" />
+        <div className="load-error__text">
+          <p className="load-error__title">There is no order at this link</p>
+          <p className="load-error__hint">It may have been removed, or the link is wrong.</p>
         </div>
+        <button type="button" className="tw-btn load-error__retry" onClick={() => navigate('/bookings/orders')}>All orders</button>
       </div>
     </div>
   );
@@ -430,11 +442,14 @@ export default function Bookings() {
         // The shared action words (staleAction), plus where on this page to
         // do it. Loading cannot go straight to Delivered here, so it says
         // "in transit" instead.
+        // Phones: Change status lives in the title row's ⋯ menu, so the
+        // line says where to find it (R7).
+        const viaStatus = <>Change status<span className="bk-phone-note"> in the ⋯ menu</span></>;
         const staleAct = load.status === 'LOADING'
-          ? 'Mark it in transit or cancel it via Change status'
+          ? <>Mark it in transit or cancel it via {viaStatus}</>
           : ['PENDING', 'ASSIGNED'].includes(load.status) && !billingBlocked
-            ? `${staleAction(load)} with Edit or Change status`
-            : `${staleAction(load)} via Change status`;
+            ? <>{staleAction(load)} with Edit or {viaStatus}</>
+            : <>{staleAction(load)} via {viaStatus}</>;
         return (
           <section className="bk-card bk-progress" aria-label="Order progress">
           {/* One grid column per step: the dot sits at the column centre and
@@ -534,7 +549,9 @@ export default function Bookings() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
               <p className="bk-help">
                 {!load.vehicle
-                  ? 'Live position shows once a vehicle is assigned.'
+                  ? assignmentLocked
+                    ? 'No vehicle on this order, so there is no live position.'
+                    : 'Live position shows once a vehicle is assigned.'
                   : !vehicleDetail?.ctrlfleet_vehicle_code
                     ? 'The assigned vehicle is not linked to CtrlFleet, so there is no live tracking.'
                     : vehicleDetail?.last_location_at
@@ -615,14 +632,14 @@ export default function Bookings() {
                 <p className="bk-help">
                   {load.status === 'LOADING'
                     ? 'To add the vehicle, move it back to Assigned via Change status; that asks for one.'
-                    : "The vehicle can't be changed once a load is in transit. Mark it delivered or cancel it via Change status."}
+                    : `The vehicle can't be changed once a load is in transit.${staleWork(load) ? '' : ' Mark it delivered or cancel it via Change status.'}`}
                 </p>
               </div>
             )}
             {!editingAssignment || assignmentLocked ? (
               [
                 { label: 'Vehicle', value: load.vehicle_info || 'Not assigned', node: vehicleValue(load.vehicle_info) },
-                { label: 'Driver', value: load.driver_name || 'Not assigned' },
+                { label: 'Driver', value: load.driver_name || 'Not assigned', node: load.driver_name && driverInactive ? <>{load.driver_name} <span className="bk-muted">· marked inactive</span></> : undefined },
               ].map((r: { label: string; value: string; node?: React.ReactNode }) => (
                 <div key={r.label} className="bk-kv">
                   <span className="bk-kv__label">{r.label}</span>

@@ -6,7 +6,7 @@ import StaleDataNotice from '@/components/data/StaleDataNotice';
 import './table-heading-roles.css';
 import { Plus, Truck as EmptyFleetIcon } from 'lucide-react';
 import { useEffect, useState, useRef, type ReactNode } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { fleetMenuItems, useFleetPhoneHead } from '@/components/fleet-detail/fleetHead';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData, patchData, deleteData } from '../lib/Api';
@@ -236,7 +236,11 @@ export default function Vehicles() {
   // Shared public demo account — creation/edit/delete controls are fixed off,
   // viewing/filtering/search stay fully live.
   const isDemo = !!authUser?.is_demo;
-  const [tileFilter, setTileFilter] = useState<FilterKey | null>(null);
+  // ?tile=job|free|shop opens the list already filtered (Home's "vehicles idle" link).
+  const [tileFilter, setTileFilter] = useState<FilterKey | null>(() => {
+    const t = new URLSearchParams(window.location.search).get('tile');
+    return t === 'job' || t === 'free' || t === 'shop' ? t : null;
+  });
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -324,8 +328,10 @@ export default function Vehicles() {
     );
   };
 
-  const getStatusBadge = (status: string) => (
-    <StatusChip status={status} size="sm" />
+  // One amber mark per row (R7): a truck with an order left open carries the
+  // amber stale dot, so its status chip reads neutral beside it.
+  const getStatusBadge = (v: Vehicle) => (
+    <StatusChip status={v.status} size="sm" tone={staleWork(activeLoadByVehicle[v.id]) ? 'neutral' : undefined} />
   );
 
   // Summary figures: only what changes a decision today.
@@ -354,7 +360,10 @@ export default function Vehicles() {
       // dot, two lines; the order and its actions are on the truck's page.
       return <>
         <span className="fleet-doing--stale"><i className="fleet-doing__dot" aria-hidden="true" />{driver ? `${driver} · ` : ''}order left open</span>
-        <span className="fleet-table__sub" title={l.load_number || undefined}>{staleLabel(stale).text}</span>
+        <span className="fleet-table__sub fleet-stale-sub">
+          {staleLabel(stale).text}{' · '}
+          <Link className="fleet-stale-link" to={`/bookings/${l.id}`} onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()} aria-label={`Open order ${l.load_number || ''}`.trim()}>Open order</Link>
+        </span>
       </>;
     }
     if (l) {
@@ -598,7 +607,14 @@ export default function Vehicles() {
                     {lastSeen}
                     {renewal(v)}
                     {/* Phone: the Status column steps aside so Revenue stays in view; the chip rides here. */}
-                    <span className="fleet-table__sub fleet-only-narrow">{getStatusBadge(v.status)}</span>
+                    <span className="fleet-table__sub fleet-only-narrow">
+                      {getStatusBadge(v)}
+                      {staleWork(activeLoadByVehicle[v.id]) && (
+                        <Link className="fleet-stale-narrow fleet-stale-link" to={`/bookings/${activeLoadByVehicle[v.id].id}`} onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()} aria-label={`Order left open: open ${activeLoadByVehicle[v.id].load_number || 'the order'}`}>
+                          <i className="fleet-doing__dot" aria-hidden="true" />Left open
+                        </Link>
+                      )}
+                    </span>
                   </td>
                   <td className="is-primary fleet-col-truck fleet-col-phone" title={[vehicleName, v.vehicle_type_name, tonnes ? formatWeight(tonnes) : ''].filter(Boolean).join(', ')}>
                     {vehicleName || 'Not recorded'}
@@ -609,7 +625,7 @@ export default function Vehicles() {
                     )}
                   </td>
                   <td className="fleet-col-opt fleet-col-doing">{doingNow(v)}</td>
-                  <td className="fleet-col-status">{getStatusBadge(v.status)}</td>
+                  <td className="fleet-col-status">{getStatusBadge(v)}</td>
                   <td className="is-numeric" style={{ color: done?.revenue ? 'var(--text-primary)' : undefined }}>
                     {done?.revenue ? <>
                       {formatZAR(done.revenue)}

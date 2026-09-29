@@ -10,14 +10,12 @@ import { MobileAuthLayout } from "@/components/MobileAuthLayout";
 // Same list Signup.tsx and BillingSettings.tsx show — kept identical across
 // every page that mentions the plan, so returning users see the same promise
 // new signups do.
-const PLAN_FEATURES = [
-  "Unlimited loads and invoices",
+// R7: the sign-in page reminds, it doesn't sell. Three proof points, each
+// one line, each something the product does today (no pricing checklist).
+const PROOF_POINTS = [
   "Quotes priced from your own costs",
-  "Reports and insights",
-  "Fleet and driver records",
-  "Multi-user access",
-  "API and integrations",
-  "Priority support",
+  "Delivered loads invoice themselves",
+  "See who owes you, and for how long",
 ];
 
 const Login = () => {
@@ -175,7 +173,7 @@ const Login = () => {
         </div>
 
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div className="tw-auth-labelrow" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <label htmlFor="password" style={{ ...labelStyle, marginBottom: 0 }}>Password</label>
             <Link
               to="/password-reset"
@@ -298,21 +296,20 @@ const Login = () => {
   // title/subtitle (those become MobileAuthLayout's own header props on
   // mobile) — demoted to a footer below the form there, since none of it
   // blocks completing the form above it.
+  const proofList = (
+    <ul className="tw-auth-proof">
+      {PROOF_POINTS.map(f => (
+        <li key={f}>
+          <Check size={16} strokeWidth={2} aria-hidden="true" />
+          {f}
+        </li>
+      ))}
+    </ul>
+  );
   const extraContent = (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px 16px' }}>
-        {PLAN_FEATURES.map(f => (
-          <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-            <Check size={16} aria-hidden="true" style={{ color: 'var(--text-primary)', flexShrink: 0, marginTop: 2 }} />
-            {f}
-          </div>
-        ))}
-      </div>
-
-
-      <div style={{ marginTop: 16, fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)' }}>
-        Built for South African road freight
-      </div>
+      {proofList}
+      <div className="tw-auth-foot">Built for South African road freight</div>
     </>
   );
 
@@ -330,54 +327,24 @@ const Login = () => {
   }
 
   return (
-    <div className="login-split">
-      <style>{`
-        .login-split {
-          /* html/body/#root are pinned to height:100vh + overflow:hidden
-             app-wide (the dashboard shell scrolls internally instead) — this
-             page needs to be its own scroll container or content can end up
-             clipped with no way to reach it (see Signup.tsx for the same fix). */
-          height: 100vh;
-          overflow-y: auto;
-          display: flex;
-          background: var(--bg-deep);
-        }
-        .login-split__content, .login-split__form {
-          flex: 1 1 50%;
-          min-width: 0;
-          padding: 48px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-        }
-        .login-split__form { align-items: center; }
-      `}</style>
-
-      {/* Content side — a reminder of what's waiting, not a sales pitch */}
-      <div className="login-split__content" style={{
-        position: 'relative', overflow: 'hidden',
-        background: 'var(--bg-deep)',
-        borderRight: '1px solid var(--border-subtle)',
-      }}>
-        <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
-          <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
-
-          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)', marginBottom: 10 }}>
-            Welcome back
-          </div>
-          <p style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '34px', margin: '0 0 16px', letterSpacing: 'normal' }}>
-            Your fleet, right where <span style={{ color: 'var(--text-tertiary)' }}>you left it</span>.
+    <div className="login-split tw-auth-split">
+      {/* Brand side: a calm reminder of what's waiting, not a sales pitch.
+          Its own surface (white in light, the card surface in dark), and its
+          logo line starts at the same y as the form card (tw-auth-split). */}
+      <div className="tw-auth-split__brand">
+        <div className="tw-auth-split__inner">
+          <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ height: 32, width: 'auto', display: 'block' }} />
+          <div className="tw-auth-eyebrow">Welcome back</div>
+          <p className="tw-auth-headline">
+            Your fleet,<br />right where <span>you left it</span>.
           </p>
-          <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: '22px', marginBottom: 32 }}>
-            Loads, quotes, invoices and your fleet, in one place.
-          </div>
-
+          <p className="tw-auth-lede">Loads, quotes, invoices and your fleet, in one place.</p>
           {extraContent}
         </div>
       </div>
 
       {/* Form side */}
-      <div className="login-split__form">
+      <div className="tw-auth-split__form">
         {formCard}
       </div>
     </div>

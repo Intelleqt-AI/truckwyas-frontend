@@ -5,19 +5,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, patchData } from '@/lib/Api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  DetailMessage, DetailSkeleton, InfoTip, Panel, RecordHeader, StatusChip, StatusControl,
+  DetailSkeleton, RecordState, randCents, InfoTip, Panel, RecordHeader, StatusChip, StatusControl,
   capacityTonnes, dateText, formatStatus, isNotFound, kmText, num, plural, randWhole,
 } from '@/components/fleet-detail/parts';
 import {
   ComplianceCard, ConditionCard, FactsCard, LinkCard, LoadLink, NowLine, PerformanceCard,
-  daysSince, fleetPerKm, isDelivered, isOpenLoad, latest, perfFigures, perfLine, performance, dateToDo, staleWork, staleAction, staleLabel, type ToDo,
+  daysSince, fleetPerKm, isDelivered, isOpenLoad, latest, perfFigures, perfLine, performance, dateToDo, staleWork, staleSentence, StaleOrderButton, type ToDo,
 } from '@/components/fleet-detail/record';
 import { useBalancedColumns } from '@/components/fleet-detail/useBalancedColumns';
 import { formatNumber, formatPercent, formatWeight, sentenceCaseLabel } from '@/lib/formatters';
 import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
 import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
 import { useLedger } from '@/components/reports/data';
-import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { loadFailed } from '@/components/data/LoadError';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import { Link } from 'react-router-dom';
 
@@ -69,9 +69,10 @@ export default function VehicleFinancialProfile() {
   // load, for the fleet's revenue per km (the comparison).
   const ledger = useLedger(['expenses', 'loads']);
 
-  // Condition may move into the rail, or the driver and facts into the main column,
-  // so the two columns end within 48px of each other (R5).
-  const bal = useBalancedColumns({ toMain: ['driver', 'facts'], toSide: ['condition'] }, `${id}-${isLoading}-${loadsLoading}-${ledger.loading}`);
+  // The driver and facts may drop into the main column so the two columns end
+  // within 48px of each other (R5). Condition always stays in the rail, so it
+  // has one layout on every truck (R7).
+  const bal = useBalancedColumns({ toMain: ['driver', 'facts'] }, `${id}-${isLoading}-${loadsLoading}-${ledger.loading}`);
   const sideRef = useCallback((n: HTMLElement | null) => { railRef(n); bal.sideRef.current = n; }, [railRef, bal.sideRef]);
 
   const { data: vtData } = useQuery({
@@ -92,24 +93,17 @@ export default function VehicleFinancialProfile() {
     return { id: d.id, name: fn && ln ? `${fn} ${ln}` : fn || ln || `Driver ${d.id}` };
   });
 
+  // Error states keep the head ("Vehicle") and the breadcrumb (R7): a 404 says
+  // the truck is not there; anything else is a load error with Retry.
+  const stateProps = { type: 'Vehicle', crumb: 'Vehicles', crumbTo: '/fleet/vehicles', what: 'this vehicle',
+    missingTitle: 'There is no vehicle at this link', missingHint: 'It may have been removed, or the link is out of date.', backLabel: 'All vehicles' };
   if (isError && !isNotFound(loadError)) return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <div>
-        <button type="button" className="tw-btn tw-btn--ghost" onClick={() => navigate('/fleet/vehicles')}>Back to vehicles</button>
-      </div>
-      <LoadError what="this vehicle" error={loadError} busy={vehicleQuery.isFetching} onRetry={() => refetch()} />
-    </div>
+    <RecordState kind="error" {...stateProps} error={loadError} busy={vehicleQuery.isFetching} onRetry={() => refetch()} />
   );
   // Loads and the cost ledger decide the cards: wait for them so nothing jumps.
   // A failed ledger does not block the page; the margin figure is left out.
   if ((isLoading || loadsLoading || ledger.loading) && !isError) return <DetailSkeleton crumb="Vehicles" crumbTo="/fleet/vehicles" />;
-  if (!vehicle) return (
-    <DetailMessage
-      title="Vehicle not found"
-      body="It may have been removed, or the link is out of date."
-      primary={{ label: 'Back to vehicles', onClick: () => navigate('/fleet/vehicles') }}
-    />
-  );
+  if (!vehicle) return <RecordState kind="missing" {...stateProps} />;
 
   const loads: any[] = Array.isArray(loadsData) ? loadsData : (loadsData?.results || []);
   const loadsTotal: number = loadsData?.count ?? loads.length;
@@ -184,15 +178,12 @@ export default function VehicleFinancialProfile() {
   let now: JSX.Element;
   const stale = staleWork(openLoad);
   if (openLoad && stale) {
-    // Stale work (R5): an order left open is not current work. Neutral text, one amber dot.
-    const driverName = vehicle.driver_name || openLoad.driver_name;
+    // Stale work (R5/R7): an order left open is not current work. One short
+    // fact line (neutral, one amber dot) and one action; the load number is in
+    // the Loads card and the driver in the Driver card, so neither repeats here.
     now = (
-      <NowLine dot action={<Link className="fd-ghost" to={`/bookings/${openLoad.id}`}>Open order</Link>}>
-        {status !== 'IN_USE' ? <><strong>Marked {formatStatus(status).toLowerCase()}</strong>, still on </> : <>Still on </>}
-        <LoadLink load={openLoad} />
-        {driverName ? <> with {driverName}</> : null}
-        {openLoad.delivery_city ? <> to {openLoad.delivery_city}</> : null}
-        {' '}{staleLabel(stale).text} — {staleAction(openLoad).toLowerCase()} on the order
+      <NowLine dot action={<StaleOrderButton load={openLoad} />}>
+        {staleSentence(openLoad, stale)}
       </NowLine>
     );
   } else if (openLoad) {
@@ -210,8 +201,9 @@ export default function VehicleFinancialProfile() {
     );
   } else if (status === 'IN_USE') {
     now = (
-      <NowLine flag="No open order" action={openOrders}>
-        Marked in use{lastWhen ? `, last load delivered ${lastWhen}` : ', and it has no loads'}
+      <NowLine flag="No current order" action={openOrders}>
+        {/* The head chip already says "In use"; the flag says what contradicts it. */}
+        {lastWhen ? <>Last delivery <span className="fd-nowrap">{lastWhen}</span></> : 'No loads yet'}
       </NowLine>
     );
   } else if (status === 'MAINTENANCE') {
@@ -221,8 +213,8 @@ export default function VehicleFinancialProfile() {
   } else if (lastDelivered && idleDays !== null) {
     now = (
       <NowLine action={openOrders}>
-        <strong>Idle {plural(Math.max(0, idleDays), 'day')}</strong>, last load delivered {lastWhen}
-        {lastDelivered.delivery_city ? ` in ${lastDelivered.delivery_city}` : ''}
+        <strong>Idle {plural(Math.max(0, idleDays), 'day')}</strong>, last delivery <span className="fd-nowrap">{lastWhen}</span>
+        {lastDelivered.delivery_city ? <> in <span className="fd-nowrap">{lastDelivered.delivery_city}</span></> : null}
       </NowLine>
     );
   } else {
@@ -251,15 +243,16 @@ export default function VehicleFinancialProfile() {
   }
 
   // ---- Performance
+  const fleetKm = fleetPerKm(ledger.data?.loads);
   const basis = <>
     Delivered and invoiced loads on this truck, counted in the month of delivery, over the last 12 months (the Reports definition).
     {' '}Margin after truck costs: revenue less approved expenses logged on this truck (fuel, tolls, maintenance, insurance) in the same months; expenses waiting for approval are not deducted, as in the P&L, and the line under the margin shows what it becomes if they are approved.
     {perf.costCount > 0 ? ` Approved costs in these months: ${randWhole(perf.costs)}${perf.pending > 0 ? `; ${randWhole(perf.pending)} more is waiting for approval` : ''}.` : ''}
-    {' '}Revenue per km uses loads with a distance{perf.km > 0 ? ` (${kmText(perf.km)} here)` : ''}; the fleet figure is every delivered load with a distance over the same 12 months, the basis Insights uses. Days on a job count calendar days from pickup to delivery.
+    {' '}Revenue per km uses loads with a distance{perf.km > 0 ? ` (${kmText(perf.km)} here)` : ''}; the fleet figure{fleetKm ? ` (${randCents(fleetKm.perKm)} per km)` : ''} is every delivered load with a distance over the same 12 months, the basis Insights uses. Days on a job count calendar days from pickup to delivery.
     {partial ? ` Based on the latest ${loads.length} of ${loadsTotal} loads.` : ''}
     {perf.older > 0 ? ` ${plural(perf.older, 'older delivered load')} fall outside the 12 months.` : ''}
   </>;
-  const figures = perfFigures(perf, { revenueLabel: 'Revenue', thin, costs: true, costsKnown: expenses !== null, fleetKm: fleetPerKm(ledger.data?.loads) });
+  const figures = perfFigures(perf, { revenueLabel: 'Revenue', thin, costs: true, costsKnown: expenses !== null, fleetKm });
 
   // ---- Condition
   const overall = Number(vehicle.ai_health_score) || null;
@@ -272,6 +265,9 @@ export default function VehicleFinancialProfile() {
   // The driver on the vehicle record, else the driver on its open order
   // (named as the Now line does: "On LOAD-… with Riaan Venter"), else none.
   const openDriver = openLoad && !(driverId && driverName) ? (openLoad.driver_name || null) : null;
+  // Said once, here (R7): the driver on the open order is marked inactive.
+  const openDriverInactive = !!openLoad?.driver && String(((Array.isArray(driversData) ? driversData : driversData?.results) || [])
+    .find((d: any) => d.id === openLoad.driver)?.status || '').toUpperCase() === 'INACTIVE';
   const driverCard = driverId && driverName ? (
     <LinkCard title="Driver" className="fd-o-driver"
       primary={<Link className="fd-inline-link" to={`/fleet/drivers/${driverId}`}>{driverName}</Link>}
@@ -279,7 +275,7 @@ export default function VehicleFinancialProfile() {
   ) : openLoad && openDriver ? (
     <LinkCard title="Driver" className="fd-o-driver"
       primary={openLoad.driver ? <Link className="fd-inline-link" to={`/fleet/drivers/${openLoad.driver}`}>{openDriver}</Link> : openDriver}
-      secondary={<>On {openLoad.load_number || 'an open order'}{stale ? `, ${staleLabel(stale).text}` : ''} · no regular driver</>} />
+      secondary={openDriverInactive ? 'Marked inactive · no regular driver' : 'On the open order · no regular driver'} />
   ) : noLoads ? null : (
     <LinkCard title="Driver" className="fd-o-driver" primary={<span className="fd-muted">No driver assigned</span>}
       action={<button type="button" className="fd-ghost" onClick={openEdit}>Assign</button>} />
@@ -377,7 +373,6 @@ export default function VehicleFinancialProfile() {
             </Panel>
           )}
 
-          {bal.inMain('condition') && conditionCard}
           {bal.inMain('driver') && driverCard}
           {bal.inMain('facts') && factsCard}
         </div>
@@ -386,7 +381,7 @@ export default function VehicleFinancialProfile() {
           {!noLoads && <ComplianceCard className="fd-o-todo" items={todos} />}
           {!bal.inMain('driver') && driverCard}
           {!bal.inMain('facts') && factsCard}
-          {!bal.inMain('condition') && conditionCard}
+          {conditionCard}
         </aside>
       </div>
 

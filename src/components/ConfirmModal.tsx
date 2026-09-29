@@ -70,7 +70,7 @@ export function ConfirmModal({
             onClick={onCancel}
             style={{
               padding: '8px 16px',
-              minHeight: 40,
+              minHeight: 'var(--confirm-btn-h, 40px)',
               background: 'transparent',
               border: '1px solid var(--border-subtle)',
               color: 'var(--text-primary)',
@@ -90,7 +90,7 @@ export function ConfirmModal({
             onClick={() => { onConfirm(); onCancel(); }}
             style={{
               padding: '8px 16px',
-              minHeight: 40,
+              minHeight: 'var(--confirm-btn-h, 40px)',
               background: danger ? 'var(--confirm-danger-surface)' : 'var(--accent-primary)',
               border: danger ? '1px solid var(--confirm-danger-text)' : '1px solid transparent',
               color: danger ? 'var(--confirm-danger-text)' : 'var(--btn-action-color, #fff)',

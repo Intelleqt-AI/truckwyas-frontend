@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Tip, TipRow, localPoint, niceTicks, rand, randCompact, useTip, useWidth } from '@/components/viz/core';
 import '@/components/viz/viz.css';
+import { staleWork } from '@/lib/staleWork';
 
 /**
  * Home (Overview) presentation pieces. Every value comes from what the page
@@ -175,22 +176,28 @@ export function usePipeline(quotes: any[], loads: any[] = []) {
   return useMemo(() => {
     const by = { DRAFT: 0, SENT: 0, ACCEPTED: 0, DECLINED: 0 };
     for (const q of quotes) { const s = boardStage(q); if (s) by[s] += 1; }
-    const onTheRoad = loads.filter((l) => String(l?.status || '').toUpperCase() === 'IN_TRANSIT').length;
+    // R7: "On the road" is current work only. In-transit loads past their
+    // delivery date (or open > 30 days, src/lib/staleWork.ts) are "not closed",
+    // counted separately so the card can say so instead of calling them active.
+    const inTransit = loads.filter((l) => String(l?.status || '').toUpperCase() === 'IN_TRANSIT');
+    const staleInTransit = inTransit.filter((l) => staleWork(l)).length;
+    const onTheRoad = inTransit.length - staleInTransit;
     const stages = [
       { key: 'draft', label: 'Draft', count: by.DRAFT },
       { key: 'sent', label: 'Sent', count: by.SENT },
       { key: 'won', label: 'Accepted', count: by.ACCEPTED },
-      { key: 'moving', label: 'On the road', count: onTheRoad },
+      // Stale in-transit loads are said under this row, never counted in it.
+      { key: 'moving', label: 'On the road', count: onTheRoad, note: staleInTransit > 0 ? `+${staleInTransit} past delivery date, not closed` : undefined },
       { key: 'lost', label: 'Declined', count: by.DECLINED },
     ];
     // Every quote that went out: still waiting, accepted or declined.
     const sentEver = by.SENT + by.ACCEPTED + by.DECLINED;
     const winRate = sentEver > 0 ? Math.round((by.ACCEPTED / sentEver) * 100) : null;
-    return { stages, awaiting: by.SENT, drafts: by.DRAFT, accepted: by.ACCEPTED, sentEver, winRate };
+    return { stages, awaiting: by.SENT, drafts: by.DRAFT, accepted: by.ACCEPTED, sentEver, winRate, staleInTransit };
   }, [quotes, loads]);
 }
 
-export function PipelineBars({ stages }: { stages: { key: string; label: string; count: number }[] }) {
+export function PipelineBars({ stages }: { stages: { key: string; label: string; count: number; note?: string }[] }) {
   const max = Math.max(1, ...stages.map((s) => s.count));
   return (
     <ol className="td-pipe" aria-label="Quotes by board column, and orders on the road">
@@ -204,6 +211,7 @@ export function PipelineBars({ stages }: { stages: { key: string; label: string;
               <span style={{ width: `${(s.count / max) * 100}%` }} />
             </span>
             <span className="td-pipe__count">{s.count}</span>
+            {s.note && <span className="td-pipe__note">{s.note}</span>}
           </li>
         );
       })}

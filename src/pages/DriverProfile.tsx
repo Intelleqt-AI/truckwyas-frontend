@@ -4,17 +4,17 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
 import {
-  DetailMessage, DetailSkeleton, Panel, RecordHeader, StatusChip, StatusControl, dateText, formatStatus, isNotFound, kmText, plural,
+  DetailSkeleton, RecordState, randCents, Panel, RecordHeader, StatusChip, StatusControl, dateText, formatStatus, isNotFound, kmText, plural,
 } from '@/components/fleet-detail/parts';
 import {
   ComplianceCard, FactsCard, LinkCard, LoadLink, NowLine, PerformanceCard,
-  dateToDo, daysSince, fleetPerKm, isDelivered, isOpenLoad, latest, perfFigures, perfLine, performance, staleWork, staleAction, staleLabel, type ToDo,
+  dateToDo, daysSince, fleetPerKm, isDelivered, isOpenLoad, latest, perfFigures, perfLine, performance, staleWork, staleSentence, StaleOrderButton, type ToDo,
 } from '@/components/fleet-detail/record';
 import { useBalancedColumns } from '@/components/fleet-detail/useBalancedColumns';
 import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
 import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
 import { useLedger } from '@/components/reports/data';
-import LoadError, { loadFailed } from '@/components/data/LoadError';
+import { loadFailed } from '@/components/data/LoadError';
 
 const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] as const;
 
@@ -61,24 +61,17 @@ export default function DriverProfile() {
   const bal = useBalancedColumns({ toMain: ['truck', 'contact', 'facts'] }, `${driverId}-${isLoading}-${loadsLoading}-${ledger.loading}`);
   const sideRef = useCallback((n: HTMLElement | null) => { railRef(n); bal.sideRef.current = n; }, [railRef, bal.sideRef]);
 
+  // Error states keep the head ("Driver") and the breadcrumb (R7): a 404 says
+  // the driver is not there; anything else is a load error with Retry.
+  const stateProps = { type: 'Driver', crumb: 'Drivers', crumbTo: '/fleet/drivers', what: 'this driver',
+    missingTitle: 'There is no driver at this link', missingHint: 'They may have been removed, or the link is out of date.', backLabel: 'All drivers' };
   if (isError && !isNotFound(loadError)) return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <div>
-        <button type="button" className="tw-btn tw-btn--ghost" onClick={() => navigate('/fleet/drivers')}>Back to drivers</button>
-      </div>
-      <LoadError what="this driver" error={loadError} busy={driverQuery.isFetching} onRetry={() => refetch()} />
-    </div>
+    <RecordState kind="error" {...stateProps} error={loadError} busy={driverQuery.isFetching} onRetry={() => refetch()} />
   );
   // Wait for the loads and the truck list too: they decide the cards, so
   // drawing before they land would make the page jump.
   if ((isLoading || loadsLoading || ledger.loading) && !isError) return <DetailSkeleton crumb="Drivers" crumbTo="/fleet/drivers" />;
-  if (!driver) return (
-    <DetailMessage
-      title="Driver not found"
-      body="They may have been removed, or the link is out of date."
-      primary={{ label: 'Back to drivers', onClick: () => navigate('/fleet/drivers') }}
-    />
-  );
+  if (!driver) return <RecordState kind="missing" {...stateProps} />;
 
   const ud = driver.user_details || {};
   const firstName = driver.first_name || ud.first_name || '';
@@ -117,16 +110,12 @@ export default function DriverProfile() {
   let now: JSX.Element;
   const stale = staleWork(openLoad);
   if (openLoad && stale) {
-    // Stale work (R6 shared rule): an order left open is not current work.
-    // Neutral text, one amber dot, and the action the order page allows.
-    const plate = plateOf(openLoad);
+    // Stale work (R6/R7): one short fact line and one action. The head chip
+    // says the driver's status, the Loads card the load number and the Truck
+    // card the plate, so none of them repeats here.
     now = (
-      <NowLine dot action={<Link className="fd-ghost" to={`/bookings/${openLoad.id}`}>Open order</Link>}>
-        {status !== 'ACTIVE' ? <><strong>Marked {formatStatus(status).toLowerCase()}</strong>, still on </> : <>Still on </>}
-        <LoadLink load={openLoad} />
-        {plate ? <> with {plate}</> : null}
-        {openLoad.delivery_city ? <> to {openLoad.delivery_city}</> : null}
-        {' '}{staleLabel(stale).text} — {staleAction(openLoad).toLowerCase()} on the order
+      <NowLine dot action={<StaleOrderButton load={openLoad} />}>
+        {staleSentence(openLoad, stale)}
       </NowLine>
     );
   } else if (openLoad) {
@@ -142,15 +131,15 @@ export default function DriverProfile() {
       </NowLine>
     );
   } else if (status === 'ON_LEAVE') {
-    now = <NowLine>On leave{lastWhen ? `, last load delivered ${lastWhen}` : ''}</NowLine>;
+    now = <NowLine>On leave{lastWhen ? `, last delivery ${lastWhen}` : ''}</NowLine>;
   } else if (status === 'INACTIVE') {
-    now = <NowLine>Inactive{lastWhen ? `, last load delivered ${lastWhen}` : ''}</NowLine>;
+    now = <NowLine>Inactive{lastWhen ? `, last delivery ${lastWhen}` : ''}</NowLine>;
   } else if (lastDelivered) {
     const idle = daysSince(lastDelivered.delivery_date || lastDelivered.pickup_date);
     now = (
       <NowLine action={openOrders}>
-        <strong>Free{idle !== null && idle > 0 ? ` for ${plural(idle, 'day')}` : ''}</strong>, last load delivered {lastWhen}
-        {lastDelivered.delivery_city ? ` in ${lastDelivered.delivery_city}` : ''}
+        <strong>Free{idle !== null && idle > 0 ? ` for ${plural(idle, 'day')}` : ''}</strong>, last delivery <span className="fd-nowrap">{lastWhen}</span>
+        {lastDelivered.delivery_city ? <> in <span className="fd-nowrap">{lastDelivered.delivery_city}</span></> : null}
       </NowLine>
     );
   } else {
@@ -164,11 +153,12 @@ export default function DriverProfile() {
   ].filter(Boolean) as ToDo[];
 
   // ---- Performance
-  const figures = perfFigures(perf, { revenueLabel: 'Revenue driven', thin, fleetKm: fleetPerKm(ledger.data?.loads) });
+  const fleetKm = fleetPerKm(ledger.data?.loads);
+  const figures = perfFigures(perf, { revenueLabel: 'Revenue driven', thin, fleetKm });
   if (timed.length > 0) figures.push({ label: 'On time', value: `${Math.round((onTime / timed.length) * 100)}%`, note: `${onTime} of ${timed.length} timed` });
   const basis = <>
     Delivered and invoiced loads this driver drove, counted in the month of delivery, over the last 12 months (the Reports definition).
-    {' '}Revenue per km uses loads with a distance{perf.km > 0 ? ` (${kmText(perf.km)} here)` : ''}; the fleet figure is every delivered load with a distance over the same 12 months, the basis Insights uses. Days on a job count calendar days from pickup to delivery.
+    {' '}Revenue per km uses loads with a distance{perf.km > 0 ? ` (${kmText(perf.km)} here)` : ''}; the fleet figure{fleetKm ? ` (${randCents(fleetKm.perKm)} per km)` : ''} is every delivered load with a distance over the same 12 months, the basis Insights uses. Days on a job count calendar days from pickup to delivery.
     {' '}On time needs an actual delivery time{timed.length === 0 ? ', and none is recorded yet, so it is not shown' : ''}.
     {partial ? ` Based on the latest ${loads.length} of ${loadsTotal} loads.` : ''}
     {perf.older > 0 ? ` ${plural(perf.older, 'older delivered load')} fall outside the 12 months.` : ''}
@@ -197,7 +187,7 @@ export default function DriverProfile() {
   ) : openLoad && openPlate ? (
     <LinkCard title="Truck" className="fd-o-driver"
       primary={openLoad.vehicle ? <Link className="fd-inline-link" to={`/fleet/vehicles/${openLoad.vehicle}`}>{openPlate}</Link> : openPlate}
-      secondary={<>On {openLoad.load_number || 'an open order'}{stale ? `, ${staleLabel(stale).text}` : ''} · no regular truck</>} />
+      secondary="On the open order · no regular truck" />
   ) : (
     <LinkCard title="Truck" className="fd-o-driver" primary={<span className="fd-muted">No truck assigned</span>}
       action={<button type="button" className="fd-ghost" onClick={edit}>Assign</button>} />

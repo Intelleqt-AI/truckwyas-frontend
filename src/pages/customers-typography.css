@@ -37,6 +37,19 @@
 
 /* R5, phones: the customer name wraps to two lines instead of truncating
    (it has the room Owed does not need). */
+/* R7, phones: one line per name. The legal suffix folds away (full name in
+   the title); anything still too long ends in an ellipsis, never a wrap
+   mid-name. */
 @container (max-width: 520px) {
-  .customers-typography .bk-table .bk-col-customer.is-truncate { max-width: none; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; min-width: 12ch; }
+  .customers-typography .bk-table .bk-col-customer.is-truncate { max-width: none; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .customers-typography .bk-table .cu-suffix { display: none; }
+  .customers-typography .bk-table .cu-owed { padding-left: 8px; }
+}
+
+/* R7 touch: the Owed header tip's 44px target fits inside the 44px head row
+   (the table card clips anything taller) and sits above the pinned actions
+   column, which overlaps its right edge. */
+@media (pointer: coarse) {
+  .customers-typography .cu-owed__head .tw-info::after { inset: -12px; }
+  .customers-typography .cu-owed__head .tw-info { position: relative; z-index: 2; }
 }

@@ -22,6 +22,8 @@
 .dashboard-confirm-button:not(.dashboard-confirm-primary):hover { background: var(--surface-tint-hover) !important; }
 .dashboard-confirm-primary:hover { opacity: 0.9; }
 .dashboard-confirm-button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
-@media (max-width: 767px) {
-  .dashboard-confirm-dialog .dashboard-confirm-button { min-height: 48px; }
+/* Touch and phones (R7): both actions are 44px targets. The height is a
+   variable because the geometry is inline in ConfirmModal.tsx. */
+@media (max-width: 767px), (pointer: coarse) {
+  .dashboard-confirm-dialog { --confirm-btn-h: 44px; }
 }

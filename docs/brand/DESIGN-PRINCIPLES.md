@@ -193,6 +193,7 @@ Every pair the palette ships was computed with the WCAG relative-luminance formu
 
 - One rule, `src/lib/staleWork.ts`: an open load (Pending, Assigned, Loading, In transit) is stale when past its delivery date or open more than 30 days. Use `staleWork()`, `staleLoads()`, `countStale()`, `staleLabel()` ("since 20 Jun 2026 (101 days)") and `staleAction()` (the action the page can really take). Never count stale work any other way.
 - Every day count is a South African calendar day (`saDaysBetween()` / `saDateISO()` in `src/lib/dates.ts`, the Debtors report's basis), whatever the viewer's time zone.
+- R7 words: **active** means open and not stale. Stale loads are "not closed" or "left open", never "active", "on the road" or "current". A tile that counts open work counts only the active ones and says the rest beside the figure ("Active loads 0 · 11 not closed"); a split that matters is said where the count is ("On the road 0 · +4 past delivery date, not closed").
 
 ## 6. Copy
 
@@ -219,6 +220,10 @@ Every pair the palette ships was computed with the WCAG relative-luminance formu
 - Row actions inside tables and inline link-style buttons may be 24 to 32px with a mouse so they sit inside 44 to 48px rows, but every one of them must reach a 44px target on touch screens (`@media (pointer: coarse)`, see `theme.css`).
 - Icon-only buttons: 44px target at every size.
 - R6: on coarse pointers segmented options are 44px (the track drops its vertical padding and keeps the inset chip with an inset ring), info tips have a 44px hit area, and `SectionHeader` back links are 44px tall without moving the line. These are floors in `theme.css` / `section-header.css`; pages do not override them.
+- R7 global touch floor (`theme.css`, "GLOBAL TOUCH FLOOR"): on coarse pointers **every** link, button, `summary`, tab, menu item and segmented option gets a hit area of at least 44 x 44 from an invisible, centred, absolutely positioned `::after`. It never changes the drawn size, so rows, prose and toolbars keep their height (measured: 0 elements move on any page at 390 with the rule on vs off). The rule has zero specificity (`:where`), so a component that already uses `::after` or sets `position` keeps its own. Also on coarse pointers: tabs and segmented options are at least 44px wide, menu items (account menu, ⋯ menus) are drawn 44px tall, and dialog buttons (`ConfirmModal`) are 44px.
+  - Opt out with `.tw-no-hit` on the control or on any ancestor (a dense picker whose neighbours would steal each other's taps). Map internals are excluded.
+  - The target is clipped by an ancestor with `overflow: hidden`. Truncate the text span inside the control, not the box around it (e.g. a KPI label: the text ellipsises, the label box stays `overflow: visible` so its tip keeps 44px). A nested control (a tip inside a clickable tile) is lifted above its parent's target automatically.
+  - Check: every page at 390, real hit test (`elementFromPoint` sweep from each control's centre): 44 up/down and left/right.
 
 ## 9. Words (v3, owner review 28 Sep 2026: "far too much text", "looks babyish")
 
@@ -390,6 +395,8 @@ For pages with only 1 to 3 summary figures (or figures that sit above a table). 
 ```
 
 `bare` renders the line without its own card (inside an existing card).
+
+R7: with one or two figures the card sizes to its stats (`.tw-kpi-stats--fit`, automatic), so it never runs the full width with a 40% empty tail; three or more share the width evenly. On phones the line is full width, two per row.
 
 ### `<Toolbar>` and `<SearchInput>` (`src/components/ui/Toolbar.tsx`, styles `.tw-toolbar`, `.tw-search`)
 

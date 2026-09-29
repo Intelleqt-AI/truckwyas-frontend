@@ -455,3 +455,18 @@
    An order left open is not current work: neutral words, one amber dot. */
 .fleet-page .fleet-doing--stale { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fleet-page .fleet-doing__dot { display: inline-block; width: 8px; height: 8px; margin: 0 8px 1px 0; border-radius: 50%; vertical-align: middle; background: var(--status-warning-dot); }
+
+/* ---- Round 7: a stale row offers its action (the order) on the sub line;
+   the link keeps its text size and gets a 44px hit area on touch. */
+.fleet-page .fleet-table .fleet-stale-sub { white-space: nowrap; overflow: visible; }
+.fleet-page .fleet-stale-link { position: relative; color: var(--accent-primary); font-weight: 500; text-decoration: none; }
+.fleet-page .fleet-stale-link:hover { text-decoration: underline; }
+.fleet-page .fleet-stale-link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
+@media (pointer: coarse) {
+  .fleet-page .fleet-stale-link::after { content: ''; position: absolute; top: calc(50% - 22px); bottom: calc(50% - 22px); left: min(-4px, calc(50% - 22px)); right: min(-4px, calc(50% - 22px)); }
+}
+/* Phone: the Doing column steps aside, so the stale dot rides beside the (neutral) chip. */
+.fleet-page .fleet-stale-narrow { display: inline-flex; align-items: center; margin-left: 8px; color: var(--text-tertiary); font: 400 12px/16px var(--font-sans); white-space: nowrap; vertical-align: middle; }
+.fleet-page .fleet-stale-narrow .fleet-doing__dot { margin-right: 6px; }
+.fleet-page .fleet-table .fleet-only-narrow:has(.fleet-stale-narrow) { overflow: visible; }
+.fleet-page .fleet-stale-narrow.fleet-stale-link { color: var(--accent-primary); font-weight: 500; }

@@ -7,13 +7,14 @@ import { StatusChip } from '@/components/ui/StatusChip';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { CAPITAL_LAUNCHED } from '@/lib/features';
 import { toast } from '@/lib/toast';
-import { normaliseFigures, formatMoney } from '@/lib/formatters';
+import { normaliseFigures, formatMoney, formatDateTime } from '@/lib/formatters';
+import { saDateISO } from '@/lib/dates';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { postData, fetchData, deleteData } from '@/lib/Api';
 import { useAuth } from '@/lib/AuthContext';
 import Markdown from '@/components/copilot/Markdown';
 import ProposalCard, { Proposal } from '@/components/copilot/ProposalCard';
-import ConversationList, { ConversationSummary, conversationTitle } from '@/components/copilot/ConversationList';
+import ConversationList, { ConversationSummary, conversationTitle, updatedAgo } from '@/components/copilot/ConversationList';
 import ConversationsSheet from '@/components/copilot/ConversationsSheet';
 
 interface Action { label: string; route: string; }
@@ -30,6 +31,24 @@ interface Message {
   proposal?: Proposal | null;
   animate?: boolean;
   degraded?: boolean; // reply came from the rules engine (AI unavailable), not the LLM
+  /** When the reply was written (stored created_at, or when it arrived). */
+  createdAt?: string | null;
+}
+
+/**
+ * When a reply was written, so an old answer's figures never read as today's
+ * (R7): "Today, 14:05" for today's replies, else "3 hours ago" / "104 days ago".
+ * The full date and time are the title.
+ */
+function replyWhen(iso?: string | null): string {
+  if (!iso) return '';
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return '';
+  if (saDateISO(t) === saDateISO(new Date())) {
+    const hm = formatDateTime(t).split(', ').pop();
+    return hm ? `Today, ${hm}` : updatedAgo(iso);
+  }
+  return updatedAgo(iso);
 }
 
 // The Typewriter streams raw text, which would flash unrendered markdown syntax.
@@ -37,7 +56,7 @@ interface Message {
 // inline code) skip the animation and render through <Markdown> immediately;
 // plain replies animate and then hand off to <Markdown> when done (onDone).
 function looksLikeMarkdown(s: string): boolean {
-  return s.includes('|') || s.includes('```') || s.includes('**') || s.includes('`')
+  return s.includes('|') || s.includes('```') || s.includes(' • ') || s.includes('**') || s.includes('`')
     || /\[[^\]]+\]\([^)]+\)/.test(s) || /^#{1,6}\s/m.test(s)
     || /^\s*[-*]\s/m.test(s) || /^\s*\d+\.\s/m.test(s);
 }
@@ -171,7 +190,7 @@ export default function Copilot() {
         // (pending/executed/dismissed/failed/expired) so history stays truthful.
         const hist = (d?.messages || []).map((m: any) => ({
           role: m.role, content: m.content, proposal: m.proposal || null,
-          actions: m.actions || [],
+          actions: m.actions || [], createdAt: m.created_at || null,
         }));
         setConversationId(id);
         setMessages(hist.length ? [introMsg, ...hist] : [introMsg]);
@@ -226,6 +245,7 @@ export default function Copilot() {
         actionState: res?.proposed_action ? 'pending' : undefined,
         proposal: res?.proposal || null, animate: true,
         degraded: res?.ai_available === false,
+        createdAt: new Date().toISOString(),
       }]);
       refreshConversations();
     } catch (e: any) {
@@ -470,6 +490,11 @@ export default function Copilot() {
                       <span className="cp-mark" aria-hidden="true"><Bot size={16} /></span>
                       <div className="cp-msg__body">
                         <span className="cp-sr">Copilot: </span>
+                        {m.createdAt && replyWhen(m.createdAt) && (
+                          <p className="cp-msg__meta">
+                            <time dateTime={m.createdAt} title={formatDateTime(m.createdAt)}>{replyWhen(m.createdAt)}</time>
+                          </p>
+                        )}
                         <div className="cp-answer">
                           {m.animate && !looksLikeMarkdown(m.content)
                             ? <Typewriter

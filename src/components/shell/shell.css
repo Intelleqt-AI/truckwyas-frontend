@@ -376,7 +376,9 @@
   }
   .tw-side { display: none; }
   .tw-shell > .tw-top { grid-column: 1; padding: 0 8px 0 16px; gap: 8px; border-bottom: 1px solid var(--border-subtle); }
-  .tw-top__mark { display: block; height: 20px; overflow: hidden; }
+  /* The 20px wordmark is a 44px tall link (padding in, margin out), so the
+     drawn mark and the bar do not move. */
+  .tw-top__mark { display: block; height: 44px; padding-block: 12px; margin-block: -12px; box-sizing: border-box; overflow: hidden; }
   .tw-top__mark img { height: 20px; width: auto; display: block; }
   .tw-top .tw-topsearch { display: none !important; }
   /* Phones switch theme from the More sheet and the account menu. */

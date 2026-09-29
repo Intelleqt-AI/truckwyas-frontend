@@ -208,5 +208,16 @@ table.settings-table.is-inset :is(th, td):last-child { padding-right: 0; }
 /* Users on phones: the search takes the row; emails wrap instead of clipping. */
 @media (max-width: 600px) {
   .st-search { flex: 1 1 auto; width: auto !important; }
-  table.settings-table .st-email { max-width: none; white-space: normal; overflow-wrap: break-word; }
+  /* R7: one line, cut with an ellipsis (full address in the title), never
+     split at "@" onto a second line. The width leaves room for the status
+     and row menu columns. */
+  table.settings-table .st-email { max-width: calc(100vw - 170px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* R7 Users on phones: role (and a non-active status) beside the name. */
+.st-phone-inline { display: none; }
+@media (max-width: 600px) { .st-phone-inline { display: inline; color: var(--text-secondary); } }
+
+/* R7 Company: a label's info tip keeps its 44px target clear of the control
+   below it on touch screens. */
+@media (pointer: coarse) { .tw-settings-shell { --cs-tip-gap: 14px; } }

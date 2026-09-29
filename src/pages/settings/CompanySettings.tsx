@@ -25,7 +25,9 @@ const inputStyle = settingsInputStyle;
 const helpTextStyle = settingsHelpStyle;
 
 const bodyStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
-const labelTipStyle: React.CSSProperties = { ...settingsLabelStyle, display: 'flex', alignItems: 'center', gap: 4 };
+// A label with a tip: on touch screens it keeps 14px above the control, so
+// the tip's 44px target never sits under the select (R7, settings-brand.css).
+const labelTipStyle: React.CSSProperties = { ...settingsLabelStyle, display: 'flex', alignItems: 'center', gap: 4, marginBottom: 'var(--cs-tip-gap, 6px)' };
 
 /* A decimal field in the ZA format ("10,00", "29,11"). The form keeps the
    API's own value (dot decimal, full precision) so an untouched field saves

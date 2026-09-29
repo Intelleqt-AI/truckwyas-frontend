@@ -13,7 +13,8 @@ import { InfoTip } from "@/components/ui/InfoTip";
 import SectionHeader from "@/components/layout/SectionHeader";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { MicroBars, RevenueCostBars, PipelineBars, usePipeline } from "@/components/overview/today";
-import { presentSignal, staleSignal, isInTransitSignal } from "@/components/overview/signals";
+import { presentSignal, staleSignal, isInTransitSignal, isIdleVehiclesSignal, idleVehiclesUrl } from "@/components/overview/signals";
+import { isOpenLoad, staleWork } from "@/lib/staleWork";
 import { useAllQuotes, useHomeLedger } from "@/components/overview/ledger";
 
 // Fetches + derives all dashboard data. Lives in the queryFn so the result is
@@ -239,7 +240,7 @@ export default function Overview() {
   const stale = !needsLoading && allLoads.length ? staleSignal(allLoads) : null;
   const needs: { row: ReturnType<typeof presentSignal>; actionUrl: string | null; severity: string }[] = [
     ...(stale ? [{ row: stale, actionUrl: stale.actionUrl, severity: "medium" }] : []),
-    ...signals.filter((i: any) => !(stale && isInTransitSignal(i))).map((i: any) => ({ row: presentSignal(i, allLoads), actionUrl: i.actionUrl as string | null, severity: String(i.severity || "low") })),
+    ...signals.filter((i: any) => !(stale && isInTransitSignal(i))).map((i: any) => ({ row: presentSignal(i, allLoads), actionUrl: isIdleVehiclesSignal(i) ? idleVehiclesUrl : i.actionUrl as string | null, severity: String(i.severity || "low") })),
   ];
 
   useEffect(() => {
@@ -274,9 +275,14 @@ export default function Overview() {
     ? `${marginChange >= 0 ? "Up" : "Down"} ${formatPercent(Math.abs(marginChange)).replace("%", "")} pts vs the prior 12 months` : "";
 
   // Active loads and the 28-day bars use every load (all pages), not page 1.
-  const TERMINAL_LOAD_STATUSES = ["DELIVERED", "INVOICED", "CANCELLED", "COMPLETED", "PAID"];
-  const loadsReady = !!ledger.data || !!data;
-  const activeLoadsCount = allLoads.filter((l: any) => !TERMINAL_LOAD_STATUSES.includes(String(l.status || "").toUpperCase())).length;
+  // R7: "active" means open AND current. Open loads past their delivery date
+  // or open more than 30 days (src/lib/staleWork.ts) are "not closed": they
+  // are counted beside the figure, never in it (the Needs you row lists them).
+  // Wait for the full ledger so the figure never changes after paint.
+  const loadsReady = !!ledger.data || !!ledger.error;
+  const openLoads = allLoads.filter((l: any) => isOpenLoad(l));
+  const notClosedCount = openLoads.filter((l: any) => staleWork(l)).length;
+  const activeLoadsCount = openLoads.length - notClosedCount;
   const heatmapData: number[] = (() => {
     const out = new Array(28).fill(0);
     const now = Date.now();
@@ -430,7 +436,7 @@ export default function Overview() {
             <h2 className="td-kpi__label">
               Active loads
               <InfoTip align="end">
-                Loads not yet delivered, invoiced or cancelled. Bars show loads booked per day, last 28 days.
+                Open loads that are on schedule: not past their delivery date and open 30 days or less. Loads past that are counted as not closed, never as active; Needs you lists them. Bars show loads booked per day, last 28 days.
                 {!loading && !vehiclesFailed && totalVehicles > 0 && data?.vehiclesComplete && ` ${availableVehicles} of ${totalVehicles} trucks are available now.`}
               </InfoTip>
             </h2>
@@ -441,8 +447,11 @@ export default function Overview() {
             <MicroBars values={heatmapData} ariaLabel={`Loads booked per day, last 28 days: ${loads28} in total`} />
           </div>
           <div className="td-kpi__meta">
-            {/* Phones: the short form, so the note never clips (it may still wrap to a second line). */}
-            {loadsReady && !loadsFailed && <span>{loads28 === 0 ? "None booked" : `${loads28} booked`} in<span className="td-hide-sm"> the last</span> 28 days</span>}
+            {/* "0 · 11 not closed": the stale loads are said beside the figure,
+                not in it. Phones keep the short form so the note never clips. */}
+            {loadsReady && !loadsFailed && (notClosedCount > 0
+              ? <span>{notClosedCount} not closed<span className="td-hide-sm"> · {loads28 === 0 ? "none" : loads28} booked in 28 days</span></span>
+              : <span>{loads28 === 0 ? "None booked" : `${loads28} booked`} in<span className="td-hide-sm"> the last</span> 28 days</span>)}
           </div>
         </section>
       </div>
@@ -609,7 +618,7 @@ export default function Overview() {
               <div className="tw-card__titles">
                 <h2 id="td-pipe-title" className="tw-card__title">
                   Quote pipeline
-                  <InfoTip align="end">Draft, Sent, Accepted and Declined are the Quotes board columns (a quote marked lost counts as Declined). On the road is the Orders tab's In transit count. Win rate is accepted as a share of every quote sent{pipeline.sentEver > 0 ? `: ${pipeline.accepted} of ${pipeline.sentEver}` : ""}.</InfoTip>
+                  <InfoTip align="end">Draft, Sent, Accepted and Declined are the Quotes board columns (a quote marked lost counts as Declined). On the road counts in-transit loads still on schedule; in-transit loads past their delivery date are said under that row as not closed. Win rate is accepted as a share of every quote sent{pipeline.sentEver > 0 ? `: ${pipeline.accepted} of ${pipeline.sentEver}` : ""}.</InfoTip>
                 </h2>
                 <p className="tw-card__sub">
                   {quotesAll.isLoading && loading ? "Quotes by stage"

@@ -61,7 +61,7 @@ export function PaymentDotPlot({ rows, maxRows = 10 }: { rows: PayRow[]; maxRows
           {ticks.map((t) => (
             <g key={t}>
               <line x1={x(t)} x2={x(t)} y1={axisH - 6} y2={H} className="viz-gridline" />
-              <text x={t === 0 ? x(t) - 4 : x(t)} y={12} textAnchor={t === 0 ? 'start' : t === ticks[ticks.length - 1] ? 'end' : 'middle'}>{t === 0 ? 'Issued' : `${t}d`}</text>
+              <text x={t === 0 ? x(t) - 4 : x(t)} y={12} textAnchor={t === 0 ? 'start' : t === ticks[ticks.length - 1] ? 'end' : 'middle'}>{t === 0 ? 'Issued' : t === ticks[ticks.length - 1] ? `${t} days` : String(t)}</text>
             </g>
           ))}
           {visible.map((r, ri) => {
@@ -101,23 +101,27 @@ export function PaymentDotPlot({ rows, maxRows = 10 }: { rows: PayRow[]; maxRows
                     </g>
                   );
                 })}
-                {!stacked && r.terms != null && worst > r.terms && (
-                  <text x={Math.min(x(worst) + 10, W - padR)} y={cy} dy="0.32em" textAnchor={x(worst) + 60 > W ? 'end' : 'start'} className="viz-muted" style={{ display: x(worst) + 60 > W ? 'none' : undefined }}>
-                    +{worst - r.terms}d
-                  </text>
-                )}
+                {!stacked && r.terms != null && worst > r.terms && (() => {
+                  // Words, not "+150d" (R7). Shown only where it fits right of the mark.
+                  const late = `${plural(worst - r.terms, 'day')} late`;
+                  const fits = x(worst) + 10 + late.length * 6.6 <= W;
+                  return fits ? (
+                    <text x={x(worst) + 10} y={cy} dy="0.32em" textAnchor="start" className="viz-muted">{late}</text>
+                  ) : null;
+                })()}
               </g>
             );
           })}
         </svg>
       </div>
       <Tip tip={tip} width={W} />
-      {rows.length > maxRows && (
-        <button type="button" className="viz-table-toggle" onClick={() => setShowAll((s) => !s)}>
-          {showAll ? `Show the first ${maxRows}` : `Show all ${rows.length} customers`}
-        </button>
-      )}
+      {/* One foot row (R7): the quiet "Show all" on the left, the table link on the right. */}
       <TableTwin
+        note={rows.length > maxRows ? (
+          <button type="button" className="viz-table-toggle viz-table-toggle--quiet" aria-expanded={showAll} onClick={() => setShowAll((s) => !s)}>
+            {showAll ? `Show the first ${maxRows}` : `Show all ${rows.length} customers`}
+          </button>
+        ) : undefined}
         table={{
           caption: 'Days to pay per invoice, against payment terms',
           columns: [{ label: 'Customer' }, { label: 'Invoice' }, { label: 'Status' }, { label: 'Days', numeric: true }, { label: 'Terms', numeric: true }, { label: 'Amount', numeric: true }],

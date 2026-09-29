@@ -21,7 +21,7 @@ import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { fetchAllPages } from '@/components/insights/findings';
 import { useLedger, isOpen, num, todayISO } from '@/components/reports/data';
 import { InfoTip } from '@/components/ui/InfoTip';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency, formatMoneyWhole } from '@/lib/formatters';
 import { useAuth } from '@/lib/AuthContext';
 import RowActions from '@/components/ui/RowActions';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -186,13 +186,15 @@ export default function Customers() {
       ? <span className="cu-owed__dot" title={`Overdue: ${formatCurrency(overdue)}, oldest ${daysLate(row!.oldestDue)} days late`}><span className="sr-only">Overdue, oldest {daysLate(row!.oldestDue)} days late: </span></span>
       : null;
     if (overdue >= 0.005 && Math.abs(overdue - owed) < 0.005) {
-      return <span title={flag ? undefined : 'All overdue'}>{flag}{formatCurrency(owed)}{!flag && <span className="sr-only">, all overdue</span>}</span>;
+      return <span title={flag ? formatCurrency(owed) : `${formatCurrency(owed)}, all overdue`}>{flag}{formatMoneyWhole(owed)}{!flag && <span className="sr-only">, all overdue</span>}</span>;
     }
+    // Lists show whole rands (R7); the cents are in the title and on the
+    // statement.
     return (
-      <>
-        {flag}{formatCurrency(owed)}
-        {overdue >= 0.005 && <span className="cu-owed__sub">{formatCurrency(overdue)} overdue</span>}
-      </>
+      <span title={formatCurrency(owed)}>
+        {flag}{formatMoneyWhole(owed)}
+        {overdue >= 0.005 && <span className="cu-owed__sub">{formatMoneyWhole(overdue)} overdue</span>}
+      </span>
     );
   };
 
@@ -414,7 +416,14 @@ export default function Customers() {
                     />
                   </td>
                   <td className="is-primary is-truncate bk-col-customer" style={{ fontWeight: 500 }} title={[displayName(c), contactName(c)].filter(Boolean).join(', contact ')}>
-                    {displayName(c)}
+                    {(() => {
+                      // Phones: the legal suffix ("(Pty) Ltd", "Ltd") steps
+                      // aside so the name stays on one line (R7); the full
+                      // name is in the title.
+                      const n = displayName(c);
+                      const m = n.match(/^(.*?\S)(\s+(?:\(Pty\)\s*)?(?:Ltd|Inc|CC)\.?)$/i);
+                      return m ? <>{m[1]}<span className="cu-suffix">{m[2]}</span></> : n;
+                    })()}
                     {contactName(c) && <span className="bk-muted" style={{ fontWeight: 400 }}> · {contactName(c)}</span>}
                   </td>
                   <td className="is-truncate bk-col-opt" title={c.email}>

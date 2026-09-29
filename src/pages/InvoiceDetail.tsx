@@ -332,7 +332,8 @@ export default function InvoiceDetail() {
   const recordedLate = createdAt != null && earlierFact.some(t => dayOf(createdAt) > dayOf(t));
   const activity = [
     recordedLate
-      ? { label: 'Recorded in TruckWys', value: `${safeDate(invoice.created_at)}, after it was ${invoice.sent_at ? 'sent' : 'issued'}`, at: createdAt }
+      // Short label and value (R7): neither wraps in the rail.
+      ? { label: 'Recorded', value: `${safeDate(invoice.created_at)}, after it was ${invoice.sent_at ? 'sent' : 'issued'}`, at: createdAt }
       : { label: 'Created', value: safeDate(invoice.created_at), at: createdAt },
     { label: 'Sent to customer', value: invoice.sent_at ? safeDate(invoice.sent_at) : 'Not sent', at: at(invoice.sent_at) },
     ...(invoice.viewed_at ? [{ label: 'Viewed by customer', value: safeDate(invoice.viewed_at), at: at(invoice.viewed_at) }] : []),

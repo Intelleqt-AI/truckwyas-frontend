@@ -4,7 +4,6 @@ import './bookings-section.css';
 import './ops-tiles.css';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { StatusChip } from '@/components/ui/StatusChip';
-import { Segmented } from '@/components/ui/Segmented';
 import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -16,7 +15,7 @@ import { fetchAllPages } from '@/components/insights/findings';
 import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
 import { formatCurrency, formatDate, formatMoneyWhole } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
-import { QuotesList, StatusFilter } from './QuotesList';
+import { QuotesList, StatusFilter, RecordNo } from './QuotesList';
 import RowActions from '@/components/ui/RowActions';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
@@ -110,7 +109,7 @@ export const BOOKINGS_TABS: SectionTab[] = [
 
 const TAB_TITLES: Record<BookingTab, string> = {
   quotes: 'Quotes',
-  orders: 'Active orders',
+  orders: 'Open orders',
   history: 'Order history',
 };
 
@@ -252,7 +251,7 @@ export default function LoadsList() {
               <td className="is-primary is-truncate bk-col-customer" title={load.customer_name || ''}>
                 {load.customer_name || '—'}
                 {/* Phones: the load number rides under the customer (its column folds away). */}
-                <span className="bk-phone-sub" title={load.load_number}>{load.load_number}</span>
+                <RecordNo value={load.load_number} />
               </td>
               <td className={`bk-col-route${showInvoiceAction ? ' is-truncate' : ' bk-route-cell'}`} title={`${load.pickup_location} to ${load.delivery_location}`}>
                 {showInvoiceAction ? routeText(load) : (
@@ -285,10 +284,8 @@ export default function LoadsList() {
                 })()}
               </td>
               <td className="is-money" title={formatCurrency(parseFloat(load.total_amount || '0'))}>
-                {showInvoiceAction ? formatCurrency(parseFloat(load.total_amount || '0')) : (
-                  // Phones show whole rands so the stale line keeps its one line.
-                  <><span className="bk-amt-long">{formatCurrency(parseFloat(load.total_amount || '0'))}</span><span className="bk-amt-short">{formatMoneyWhole(parseFloat(load.total_amount || '0'))}</span></>
-                )}
+                {/* Lists show whole rands at every width; cents stay on the invoice (R7). */}
+                {formatMoneyWhole(parseFloat(load.total_amount || '0'))}
               </td>
               {showInvoiceAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
                 {/* One quiet row menu (R4): no column of blue "Create invoice" links. */}
@@ -350,8 +347,9 @@ export default function LoadsList() {
   );
   const wholeRand = (n: number) => formatMoneyWhole(n);
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-  const noVehicleCount = activeLoads.filter(hasNoVehicle).length;
-  const staleNoVehicle = activeLoads.filter(l => hasNoVehicle(l) && staleWork(l)?.overdue).length;
+  const needVehicle = activeLoads.filter(l => hasNoVehicle(l) && !ON_THE_MOVE.includes(l.status));
+  const needVehicleStale = needVehicle.filter(l => staleWork(l)?.overdue).length;
+  const movingNoVehicle = activeLoads.filter(l => hasNoVehicle(l) && ON_THE_MOVE.includes(l.status)).length;
   const deliveredNotInvoiced = historyLoads.filter(l => l.status === 'DELIVERED').length;
   const completedLoads = historyLoads.filter(l => l.status !== 'CANCELLED');
 
@@ -402,37 +400,45 @@ export default function LoadsList() {
         <div>
           {loading ? <TilesSkeleton count={3} /> : activeLoads.length > 0 ? summary([
             {
+              // Only orders that can still get a vehicle (Pending, Assigned).
+              // One already loading or in transit can't, so it is named in
+              // the note, not counted (R7).
               label: 'Need a vehicle',
-              value: noVehicleCount,
-              // Loads already past their delivery date need closing, not a
-              // vehicle (R6): the note says so instead of "Assign a vehicle".
-              note: noVehicleCount === 0 ? 'All have a vehicle'
-                : staleNoVehicle === noVehicleCount ? 'All past delivery date'
-                : staleNoVehicle > 0 ? `${staleNoVehicle} past delivery date` : 'Assign a vehicle',
-              tip: 'Active orders with no vehicle, in any status, including loads already in transit. Loads past their delivery date are flagged in the table.',
-              attention: noVehicleCount > 0,
+              value: needVehicle.length,
+              note: needVehicle.length === 0 ? 'All have a vehicle'
+                : needVehicleStale === needVehicle.length ? 'All past delivery date'
+                : needVehicleStale > 0 ? `${needVehicleStale} past delivery date` : 'Assign a vehicle',
+              tip: `Pending or Assigned orders with no vehicle.${movingNoVehicle > 0 ? ` Not counted: ${movingNoVehicle === 1 ? '1 order already loading or in transit without one; it' : `${movingNoVehicle} orders already loading or in transit without one; they`} can no longer be given a vehicle, only closed or cancelled.` : ''}`,
+              attention: needVehicle.length > 0,
             },
             (() => {
-              // Named by status (R5), so the note never reads as the same
-              // loads as the figure ("4 · 4 loading or assigned").
-              const loadingN = activeLoads.filter(l => l.status === 'LOADING').length;
-              const assignedN = activeLoads.filter(l => l.status === 'ASSIGNED').length;
-              const parts = [loadingN ? `${loadingN} loading` : '', assignedN ? `${assignedN} assigned` : ''].filter(Boolean);
+              // The note describes these same loads (R7), never the other
+              // statuses, so it can't read as a breakdown of the figure.
+              const inTransit = activeLoads.filter(l => l.status === 'IN_TRANSIT');
+              const late = inTransit.filter(l => staleWork(l)?.overdue).length;
               return {
                 label: 'In transit',
-                value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length,
-                note: parts.length ? parts.join(', ') : 'None loading or assigned',
-                tip: 'Orders with status In transit. The note counts the other orders that are Loading or Assigned, not these.',
+                value: inTransit.length,
+                note: inTransit.length === 0 ? 'None on the road'
+                  : late === inTransit.length ? (inTransit.length === 1 ? 'Past its delivery date' : 'All past delivery date')
+                  : late > 0 ? `${late} past delivery date` : 'All on schedule',
+                tip: 'Orders with status In transit. Loads past their delivery date are flagged in the table: close them via the order.',
               };
             })(),
             (() => {
+              // "Active" means current work (R7): orders left open past their
+              // dates are counted as left open, never as active.
               const total = activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0);
+              const leftOpen = activeLoads.filter(l => staleWork(l)).length;
+              const current = activeLoads.length - leftOpen;
               return {
-                label: 'Active order value',
+                label: 'Open order value',
                 value: wholeRand(total),
                 title: formatCurrency(total),
-                note: plural(activeLoads.length, 'active order', 'active orders'),
-                tip: 'Sum of order totals across active orders.',
+                note: leftOpen === 0 ? plural(current, 'active order', 'active orders')
+                  : current === 0 ? `${plural(leftOpen, 'order', 'orders')}, all left open`
+                  : `${current} active · ${leftOpen} left open`,
+                tip: 'Sum of order totals across orders not yet delivered or cancelled. "Left open" means past the delivery date, or open for more than 30 days.',
               };
             })(),
           ]) : (
@@ -499,7 +505,10 @@ export default function LoadsList() {
             className="bk-hist-toolbar"
             meta={`${filteredHistory.length} ${filteredHistory.length === 1 ? 'record' : 'records'}`}
             end={
-              <Segmented
+              // Phones: the count and a status select share one row under
+              // the search, like Orders (two rows, not three; R7).
+              <StatusFilter
+                compactOnPhone
                 label="Filter history by status"
                 value={historyFilter}
                 onChange={setHistoryFilter}

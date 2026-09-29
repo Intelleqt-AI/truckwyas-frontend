@@ -567,7 +567,9 @@
 .cd-tiles-skel .ops-kpis { margin-bottom: 0; }
 /* History toolbar on phones: the four-option seg always takes its own line,
    so the count arriving ("0" to "17 records") never re-wraps the row. */
-@media (max-width: 767px) { .bk-hist-toolbar .tw-toolbar__end { flex-basis: 100%; } }
+/* R7: History uses the Orders pattern on phones (count + status select on
+   one row under the search), so the toolbar is two rows, not three. */
+@media (max-width: 767px) { .bk-hist-toolbar .tw-toolbar__end { flex: 1 1 0; min-width: 0; } .bk-hist-toolbar .bk-filter--compact .bk-filter__select { min-width: 0; } }
 
 /* ---- Round 5: stale work and honest progress ---- */
 /* Stale work (an open order past its delivery date or older than 30 days):
@@ -662,3 +664,42 @@
 /* Customer detail tables on phones: long record IDs truncate (their title
    holds the full number) so Status and Balance stay in the card. */
 @container (max-width: 520px) { .bk-table .cd-col-id { max-width: 15ch; } }
+.bk-missing .load-error__icon { color: var(--text-tertiary); }
+
+/* ---- Round 7 ---- */
+/* Record numbers: the full number where it fits; the distinguishing tail
+   ("…0310-1004") on narrow rows, never a cut-off prefix. */
+.bk-table .bk-id-short { display: none; }
+@container (max-width: 520px) {
+  .bk-table .bk-id-long { display: none; }
+  .bk-table .bk-id-short { display: inline; }
+}
+@container (max-width: 520px) {
+  .bk-table .bk-id-short { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .bk-table--loads .bk-col-customer { max-width: 19ch; }
+}
+/* Booking detail: "in the ⋯ menu" only where Change status sits in ⋯. */
+.bk-phone-note { display: none; }
+@media (max-width: 768px) { .bk-phone-note { display: inline; } }
+/* Customer detail (R7): Invoices, Quotes and Open orders share one column
+   grid, so Date, Status and Amount line up down the page. Phones keep the
+   auto layout (columns fold away there). */
+@container (min-width: 701px) {
+  .bk-table.cd-grid { table-layout: fixed; width: 100%; }
+  .bk-table.cd-grid col.cd-c-id { width: 20%; }
+  .bk-table.cd-grid col.cd-c-2 { width: 15%; }
+  .bk-table.cd-grid col.cd-c-3 { width: 13%; }
+  .bk-table.cd-grid col.cd-c-date { width: 20%; }
+  .bk-table.cd-grid col.cd-c-status { width: 17%; }
+  .bk-table.cd-grid col.cd-c-amt { width: 15%; }
+  .bk-table.cd-grid td, .bk-table.cd-grid th { overflow: hidden; text-overflow: ellipsis; }
+  .bk-table.cd-grid .cd-due { white-space: nowrap; }
+}
+/* Customer detail on phones (R7): while the figures load, the cards below
+   wait behind one placeholder, so the tiles landing (one or two rows) never
+   push content that is already on screen. */
+.cd-wait-skel { display: none; }
+@media (max-width: 767px) {
+  .cd-waiting .cd-after { display: none; }
+  .cd-waiting .cd-wait-skel { display: block; }
+}

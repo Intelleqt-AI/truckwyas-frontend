@@ -243,8 +243,13 @@ export default function CustomerDetail() {
   // Tiles show whole rands; the exact amount sits in the title.
   const wholeRand = (n: number) => formatMoneyWhole(n);
 
+  // Phones (R7): the figure tiles wrap to one or two rows depending on the
+  // data, so until quotes and invoices arrive the cards below wait too (one
+  // placeholder), and nothing already on screen moves when the tiles land.
+  const figuresWaiting = quotesData === undefined || (!ledger.data && !ledger.error);
+
   return (
-    <div className="bk-detail bookings-typography">
+    <div className={`bk-detail bookings-typography${figuresWaiting ? ' cd-waiting' : ''}`}>
       {/* Back + Header */}
       <SectionHeader
         title={displayName}
@@ -267,7 +272,12 @@ export default function CustomerDetail() {
               Until quotes and invoices arrive, tile placeholders hold the row
               (never the "not quoted yet" notice, which would then swap out). */}
           {quotesData === undefined || (!ledger.data && !ledger.error) ? (
-            <div className="cd-tiles-skel"><TilesSkeleton count={2} /></div>
+            // Four placeholders: the usual row for a customer with invoices and
+            // quotes. On phones they take the same two rows the tiles will (R7).
+            <>
+              <div className="cd-tiles-skel"><TilesSkeleton count={4} /></div>
+              <div className="cd-wait-skel"><BlockSkeleton height={342} label="Loading customer" /></div>
+            </>
           ) : (owed > 0 || totalQuotes > 0) ? (
             <KpiRow>
               {owed > 0 && (
@@ -318,7 +328,7 @@ export default function CustomerDetail() {
 
           {/* Contact details: a definition grid across the column, not
               label/value rows with the value 700px from its label. */}
-          <section className="bk-card" aria-labelledby="cd-contact-title">
+          <section className="bk-card cd-after" aria-labelledby="cd-contact-title">
             <div className="bk-card__head"><h2 className="bk-card__title" id="cd-contact-title">Contact details</h2></div>
             <dl className="bk-facts bk-facts--auto cd-contact">
               {[
@@ -341,7 +351,7 @@ export default function CustomerDetail() {
         </div>
 
         {/* Account Details: sticky rail */}
-        <section ref={railRef} className="bk-card" aria-labelledby="cd-account-title">
+        <section ref={railRef} className="bk-card cd-after" aria-labelledby="cd-account-title">
           <div className="bk-card__head"><h2 className="bk-card__title" id="cd-account-title">Account details</h2></div>
           {[
             { label: "Payment terms", value: paymentTermsLabel(customer.payment_terms_default) },
@@ -375,7 +385,7 @@ export default function CustomerDetail() {
       </div>
 
       {/* Invoices: open ones first, then the most recent settled ones. */}
-      <section className="bk-card" style={{ marginTop: "var(--section-gap, 24px)", padding: 0 }} aria-labelledby="cd-invoices-title">
+      <section className="bk-card cd-after" style={{ marginTop: "var(--section-gap, 24px)", padding: 0 }} aria-labelledby="cd-invoices-title">
         <div className="bk-card__head" style={{ padding: "var(--card-pad, 20px) var(--card-pad, 20px) 0" }}>
           <h2 className="bk-card__title" id="cd-invoices-title">Invoices</h2>
           <span className="bk-toolbar__end">
@@ -395,14 +405,17 @@ export default function CustomerDetail() {
           <div className="bk-empty"><p className="bk-empty__text">No invoices for this customer yet.</p></div>
         ) : (
           <div className="bk-table-wrap bk-table-wrap--bare">
-            <table className="table-heading-roles bk-table">
+            {/* The three tables share one column grid (R7): Date, Status and
+                Amount sit at the same x on Invoices, Quotes and Open orders. */}
+            <table className="table-heading-roles bk-table cd-grid">
+              <colgroup><col className="cd-c-id" /><col className="cd-c-2" /><col className="cd-c-3" /><col className="cd-c-date" /><col className="cd-c-status" /><col className="cd-c-amt" /></colgroup>
               <thead>
                 <tr>
                   <th scope="col">Invoice</th>
                   <th scope="col" className="bk-col-opt">Issued</th>
+                  <th scope="col" className="is-num bk-col-narrow">Total</th>
                   <th scope="col" className="bk-col-phone">Due</th>
                   <th scope="col">Status</th>
-                  <th scope="col" className="is-num bk-col-narrow">Total</th>
                   <th scope="col" className="is-num">Balance</th>
                 </tr>
               </thead>
@@ -413,13 +426,13 @@ export default function CustomerDetail() {
                     <tr key={inv.id} className="is-clickable" {...rowLink(() => navigate(`/finance/invoices/${inv.id}`))} onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
                       <td className="is-id is-truncate cd-col-id" title={inv.invoice_number}>{inv.invoice_number}</td>
                       <td className="is-date bk-col-opt">{inv.issue_date ? formatDate(inv.issue_date) : "Not issued"}</td>
-                      <td className="is-date bk-col-phone">
+                      <td className="is-num bk-col-narrow" title={formatZAR(num(inv.total_amount))}>{wholeRand(num(inv.total_amount))}</td>
+                      <td className="is-date bk-col-phone cd-due">
                         {inv.due_date ? formatDate(inv.due_date) : "Not set"}
-                        {late && <span className="bk-muted"> · {daysBetween(inv.due_date, today)} days late</span>}
+                        {late && <span className="bk-muted cd-due__late"> · {daysBetween(inv.due_date, today)} days late</span>}
                       </td>
                       <td><StatusChip status={late && String(inv.status).toUpperCase() === "SENT" ? "OVERDUE" : inv.status} size="sm" /></td>
-                      <td className="is-num bk-col-narrow">{formatZAR(num(inv.total_amount))}</td>
-                      <td className="is-money">{isOpen(inv) ? formatZAR(num(inv.balance)) : <span className="bk-muted" aria-label="Nothing due">—</span>}</td>
+                      <td className="is-money" title={isOpen(inv) ? formatZAR(num(inv.balance)) : undefined}>{isOpen(inv) ? wholeRand(num(inv.balance)) : <span className="bk-muted" aria-label="Nothing due">—</span>}</td>
                     </tr>
                   );
                 })}
@@ -430,7 +443,7 @@ export default function CustomerDetail() {
       </section>
 
       {/* Quotes table */}
-      <section className="bk-card" style={{ marginTop: "var(--section-gap, 24px)", padding: 0 }} aria-labelledby="cd-quotes-title">
+      <section className="bk-card cd-after" style={{ marginTop: "var(--section-gap, 24px)", padding: 0 }} aria-labelledby="cd-quotes-title">
         <div className="bk-card__head" style={{ padding: "var(--card-pad, 20px) var(--card-pad, 20px) 0" }}>
           <h2 className="bk-card__title" id="cd-quotes-title">Quotes</h2>
           <span className="bk-toolbar__end">
@@ -445,13 +458,14 @@ export default function CustomerDetail() {
           </div>
         ) : (
           <div className="bk-table-wrap bk-table-wrap--bare">
-            <table className="table-heading-roles bk-table">
+            <table className="table-heading-roles bk-table cd-grid">
+              <colgroup><col className="cd-c-id" /><col className="cd-c-2" /><col className="cd-c-3" /><col className="cd-c-date" /><col className="cd-c-status" /><col className="cd-c-amt" /></colgroup>
               <thead>
                 <tr>
                   <th scope="col">Quote</th>
-                  <th scope="col" className="bk-col-route">Route</th>
-                  <th scope="col">Status</th>
+                  <th scope="col" className="bk-col-route" colSpan={2}>Route</th>
                   <th scope="col" className="bk-col-narrow">Date</th>
+                  <th scope="col">Status</th>
                   <th scope="col" className="is-num">Amount</th>
                 </tr>
               </thead>
@@ -466,8 +480,11 @@ export default function CustomerDetail() {
                     <td className="is-id is-truncate cd-col-id">
                       {q.quote_number || `#${q.id}`}
                     </td>
-                    <td className="is-truncate bk-col-route" title={`${q.pickup_location || "—"} → ${q.delivery_location || "—"}`}>
+                    <td className="is-truncate bk-col-route" colSpan={2} title={`${q.pickup_location || "—"} → ${q.delivery_location || "—"}`}>
                       {q.pickup_location || "—"} → {q.delivery_location || "—"}
+                    </td>
+                    <td className="is-date bk-col-narrow">
+                      {q.created_at ? formatDate(q.created_at) : "—"}
                     </td>
                     <td>
                       {/* A quote that became a load reads as booked, not as the load's own state. */}
@@ -478,11 +495,8 @@ export default function CustomerDetail() {
                           ? <StatusChip status="LOST" label="Marked lost" size="sm" />
                           : <StatusChip status={q.status} size="sm" />}
                     </td>
-                    <td className="is-date bk-col-narrow">
-                      {q.created_at ? formatDate(q.created_at) : "—"}
-                    </td>
-                    <td className="is-money">
-                      {q.total_amount || q.quote_price ? formatZAR(parseFloat(q.total_amount || q.quote_price)) : "—"}
+                    <td className="is-money" title={q.total_amount || q.quote_price ? formatZAR(parseFloat(q.total_amount || q.quote_price)) : undefined}>
+                      {q.total_amount || q.quote_price ? wholeRand(parseFloat(q.total_amount || q.quote_price)) : "—"}
                     </td>
                   </tr>
                 ))}
@@ -511,11 +525,12 @@ export default function CustomerDetail() {
               <span className="bk-toolbar__end">{open.length} {open.length === 1 ? 'order' : 'orders'}</span>
             </div>
             <div className="bk-table-wrap bk-table-wrap--bare">
-              <table className="table-heading-roles bk-table cd-orders">
+              <table className="table-heading-roles bk-table cd-orders cd-grid">
+                <colgroup><col className="cd-c-id" /><col className="cd-c-2" /><col className="cd-c-3" /><col className="cd-c-date" /><col className="cd-c-status" /><col className="cd-c-amt" /></colgroup>
                 <thead>
                   <tr>
                     <th scope="col">Load</th>
-                    <th scope="col" className="bk-col-route">Route</th>
+                    <th scope="col" className="bk-col-route" colSpan={3}>Route</th>
                     <th scope="col">Status</th>
                     <th scope="col" className="is-num">Amount</th>
                   </tr>
@@ -528,12 +543,12 @@ export default function CustomerDetail() {
                     return (
                       <tr key={l.id} className="is-clickable" {...rowLink(() => navigate(`/bookings/${l.id}`))} onClick={() => navigate(`/bookings/${l.id}`)}>
                         <td className="is-id is-truncate cd-orders__load" title={l.load_number}>{l.load_number}</td>
-                        <td className="is-truncate bk-col-route" title={`${l.pickup_location} to ${l.delivery_location}`}>{from} → {to}</td>
+                        <td className="is-truncate bk-col-route" colSpan={3} title={`${l.pickup_location} to ${l.delivery_location}`}>{from} → {to}</td>
                         <td className="bk-col-status">
                           <StatusChip status={l.status} size="sm" />
                           {st && <span className="bk-status-flag bk-status-flag--stale"><span className="bk-stale-long">{staleLabel(st).text}</span><span className="bk-stale-short">{staleLabel(st).text.replace(` ${new Date().getFullYear()} (`, ' (')}</span></span>}
                         </td>
-                        <td className="is-money" title={formatCurrency(parseFloat(l.total_amount || '0'))}><span className="bk-amt-long">{formatCurrency(parseFloat(l.total_amount || '0'))}</span><span className="bk-amt-short">{formatMoneyWhole(parseFloat(l.total_amount || '0'))}</span></td>
+                        <td className="is-money" title={formatCurrency(parseFloat(l.total_amount || '0'))}>{formatMoneyWhole(parseFloat(l.total_amount || '0'))}</td>
                       </tr>
                     );
                   })}

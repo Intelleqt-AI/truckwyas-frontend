@@ -91,7 +91,7 @@ export function ReportLibrary({ d }: { d: Ledger | null }) {
   const list = GROUPS.flatMap(g => REPORTS.filter(r => r.group === g));
   return (
     <section className="tw-card tw-card--flush fr-lib" aria-label="Reports">
-      <div className="fr-lib__head" aria-hidden="true">
+      <div className="fr-lib__head">
         <span>Report</span>
         <span className="fr-lib__col-purpose">What it answers</span>
         <span className="fr-lib__col-fig">

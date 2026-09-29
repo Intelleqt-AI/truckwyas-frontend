@@ -13,8 +13,10 @@ import { MobileAuthLayout } from "@/components/MobileAuthLayout";
 const MONTHLY_FEE = formatMoneyWhole(4499); // "R 4 499"
 const TAKE_RATE = formatPercent(0.25, 2); // "0,25%"
 
-const SIGNUP_STEPS = [
-  { label: "Create your account", detail: "Name, email and password, just below" },
+// Step 1 points at the form wherever the layout puts it: to the right of the
+// steps on desktop, above them on phones (the steps sit in the footer there).
+const signupSteps = (formIs: "on the right" | "above") => [
+  { label: "Create your account", detail: `Name, email and password, in the form ${formIs}` },
   { label: "Verify your email", detail: "We send a 6-digit code, valid for 10 minutes" },
   { label: "Add card and pay", detail: "The monthly fee, charged via Paystack. Your fleet goes live the moment it clears" },
 ];
@@ -286,7 +288,7 @@ const Signup = () => {
       {/* The 3 steps — sets the expectation up front instead of surprising
           people at the payment step */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-        {SIGNUP_STEPS.map((step, i) => (
+        {signupSteps(isMobile ? "above" : "on the right").map((step, i) => (
           <div key={step.label} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <div style={{
               flex: 'none', width: 22, height: 22, borderRadius: '50%',
@@ -305,9 +307,12 @@ const Signup = () => {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px 16px' }}>
+      {/* Two columns; a feature too long for half the width takes a whole
+          row (dense packing keeps the others paired), so none wraps to an
+          orphan word ("… your own / costs"). */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridAutoFlow: 'row dense', gap: '8px 16px' }}>
         {PLAN_FEATURES.map(f => (
-          <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+          <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', gridColumn: f.length > 28 ? '1 / -1' : undefined }}>
             <Check size={16} aria-hidden="true" style={{ color: 'var(--text-primary)', flexShrink: 0, marginTop: 2 }} />
             {f}
           </div>
@@ -336,39 +341,11 @@ const Signup = () => {
   }
 
   return (
-    <div className="signup-split">
-      <style>{`
-        .signup-split {
-          /* html/body/#root are pinned to height:100vh + overflow:hidden
-             app-wide (the dashboard shell scrolls internally instead) — this
-             page's content can be taller than one viewport, so it needs to
-             be its own scroll container or the form becomes unreachable. */
-          height: 100vh;
-          overflow-y: auto;
-          display: flex;
-          background: var(--bg-deep);
-        }
-        .signup-split__content, .signup-split__form {
-          flex: 1 1 50%;
-          min-width: 0;
-          /* Both columns start at the same top edge, so the form card lines
-             up with the brand block instead of floating mid-height. */
-          padding: 80px 48px 48px;
-          display: flex;
-          flex-direction: column;
-          justify-content: flex-start;
-        }
-        .signup-split__form { align-items: center; }
-      `}</style>
-
+    <div className="signup-split tw-auth-split tw-auth-split--tall">
       {/* Content side — what you're signing up for, before the form asks for anything */}
-      <div className="signup-split__content" style={{
-        position: 'relative', overflow: 'hidden',
-        background: 'var(--bg-deep)',
-        borderRight: '1px solid var(--border-subtle)',
-      }}>
+      <div className="tw-auth-split__brand">
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
-          <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
+          <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ height: 32, width: 'auto', display: 'block' }} />
 
           <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)', marginBottom: 10 }}>
             One flat price, no hidden tiers
@@ -383,7 +360,7 @@ const Signup = () => {
       </div>
 
       {/* Form side */}
-      <div className="signup-split__form">
+      <div className="tw-auth-split__form">
         {formCard}
       </div>
     </div>

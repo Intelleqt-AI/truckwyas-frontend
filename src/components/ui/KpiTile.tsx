@@ -91,6 +91,8 @@ export interface KpiStat {
  *   />
  *
  * Pass `bare` to render the line without its own card (inside an existing card).
+ * With one or two figures the card is as wide as its stats (tw-kpi-stats--fit),
+ * so it never shows a long empty tail.
  */
 export function KpiStats({
   items, title, actions, bare, className, ...rest
@@ -103,7 +105,11 @@ export function KpiStats({
   'aria-label'?: string;
 }) {
   const shown = items.filter((i) => i.figure !== undefined && i.figure !== null && i.figure !== '');
-  const cls = ['tw-kpi-stats', bare ? 'tw-kpi-stats--bare' : 'tw-card', className ?? ''].filter(Boolean).join(' ');
+  // R7: one or two figures never stretch across the page (a 1100px card with
+  // two 150px stats was 40% empty). The card sizes to its stats instead; three
+  // or more share the width evenly. Phones keep the full-width two-up line.
+  const fit = !bare && shown.length <= 2;
+  const cls = ['tw-kpi-stats', bare ? 'tw-kpi-stats--bare' : 'tw-card', fit ? 'tw-kpi-stats--fit' : '', className ?? ''].filter(Boolean).join(' ');
   return (
     <section className={cls} aria-label={rest['aria-label']}>
       {(title || actions) && (

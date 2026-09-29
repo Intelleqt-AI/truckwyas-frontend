@@ -3,6 +3,8 @@ import { StatusMenu } from './StatusMenu';
 import SectionHeader from '@/components/layout/SectionHeader';
 import { formatDate, formatDistance, formatMoney, formatMoneyWhole, formatMonth, formatNumber } from '@/lib/formatters';
 import { Link } from 'react-router-dom';
+import { FileSearch } from 'lucide-react';
+import LoadError from '@/components/data/LoadError';
 import { StatusChip as SharedStatusChip } from '@/components/ui/StatusChip';
 import { Segmented } from '@/components/ui/Segmented';
 import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
@@ -406,19 +408,33 @@ export function DetailSkeleton({ crumb, crumbTo }: { crumb?: string; crumbTo?: s
   );
 }
 
-export function DetailMessage({ title, body, primary, secondary }: {
-  title: string; body: string; primary: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void };
+/**
+ * A record that could not be shown (R7): the page head (H1 = the record's
+ * type, "Vehicle" / "Driver", or "… not found") and the breadcrumb stay, as on
+ * Invoice. A 404 says the record is not there, with one way back; any other
+ * failure is a load error with Retry.
+ */
+export function RecordState({ kind, type, crumb, crumbTo, what, error, busy, onRetry, missingTitle, missingHint, backLabel }: {
+  kind: 'error' | 'missing'; type: string; crumb: string; crumbTo: string;
+  /** "this vehicle" */ what: string;
+  error?: unknown; busy?: boolean; onRetry?: () => void;
+  missingTitle: string; missingHint: string; backLabel: string;
 }) {
   return (
     <div className="fleet-detail">
-      <div className="fd-message" role="alert">
-        <h1 className="fd-message__title">{title}</h1>
-        <p className="fd-message__body">{body}</p>
-        <div className="fd-message__actions">
-          <button type="button" className="btn-action" onClick={primary.onClick}>{primary.label}</button>
-          {secondary && <button type="button" className="fd-button" onClick={secondary.onClick}>{secondary.label}</button>}
+      <SectionHeader title={kind === 'missing' ? `${type} not found` : type} back={{ to: crumbTo, label: crumb }} />
+      {kind === 'error' ? (
+        <LoadError what={what} error={error} busy={busy} onRetry={onRetry ?? (() => {})} />
+      ) : (
+        <div className="load-error fd-missing" role="status">
+          <FileSearch className="load-error__icon" size={20} aria-hidden="true" />
+          <div className="load-error__text">
+            <p className="load-error__title">{missingTitle}</p>
+            <p className="load-error__hint">{missingHint}</p>
+          </div>
+          <Link className="tw-btn load-error__retry" to={crumbTo}>{backLabel}</Link>
         </div>
-      </div>
+      )}
     </div>
   );
 }

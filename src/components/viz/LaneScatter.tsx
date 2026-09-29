@@ -86,9 +86,10 @@ export function LaneScatter({ points, overallPerKm, minTrips, height: heightProp
   const avgY = overallPerKm != null && overallPerKm > 0 ? y(overallPerKm) : null;
   const avgText = overallPerKm != null ? `Fleet ${rand(overallPerKm)}/km` : '';
   const avgBox = avgY != null && W >= 520 ? textBox(avgText, W - padR, avgY - 6, 'end') : null;
-  // Lane labels may cross the average hairline (they carry a surface halo) but never its text.
+  // Lane labels keep clear of the average hairline and its text (R7: no label crosses a rule).
   const placed: Box[] = [
     ...(avgBox ? [avgBox] : []),
+    ...(avgY != null ? [{ x0: axisW, x1: W - padR, y0: avgY - 0.5, y1: avgY + 0.5 }] : []),
   ];
   const labels: { p: LanePoint; lx: number; ly: number; anchor: 'start' | 'end' | 'middle' }[] = [];
   for (const p of want) {
@@ -148,7 +149,7 @@ export function LaneScatter({ points, overallPerKm, minTrips, height: heightProp
       <Legend items={[
         ...(evidenced.length > 0 ? [{ label: `${minTrips}+ trips`, color: VIZ.accent, shape: 'dot' as const }] : []),
         { label: `Fewer than ${minTrips} trips`, color: VIZ.neutralStrong, shape: 'ring' },
-        ...(overallPerKm ? [{ label: `Fleet average${period ? ` (${period})` : ''}, ${rand(overallPerKm)}/km`, color: 'var(--text-secondary)', shape: 'line' as const }] : []),
+        ...(overallPerKm ? [{ label: `Fleet average${period ? ` (${period})` : ''}${avgBox ? '' : `, ${rand(overallPerKm)}/km`}`, color: 'var(--text-secondary)', shape: 'line' as const }] : []),
       ]} />
       <div ref={ref} onPointerLeave={close}>
         <svg ref={svgRef} width={W} height={height} role="img" tabIndex={0} className="viz-focusable"

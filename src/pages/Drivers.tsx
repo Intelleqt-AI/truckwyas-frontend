@@ -30,6 +30,7 @@ import { rowLink } from '@/lib/rowLink';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import { fleetMenuItems, useFleetPhoneHead } from '@/components/fleet-detail/fleetHead';
 import { DELIVERED, useLedger } from '@/components/reports/data';
+import { isOpenLoad } from '@/lib/staleWork';
 
 interface Driver {
   id: number;
@@ -281,6 +282,14 @@ export default function Drivers() {
   const ledgerDelivered = ledger.data ? ledger.data.loads.filter((l: any) => DELIVERED.has(String(l.status || '').toUpperCase())) : null;
   const noDriverLoads = ledgerDelivered ? ledgerDelivered.filter((l: any) => l.driver == null).length : 0;
   const completedLoads = ledgerDelivered ? ledgerDelivered.length - noDriverLoads : drivers.reduce((sum, d) => sum + (Number(d.total_trips) || 0), 0);
+  // Drivers not active who still hold an open order (the same load ledger,
+  // no new request): one quiet flag in their Status cell (R7).
+  const openLoadByDriver = new Map<number, any>();
+  for (const row of ledger.data?.loads ?? []) {
+    // The load list returns the driver id; the shared ledger type omits it.
+    const l = row as typeof row & { driver?: number | null };
+    if (l.driver != null && isOpenLoad(l as any) && !openLoadByDriver.has(Number(l.driver))) openLoadByDriver.set(Number(l.driver), l);
+  }
   const now = Date.now();
   const withExpiry = drivers.filter(d => d.license_expiry).map(d => ({ d, t: new Date(d.license_expiry as string).getTime() }));
   const expired = withExpiry.filter(x => x.t < now);
@@ -461,6 +470,9 @@ export default function Drivers() {
                   </td>
                   <td>
                     <StatusChip status={d.status} size="sm" />
+                    {d.status !== 'ACTIVE' && openLoadByDriver.has(d.id) && (
+                      <span className="fleet-table__sub" title={openLoadByDriver.get(d.id)?.load_number || undefined}>On an open order</span>
+                    )}
                   </td>
                   <td className="is-numeric fleet-col-phone">
                     {d.total_trips ?? 0}

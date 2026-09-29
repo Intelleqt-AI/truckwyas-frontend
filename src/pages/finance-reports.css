@@ -38,6 +38,12 @@
   font: 500 12px/16px var(--font-sans); color: var(--text-tertiary);
 }
 .fr-lib__col-fig { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; }
+/* Touch (R7): the head row is 44 tall so the column tip's 44px target fits
+   inside the card (which clips). */
+@media (pointer: coarse) {
+  .fr-lib__head { height: 44px; }
+  .fr-lib__head .tw-info::after { inset: -12px -14px; }
+}
 .fr-lib__col-latest { text-align: right; }
 .fr-lib__head > :last-child::after { content: ''; }
 .fr-lib__list { list-style: none; margin: 0; padding: 0; }
@@ -81,6 +87,9 @@
 /* Toolbar (first content block, --control-h controls, one row at desktop
    widths) with the basis line directly under it. */
 .fr-top { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+/* Touch (R7): the basis line's info tip keeps its 44px target clear of the
+   toolbar controls above it. */
+@media (pointer: coarse) { .fr-top { gap: 14px; } }
 .fr-top > .fr-head.tw-toolbar { margin: 0; flex-wrap: nowrap; }
 /* Block text so the info tip stays on the last line of the basis, never
    orphaned on a line of its own. */
@@ -189,6 +198,14 @@
 .fr-row--ratio > * { color: var(--text-tertiary); font-size: 12px; padding-top: 6px; padding-bottom: 10px; }
 .fr-row--muted > * { color: var(--text-tertiary); }
 .fr-link { color: inherit; text-decoration: none; }
+/* R7: a row's name link takes the whole label cell as its target (the cell
+   is at least 44 tall), so the cell's overflow clipping never cuts the hit
+   area down to the text. The sticky cell is the containing block. */
+@media screen {
+  .fr-table tbody th > .fr-link { position: static; }
+  .fr-table tbody th > .fr-link::after { content: ''; position: absolute; inset: 0; }
+  .fr-table:not(.fr-table--sticky) tbody th:has(> .fr-link) { position: relative; }
+}
 .fr-link:hover { color: var(--accent-primary); text-decoration: underline; text-underline-offset: 3px; }
 .fr-link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
 .fr-statement__foot { padding: 12px var(--card-pad, 20px) 14px; display: flex; flex-direction: column; gap: 4px; }

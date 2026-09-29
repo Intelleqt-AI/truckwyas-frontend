@@ -76,6 +76,18 @@ export function presentSignal(s: { title?: string; body?: string; action?: strin
     return { kind: 'fleet', title, detail, actionLabel };
   }
 
+  // "9 Vehicles Idle" (action ASSIGN → /fleet): a vehicle can't be assigned
+  // from the fleet list, so the row says "View" and opens the available ones
+  // (see idleVehiclesUrl). Loads get a vehicle from Orders, not from here.
+  if (isIdleVehiclesSignal(s)) {
+    return {
+      kind: 'fleet',
+      title: sentenceCaseLabel(normaliseFigures(rawTitle)),
+      detail: rawBody && rawBody !== rawTitle ? normaliseFigures(rawBody) : '',
+      actionLabel: 'View',
+    };
+  }
+
   const fleet = /fleet|vehicle|driver|truck/i.test(`${s.category || ''} ${rawTitle}`);
   return {
     kind: fleet ? 'fleet' : /invoice|payment|cash/i.test(`${s.category || ''} ${rawTitle}`) ? 'invoice' : 'other',
@@ -84,6 +96,11 @@ export function presentSignal(s: { title?: string; body?: string; action?: strin
     actionLabel,
   };
 }
+
+/** True for the backend's "N vehicles idle" signal. */
+export const isIdleVehiclesSignal = (s: { title?: string }) => /(vehicles?|trucks?)\s+idle/i.test(String(s?.title || ''));
+/** Where "N vehicles idle · View" goes: the Vehicles list, Available tile. */
+export const idleVehiclesUrl = '/fleet/vehicles?tile=free';
 
 /** True for the backend's "N loads in transit" signal, which Home replaces with the stale-work row. */
 export const isInTransitSignal = (s: { title?: string }) => /loads?\s+in\s+transit/i.test(String(s?.title || ''));

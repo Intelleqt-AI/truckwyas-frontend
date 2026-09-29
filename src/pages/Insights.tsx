@@ -363,7 +363,8 @@ function FleetTab() {
         <dl className="insights-stats insights-stats--head">
           <div><dt>Trucks</dt><dd>{list.length}</dd></div>
           <div><dt>Available or in use</dt><dd>{working}<span className="insights-stats__note">{list.length - working} in maintenance or other</span></dd></div>
-          <div><dt>With revenue recorded</dt><dd>{earning.length}<span className="insights-stats__note">{list.length - earning.length} with none yet</span></dd></div>
+          {/* R7: the trucks with none are counted once, on the toggle below; the note gives the total instead. */}
+          <div><dt>With revenue recorded</dt><dd>{earning.length}<span className="insights-stats__note">{rand(earning.reduce((s, v) => s + num(v.revenue_generated), 0), 0)} between them</span></dd></div>
         </dl>
         <RankedList
           rows={list.map(v => ({

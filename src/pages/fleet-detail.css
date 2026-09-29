@@ -197,10 +197,7 @@
 /* ---------------------------------------------------------------- states */
 .fleet-detail .fd-skel { border-radius: 6px; background: var(--bg-surface-hover); }
 .fleet-detail .fd-strip .fd-skel { background: var(--bg-surface-hover); }
-.fleet-detail .fd-message { max-width: 440px; margin: 64px auto; text-align: center; }
-.fleet-detail .fd-message__title { margin: 0 0 8px; font: 600 20px/28px var(--font-sans); letter-spacing: -0.01em; }
-.fleet-detail .fd-message__body { margin: 0 0 24px; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
-.fleet-detail .fd-message__actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.fleet-detail .fd-missing .load-error__icon { color: var(--text-tertiary); }
 
 /* ------------------------------------------------------------ responsive */
 /* The loads table sheds its least useful columns as the main column narrows. */
@@ -531,7 +528,7 @@
   .fleet-detail .fd-ghost:hover { background: none; }
   .fleet-detail .fd-ghost:hover::before { background: var(--bg-surface-hover); }
   .fleet-detail .fd-ghost::after { display: none; }
-  .fleet-detail .fd-ghost--row { height: 44px; margin: -8px 0; }
+  .fleet-detail .fd-ghost--row { height: 44px; margin: -8px 0; position: relative; z-index: 1; }
   .fleet-detail .fd-ghost--row::before { inset: 8px 0; }
   .fd-info__btn { width: 44px; height: 44px; margin: -12px -12px; }
 }
@@ -579,3 +576,17 @@
   .fleet-detail .fd-condition__band { grid-area: band; align-self: end; padding-bottom: 5px; }
   .fleet-detail .fd-condition__part > .fd-meter { grid-area: meter; margin-top: 8px; }
 }
+
+/* ======================================================= Round 7 */
+.fleet-detail .fd-nowrap { white-space: nowrap; }
+/* Touch: text links keep their size and get a 44px hit area (R7), in the
+   Now line, the linked-record cards and the Contact rows (e-mail, phone). */
+@media (pointer: coarse) {
+  .fleet-detail .fd-inline-link { position: relative; }
+  .fleet-detail .fd-inline-link::after {
+    content: ''; position: absolute; top: calc(50% - 22px); bottom: calc(50% - 22px); left: min(-4px, calc(50% - 22px)); right: min(-4px, calc(50% - 22px));
+  }
+}
+/* Fleet comparison under Revenue per km: two lines at most (R7). */
+.fleet-detail .fd-perf__narrow { display: none; }
+@container (max-width: 700px) { .fleet-detail .fd-perf__wide { display: none; } .fleet-detail .fd-perf__narrow { display: inline; } }

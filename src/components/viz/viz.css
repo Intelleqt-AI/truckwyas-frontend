@@ -35,6 +35,10 @@
   --viz-ord-3: color-mix(in srgb, var(--viz-neutral-strong) 66%, var(--chart-muted));
   --viz-ord-4: var(--viz-neutral-strong);
   --viz-ord-5: var(--viz-accent);
+  /* Calm lateness strip (R7, Fast Pay): two neutral steps of clearly different
+     lightness (the chart grey, then the ink), both >= 3:1 on the card. */
+  --viz-calm-light: var(--chart-muted);
+  --viz-calm-dark: var(--text-primary);
 
   position: relative;
   min-width: 0;
@@ -91,6 +95,9 @@
   font: 500 13px/20px var(--font-sans); color: var(--link, var(--accent-primary));
 }
 .viz-table-toggle:hover { text-decoration: underline; }
+/* A secondary foot action sits in quiet ink, so a chart foot has one blue link. */
+.viz-table-toggle--quiet { color: var(--text-secondary); }
+.viz-table-toggle--quiet:hover { color: var(--text-primary); }
 /* The ring hugs the text (about 90x24); the touch target comes from ::after, not the box. */
 .viz-table-toggle:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 6px; }
 @media (pointer: coarse) {
@@ -130,7 +137,7 @@
 .viz-strip__seg:hover { box-shadow: inset 0 0 0 2px var(--viz-surface); }
 .viz-strip-labels { display: grid; gap: 8px 16px; margin-top: 12px; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
 .viz-strip-label { display: flex; flex-direction: column; min-width: 0; }
-.viz-strip-label__name { display: flex; align-items: baseline; gap: 6px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.viz-strip-label__name { display: flex; align-items: baseline; gap: 6px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); white-space: nowrap; }
 .viz-strip-label__name .viz-key { transform: translateY(1px); }
 .viz-strip-label__value { font: 600 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .viz-strip-label__meta { font: 400 12px/16px var(--font-sans); color: var(--text-secondary); font-variant-numeric: tabular-nums; }

@@ -278,7 +278,7 @@ export default function UsersTable() {
                 <th className="adm-col-phone" style={thStyle}>Email</th>
                 {showCompanyCol && <th className="adm-col-phone" style={thStyle}>Company</th>}
                 <th className="adm-col-phone" style={thStyle}>Role</th>
-                <th style={thStyle}>Status</th>
+                <th className="adm-col-status" style={thStyle}>Status</th>
                 <th className="adm-col-low" style={thStyle}>Last login</th>
                 <th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th>
               </tr>
@@ -290,15 +290,20 @@ export default function UsersTable() {
                   <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.55 }}>
                     <td className="adm-user-name" style={tdStyle} title={[u.name, !showCompanyCol ? u.company_name : ''].filter(Boolean).join(' · ') || undefined}>
                       {u.name || '—'}
+                      {/* Phones: role (and Inactive, since the Status column folds away) beside the name. */}
+                      {(u.role || !u.is_active) && <span className="adm-user-role-inline"> · {[u.role ? roleLabel(u.role) : '', u.is_active ? '' : 'Inactive'].filter(Boolean).join(' · ')}</span>}
                       {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)' }}>Superuser</span>}
 
                       {/* Phones: email and role ride under the name (their columns fold away). */}
-                      <div className="adm-status-sub adm-owner">{String(u.email || '').split('@')[0]}{String(u.email || '').includes('@') && <><wbr />@{String(u.email).split('@').slice(1).join('@')}</>}{u.role ? ` · ${roleLabel(u.role)}` : ''}</div>
+                      {/* One line (R7): the email alone, ending in an ellipsis only when
+                          it can't fit (full address in the title); the role
+                          rides on the name line instead. */}
+                      <div className="adm-status-sub adm-user-sub" title={u.email || undefined}>{u.email}</div>
                     </td>
                     <td className="adm-col-phone" style={{ ...tdStyle, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.email}>{u.email}</td>
                     {showCompanyCol && <td className="adm-col-phone" style={{ ...tdStyle, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.company_name || undefined}>{u.company_name || '—'}</td>}
                     <td className="adm-col-phone" style={tdStyle}>{roleLabel(u.role)}</td>
-                    <td style={tdStyle}>
+                    <td className="adm-col-status" style={tdStyle}>
                       <StatusChip status={u.is_active ? 'ACTIVE' : 'INACTIVE'} size="sm" />
                     </td>
                     <td className="adm-col-low" style={{ ...tdStyle, whiteSpace: 'nowrap' }} title={u.last_login ? formatDateTime(u.last_login) : undefined}>{fmt(u.last_login)}</td>

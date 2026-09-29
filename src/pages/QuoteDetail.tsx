@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/lib/AuthContext';
 import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
 import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
-import { ArrowLeft, Download } from 'lucide-react';
+import { Download, FileSearch } from 'lucide-react';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
@@ -102,7 +102,8 @@ export default function QuoteDetail() {
   const quoteQuery = useQuery({
     queryKey: ['quote', id],
     queryFn: () => fetchData(`api/v1/quotes/${id}/`),
-    retry: 1,
+    // A 404 is an answer, not a failure: no retry, straight to "not found".
+    retry: (count, err) => (err as { status?: number } | null)?.status !== 404 && count < 1,
   });
   const { data: quote, isLoading, error } = quoteQuery;
   const quoteFailed = loadFailed(quoteQuery);
@@ -244,9 +245,7 @@ export default function QuoteDetail() {
   if (quoteFailed && quoteError?.status !== 404) {
     return (
       <div className="bk-detail">
-        <button type="button" className="bk-back" onClick={() => navigate('/bookings/quotes')}>
-          <ArrowLeft size={16} aria-hidden="true" /> Back to quotes
-        </button>
+        <SectionHeader title="Quote" back={{ to: '/bookings/quotes', label: 'Quotes' }} />
         <LoadError what="this quote" error={quoteError} busy={quoteQuery.isFetching} onRetry={() => quoteQuery.refetch()} />
       </div>
     );
@@ -265,18 +264,19 @@ export default function QuoteDetail() {
     );
   }
 
+  // Not found (404): the head and back link stay; the message and its one
+  // action share a row, like the load-error state (the invoice pattern).
   if (error || !quote) {
     return (
       <div className="bk-detail">
-        <button type="button" className="bk-back" onClick={() => navigate('/bookings/quotes')}>
-          <ArrowLeft size={16} aria-hidden="true" /> Back to quotes
-        </button>
-        <div className="bk-card">
-          <div className="bk-empty" style={{ padding: 16 }}>
-            <h1 className="bk-empty__title">Quote not found</h1>
-            <p className="bk-empty__text">It may have been deleted, or the link is out of date.</p>
-            <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate('/bookings/quotes')}>View quotes</button>
+        <SectionHeader title="Quote not found" back={{ to: '/bookings/quotes', label: 'Quotes' }} />
+        <div className="load-error bk-missing" role="status">
+          <FileSearch className="load-error__icon" size={20} aria-hidden="true" />
+          <div className="load-error__text">
+            <p className="load-error__title">There is no quote at this link</p>
+            <p className="load-error__hint">It may have been deleted, or the link is wrong.</p>
           </div>
+          <button type="button" className="tw-btn load-error__retry" onClick={() => navigate('/bookings/quotes')}>All quotes</button>
         </div>
       </div>
     );

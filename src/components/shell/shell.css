@@ -129,6 +129,11 @@
 .tw-nav__item.is-active:focus-visible { box-shadow: inset 0 0 0 2px var(--nav-active-bg), inset 0 0 0 4px var(--focus-outline, var(--accent-primary)); }
 .tw-nav__icon { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-tertiary); transition: color 0.12s; }
 .tw-nav__item:hover .tw-nav__icon { color: var(--text-primary); }
+/* Equal specificity to the :hover rule above, so without this, hovering the
+   active pill flipped its icon from --nav-active-fg to --text-primary — in
+   light theme those are the same background/icon pair, so the icon vanished
+   into its own pill (#0E1116 on #0E1116). */
+.tw-nav__item.is-active:hover .tw-nav__icon { color: var(--nav-active-fg); }
 .tw-nav__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tw-nav__item.is-muted:not(.is-active) { color: var(--text-tertiary); }
 .tw-nav__soon {

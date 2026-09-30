@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
+import './map/map.css';
 import type { Map as LeafletMap, Marker, Polyline, TileLayer, LeafletMouseEvent } from 'leaflet';
 import type { LocationCoords } from './LocationInput';
 
@@ -8,6 +9,41 @@ type MapField = 'pickup' | 'delivery' | 'return';
 
 const TOMTOM_KEY = import.meta.env.VITE_TOMTOM_API_KEY as string | undefined;
 const SA_CENTER: [number, number] = [-28.4793, 24.6727];
+
+// The app's theme lives on <html data-theme> (dark is the default when unset).
+const isDarkTheme = () =>
+  typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') !== 'light';
+
+// Same TomTom Map Display endpoint and key; only the style segment changes
+// (`main` in light, `night` in dark). Without a key: OpenStreetMap, darkened
+// in dark theme by a CSS filter on the base layer (map/map.css).
+const baseTileUrl = (dark: boolean) =>
+  TOMTOM_KEY
+    ? `https://api.tomtom.com/map/1/tile/basic/${dark ? 'night' : 'main'}/{z}/{x}/{y}.png?key=${TOMTOM_KEY}&tileSize=256`
+    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+// Marker icons: colours come from theme tokens via map/map.css classes.
+function pickupIcon(L: LeafletModule) {
+  return L.divIcon({
+    className: '',
+    html: '<span class="tw-pin"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="9" class="f-accent s-casing" stroke-width="2"/><circle cx="11" cy="11" r="3.5" class="f-white"/></svg></span>',
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
+function deliveryIcon(L: LeafletModule) {
+  return L.divIcon({
+    className: '',
+    html: '<span class="tw-pin"><svg width="26" height="32" viewBox="0 0 24 30" aria-hidden="true"><path class="f-ink s-casing" stroke-width="1.5" d="M12 1.5C6.2 1.5 1.5 6.1 1.5 11.8c0 7.3 8.9 15.6 9.9 16.5a.9.9 0 0 0 1.2 0c1-.9 9.9-9.2 9.9-16.5C22.5 6.1 17.8 1.5 12 1.5z"/><rect x="8.6" y="8.4" width="6.8" height="6.8" rx="1.4" class="f-casing"/></svg></span>',
+    iconSize: [26, 32],
+    iconAnchor: [13, 31],
+  });
+}
+
+function returnIcon(L: LeafletModule) {
+  return L.divIcon({ className: '', html: '<div class="tw-pin-letter">R</div>', iconSize: [20, 20], iconAnchor: [10, 10] });
+}
 
 interface RouteOptionGeo {
   index: number;
@@ -130,6 +166,7 @@ export function MapLocationPicker({
   const routeLinesRef = useRef<Polyline[]>([]);
   const routeLabelsRef = useRef<Marker[]>([]);
   const trafficLayerRef = useRef<TileLayer | null>(null);
+  const baseLayerRef = useRef<TileLayer | null>(null);
   const activeFieldRef = useRef<MapField>(activeField);
   const onActiveFieldChangeRef = useRef(onActiveFieldChange);
   const onLocationSelectRef = useRef(onLocationSelect);
@@ -137,6 +174,18 @@ export function MapLocationPicker({
   const [geocoding, setGeocoding] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [showTraffic, setShowTraffic] = useState(true);
+  const [dark, setDark] = useState(isDarkTheme);
+  const darkRef = useRef(dark);
+
+  // Follow live theme switches (OSLayout toggles html[data-theme]).
+  useEffect(() => {
+    const root = document.documentElement;
+    const sync = () => setDark(isDarkTheme());
+    const observer = new MutationObserver(sync);
+    observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    sync();
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => { activeFieldRef.current = activeField; }, [activeField]);
   useEffect(() => { onActiveFieldChangeRef.current = onActiveFieldChange; }, [onActiveFieldChange]);
@@ -162,13 +211,13 @@ export function MapLocationPicker({
       // doubleClickZoom off: a double-tap selects the point (see 'dblclick' below) instead of zooming.
       const map = L.map(mapRef.current, { center: SA_CENTER, zoom: 5, zoomControl: true, doubleClickZoom: false });
 
-      const tileUrl = TOMTOM_KEY
-        ? `https://api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key=${TOMTOM_KEY}&tileSize=256`
-        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-
-      L.tileLayer(tileUrl, {
+      // Theme read at creation so the first load already uses the right style
+      // (no extra tile requests); later switches swap the URL in place.
+      darkRef.current = isDarkTheme();
+      baseLayerRef.current = L.tileLayer(baseTileUrl(darkRef.current), {
         attribution: TOMTOM_KEY ? '© TomTom' : '© OpenStreetMap contributors',
         maxZoom: 19,
+        className: 'tw-map-base',
       }).addTo(map);
 
       // Live traffic flow overlay (relative0 = Google-Maps-style green→red congestion colours).
@@ -203,6 +252,7 @@ export function MapLocationPicker({
 
     return () => {
       destroyed = true;
+      baseLayerRef.current = null;
       if (instanceRef.current?.map) {
         instanceRef.current.map.remove();
         instanceRef.current = null;
@@ -210,6 +260,16 @@ export function MapLocationPicker({
       setMapReady(false);
     };
   }, []);
+
+  // Theme switched while mounted: TomTom `main` <-> `night` via setUrl (same
+  // layer, same map, markers and state untouched). OSM needs no swap: the CSS
+  // filter follows html[data-theme] on its own.
+  useEffect(() => {
+    if (!mapReady || !TOMTOM_KEY || !baseLayerRef.current) return;
+    if (darkRef.current === dark) return;
+    darkRef.current = dark;
+    baseLayerRef.current.setUrl(baseTileUrl(dark));
+  }, [dark, mapReady]);
 
   // Show/hide the live traffic flow overlay
   useEffect(() => {
@@ -237,36 +297,15 @@ export function MapLocationPicker({
     routeLabelsRef.current = [];
 
     if (pickupCoords) {
-      pickupMarkerRef.current = L.marker([pickupCoords.lat, pickupCoords.lon], {
-        icon: L.divIcon({
-          html: '<div style="background:#0057FF;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">P</div>',
-          className: '',
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
-        }),
-      }).addTo(map);
+      pickupMarkerRef.current = L.marker([pickupCoords.lat, pickupCoords.lon], { icon: pickupIcon(L) }).addTo(map);
     }
 
     if (deliveryCoords) {
-      deliveryMarkerRef.current = L.marker([deliveryCoords.lat, deliveryCoords.lon], {
-        icon: L.divIcon({
-          html: '<div style="background:#e85d04;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">D</div>',
-          className: '',
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
-        }),
-      }).addTo(map);
+      deliveryMarkerRef.current = L.marker([deliveryCoords.lat, deliveryCoords.lon], { icon: deliveryIcon(L) }).addTo(map);
     }
 
     if (returnCoords) {
-      returnMarkerRef.current = L.marker([returnCoords.lat, returnCoords.lon], {
-        icon: L.divIcon({
-          html: '<div style="background:#16a34a;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">R</div>',
-          className: '',
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
-        }),
-      }).addTo(map);
+      returnMarkerRef.current = L.marker([returnCoords.lat, returnCoords.lon], { icon: returnIcon(L) }).addTo(map);
     }
 
     // Outbound leg: P → D
@@ -288,6 +327,12 @@ export function MapLocationPicker({
           if (pts.length < 2) return;
           const isSel = r.index === selectedRouteIndex;
           const color = ROUTE_COLORS[r.index % ROUTE_COLORS.length];
+          // Soft casing under the selected route so it reads on any tile.
+          if (isSel) {
+            routeLinesRef.current.push(
+              L.polyline(pts, { className: 'tw-route-casing', color: '#ffffff', weight: 9, opacity: 0.9, interactive: false }).addTo(map)
+            );
+          }
           const line = L.polyline(
             pts,
             isSel
@@ -303,7 +348,7 @@ export function MapLocationPicker({
           const mid = pts[Math.floor(pts.length / 2)];
           const label = L.marker(mid, {
             icon: L.divIcon({
-              html: `<div style="background:${color};color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);opacity:${isSel ? 1 : 0.65}">${r.index + 1}</div>`,
+              html: `<div class="tw-pin-num" style="background:${color};color:#fff;border:0;opacity:${isSel ? 1 : 0.7}">${r.index + 1}</div>`,
               className: '',
               iconSize: [20, 20],
               iconAnchor: [10, 10],
@@ -322,7 +367,11 @@ export function MapLocationPicker({
         fetchRoute(pickupCoords, deliveryCoords).then((pts) => {
           if (cancelled) return;
           if (lineRef.current) { map.removeLayer(lineRef.current); lineRef.current = null; }
-          lineRef.current = L.polyline(pts, { color: '#0057FF', weight: 4, opacity: 0.85 }).addTo(map);
+          // Accent 4px on a 7px casing, grouped so the existing ref removes both.
+          lineRef.current = L.polyline(pts, { className: 'tw-route', color: '#2563EB', weight: 4, opacity: 1 });
+          const casing = L.polyline(pts, { className: 'tw-route-casing', color: '#ffffff', weight: 7, opacity: 0.9, interactive: false });
+          routeLinesRef.current.push(casing.addTo(map));
+          lineRef.current.addTo(map);
           // Fit to include return marker too if present
           const bounds = lineRef.current.getBounds();
           if (returnCoords) bounds.extend([returnCoords.lat, returnCoords.lon]);
@@ -340,72 +389,69 @@ export function MapLocationPicker({
       fetchRoute(deliveryCoords, returnCoords).then((pts) => {
         if (cancelled) return;
         if (returnLineRef.current) { map.removeLayer(returnLineRef.current); returnLineRef.current = null; }
-        returnLineRef.current = L.polyline(pts, { color: '#16a34a', weight: 4, opacity: 0.8, dashArray: '8 5' }).addTo(map);
+        returnLineRef.current = L.polyline(pts, { className: 'tw-route--return', color: '#434A55', weight: 3, opacity: 0.9, dashArray: '8 6', lineCap: 'round' }).addTo(map);
       });
     }
 
     return () => { cancelled = true; };
   }, [pickupCoords, deliveryCoords, returnCoords, mapReady, routeOptions, selectedRouteIndex]);
 
+  // Dot colours match the map markers (accent pickup, ink drop-off, neutral return).
   const FIELD_CONFIG: { key: MapField; label: string; color: string; visible: boolean }[] = [
-    { key: 'pickup', label: '● PICKUP', color: '#0057FF', visible: true },
-    { key: 'delivery', label: '● DELIVERY', color: '#e85d04', visible: true },
-    { key: 'return', label: '● RETURN', color: '#16a34a', visible: showReturn },
+    { key: 'pickup', label: 'Pickup', color: 'var(--accent-primary, #2563EB)', visible: true },
+    { key: 'delivery', label: 'Delivery', color: 'var(--text-primary, #0E1116)', visible: true },
+    { key: 'return', label: 'Return', color: 'var(--text-secondary, #434A55)', visible: showReturn },
   ];
 
   const btnBase: React.CSSProperties = {
     flex: 1,
-    padding: '6px 10px',
-    borderRadius: 2,
-    fontSize: 10,
-    fontFamily: 'var(--font-mono)',
-    letterSpacing: '0.08em',
+    padding: '8px 12px',
+    minHeight: 40,
+    borderRadius: 'var(--radius-control)',
+    fontSize: 14,
+    lineHeight: '20px',
+    fontFamily: 'var(--font-sans)',
+    letterSpacing: 'normal',
     cursor: 'pointer',
-    fontWeight: 600,
-    transition: 'all 0.15s',
+    fontWeight: 500,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    transition: 'background-color 0.15s, border-color 0.15s, color 0.15s',
   };
+
+  const hasTopRightButton = !!(onExpand || onClose);
 
   return (
     <div style={{ marginBottom: 4 }}>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         {FIELD_CONFIG.filter((f) => f.visible).map(({ key, label, color }) => (
           <button
             key={key}
             type="button"
             onClick={() => onActiveFieldChange(key)}
+            aria-pressed={activeField === key}
             style={{
               ...btnBase,
-              background: activeField === key ? color : 'var(--bg-surface)',
-              border: `1px solid ${activeField === key ? color : 'var(--border-subtle)'}`,
-              color: activeField === key ? '#fff' : 'var(--text-tertiary)',
+              background: activeField === key ? 'var(--accent-dim)' : 'var(--bg-surface)',
+              border: `1px solid ${activeField === key ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+              color: activeField === key ? 'var(--text-primary)' : 'var(--text-secondary)',
             }}
           >
+            <span aria-hidden="true" className="tw-map-dot" style={{ background: color }} />
             {label}
           </button>
         ))}
       </div>
 
-      <div style={{ position: 'relative', border: '1px solid var(--border-subtle)', borderRadius: 3, overflow: 'hidden' }}>
+      <div className={TOMTOM_KEY ? 'tw-map' : 'tw-map tw-map--osm'}>
         <div ref={mapRef} style={{ height: mapHeight, width: '100%' }} />
 
-        <div style={{
-          position: 'absolute', bottom: 8, left: 8, zIndex: 500,
-          background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-          borderRadius: 3, padding: '3px 8px',
-          fontSize: 9, color: '#fff', fontFamily: 'var(--font-mono)',
-          letterSpacing: '0.07em', pointerEvents: 'none',
-        }}>
-          DOUBLE-TAP MAP TO SET {activeField.toUpperCase()}
+        <div className="tw-map-chip" style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 500, pointerEvents: 'none' }}>
+          Double-tap the map to set <strong>{activeField}</strong>
         </div>
 
         {geocoding && (
-          <div style={{
-            position: 'absolute', top: 8, right: 8, zIndex: 500,
-            background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-            borderRadius: 2, padding: '4px 8px',
-            fontSize: 9, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)',
-          }}>
-            LOCATING…
+          <div className="tw-map-chip" role="status" style={{ position: 'absolute', top: 8, right: hasTopRightButton ? 48 : 8, zIndex: 500 }}>
+            Locating…
           </div>
         )}
 
@@ -414,15 +460,11 @@ export function MapLocationPicker({
             type="button"
             onClick={onExpand}
             title="Expand map"
-            style={{
-              position: 'absolute', top: 8, right: 8, zIndex: 500,
-              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-              border: 'none', borderRadius: 3, width: 28, height: 28,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: '#fff', fontSize: 14,
-            }}
+            aria-label="Expand map"
+            className="tw-map-btn"
+            style={{ zIndex: 500 }}
           >
-            ⛶
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 3h6v6" /><path d="m21 3-7 7" /><path d="m3 21 7-7" /><path d="M9 21H3v-6" /></svg>
           </button>
         )}
 
@@ -431,48 +473,38 @@ export function MapLocationPicker({
             type="button"
             onClick={onClose}
             title="Close fullscreen"
-            style={{
-              position: 'absolute', top: 8, right: 8, zIndex: 500,
-              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-              border: 'none', borderRadius: 3, width: 32, height: 32,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: '#fff', fontSize: 18, lineHeight: 1,
-            }}
+            aria-label="Close fullscreen"
+            className="tw-map-btn"
+            style={{ zIndex: 500 }}
           >
-            ✕
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </button>
         )}
 
         {TOMTOM_KEY && (
           <div style={{
-            position: 'absolute', bottom: 8, right: 8, zIndex: 500,
+            position: 'absolute', bottom: 28, right: 8, zIndex: 500,
             display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4,
           }}>
             <button
               type="button"
               onClick={() => setShowTraffic((v) => !v)}
               title="Toggle live traffic"
-              style={{
-                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-                border: `1px solid ${showTraffic ? '#2EAB30' : 'transparent'}`,
-                borderRadius: 3, padding: '4px 8px', cursor: 'pointer',
-                fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.07em',
-                color: showTraffic ? '#7CF07E' : '#cbd5e1', fontWeight: 600,
-              }}
+              className="tw-map-chip"
+              aria-pressed={showTraffic}
             >
-              {showTraffic ? '● TRAFFIC ON' : '○ TRAFFIC OFF'}
+              <span aria-hidden="true" className="tw-map-dot" style={{
+                background: showTraffic ? '#2EAB30' : 'transparent',
+                boxShadow: showTraffic ? 'none' : 'inset 0 0 0 1.5px var(--text-tertiary)',
+              }} />
+              {showTraffic ? 'Traffic on' : 'Traffic off'}
             </button>
             {showTraffic && (
-              <div style={{
-                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-                borderRadius: 3, padding: '3px 8px',
-                fontSize: 8, fontFamily: 'var(--font-mono)', color: '#fff',
-                display: 'flex', gap: 8, alignItems: 'center', letterSpacing: '0.05em',
-              }}>
-                <span style={{ color: '#2EAB30' }}>● clear</span>
-                <span style={{ color: '#F1BF40' }}>● light</span>
-                <span style={{ color: '#F18237' }}>● mod</span>
-                <span style={{ color: '#E70704' }}>● heavy</span>
+              <div className="tw-map-chip" style={{ gap: 8 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span aria-hidden="true" className="tw-map-dot" style={{ background: '#2EAB30' }} /> Clear</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span aria-hidden="true" className="tw-map-dot" style={{ background: '#F1BF40' }} /> Light</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span aria-hidden="true" className="tw-map-dot" style={{ background: '#F18237' }} /> Moderate</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span aria-hidden="true" className="tw-map-dot" style={{ background: '#E70704' }} /> Heavy</span>
               </div>
             )}
           </div>

@@ -1,78 +1,16 @@
+import '@/pages/settings/settings-brand.css';
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { fetchData, patchData } from "@/lib/Api";
 import { enablePush, disablePush, pushSupported, PushStatus } from "@/lib/push";
 import { useAuth } from "@/lib/AuthContext";
+import { SettingsToggleRow, settingsBadgeStyle, settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, SettingsPageHeader } from "./settingsUi";
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 'var(--card-radius)',
-  marginBottom: 16,
-};
-
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: '16px 20px 12px',
-  borderBottom: '1px solid var(--border-subtle)',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  lineHeight: '24px',
-  textTransform: 'none' as const,
-  letterSpacing: 'normal',
-  margin: 0,
-  color: 'var(--text-secondary)',
-  fontWeight: 600,
-};
-
-const sectionBodyStyle: React.CSSProperties = { padding: '4px 0 8px' };
-
-interface ToggleRowProps {
-  label: string;
-  description?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-  disabledTitle?: string;
-}
-
-function ToggleRow({ label, description, checked, onChange, disabled, disabledTitle }: ToggleRowProps) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '12px 20px',
-      borderBottom: '1px solid var(--border-row)',
-      opacity: disabled ? 0.5 : 1,
-    }}>
-      <div>
-        <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: description ? 2 : 0 }}>{label}</div>
-        {description && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{description}</div>}
-      </div>
-      <button
-        onClick={() => !disabled && onChange(!checked)}
-        disabled={disabled}
-        title={disabled ? disabledTitle : undefined}
-        style={{
-          width: 36, height: 20, borderRadius: 10, border: 'none',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          background: checked ? 'var(--accent-primary)' : 'var(--border-active)',
-          position: 'relative', flexShrink: 0, transition: 'background 0.2s',
-        }}
-      >
-        <span style={{
-          position: 'absolute', top: 2, left: checked ? 18 : 2,
-          width: 16, height: 16, borderRadius: '50%', background: 'var(--bg-surface)',
-          transition: 'left 0.2s',
-        }} />
-      </button>
-    </div>
-  );
-}
+const sectionStyle = settingsCardStyle;
+const sectionHeaderStyle = settingsCardHeaderStyle;
+const sectionTitleStyle = settingsCardTitleStyle;
+const sectionBodyStyle: React.CSSProperties = { padding: 0 };
+const ToggleRow = SettingsToggleRow;
 
 // Canonical schema — mirrors backend core/services/notification_prefs.py.
 const DEFAULTS = {
@@ -108,7 +46,7 @@ export function NotificationSettings() {
       .then((d: any) => setSettings(mergeSettings(d)))
       .catch(() => {
         setLoadFailed(true);
-        toast.error('Could not load your notification settings. Showing defaults — retry before saving.');
+        toast.error('Could not load your notification settings. Showing defaults, so retry before saving.');
       });
   };
 
@@ -136,7 +74,7 @@ export function NotificationSettings() {
             const status = await enablePush();
             setPushStatus(status);
             if (status === 'denied') {
-              toast.warn('Browser notifications are blocked for this site — enable them in your browser settings to receive push notifications.');
+              toast.warn('Browser notifications are blocked for this site. Enable them in your browser settings to receive push notifications.');
             }
           } else {
             await disablePush();
@@ -150,7 +88,7 @@ export function NotificationSettings() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
-      toast.error('Saving notification settings failed — your changes are NOT saved. Check your connection and try again.');
+      toast.error('Saving notification settings failed. Your changes are not saved. Check your connection and try again.');
     }
     setSaving(false);
   };
@@ -158,23 +96,19 @@ export function NotificationSettings() {
   const pushHint =
     !pushSupported() ? 'This browser does not support push notifications.'
     : pushStatus === 'denied' ? 'Notifications are blocked for this site in your browser settings.'
-    : pushStatus === 'server-not-configured' ? 'Browser push is not configured on the server yet — in-app toasts still follow these toggles.'
+    : pushStatus === 'server-not-configured' ? 'Browser push is not configured on the server yet. In-app toasts still follow these toggles.'
     : pushStatus === 'subscribed' ? 'This browser will receive push notifications, even when the tab is closed.'
     : undefined;
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
-          Notification Settings
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-          Choose what you get notified about and how
-        </div>
+    // Settings forms cap at 720px so each toggle sits near its label.
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
+      <SettingsPageHeader title="Notifications" description="Choose what you get notified about and how" />
+      <div>
         {loadFailed && (
-          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--status-danger)' }}>
+          <div style={{ marginTop: 8, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>
             Settings failed to load.{' '}
-            <button onClick={load} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: 0, fontSize: 12, textDecoration: 'underline' }}>
+            <button type="button" className="settings-control" onClick={load} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: '20px', textDecoration: 'underline' }}>
               Retry
             </button>
           </div>
@@ -206,7 +140,7 @@ export function NotificationSettings() {
           <ToggleRow label="Maintenance due" checked={settings.push.maintenance_due} onChange={v => setChannel('push', 'maintenance_due', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           <ToggleRow label="Driver status updates" checked={settings.push.driver_updates} onChange={v => setChannel('push', 'driver_updates', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           {pushHint && (
-            <div style={{ padding: '10px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{pushHint}</div>
+            <div style={{ padding: '12px var(--card-pad, 20px)', borderTop: '1px solid var(--border-row)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{pushHint}</div>
           )}
         </div>
       </div>
@@ -215,11 +149,7 @@ export function NotificationSettings() {
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <h2 style={sectionTitleStyle}>SMS notifications</h2>
-          <span style={{
-            fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px', fontWeight: 500,
-            color: 'var(--text-tertiary)',
-            border: '1px solid var(--border-subtle)', borderRadius: 4, padding: '2px 6px',
-          }}>Coming soon</span>
+          <span style={settingsBadgeStyle}>Coming soon</span>
         </div>
         <div style={sectionBodyStyle}>
           <ToggleRow label="Critical alerts only" description="System-wide urgent notifications" checked={settings.sms.critical_alerts} onChange={v => setChannel('sms', 'critical_alerts', v)} disabled />
@@ -227,13 +157,16 @@ export function NotificationSettings() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      {/* One save pattern across Settings (R9): the sticky save bar, as on
+          Company details. It saves every card on this page. */}
+      <div className="cs-savebar">
+        <span className="cs-savebar__note">{saved ? 'Saved.' : 'Applies to the alerts you receive.'}</span>
         <button
-          className="btn-action"
+          className="btn-action settings-control"
           onClick={handleSave}
           disabled={saving || isDemo}
           title={isDemo ? 'Fixed in demo mode' : undefined}
-          style={{ minHeight: 40, borderRadius: 6, opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+          style={{ opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
         >
           {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
         </button>

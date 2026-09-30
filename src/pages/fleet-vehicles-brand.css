@@ -21,17 +21,17 @@
   flex-wrap: wrap;
   gap: 16px;
 }
-.fleet-page .fleet-toolbar { margin-bottom: 16px; }
+.fleet-page .fleet-toolbar { margin-bottom: var(--card-gap, 16px); }
 
 .fleet-page .fleet-summary {
   display: grid;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--card-gap, 16px);
+  margin-bottom: var(--section-gap, 24px);
 }
 .fleet-page .fleet-summary--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .fleet-page .fleet-summary--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .fleet-page .fleet-summary--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.fleet-page .fleet-summary > .card { min-width: 0; padding: 24px; border-radius: 8px; }
+.fleet-page .fleet-summary > .card { min-width: 0; padding: 24px; border-radius: var(--radius-card, 12px); }
 
 /* Shared metric classes carry legacy mono/uppercase — corrected inside this page only. */
 .fleet-page .fleet-summary .card-title {
@@ -56,8 +56,8 @@
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 20px;
-  min-height: 40px;
-  border-radius: 6px;
+  min-height: var(--control-h, 36px);
+  border-radius: var(--radius-control, 8px);
   text-transform: none;
   letter-spacing: normal;
 }
@@ -71,12 +71,169 @@
   outline-offset: 3px;
 }
 
+/* Toolbar: search left, filter chips right — identical on Vehicles and Drivers. */
+.fleet-page .fleet-search {
+  width: 280px;
+  max-width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 8px 12px;
+}
+.fleet-page .fleet-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+.fleet-page .fleet-filter {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.fleet-page .fleet-filter:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+.fleet-page .fleet-filter[aria-pressed="true"] {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-active);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
 /* Table card: intentional zero outer padding + local scroll region. */
-.fleet-page .fleet-table-region { border-radius: 8px; }
+.fleet-page .fleet-table-region {
+  border-radius: var(--radius-card, 12px);
+  padding: 0;
+  overflow-x: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.fleet-page .fleet-table { width: 100%; border-collapse: collapse; }
+.fleet-page .fleet-table th {
+  height: 44px;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.fleet-page .fleet-table td {
+  height: 48px; /* 48px rows; 7px padding leaves room for 32px row controls */
+  box-sizing: border-box;
+  padding: 7px 16px;
+  font: 400 14px/20px var(--font-sans);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+/* First column aligns with the card inset used everywhere else. */
+.fleet-page .fleet-table th:first-child,
+.fleet-page .fleet-table td:first-child { padding-left: var(--fleet-card-inset); }
+.fleet-page .fleet-table th:last-child,
+.fleet-page .fleet-table td:last-child { padding-right: var(--fleet-card-inset); }
+.fleet-page .fleet-table .fleet-table__select { width: 56px; padding-right: 0; }
+.fleet-page .fleet-table .is-numeric { text-align: right; font-variant-numeric: tabular-nums; }
+.fleet-page .fleet-table__id {
+  font: 400 14px/20px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.fleet-page .fleet-table__actions { text-align: right; width: 1%; }
+/* One row action (RowActions). It stays pinned to the right edge so it is
+   reachable without scrolling the table sideways on narrower screens. */
+.fleet-page .fleet-table th:last-child:not([colspan]),
+.fleet-page .fleet-table td.fleet-table__actions {
+  position: sticky; right: 0; z-index: 1;
+  background: var(--bg-surface);
+}
+.fleet-page .fleet-table tbody tr.is-clickable:hover td.fleet-table__actions { background: var(--bg-surface-hover); }
+.fleet-page .fleet-table td.fleet-table__state-cell { padding: 0; }
+.fleet-page .fleet-table td.fleet-table__no-match {
+  padding: 40px var(--fleet-card-inset);
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+.fleet-page .fleet-table-state {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 240px;
+}
+.fleet-page .fleet-empty { padding: 48px var(--fleet-card-inset); text-align: center; white-space: normal; }
+.fleet-page .fleet-empty__icon { margin-bottom: 16px; color: var(--text-tertiary); display: flex; justify-content: center; }
+.fleet-page .fleet-empty__title {
+  margin: 0 0 8px;
+  font: 600 16px/24px var(--font-sans);
+  color: var(--text-primary);
+}
+.fleet-page .fleet-empty__text {
+  margin: 0 0 20px;
+  font: 400 13px/20px var(--font-sans);
+  color: var(--text-secondary);
+}
+.fleet-page .fleet-empty__actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 .fleet-page td { font-variant-numeric: tabular-nums; }
 /* Row actions must not inherit the primary-control width. */
 .fleet-page td button[data-fleet-control] { min-width: 0; width: auto; }
 
+/* Shared fleet panels (heatmap, overview). */
+.fleet-page .fleet-secondary-button {
+  background: none;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.fleet-page .fleet-secondary-button:hover { color: var(--text-primary); }
+.fleet-page .fleet-metric-sub { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); margin-top: 4px; }
+.fleet-page .fleet-muted { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-page .fleet-panel { padding: var(--fleet-card-inset); border-radius: var(--radius-card, 12px); min-width: 0; }
+.fleet-page .fleet-panel__title {
+  margin: 0 0 16px;
+  font: 600 16px/24px var(--font-sans);
+  color: var(--text-primary);
+  letter-spacing: normal;
+  text-transform: none;
+}
+.fleet-page .fleet-panel__figure {
+  font: 600 22px/28px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  min-width: 60px;
+  text-align: right;
+}
+/* Heatmap and Top routes stack full width: the 7x24 grid fills the card's
+   width with fixed-height cells (so the card is sized by its content, never
+   stretched around it), and the routes list flows into two columns. */
+.fleet-page .fleet-heatmap-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--card-gap, 16px); align-items: start; }
+.fleet-page .fleet-heatmap__row { display: grid; grid-template-columns: 40px repeat(24, minmax(0, 1fr)); gap: 3px; margin-bottom: 3px; }
+.fleet-page .fleet-heatmap__cell { height: 28px; border-radius: 3px; min-width: 0; }
+.fleet-page .fleet-routes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row; column-gap: 40px; }
+@media (max-width: 900px) {
+  .fleet-page .fleet-routes { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 767px) {
+  .fleet-page .fleet-heatmap__row { grid-template-columns: 32px repeat(24, minmax(0, 1fr)); gap: 2px; margin-bottom: 2px; }
+  .fleet-page .fleet-heatmap__cell { height: 18px; border-radius: 2px; }
+}
+.fleet-page .fleet-heatmap__hour,
+.fleet-page .fleet-heatmap__day {
+  font: 400 12px/16px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.fleet-page .fleet-heatmap__hour { text-align: center; }
+.fleet-page .fleet-heatmap__day { display: flex; align-items: center; }
+.fleet-page .fleet-route { margin-bottom: 12px; }
+.fleet-page .fleet-route__row { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.fleet-page .fleet-route__name { font: 400 14px/20px var(--font-sans); color: var(--text-primary); min-width: 0; overflow-wrap: anywhere; }
+.fleet-page .fleet-route__figures {
+  display: flex; gap: 16px; flex-shrink: 0;
+  font: 400 13px/20px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+.fleet-page .fleet-route__money { color: var(--text-primary); }
+.fleet-page .fleet-route__track { height: 4px; background: var(--border-subtle); border-radius: 2px; }
+.fleet-page .fleet-route__fill { height: 4px; background: var(--accent-primary); border-radius: 2px; }
 @media (max-width: 1100px) {
   .fleet-page .fleet-summary--4,
   .fleet-page .fleet-summary--5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -86,10 +243,242 @@
   .fleet-page { --fleet-input-font: 16px; --fleet-card-inset: 16px; }
   .fleet-page .fleet-summary > .card { padding: 16px; }
   .fleet-page button[data-fleet-control],
-  .fleet-page input[data-fleet-control] { min-height: 48px; }
+  .fleet-page input[data-fleet-control] { min-height: var(--control-h, 44px); }
 }
 @media (max-width: 480px) {
   .fleet-page .fleet-summary--4,
   .fleet-page .fleet-summary--5,
   .fleet-page .fleet-summary--3 { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---- Design principles v2 ---- */
+/* Doubled class outranks the shell's `.os-app-shell .card` regardless of load order. */
+.fleet-page .card.card { border-radius: var(--radius-card, 12px); box-shadow: none; }
+.fleet-page .card.card:hover { border-color: var(--border-subtle); box-shadow: none; }
+
+/* Summary figures now use separate tiles: see ops-tiles.css. */
+
+
+/* Rows: hover is a surface tint. */
+.fleet-page .fleet-table tbody tr.is-clickable { cursor: pointer; border-bottom: 1px solid var(--border-row); transition: background 0.15s ease; }
+.fleet-page .fleet-table tbody tr.is-clickable:last-child { border-bottom: none; }
+.fleet-page .fleet-table tbody tr.is-clickable:hover { background: var(--bg-surface-hover); }
+.fleet-page .fleet-table .is-primary { color: var(--text-primary); }
+.fleet-page .fleet-table__sub { display: block; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+
+/* Status chip: 6px, AA text role on a tinted surface, always a word. */
+.fleet-page .fleet-chip {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-chip, 6px);
+  font: 500 13px/20px var(--font-sans);
+  white-space: nowrap;
+  color: var(--text-secondary);
+  background: var(--status-neutral-bg);
+}
+.fleet-page .fleet-chip--success { color: var(--status-success-text); background: rgba(34, 197, 94, 0.12); }
+.fleet-page .fleet-chip--warning { color: var(--status-warning-text); background: var(--status-warning-bg); }
+.fleet-page .fleet-chip--danger { color: var(--status-danger-text); background: var(--status-danger-bg); }
+.fleet-page .fleet-chip--info { color: var(--status-info-text); background: var(--accent-glow); }
+
+/* Quiet row actions: 32px, neutral until hovered. */
+.fleet-page td button.fleet-row-action {
+  min-height: 32px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control, 8px);
+  color: var(--text-secondary);
+  font: 400 14px/20px var(--font-sans);
+  cursor: pointer;
+}
+.fleet-page td button.fleet-row-action:hover:not(:disabled) { background: var(--bg-surface-hover); color: var(--text-primary); }
+.fleet-page td button.fleet-row-action--danger:hover:not(:disabled) { background: var(--status-danger-bg); color: var(--status-danger-text); }
+.fleet-page td button.fleet-row-action:disabled { opacity: 0.5; cursor: not-allowed; }
+.fleet-page td button.fleet-row-action:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.fleet-page .fleet-header-secondary {
+  background: none; border: 1px solid var(--border-subtle); color: var(--text-primary);
+  padding: 8px 16px; cursor: pointer;
+}
+.fleet-page .fleet-header-secondary:hover:not(:disabled) { background: var(--bg-surface-hover); }
+.fleet-page .fleet-header-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Heatmap page when pickup times are not captured: weekday bars beside routes. */
+.fleet-page .fleet-heatmap-grid--2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.fleet-page .fleet-routes--1 { grid-template-columns: minmax(0, 1fr); }
+.fleet-page .fleet-days { display: flex; flex-direction: column; gap: 10px; }
+.fleet-page .fleet-days__row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 32px; align-items: center; gap: 12px; }
+.fleet-page .fleet-days__day { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-page .fleet-days__track { display: block; height: 8px; border-radius: 4px; }
+.fleet-page .fleet-days__track .fleet-route__fill { height: 8px; border-radius: 4px; }
+.fleet-page .fleet-days__count { font: 500 13px/20px var(--font-sans); color: var(--text-primary); text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 1000px) { .fleet-page .fleet-heatmap-grid--2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* Column priority on the fleet tables: Status and money never leave the card;
+   free text truncates, then Health, then Driver drop out. */
+.fleet-page .fleet-table-region { container-type: inline-size; }
+.fleet-page .fleet-table .fleet-col-truck { max-width: 32ch; overflow: hidden; text-overflow: ellipsis; }
+@container (max-width: 1080px) { .fleet-page .fleet-table .fleet-col-opt2 { display: none; } }
+@container (max-width: 900px) { .fleet-page .fleet-table .fleet-col-opt { display: none; } .fleet-page .fleet-table .fleet-col-truck { max-width: 22ch; } }
+/* Plus icon inside the primary action. */
+.fleet-page button[data-fleet-control].btn-action { display: inline-flex; align-items: center; gap: 6px; }
+@container (max-width: 600px) {
+  .fleet-page .fleet-table .fleet-col-phone { display: none; }
+  .fleet-page .fleet-table th, .fleet-page .fleet-table td { padding-left: 8px; padding-right: 8px; }
+  .fleet-page .fleet-table th:first-child, .fleet-page .fleet-table td:first-child { padding-left: 16px; }
+  .fleet-page .fleet-table th:last-child, .fleet-page .fleet-table td:last-child { padding-right: 16px; }
+  .fleet-page .fleet-table .fleet-table__select { display: none; }
+  .fleet-page .fleet-table td { font-size: 13px; }
+  .fleet-page .fleet-table .fleet-table__select + * { padding-left: 16px; }
+}
+/* Phone: Fleet's head matches Bookings' (one 40px primary action). The
+   desktop-only tools (Excel import, heatmap link) step aside. */
+@media (max-width: 768px) {
+  /* They move to the head's "⋯" (menuItems, R5). */
+  .fleet-page .section-header__actions .fleet-header-secondary { display: none; }
+  .fleet-page .section-header__actions button[data-fleet-control] { min-height: var(--control-h, 44px); }
+}
+
+/* ---- Round 3: Vehicles absorbs Fleet status ---- */
+/* Status tiles are the list filter. The chosen tile gets a calm ring, not a fill. */
+.fleet-page .fleet-kpis--filter .tw-kpi--link.is-selected { border-color: var(--border-active, var(--text-primary)); box-shadow: inset 0 0 0 1px var(--border-active, var(--text-primary)); }
+/* Toolbar: search left, filter state and count right. */
+.fleet-page .fleet-toolbar__count { display: inline-flex; align-items: center; gap: 12px; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fleet-page .fleet-toolbar__clear { background: none; border: 0; padding: 0; font: 500 13px/20px var(--font-sans); color: var(--accent-primary); cursor: pointer; }
+.fleet-page .fleet-toolbar__clear:hover { text-decoration: underline; }
+.fleet-page .fleet-toolbar__clear:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
+/* Sub-lines (type, destination, renewals) sit under the cell's first line. */
+.fleet-page .fleet-table .fleet-table__sub { color: var(--text-tertiary); font-size: 13px; line-height: 18px; overflow: hidden; text-overflow: ellipsis; }
+.fleet-page .fleet-table .fleet-table__sub--warn { color: var(--status-warning-text); }
+.fleet-page .fleet-table td .tw-status + .fleet-table__sub { margin-top: 2px; }
+.fleet-page .fleet-table .fleet-col-truck { max-width: 30ch; }
+.fleet-page .fleet-table .fleet-col-doing { max-width: 34ch; overflow: hidden; text-overflow: ellipsis; }
+.fleet-page .fleet-table .fleet-col-doing .tw-status { max-width: 100%; }
+.fleet-page .fleet-th-tip { display: inline-flex; align-items: center; gap: 4px; }
+/* Health: a 0-100 meter so the number has a scale; below 60 is labelled Low. */
+.fleet-page .fleet-health { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.fleet-page .fleet-health__track { display: inline-block; width: 40px; height: 4px; border-radius: 2px; background: var(--border-subtle); overflow: hidden; }
+.fleet-page .fleet-health__fill { display: block; height: 100%; border-radius: 2px; background: var(--text-tertiary); }
+.fleet-page .fleet-health__fill.is-low { background: var(--status-warning-dot); }
+.fleet-page .fleet-health__n { min-width: 2ch; text-align: right; }
+.fleet-page .fleet-health__low { font: 500 12px/16px var(--font-sans); color: var(--status-warning-text); }
+/* The status chip only rides under the registration when the Status column is hidden. */
+.fleet-page .fleet-table .fleet-only-narrow { display: none; }
+@container (max-width: 600px) {
+  .fleet-page .fleet-table .fleet-col-status { display: none; }
+  .fleet-page .fleet-table .fleet-only-narrow { display: block; margin-top: 4px; }
+}
+/* Head actions are head controls (R3): 36px, 44 on touch. The shell's
+   .btn-action floor (40/48) is overridden inside the fleet head only. */
+.os-app-shell .fleet-page .section-header__actions .btn-action,
+.os-app-shell .fleet-page .section-header__actions button[data-fleet-control] { min-height: var(--control-h, 36px); height: var(--control-h, 36px); padding-top: 0; padding-bottom: 0; }
+.fleet-page .tw-toolbar.fleet-toolbar { justify-content: flex-start; gap: 8px 12px; }
+
+/* ---- Round 3: Activity (was "Activity heatmap") ---- */
+.fleet-page { --fleet-card-inset: var(--card-pad, 20px); }
+.fleet-page .fleet-activity { display: flex; flex-direction: column; gap: var(--card-gap, 16px); }
+.fleet-page .fleet-activity > .tw-kpi-row { margin: 0; }
+.fleet-page .fleet-activity .ops-kpis { margin-bottom: 0; }
+/* The two cards share one height; the weekday rows spread to fill it. */
+.fleet-page .fleet-heatmap-grid--2 { align-items: stretch; }
+.fleet-page .fleet-heatmap-grid--2 > .fleet-panel { display: flex; flex-direction: column; }
+.fleet-page .fleet-heatmap-grid--2 .fleet-days { flex: 1; justify-content: space-between; gap: 8px; }
+.fleet-page .fleet-panel__title { display: inline-flex; align-items: center; gap: 6px; }
+.fleet-page .fleet-panel__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.fleet-page .fleet-panel__head .fleet-panel__title { margin: 0; }
+/* Ranked bars are neutral; only the top item carries the accent. */
+.fleet-page .fleet-route__fill { background: var(--text-tertiary); opacity: 0.55; }
+.fleet-page .fleet-route__fill.is-top { background: var(--accent-primary); opacity: 1; }
+.fleet-page .fleet-route:last-child { margin-bottom: 0; }
+/* Pickups by month: one column per month, count above, compact money below. */
+.fleet-page .fleet-months__bars { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(var(--months, 12), minmax(0, 1fr)); gap: 8px; align-items: end; }
+.fleet-page .fleet-months__col { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.fleet-page .fleet-months__count { font: 500 13px/16px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.fleet-page .fleet-months__track { position: relative; display: block; width: 100%; max-width: 56px; height: 120px; border-radius: 4px; background: var(--bg-surface-hover); overflow: hidden; }
+.fleet-page .fleet-months__fill { position: absolute; left: 0; right: 0; bottom: 0; display: block; background: var(--text-tertiary); opacity: 0.55; border-radius: 4px 4px 0 0; }
+.fleet-page .fleet-months__fill.is-top { background: var(--accent-primary); opacity: 1; }
+.fleet-page .fleet-months__label { font: 400 12px/16px var(--font-sans); color: var(--text-secondary); }
+.fleet-page .fleet-months__money { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+@media (max-width: 767px) {
+  .fleet-page .fleet-months__bars { gap: 4px; }
+  .fleet-page .fleet-months__track { height: 88px; }
+  .fleet-page .fleet-months__money { display: none; }
+  .fleet-page .fleet-route__figures { gap: 8px; }
+}
+
+/* ---- Round 4: calmer Vehicles ---- */
+/* Status/order mismatches read as neutral words in the rows; amber is kept
+   for the one review line above the table and for rows while reviewing. */
+.fleet-page .fleet-doing--mismatch { color: var(--text-secondary); }
+.fleet-page .fleet-review { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.fleet-page .fleet-review__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--status-warning-dot); flex-shrink: 0; }
+.fleet-page .fleet-review__text { font: 500 13px/20px var(--font-sans); color: var(--text-primary); white-space: nowrap; }
+.fleet-page .fleet-review__btn {
+  position: relative; height: 32px; padding: 0 12px; flex-shrink: 0;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-control, 8px);
+  background: none; color: var(--text-primary); font: 500 13px/20px var(--font-sans); cursor: pointer;
+}
+.fleet-page .fleet-review__btn::after { content: ''; position: absolute; inset: -6px -2px; }
+.fleet-page .fleet-review__btn:hover { background: var(--bg-surface-hover); }
+.fleet-page .fleet-review__btn[aria-pressed="true"] { border-color: var(--text-primary); }
+.fleet-page .fleet-review__btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.fleet-page .fleet-health__low { color: var(--text-secondary); font-weight: 400; }
+.fleet-page .fleet-health__low.is-action { color: var(--status-danger-text); font-weight: 500; }
+.fleet-page .fleet-health__fill.is-low { background: var(--status-danger-dot); }
+/* Pickups by month: no empty track behind each bar, just a shared baseline. */
+.fleet-page .fleet-months__track { background: none; border-bottom: 1px solid var(--border-subtle); border-radius: 0; }
+/* The count row is as tall as the Review button from the first paint, so the flag never moves the table. */
+.fleet-page .fleet-toolbar__count { min-height: 32px; }
+
+/* ---- Round 5 ---- */
+/* Touch: Review and the status filter are 44px to the finger. The Review
+   box grows (measurable) while its outline stays drawn at 32. */
+@media (pointer: coarse) {
+  .fleet-page .fleet-review__btn { height: 44px; margin: -6px 0; border-color: transparent; background: none; isolation: isolate; }
+  .fleet-page .fleet-review__btn::before {
+    content: ''; position: absolute; inset: 6px 0; z-index: -1; pointer-events: none;
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-control, 8px);
+  }
+  .fleet-page .fleet-review__btn::after { display: none; }
+  .fleet-page .fleet-toolbar .tw-seg__opt { min-height: 44px; }
+}
+/* Activity, pickups by month: each count sits on its own bar top. The fill
+   scale leaves 20px of headroom in the track so the tallest count fits. */
+.fleet-page .fleet-months__track { overflow: visible; }
+.fleet-page .fleet-months__fill { height: calc((100% - 20px) * var(--v, 0)); }
+.fleet-page .fleet-months__track .fleet-months__count {
+  position: absolute; left: 0; right: 0; text-align: center;
+  bottom: calc((100% - 20px) * var(--v, 0) + 3px); line-height: 16px;
+}
+
+/* ---- Round 6: stale work in "Doing now" (shared rule, src/lib/staleWork.ts) ----
+   An order left open is not current work: neutral words, one amber dot. */
+.fleet-page .fleet-doing--stale { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fleet-page .fleet-doing__dot { display: inline-block; width: 8px; height: 8px; margin: 0 8px 1px 0; border-radius: 50%; vertical-align: middle; background: var(--status-warning-dot); }
+
+/* ---- Round 7: a stale row offers its action (the order) on the sub line;
+   the link keeps its text size and gets a 44px hit area on touch. */
+.fleet-page .fleet-table .fleet-stale-sub { white-space: nowrap; overflow: visible; }
+.fleet-page .fleet-stale-link { position: relative; color: var(--accent-primary); font-weight: 500; text-decoration: none; }
+.fleet-page .fleet-stale-link:hover { text-decoration: underline; }
+.fleet-page .fleet-stale-link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
+@media (pointer: coarse) {
+  .fleet-page .fleet-stale-link::after { content: ''; position: absolute; top: calc(50% - 22px); bottom: calc(50% - 22px); left: min(-4px, calc(50% - 22px)); right: min(-4px, calc(50% - 22px)); }
+}
+/* Phone: the Doing column steps aside, so the stale dot rides beside the (neutral) chip. */
+.fleet-page .fleet-stale-narrow { display: inline-flex; align-items: center; margin-left: 8px; color: var(--text-tertiary); font: 400 12px/16px var(--font-sans); white-space: nowrap; vertical-align: middle; }
+.fleet-page .fleet-stale-narrow .fleet-doing__dot { margin-right: 6px; }
+.fleet-page .fleet-table .fleet-only-narrow:has(.fleet-stale-narrow) { overflow: visible; }
+.fleet-page .fleet-stale-narrow.fleet-stale-link { color: var(--accent-primary); font-weight: 500; }
+/* R8: the phone "Left open" link is itself a 44px target (not only a
+   pseudo-element on coarse pointers); the negative margins keep the row
+   height unchanged. */
+.fleet-page .fleet-stale-narrow.fleet-stale-link { min-height: 44px; margin-top: -14px; margin-bottom: -14px; padding-right: 4px; }
+/* R9: in the table's last row the link's 44px box ran 5px past the card,
+   whose overflow clipped it (39px hit). There the box starts 6px higher
+   (margins -20/-8) and the text drops back by the same 12px of top padding,
+   so the words and the row height stay exactly where they were. */
+.fleet-page .fleet-table tbody > tr:last-child .fleet-stale-narrow.fleet-stale-link { margin-top: -20px; margin-bottom: -8px; padding-top: 12px; }
+/* R9: the Available note's long form ("3 hold an order left open") drops to
+   "3 left open" on phones, where the tile is too narrow for it. */
+@media (max-width: 520px) { .fleet-page .fleet-kpis .fleet-kpi-long { display: none; } }

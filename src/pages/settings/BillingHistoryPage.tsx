@@ -3,29 +3,19 @@ import '@/pages/settings/settings-brand.css';
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchData } from "@/lib/Api";
+import { formatCurrency, formatDate } from "@/lib/formatters";
+import { SettingsShell } from "./SettingsShell";
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
+import { Segmented } from '@/components/ui/Segmented';
+import { StatusChip } from '@/components/ui/StatusChip';
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 8,
-  marginBottom: 20,
-};
+const sectionStyle = settingsCardStyle;
+const sectionHeaderStyle: React.CSSProperties = { ...settingsCardHeaderStyle, justifyContent: 'space-between' };
+const sectionTitleStyle = settingsCardTitleStyle;
 
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: '14px 20px',
-  borderBottom: '1px solid var(--border-subtle)',
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  lineHeight: '24px',
-  fontWeight: 600,
-  color: 'var(--text-primary)',
-  margin: 0,
+const STATUS_COLOR: Record<string, string> = {
+  complete: 'var(--status-success-text)',
+  pending: 'var(--status-warning-text)',
 };
 
 // Presentation-only labels for known status payload values — unknown strings
@@ -46,10 +36,11 @@ interface BillingTransaction {
   status: string;
 }
 
-const formatRand = (amount?: string | number | null) =>
-  `R${Number(amount ?? 0).toLocaleString('en-ZA')}`;
+// Exact ZAR with cents (brand: two decimals for exact totals).
+const formatRand = (amount?: string | number | null) => formatCurrency(Number(amount ?? 0));
 
-const PERIODS = ['All time', 'Today', 'This week', 'This month', 'This year'] as const;
+// No "Today": a single day of platform charges is never a useful view.
+const PERIODS = ['All time', 'This week', 'This month', 'This year'] as const;
 type Period = typeof PERIODS[number];
 
 function startOfWeek(d: Date): Date {
@@ -64,7 +55,6 @@ function startOfWeek(d: Date): Date {
 function matchesPeriod(isoDate: string, period: Period, now: Date): boolean {
   if (period === 'All time') return true;
   const d = new Date(isoDate);
-  if (period === 'Today') return d.toDateString() === now.toDateString();
   if (period === 'This week') return d >= startOfWeek(now);
   if (period === 'This month') return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
   if (period === 'This year') return d.getFullYear() === now.getFullYear();
@@ -76,7 +66,7 @@ function HistoryTable({ title, rows }: { title: string; rows: BillingTransaction
   return (
     <div style={sectionStyle}>
       <div style={sectionHeaderStyle}>
-        <h3 style={sectionTitleStyle}>{title}</h3>
+        <h2 style={sectionTitleStyle}>{title}</h2>
         <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
           {rows.length} charge{rows.length === 1 ? '' : 's'} · {formatRand(total)} total
         </span>
@@ -87,35 +77,29 @@ function HistoryTable({ title, rows }: { title: string; rows: BillingTransaction
         </div>
       ) : (
         <div className="settings-scroll-region" role="region" aria-label={title} tabIndex={0} style={{ overflowX: 'auto' }}>
-        <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+        <table className="table-heading-roles settings-table">
           <thead>
             <tr>
               {['Charge', 'Reference', 'Date', 'Amount', 'Status'].map(h => (
-                <th key={h} style={{
-                  padding: '10px 20px', textAlign: 'left' as const,
-                  borderBottom: '1px solid var(--border-subtle)',
-                }}>{h}</th>
+                <th key={h} scope="col" className={h === 'Amount' ? 'num' : undefined} style={{ textAlign: h === 'Amount' ? 'right' : 'left' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {rows.map((tx, i) => (
               <tr key={tx.id} style={{ borderBottom: i < rows.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{tx.label}</td>
-                <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{tx.label}</td>
+                <td style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                   {tx.reference || '—'}
                 </td>
-                <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                  {new Date(tx.created_at).toLocaleDateString('en-ZA')}
+                <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                  {formatDate(tx.created_at)}
                 </td>
-                <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                <td className="num" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                   {formatRand(tx.amount)}
                 </td>
-                <td style={{ padding: '12px 20px' }}>
-                  <span style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-                    color: tx.status === 'complete' ? 'var(--accent-primary)' : tx.status === 'pending' ? 'var(--status-warning)' : 'var(--status-danger)',
-                  }}>{statusDisplay(tx.status)}</span>
+                <td>
+                  <StatusChip tone={tx.status === 'complete' ? 'success' : tx.status === 'pending' ? 'warning' : tx.status === 'refunded' ? 'neutral' : 'danger'} label={statusDisplay(tx.status)} size="sm" />
                 </td>
               </tr>
             ))}
@@ -149,60 +133,37 @@ export default function BillingHistoryPage() {
   const feeCharges = filtered.filter(tx => tx.kind === 'delivery_fee');
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto' }}>
-      <button className="settings-control" onClick={() => navigate('/settings/billing')} style={{
-        background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 13, lineHeight: '20px',
-        fontFamily: 'var(--font-sans)', fontWeight: 500, cursor: 'pointer', padding: '8px 0', minHeight: 44, marginBottom: 8,
-      }}>
-        ← Back to billing
-      </button>
-
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Billing history</h2>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-          Every charge to your card on file — the monthly plan and the per-delivery platform fee
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {PERIODS.map(p => (
-          <button
-            key={p}
-            className="settings-control"
-            onClick={() => setPeriod(p)}
-            aria-pressed={period === p}
-            style={{
-              background: period === p ? 'var(--accent-primary)' : 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              color: period === p ? 'var(--btn-action-color, var(--bg-deep))' : 'var(--text-secondary)',
-              padding: '8px 12px',
-              borderRadius: 6,
-              minHeight: 40,
-              fontSize: 14,
-              lineHeight: '20px',
-              fontFamily: 'var(--font-sans)',
-              cursor: 'pointer',
-              fontWeight: period === p ? 500 : 400,
-              transition: 'all 0.2s ease',
-            }}
-          >
-            {p}
+    <SettingsShell activeId="billing">
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
+      {/* Title block sits at the same y as every other settings section; the
+          way back lives beside it instead of pushing the h1 down. */}
+      <SettingsPageHeader
+        title="Billing history"
+        description="Plan and per-delivery fees charged to your card"
+        actions={
+          <button type="button" className="settings-control" onClick={() => navigate('/settings/billing')} style={{ ...settingsSecondaryButtonStyle, flexShrink: 0 }}>
+            Back to billing
           </button>
-        ))}
+        }
+      />
+
+      <div className="tw-toolbar" style={{ maxWidth: '100%', overflowX: 'auto' }}>
+        <Segmented label="Period" value={period} onChange={setPeriod} options={PERIODS.map(p => ({ value: p, label: p }))} />
       </div>
 
       {loading ? (
         <div style={sectionStyle}>
-          <div style={{ padding: 20 }}>
-            <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 4, width: '40%' }} />
+          <div style={{ padding: 'var(--card-pad, 20px)' }}>
+            <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', width: '40%' }} />
           </div>
         </div>
       ) : (
         <>
           <HistoryTable title="Plan purchased" rows={planCharges} />
-          <HistoryTable title="Platform fee (0.25% per delivery)" rows={feeCharges} />
+          <HistoryTable title="Platform fee (0,25% per delivery)" rows={feeCharges} />
         </>
       )}
     </div>
+    </SettingsShell>
   );
 }

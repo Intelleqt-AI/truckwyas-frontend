@@ -1,5 +1,5 @@
 /* Compact expense row actions: one icon trigger sized for real targets,
-   with the approve/reject/edit/delete actions in a menu. */
+   with the edit/delete actions in a menu. */
 .expense-row-actions {
   position: relative;
   display: flex;

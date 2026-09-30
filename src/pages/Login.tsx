@@ -1,3 +1,4 @@
+import "./auth-brand.css";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Check } from "lucide-react";
@@ -9,15 +10,15 @@ import { MobileAuthLayout } from "@/components/MobileAuthLayout";
 // Same list Signup.tsx and BillingSettings.tsx show — kept identical across
 // every page that mentions the plan, so returning users see the same promise
 // new signups do.
-const PLAN_FEATURES = [
-  "Unlimited loads & invoices",
-  "AI-powered quote optimisation",
-  "Fast Pay capital access",
-  "Advanced analytics & reporting",
-  "Fleet intelligence dashboard",
-  "Multi-user access",
-  "API & integrations",
-  "Priority support",
+// R7: the sign-in page reminds, it doesn't sell. Three proof points, each
+// one line, each something the product does today (no pricing checklist).
+const PROOF_POINTS = [
+  "Quotes priced from your own costs",
+  // R8: checked against the backend (core/signals.py _auto_invoice_on_delivery,
+  // AUTO_INVOICE_ON_DELIVERY on by default): marking a load delivered raises
+  // its invoice. It is not e-mailed, so the line says "raised", nothing more.
+  "Invoices raised the moment a load is delivered",
+  "See who owes you, and for how long",
 ];
 
 const Login = () => {
@@ -108,25 +109,27 @@ const Login = () => {
   };
 
   const inputStyle: React.CSSProperties = {
-    background: 'var(--bg-surface)',
+    background: 'var(--input-bg, var(--bg-surface))',
     border: '1px solid var(--border-subtle)',
-    padding: '10px 12px',
+    padding: '8px 12px',
+    minHeight: 40,
     color: 'var(--text-primary)',
-    borderRadius: 2,
-    fontSize: 13,
-    outline: 'none',
+    borderRadius: 'var(--radius-control)',
+    fontSize: 14,
+    lineHeight: '20px',
     width: '100%',
+    boxSizing: 'border-box',
     fontFamily: 'var(--font-sans)',
   };
 
   const labelStyle: React.CSSProperties = {
     display: 'block',
-    fontSize: 10,
-    fontFamily: 'var(--font-mono)',
-    color: 'var(--text-tertiary)',
-    marginBottom: 8,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
+    fontSize: 13,
+    lineHeight: '20px',
+    fontWeight: 500,
+    fontFamily: 'var(--font-sans)',
+    color: 'var(--text-primary)',
+    marginBottom: 6,
   };
 
   const formCard = (
@@ -135,16 +138,16 @@ const Login = () => {
       maxWidth: 400,
       background: 'var(--bg-surface)',
       border: '1px solid var(--border-subtle)',
-      borderRadius: 2,
-      padding: 40,
+      borderRadius: 'var(--radius-card)',
+      padding: 24,
       boxSizing: 'border-box',
     }}>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
           Sign in to your account
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-          Enter your credentials to access the dashboard
+        </h1>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+          Use the email and password you signed up with
         </div>
       </div>
 
@@ -153,6 +156,7 @@ const Login = () => {
           <label htmlFor="username" style={labelStyle}>Email</label>
           <input
             id="username"
+            className="tw-auth-control"
             name="username"
             type="text"
             placeholder="name@example.com"
@@ -165,20 +169,23 @@ const Login = () => {
             }}
           />
           {validationErrors.username && (
-            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
+            <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>
               {validationErrors.username}
             </div>
           )}
         </div>
 
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div className="tw-auth-labelrow" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <label htmlFor="password" style={{ ...labelStyle, marginBottom: 0 }}>Password</label>
             <Link
               to="/password-reset"
+              className="tw-auth-control"
               style={{
-                fontSize: 11,
-                color: 'var(--accent-primary)',
+                fontSize: 13,
+                lineHeight: '20px',
+                fontWeight: 500,
+                color: 'var(--text-primary)',
                 textDecoration: 'none',
               }}
             >
@@ -188,6 +195,7 @@ const Login = () => {
           <div style={{ position: 'relative' }}>
             <input
               id="password"
+              className="tw-auth-control"
               name="password"
               type={showPassword ? "text" : "password"}
               required
@@ -202,6 +210,7 @@ const Login = () => {
             <button
               type="button"
               onClick={() => setShowPassword(v => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
               style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}
               tabIndex={-1}
             >
@@ -209,7 +218,7 @@ const Login = () => {
             </button>
           </div>
           {validationErrors.password && (
-            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
+            <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>
               {validationErrors.password}
             </div>
           )}
@@ -220,10 +229,11 @@ const Login = () => {
             padding: '12px 16px',
             background: 'var(--status-danger-bg)',
             border: '1px solid var(--status-danger)',
-            borderRadius: 2,
-            color: 'var(--status-danger)',
-            fontSize: 12,
-          }}>
+            borderRadius: 'var(--radius-nested)',
+            color: 'var(--status-danger-text)',
+            fontSize: 13,
+            lineHeight: '20px',
+          }} role="alert">
             {error}
           </div>
         )}
@@ -233,18 +243,21 @@ const Login = () => {
           className="btn-action"
           style={{
             width: '100%',
-            padding: '12px 16px',
-            fontSize: 11,
-            letterSpacing: '0.08em',
+            padding: '10px 16px',
+            borderRadius: 'var(--radius-control)',
+            fontSize: 14,
+            lineHeight: '20px',
+            letterSpacing: 'normal',
+            minHeight: 40,
             cursor: isPending ? 'wait' : 'pointer',
             opacity: isPending ? 0.6 : 1,
           }}
           disabled={isPending}
         >
-          {isPending ? "Signing in..." : "Sign in"}
+          {isPending ? "Signing in…" : "Sign in"}
         </button>
 
-        <div style={{ marginTop: 4, textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>
+        <div style={{ marginTop: 4, textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
           Just exploring?{" "}
           <button
             type="button"
@@ -255,14 +268,14 @@ const Login = () => {
               border: 'none',
               padding: 0,
               font: 'inherit',
-              color: 'var(--accent-primary)',
+              color: 'var(--link)',
               fontWeight: 500,
               textDecoration: 'none',
               cursor: isPending ? 'wait' : 'pointer',
               opacity: isPending ? 0.6 : 1,
             }}
           >
-            View Demo
+            View demo
           </button>
         </div>
       </form>
@@ -271,10 +284,11 @@ const Login = () => {
         marginTop: 24,
         textAlign: 'center',
         fontSize: 13,
+        lineHeight: '20px',
         color: 'var(--text-secondary)'
       }}>
         Don't have an account?{" "}
-        <Link to="/signup" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+        <Link to="/signup" style={{ color: 'var(--link)', textDecoration: 'none', fontWeight: 500 }}>
           Sign up
         </Link>
       </div>
@@ -285,29 +299,20 @@ const Login = () => {
   // title/subtitle (those become MobileAuthLayout's own header props on
   // mobile) — demoted to a footer below the form there, since none of it
   // blocks completing the form above it.
+  const proofList = (
+    <ul className="tw-auth-proof">
+      {PROOF_POINTS.map(f => (
+        <li key={f}>
+          <Check size={16} strokeWidth={2} aria-hidden="true" />
+          {f}
+        </li>
+      ))}
+    </ul>
+  );
   const extraContent = (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
-        {PLAN_FEATURES.map(f => (
-          <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-            <Check size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-            {f}
-          </div>
-        ))}
-      </div>
-
-      <div style={{
-        marginTop: 18, padding: '10px 13px', border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--card-radius)', background: 'var(--bg-surface-hover)',
-        fontSize: 12, color: 'var(--text-secondary)',
-      }}>
-        Reminder: every completed load also carries a <strong style={{ color: 'var(--text-primary)' }}>0.25% platform fee</strong>,
-        charged automatically to the card on file on top of the monthly plan.
-      </div>
-
-      <div style={{ marginTop: 16, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
-        BUILT FOR SOUTH AFRICAN ROAD FREIGHT
-      </div>
+      {proofList}
+      <div className="tw-auth-foot">Built for South African road freight</div>
     </>
   );
 
@@ -315,8 +320,8 @@ const Login = () => {
     return (
       <MobileAuthLayout
         eyebrow="Welcome back"
-        title={<>Your fleet, right where <span style={{ color: 'var(--accent-primary)' }}>you left it</span>.</>}
-        subtitle="Loads, quotes, invoices, and fleet intelligence — all in one dashboard, updated in real time."
+        title={<>Your fleet, right where <span style={{ color: 'var(--text-tertiary)' }}>you left it</span>.</>}
+        subtitle="Loads, quotes, invoices and your fleet, in one place."
         footer={extraContent}
       >
         {formCard}
@@ -325,54 +330,24 @@ const Login = () => {
   }
 
   return (
-    <div className="login-split">
-      <style>{`
-        .login-split {
-          /* html/body/#root are pinned to height:100vh + overflow:hidden
-             app-wide (the dashboard shell scrolls internally instead) — this
-             page needs to be its own scroll container or content can end up
-             clipped with no way to reach it (see Signup.tsx for the same fix). */
-          height: 100vh;
-          overflow-y: auto;
-          display: flex;
-          background: var(--bg-deep);
-        }
-        .login-split__content, .login-split__form {
-          flex: 1 1 50%;
-          min-width: 0;
-          padding: 48px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-        }
-        .login-split__form { align-items: center; }
-      `}</style>
-
-      {/* Content side — a reminder of what's waiting, not a sales pitch */}
-      <div className="login-split__content" style={{
-        position: 'relative', overflow: 'hidden',
-        background: `radial-gradient(120% 100% at 0% 0%, var(--glow-color), var(--glow-transparent)), var(--bg-surface)`,
-        borderRight: '1px solid var(--border-subtle)',
-      }}>
-        <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
-          <img src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
-
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent-primary)', marginBottom: 10 }}>
-            Welcome back
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3, marginBottom: 16, letterSpacing: '-0.01em' }}>
-            Your fleet, right where <span style={{ color: 'var(--accent-primary)' }}>you left it</span>.
-          </div>
-          <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 32 }}>
-            Loads, quotes, invoices, and fleet intelligence — all in one dashboard, updated in real time.
-          </div>
-
+    <div className="login-split tw-auth-split">
+      {/* Brand side: a calm reminder of what's waiting, not a sales pitch.
+          Its own surface (white in light, the card surface in dark), and its
+          logo line starts at the same y as the form card (tw-auth-split). */}
+      <div className="tw-auth-split__brand">
+        <div className="tw-auth-split__inner">
+          <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ height: 32, width: 'auto', display: 'block' }} />
+          <div className="tw-auth-eyebrow">Welcome back</div>
+          <p className="tw-auth-headline">
+            Your fleet,<br />right where <span>you left it</span>.
+          </p>
+          <p className="tw-auth-lede">Loads, quotes, invoices and your fleet, in one place.</p>
           {extraContent}
         </div>
       </div>
 
       {/* Form side */}
-      <div className="login-split__form">
+      <div className="tw-auth-split__form">
         {formCard}
       </div>
     </div>

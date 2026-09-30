@@ -19,27 +19,27 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-7 w-7 p-0 opacity-50 hover:opacity-100"
+          "h-10 w-10 p-0 border-0 bg-transparent text-[color:var(--text-secondary)] hover:bg-[var(--surface-tint-hover)] hover:text-[color:var(--text-primary)]"
         ),
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
         table: "w-full border-collapse",
         head_row: "flex",
-        head_cell: "rounded-md w-9 font-normal text-[0.75rem] opacity-50",
+        head_cell: "rounded-md w-10 font-normal text-[13px] leading-5 text-[color:var(--text-secondary)]",
         row: "flex w-full mt-1",
-        cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
-        day: "rdp-day-btn h-9 w-9 p-0 font-normal rounded-md",
+        cell: "h-10 w-10 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+        day: "rdp-day-btn h-10 w-10 p-0 text-sm font-normal rounded-md",
         day_selected: "rdp-day-selected",
         day_today: "rdp-day-today",
-        day_outside: "opacity-30",
-        day_disabled: "opacity-30 cursor-not-allowed",
+        day_outside: "rdp-day-outside",
+        day_disabled: "text-[color:var(--text-disabled)] cursor-not-allowed",
         day_hidden: "invisible",
         ...classNames,
       }}
+      // Border resets live in CSS (index.css for the default calendar,
+      // date-picker-dashboard.css for the dashboard opt-in) so stylesheets can
+      // still own the borders; inline styles here would silently outrank them.
       styles={{
-        cell: { border: "none" },
-        day: { border: "none" },
-        head_cell: { border: "none" },
         table: { borderCollapse: "collapse" },
       }}
       components={{

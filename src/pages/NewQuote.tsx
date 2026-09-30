@@ -1388,7 +1388,7 @@ export default function NewQuote() {
                     alignItems: "center",
                     justifyContent: "center",
                     fontSize: 9,
-                    fontWeight: 700,
+                    fontWeight: 600,
                     fontFamily: "var(--font-mono)",
                     flexShrink: 0,
                   }}>
@@ -1993,7 +1993,7 @@ export default function NewQuote() {
                     background: "var(--bg-surface)",
                     border: "1px solid var(--status-danger)",
                     borderRadius: 2,
-                    color: "var(--status-danger)",
+                    color: "var(--status-danger-text, var(--status-danger))",
                     fontSize: 12,
                     marginBottom: 16,
                   }}>
@@ -2207,7 +2207,7 @@ export default function NewQuote() {
                               border: "1px solid var(--status-warning)",
                               borderRadius: 2,
                               fontSize: 9,
-                              color: "var(--status-warning)",
+                              color: "var(--status-warning-text, var(--status-warning))",
                               fontWeight: 600,
                               fontFamily: "var(--font-mono)",
                             }}>
@@ -2232,9 +2232,9 @@ export default function NewQuote() {
                           <span
                             style={{
                               fontSize: 13,
-                              fontWeight: 700,
+                              fontWeight: 600,
                               fontFamily: "var(--font-mono)",
-                              color: "var(--status-warning)",
+                              color: "var(--status-warning-text, var(--status-warning))",
                             }}>
                             +R {Math.round(totalAdditional).toLocaleString()}
                           </span>
@@ -2249,9 +2249,9 @@ export default function NewQuote() {
                                 height: 18,
                                 borderRadius: "50%",
                                 border: "1.5px solid var(--status-warning)",
-                                color: "var(--status-warning)",
+                                color: "var(--status-warning-text, var(--status-warning))",
                                 fontSize: 10,
-                                fontWeight: 700,
+                                fontWeight: 600,
                                 fontFamily: "var(--font-mono)",
                                 display: "flex",
                                 alignItems: "center",
@@ -2561,7 +2561,7 @@ export default function NewQuote() {
                                               gap: 6,
                                               fontSize: 11,
                                               fontFamily: "var(--font-sans)",
-                                              color: "var(--status-warning)",
+                                              color: "var(--status-warning-text, var(--status-warning))",
                                             }}>
                                             <span style={{ flexShrink: 0 }}>
                                               <AlertTriangle size={12} />
@@ -2616,7 +2616,7 @@ export default function NewQuote() {
                             <span
                               style={{
                                 fontFamily: "var(--font-mono)",
-                                color: "var(--status-warning)",
+                                color: "var(--status-warning-text, var(--status-warning))",
                                 fontWeight: 600,
                               }}>
                               R{" "}
@@ -2657,7 +2657,7 @@ export default function NewQuote() {
                             <span
                               style={{
                                 fontFamily: "var(--font-mono)",
-                                color: "var(--status-warning)",
+                                color: "var(--status-warning-text, var(--status-warning))",
                                 fontWeight: 600,
                               }}>
                               R{" "}
@@ -2698,7 +2698,7 @@ export default function NewQuote() {
                             <span
                               style={{
                                 fontFamily: "var(--font-mono)",
-                                color: "var(--status-warning)",
+                                color: "var(--status-warning-text, var(--status-warning))",
                                 fontWeight: 600,
                               }}>
                               R{" "}
@@ -2797,7 +2797,7 @@ export default function NewQuote() {
                                   alignItems: "center",
                                   justifyContent: "center",
                                   fontSize: 10,
-                                  fontWeight: 700,
+                                  fontWeight: 600,
                                   color: "#fff",
                                   flexShrink: 0,
                                   opacity: isSel ? 1 : 0.65,
@@ -2807,7 +2807,7 @@ export default function NewQuote() {
                               <span
                                 style={{
                                   fontSize: 13,
-                                  fontWeight: 700,
+                                  fontWeight: 600,
                                   color: "var(--text-primary)",
                                   flex: 1,
                                 }}>
@@ -2847,7 +2847,7 @@ export default function NewQuote() {
                                   gap: 8,
                                   flexShrink: 0,
                                 }}>
-                                <span style={{ fontWeight: 700 }}>
+                                <span style={{ fontWeight: 600 }}>
                                   {Math.floor(r.duration_minutes / 60)}h{" "}
                                   {r.duration_minutes % 60}m
                                 </span>
@@ -2894,7 +2894,7 @@ export default function NewQuote() {
                                     <div
                                       style={{
                                         fontSize: 12,
-                                        fontWeight: 700,
+                                        fontWeight: 600,
                                         color: severityColor,
                                         fontFamily: "var(--font-mono)",
                                         marginBottom: 4,
@@ -2964,7 +2964,7 @@ export default function NewQuote() {
                                     <div
                                       style={{
                                         fontSize: 18,
-                                        fontWeight: 700,
+                                        fontWeight: 600,
                                         color: "var(--text-primary)",
                                         fontFamily: "var(--font-mono)",
                                         lineHeight: 1,
@@ -3037,7 +3037,7 @@ export default function NewQuote() {
                                     <div
                                       style={{
                                         fontSize: 18,
-                                        fontWeight: 700,
+                                        fontWeight: 600,
                                         lineHeight: 1,
                                         marginBottom: 4,
                                         color:
@@ -3118,7 +3118,7 @@ export default function NewQuote() {
                                     <div
                                       style={{
                                         fontSize: 12,
-                                        fontWeight: 700,
+                                        fontWeight: 600,
                                         color: "var(--text-primary)",
                                         fontFamily: "var(--font-sans)",
                                         marginBottom: 4,
@@ -3168,7 +3168,7 @@ export default function NewQuote() {
                                     <div
                                       style={{
                                         fontSize: 14,
-                                        fontWeight: 700,
+                                        fontWeight: 600,
                                         color: "var(--text-primary)",
                                         fontFamily: "var(--font-mono)",
                                         lineHeight: 1,
@@ -3184,7 +3184,7 @@ export default function NewQuote() {
                                         <div
                                           style={{
                                             fontSize: 9,
-                                            color: "var(--status-warning)",
+                                            color: "var(--status-warning-text, var(--status-warning))",
                                             fontFamily: "var(--font-mono)",
                                           }}>
                                           +
@@ -3222,8 +3222,8 @@ export default function NewQuote() {
                                         <div
                                           style={{
                                             fontSize: 12,
-                                            fontWeight: 700,
-                                            color: "var(--status-warning)",
+                                            fontWeight: 600,
+                                            color: "var(--status-warning-text, var(--status-warning))",
                                             fontFamily: "var(--font-mono)",
                                             marginBottom: 4,
                                           }}>
@@ -3243,7 +3243,7 @@ export default function NewQuote() {
                                         <div
                                           style={{
                                             fontSize: 12,
-                                            fontWeight: 700,
+                                            fontWeight: 600,
                                             color: "var(--status-success)",
                                             fontFamily: "var(--font-mono)",
                                             marginBottom: 4,
@@ -3326,7 +3326,7 @@ export default function NewQuote() {
                                     padding: "10px 0",
                                     borderRadius: 2,
                                     cursor: isSel ? "default" : "pointer",
-                                    fontWeight: 700,
+                                    fontWeight: 600,
                                     fontSize: 11,
                                     fontFamily: "var(--font-mono)",
                                     letterSpacing: "0.07em",
@@ -3454,7 +3454,7 @@ export default function NewQuote() {
                             <div
                               style={{
                                 color: "var(--text-primary)",
-                                fontWeight: 700,
+                                fontWeight: 600,
                                 fontSize: 16,
                               }}>
                               {Math.round(rd.distance_km)} km
@@ -3472,7 +3472,7 @@ export default function NewQuote() {
                             <div
                               style={{
                                 color: "var(--text-primary)",
-                                fontWeight: 700,
+                                fontWeight: 600,
                                 fontSize: 16,
                               }}>
                               {Math.floor(rd.duration_minutes / 60)}h{" "}
@@ -3491,7 +3491,7 @@ export default function NewQuote() {
                             <div
                               style={{
                                 color: "var(--text-primary)",
-                                fontWeight: 700,
+                                fontWeight: 600,
                                 fontSize: 16,
                               }}>
                               {Math.round(rd.fuel_usage_litres)} L
@@ -3536,12 +3536,12 @@ export default function NewQuote() {
                                     ? {
                                         label: `${weightTons}t load`,
                                         note: actualRate != null ? `${actualRate.toFixed(1)} L/100km` : "Heavy — ~38–45 L/100km",
-                                        color: "var(--status-warning)",
+                                        color: "var(--status-warning-text, var(--status-warning))",
                                       }
                                     : {
                                         label: `${weightTons}t load`,
                                         note: actualRate != null ? `${actualRate.toFixed(1)} L/100km` : "Very heavy — ~45–55 L/100km",
-                                        color: "var(--status-danger)",
+                                        color: "var(--status-danger-text, var(--status-danger))",
                                       };
 
                           // Terrain impact hints
@@ -3663,7 +3663,7 @@ export default function NewQuote() {
                                   <span
                                     style={{
                                       fontSize: 22,
-                                      fontWeight: 700,
+                                      fontWeight: 600,
                                       fontFamily: "var(--font-mono)",
                                       color: "var(--text-primary)",
                                     }}>
@@ -3838,7 +3838,7 @@ export default function NewQuote() {
                                       style={{
                                         fontSize: 13,
                                         fontFamily: "var(--font-mono)",
-                                        fontWeight: 700,
+                                        fontWeight: 600,
                                         color:
                                           costMode === "fuel"
                                             ? "var(--accent-primary)"
@@ -3889,7 +3889,7 @@ export default function NewQuote() {
                                       style={{
                                         fontSize: 13,
                                         fontFamily: "var(--font-mono)",
-                                        fontWeight: 700,
+                                        fontWeight: 600,
                                         color:
                                           costMode === "base_rate"
                                             ? "var(--accent-primary)"
@@ -4049,7 +4049,7 @@ export default function NewQuote() {
                                               display: "flex",
                                               justifyContent: "space-between",
                                               paddingTop: 5,
-                                              fontWeight: 700,
+                                              fontWeight: 600,
                                               color: "var(--text-primary)",
                                             }}>
                                             <span>
@@ -4175,7 +4175,7 @@ export default function NewQuote() {
                                       justifyContent: "space-between",
                                       alignItems: "center",
                                       fontSize: 13,
-                                      fontWeight: 700,
+                                      fontWeight: 600,
                                       borderTop:
                                         "1px solid var(--border-subtle)",
                                       paddingTop: 8,
@@ -4216,7 +4216,7 @@ export default function NewQuote() {
                                           width: 130,
                                           padding: "5px 8px",
                                           fontSize: 13,
-                                          fontWeight: 700,
+                                          fontWeight: 600,
                                           textAlign: "right",
                                         }}
                                       />
@@ -4303,7 +4303,7 @@ export default function NewQuote() {
                   padding: "10px 14px", cursor: "pointer",
                 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 11, color: `var(--status-${revenueGuard.color})`, fontFamily: "var(--font-mono)", fontWeight: 700, letterSpacing: "0.06em" }}>
+                  <span style={{ fontSize: 11, color: `var(--status-${revenueGuard.color})`, fontFamily: "var(--font-mono)", fontWeight: 600, letterSpacing: "0.06em" }}>
                     {revenueGuard.risk_level === "AT_RISK" ? "⚠ AT RISK" : "⚠ CAUTION"}
                   </span>
                   <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
@@ -4411,7 +4411,7 @@ export default function NewQuote() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, marginBottom: 12 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span style={{ color: "var(--text-secondary)" }}>Cost vs route:</span>
-                        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 2, color: "#fff", background: `var(--status-${analysis.cost_analysis.color || "success"})` }}>
+                        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 2, color: "#fff", background: `var(--status-${analysis.cost_analysis.color || "success"})` }}>
                           {(analysis.cost_analysis.risk_level || "").replace("_", " ")} · {analysis.cost_analysis.margin_pct?.toFixed(1)}%
                         </span>
                       </div>
@@ -4435,7 +4435,7 @@ export default function NewQuote() {
                           {analysis.fuel_analysis.current_price != null && (
                             <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>R {analysis.fuel_analysis.current_price.toFixed(2)}/L</span>
                           )}
-                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 2, color: "#fff", background: analysis.fuel_analysis.is_stale ? "var(--status-warning)" : "var(--status-success)" }}>
+                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 2, color: "#fff", background: analysis.fuel_analysis.is_stale ? "var(--status-warning)" : "var(--status-success)" }}>
                             {analysis.fuel_analysis.is_stale ? "STALE" : "LIVE"}
                           </span>
                         </span>
@@ -4447,7 +4447,7 @@ export default function NewQuote() {
                         </div>
                       )}
                       {(analysis.fuel_analysis.stale_warning || analysis.fuel_analysis.price_note) && (
-                        <div style={{ fontSize: 11, color: "var(--status-warning)" }}>{analysis.fuel_analysis.stale_warning || analysis.fuel_analysis.price_note}</div>
+                        <div style={{ fontSize: 11, color: "var(--status-warning-text, var(--status-warning))" }}>{analysis.fuel_analysis.stale_warning || analysis.fuel_analysis.price_note}</div>
                       )}
                     </div>
                   )}
@@ -4498,7 +4498,7 @@ export default function NewQuote() {
                         style={{
                           fontFamily: "var(--font-mono)",
                           fontSize: 16,
-                          fontWeight: 700,
+                          fontWeight: 600,
                           color: "var(--accent-primary)",
                         }}>
                         R {Math.round(optimal.optimal_price).toLocaleString()}
@@ -4898,7 +4898,7 @@ export default function NewQuote() {
                     style={{
                       fontFamily: "var(--font-mono)",
                       color: "var(--accent-primary)",
-                      fontWeight: 700,
+                      fontWeight: 600,
                       fontSize: 11,
                     }}>
                     ROUND TRIP
@@ -5032,7 +5032,7 @@ export default function NewQuote() {
                   <span
                     style={{
                       fontWeight: 600,
-                      color: "var(--status-warning)",
+                      color: "var(--status-warning-text, var(--status-warning))",
                     }}>
                     R {Math.round(_weightSurcharge).toLocaleString()}
                   </span>
@@ -5051,7 +5051,7 @@ export default function NewQuote() {
                   <span
                     style={{
                       fontWeight: 600,
-                      color: "var(--status-warning)",
+                      color: "var(--status-warning-text, var(--status-warning))",
                     }}>
                     R {Math.round(_additionalCosts).toLocaleString()}
                   </span>
@@ -5130,7 +5130,7 @@ export default function NewQuote() {
                   style={{
                     fontFamily: "var(--font-mono)",
                     fontSize: 20,
-                    fontWeight: 700,
+                    fontWeight: 600,
                     color: "var(--accent-primary)",
                   }}>
                   R {Math.round(total).toLocaleString()}
@@ -5272,7 +5272,7 @@ export default function NewQuote() {
                     style={{
                       fontFamily: "var(--font-mono)",
                       color: "var(--accent-primary)",
-                      fontWeight: 700,
+                      fontWeight: 600,
                     }}>
                     R {Math.round(total).toLocaleString()}
                   </span>
@@ -5374,7 +5374,7 @@ export default function NewQuote() {
                 <div
                   style={{
                     fontSize: 10,
-                    color: "var(--status-warning)",
+                    color: "var(--status-warning-text, var(--status-warning))",
                     fontFamily: "var(--font-sans)",
                     marginBottom: 10,
                     padding: "8px",
@@ -5650,7 +5650,7 @@ export default function NewQuote() {
                 background: "var(--bg-surface)",
                 border: "1px solid var(--status-danger)",
                 borderRadius: 2,
-                color: "var(--status-danger)",
+                color: "var(--status-danger-text, var(--status-danger))",
                 fontSize: 12,
                 marginBottom: 16,
               }}>
@@ -5800,7 +5800,7 @@ export default function NewQuote() {
                   }}>
                   {f.label}
                   <span
-                    style={{ color: "var(--status-danger)", marginLeft: 2 }}>
+                    style={{ color: "var(--status-danger-text, var(--status-danger))", marginLeft: 2 }}>
                     *
                   </span>
                 </label>

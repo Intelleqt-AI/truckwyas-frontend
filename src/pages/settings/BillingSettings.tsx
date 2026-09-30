@@ -1,4 +1,5 @@
 import '@/pages/table-heading-roles.css';
+import { formatDate, formatMoney, formatMoneyWhole, formatPercent } from '@/lib/formatters';
 import '@/pages/settings/settings-brand.css';
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -6,39 +7,19 @@ import { fetchData, postData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { useAuth } from "@/lib/AuthContext";
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
+import { StatusChip } from '@/components/ui/StatusChip';
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 8,
-  marginBottom: 16,
-};
-
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: '14px 20px',
-  borderBottom: '1px solid var(--border-subtle)',
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  lineHeight: '24px',
-  fontWeight: 600,
-  color: 'var(--text-primary)',
-  margin: 0,
-};
+const sectionStyle = settingsCardStyle;
+const sectionHeaderStyle = settingsCardHeaderStyle;
+const sectionTitleStyle = settingsCardTitleStyle;
 
 const planBadgeStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px', fontWeight: 500,
-  padding: '2px 7px', borderRadius: 4,
+  fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  padding: '2px 8px', borderRadius: 'var(--radius-chip)', whiteSpace: 'nowrap',
 };
 
-const secondaryBtnStyle: React.CSSProperties = {
-  background: 'none', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-secondary)', padding: '8px 12px', minHeight: 40,
-  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-  borderRadius: 6,
-};
+const secondaryBtnStyle = settingsSecondaryButtonStyle;
 
 // Presentation-only labels for known status payload values — unknown strings
 // render verbatim (own-property lookup).
@@ -115,18 +96,22 @@ interface BillingTransaction {
 // Pricing is server-driven (billing/status/ returns flat_plan) — only the
 // feature list lives here.
 const PLAN_FEATURES = [
-  'Unlimited loads & invoices',
-  'AI-powered quote optimisation',
-  'Fast Pay capital access',
-  'Advanced analytics & reporting',
-  'Fleet intelligence dashboard',
+  'Unlimited loads and invoices',
+  'Quotes priced from your own costs',
+  'Reports and insights',
+  'Fleet and driver records',
   'Multi-user access',
-  'API & integrations',
+  'API and integrations',
   'Priority support',
 ];
 
-const formatRand = (amount?: string | number | null) =>
-  `R${Number(amount ?? 0).toLocaleString('en-ZA')}`;
+/** Server take rate ("0.25") in the house format ("0,25%"). */
+const formatRate = (pct?: string | number | null) => formatPercent(pct, 2);
+
+const formatRand = (amount?: string | number | null) => {
+  const n = Number(amount ?? 0);
+  return Number.isInteger(n) ? formatMoneyWhole(n) : formatMoney(n);
+};
 
 // Live-ticking countdown to next_billing_at. Under 48h out it ticks every
 // second (HH:MM:SS, or MM:SS once under an hour) so a fast test cycle is
@@ -165,11 +150,11 @@ function NextPaymentCountdown({ nextBillingAt, mode = 'charge' }: { nextBillingA
 
   return (
     <div style={{
-      fontSize: 13, lineHeight: '20px', color: mode === 'cancel' ? 'var(--status-warning)' : 'var(--accent-primary)', marginTop: 2,
+      fontSize: 13, lineHeight: '20px', color: mode === 'cancel' ? 'var(--status-warning-text)' : 'var(--accent-primary)', marginTop: 2,
       fontVariantNumeric: 'tabular-nums' as const,
     }}>
-      {label} · {new Date(nextBillingAt).toLocaleDateString('en-ZA')}
-      {mode === 'cancel' && ' — you won\'t be charged again'}
+      {label} · {formatDate(nextBillingAt)}
+      {mode === 'cancel' && '. You won\'t be charged again.'}
     </div>
   );
 }
@@ -318,17 +303,17 @@ export function BillingSettings() {
       // Subscription is active and already paid for this cycle — only the
       // failed delivery fee(s) are being charged; the cycle is untouched.
       title = 'Clear failed delivery fees';
-      message = `This charges ${formatRand(total)} now to whichever card you enter next — covering ${feesCount} previously failed delivery fee charge${feesCount === 1 ? '' : 's'}. Your subscription is already paid up and is not re-charged or reset; the new card just becomes your card on file going forward.`;
+      message = `This charges ${formatRand(total)} now to whichever card you enter next, covering ${feesCount} previously failed delivery fee charge${feesCount === 1 ? '' : 's'}. Your subscription is already paid up and is not re-charged or reset; the new card just becomes your card on file going forward.`;
       confirmLabel = 'Charge & update card';
     } else if (subscriptionFailed) {
       title = 'Retry payment with a different card';
       message = feesCount > 0
-        ? `This charges ${formatRand(total)} now to whichever card you enter next — ${formatRand(flatPlan?.amount)} for the failed subscription payment plus ${formatRand(feesTotal)} across ${feesCount} previously failed delivery fee charge${feesCount === 1 ? '' : 's'} — clearing everything in one payment.`
+        ? `This charges ${formatRand(total)} now to whichever card you enter next: ${formatRand(flatPlan?.amount)} for the failed subscription payment plus ${formatRand(feesTotal)} across ${feesCount} previously failed delivery fee charge${feesCount === 1 ? '' : 's'}. This clears everything in one payment.`
         : `This charges ${formatRand(total)} now to whichever card you enter next, clearing the failed payment and setting it as your card on file going forward.`;
       confirmLabel = 'Continue to payment';
     } else {
       title = 'Update payment method';
-      message = `This charges ${formatRand(total)} now to whichever card you enter next, and starts a new billing cycle from today — it's a full resubscribe, not a free card swap, since your current cycle's charge already happened. It becomes your card on file for every future charge.`;
+      message = `This charges ${formatRand(total)} now to whichever card you enter next, and starts a new billing cycle from today. It's a full resubscribe, not a free card swap, since your current cycle's charge already happened. It becomes your card on file for every future charge.`;
       confirmLabel = 'Charge & update card';
     }
 
@@ -344,7 +329,7 @@ export function BillingSettings() {
   const handleCancel = () => {
     setConfirmOpts({
       title: 'Cancel subscription',
-      message: 'Are you sure you want to cancel your subscription? Access continues in full until the end of your current billing period — you won\'t be charged again, and you can undo this any time before then.',
+      message: 'Are you sure you want to cancel your subscription? Access continues in full until the end of your current billing period. You won\'t be charged again, and you can undo this any time before then.',
       confirmLabel: 'Cancel plan',
       danger: true,
       onConfirm: async () => {
@@ -382,7 +367,7 @@ export function BillingSettings() {
     try {
       await postData({ url: 'api/v1/billing/undo-cancel/', data: {} });
       setBillingStatus(prev => prev ? { ...prev, cancel_at_period_end: false } : prev);
-      toast.success('Cancellation undone — your subscription will continue.');
+      toast.success('Cancellation undone. Your subscription will continue.');
     } catch {
       toast.error('Failed to undo cancellation. Please try again.');
     } finally {
@@ -403,14 +388,11 @@ export function BillingSettings() {
   const showLoading = loading || confirming;
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Billing</h2>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Manage your subscription and payment history</div>
-      </div>
+    <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
+      <SettingsPageHeader title="Billing" description="Manage your subscription and payment history" />
 
       {confirming && (
-        <div style={{ ...sectionStyle, padding: 16, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ ...sectionStyle, padding: '16px var(--card-pad, 20px)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 16, height: 16, border: '2px solid var(--accent-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Activating your subscription…</span>
         </div>
@@ -418,40 +400,31 @@ export function BillingSettings() {
 
       {showLoading && !confirming && (
         <div style={sectionStyle}>
-          <div style={{ padding: 20 }}>
-            <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
-            <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4, width: '40%' }} />
+          <div style={{ padding: 'var(--card-pad, 20px)' }}>
+            <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', marginBottom: 12, width: '60%' }} />
+            <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', width: '40%' }} />
           </div>
         </div>
       )}
 
       {!showLoading && (
         <div style={sectionStyle}>
-          <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Plan</h3></div>
-          <div style={{ padding: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+          <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Plan</h2></div>
+          <div style={{ padding: 'var(--card-pad, 20px)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                   <span style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>
                     {isPaid ? (billingStatus?.item_name || 'TruckWys Fleet') : 'Free plan'}
                   </span>
                   {isPaid && !billingStatus?.cancel_at_period_end && (
-                    <span style={{
-                      ...planBadgeStyle,
-                      background: 'var(--status-success-bg)', color: 'var(--accent-primary)',
-                    }}>Active</span>
+                    <StatusChip status="ACTIVE" />
                   )}
                   {isPaid && billingStatus?.cancel_at_period_end && (
-                    <span style={{
-                      ...planBadgeStyle,
-                      background: 'var(--status-warning-bg)', color: 'var(--status-warning)',
-                    }}>Cancelling</span>
+                    <StatusChip tone="warning" label="Cancelling" />
                   )}
                   {subStatus === 'cancelled' && (
-                    <span style={{
-                      ...planBadgeStyle,
-                      background: 'var(--status-danger-bg)', color: 'var(--status-danger)',
-                    }}>Cancelled</span>
+                    <StatusChip tone="danger" label="Cancelled" />
                   )}
                 </div>
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
@@ -491,7 +464,7 @@ export function BillingSettings() {
                     disabled={cancelling || isDemo}
                     title={isDemo ? 'Fixed in demo mode' : undefined}
                     className="btn-action settings-control"
-                    style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                    style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
                   >
                     {cancelling ? 'Restoring…' : 'Keep subscription'}
                   </button>
@@ -516,12 +489,13 @@ export function BillingSettings() {
                       disabled={subscribing || isDemo}
                       title={isDemo ? 'Fixed in demo mode' : undefined}
                       className="btn-action settings-control"
-                      style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                      style={{ minHeight: 'var(--control-h, 36px)', borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
                     >
-                      {subscribing ? 'Redirecting…' : isSuspended ? `Reactivate — ${formatRand(subscribeAmount)}/month` : `Subscribe — ${formatRand(subscribeAmount)}/month`}
+                      {subscribing ? 'Redirecting…' : isSuspended ? `Reactivate for ${formatRand(subscribeAmount)}/month` : `Subscribe for ${formatRand(subscribeAmount)}/month`}
                     </button>
+                    {/* The fee is stated once, here, beside the price it adds to. */}
                     <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' as const }}>
-                      + {flatPlan?.take_rate_pct}% of every delivered load
+                      + {formatRate(flatPlan?.take_rate_pct)} of each delivered load's value
                     </span>
                   </div>
                 )}
@@ -532,9 +506,9 @@ export function BillingSettings() {
               <div style={{
                 marginBottom: 16, padding: 16,
                 background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)',
-                borderRadius: 8, fontSize: 14, lineHeight: '20px', color: 'var(--status-danger)',
+                borderRadius: 'var(--radius-nested)', fontSize: 14, lineHeight: '20px', color: 'var(--status-danger-text)',
               }}>
-                <strong>Your account is suspended.</strong> You can still view existing data and manage
+                <span style={{ fontWeight: 600 }}>Your account is suspended.</span> You can still view existing data and manage
                 drivers/vehicles, but can't create quotes or invoices until you update your payment method.
               </div>
             )}
@@ -543,48 +517,48 @@ export function BillingSettings() {
               <div style={{
                 marginBottom: 16, padding: 16,
                 background: 'var(--status-warning-bg)', border: '1px solid var(--status-warning)',
-                borderRadius: 8, fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)',
+                borderRadius: 'var(--radius-nested)', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)',
               }}>
                 <div style={{ fontWeight: 600, marginBottom: 6 }}>
                   We couldn't charge your card
                 </div>
-                <div style={{ color: 'var(--status-warning)', fontWeight: 500 }}>
+                <div style={{ color: 'var(--status-warning-text)', fontWeight: 500 }}>
                   {grace.days_remaining > 0
                     ? `${grace.days_remaining} day${grace.days_remaining === 1 ? '' : 's'} left to resolve this before your account is suspended.`
-                    : 'Grace period has ended — a successful charge is needed to avoid suspension.'}
+                    : 'Grace period has ended. A successful charge is needed to avoid suspension.'}
                 </div>
               </div>
             )}
 
             {(billingStatus?.update_card?.items?.length ?? 0) > 0 && (
               <div style={{
-                marginBottom: 16, border: '1px solid var(--border-subtle)', borderRadius: 8, overflow: 'hidden',
+                marginBottom: 16, border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)', overflow: 'hidden',
               }}>
                 <div style={{
-                  padding: '10px 14px', background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)',
+                  padding: '12px 16px', background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)',
                   fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
                   color: 'var(--text-secondary)',
                 }}>
-                  Failed charges — cleared together when you update payment method
+                  Failed charges, cleared together when you update payment method
                 </div>
                 {billingStatus!.update_card!.items.map((item, i) => (
                   <div key={i} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '10px 14px', fontSize: 13,
-                    borderBottom: i < billingStatus!.update_card!.items.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                    padding: '12px 16px', fontSize: 13,
+                    borderBottom: i < billingStatus!.update_card!.items.length - 1 ? '1px solid var(--border-row)' : 'none',
                   }}>
                     <div>
                       <div style={{ color: 'var(--text-primary)' }}>{item.label}</div>
                       <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 1 }}>
-                        Failed {new Date(item.failed_at).toLocaleDateString('en-ZA')}
+                        Failed {formatDate(item.failed_at)}
                       </div>
                     </div>
-                    <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--status-warning)' }}>{formatRand(item.amount)}</span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--status-warning-text)' }}>{formatRand(item.amount)}</span>
                   </div>
                 ))}
                 <div style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '10px 14px', fontSize: 13, fontWeight: 600, background: 'var(--bg-deep)',
+                  padding: '12px 16px', fontSize: 13, fontWeight: 600, background: 'var(--bg-deep)',
                 }}>
                   <span>Total to clear everything</span>
                   <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatRand(billingStatus?.update_card?.total)}</span>
@@ -596,7 +570,7 @@ export function BillingSettings() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 {PLAN_FEATURES.map(f => (
                   <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                    <span style={{ color: 'var(--border-subtle)', fontSize: 14 }}>✓</span>
+                    <span style={{ color: 'var(--text-tertiary)', fontSize: 14 }} aria-hidden="true">✓</span>
                     {f}
                   </div>
                 ))}
@@ -605,25 +579,11 @@ export function BillingSettings() {
 
             {isPaid && (
               <div style={{ marginTop: 16, fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                Every delivered load is also charged {billingStatus?.flat_plan?.take_rate_pct}% of its invoice value
-                automatically to this card, on top of the monthly fee — see Billing history below for every charge taken.
+                Every delivered load is also charged {formatRate(billingStatus?.flat_plan?.take_rate_pct)} of its invoice value
+                automatically to this card, on top of the monthly fee. See Billing history below for every charge taken.
               </div>
             )}
 
-            {!isPaid && subStatus !== 'cancelled' && !isSuspended && (
-              <div style={{
-                marginTop: 16, padding: 16,
-                background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
-                borderRadius: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
-              }}>
-                <strong style={{ color: 'var(--accent-primary)' }}>Unlock the full platform</strong>
-                <br />
-                Subscribe to TruckWys for AI-powered insights, Fast Pay capital access, and unlimited loads —
-                one flat fee of {formatRand(flatPlan?.amount)}/month, whatever your fleet size,{' '}
-                <strong>plus {flatPlan?.take_rate_pct}% of every delivered load's value</strong>, charged
-                automatically to the same card the moment each load is delivered.
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -631,7 +591,7 @@ export function BillingSettings() {
       {!showLoading && (
         <div style={sectionStyle}>
           <div style={{ ...sectionHeaderStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={sectionTitleStyle}>Billing history</h3>
+            <h2 style={sectionTitleStyle}>Billing history</h2>
             {billingHistory.length > 0 && (
               <button className="settings-control" onClick={() => navigate('/settings/billing/history')} style={{
                 ...secondaryBtnStyle, color: 'var(--accent-primary)', cursor: 'pointer',
@@ -647,37 +607,31 @@ export function BillingSettings() {
             </div>
           ) : (
             <div className="settings-scroll-region" role="region" aria-label="Billing history" tabIndex={0} style={{ overflowX: 'auto' }}>
-            <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+            <table className="table-heading-roles settings-table">
               <thead>
                 <tr>
                   {['Charge', 'Reference', 'Date', 'Amount', 'Status'].map(h => (
-                    <th key={h} style={{
-                      padding: '10px 20px', textAlign: 'left' as const,
-                      borderBottom: '1px solid var(--border-subtle)',
-                    }}>{h}</th>
+                    <th key={h || 'actions'} scope="col" style={{ textAlign: (h === 'Amount') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {billingHistory.slice(0, 5).map((tx, i, arr) => (
                   <tr key={tx.id} style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                    <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
+                    <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
                       {tx.label}
                     </td>
-                    <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                       {tx.reference || '—'}
                     </td>
-                    <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                      {new Date(tx.created_at).toLocaleDateString('en-ZA')}
+                    <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                      {formatDate(tx.created_at)}
                     </td>
-                    <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                    <td className="num" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                       {formatRand(tx.amount)}
                     </td>
-                    <td style={{ padding: '12px 20px' }}>
-                      <span style={{
-                        fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-                        color: tx.status === 'complete' ? 'var(--accent-primary)' : tx.status === 'pending' ? 'var(--status-warning)' : 'var(--status-danger)',
-                      }}>{statusDisplay(tx.status)}</span>
+                    <td>
+                      <StatusChip tone={tx.status === 'complete' ? 'success' : tx.status === 'pending' ? 'warning' : 'danger'} label={statusDisplay(tx.status)} size="sm" />
                     </td>
                   </tr>
                 ))}

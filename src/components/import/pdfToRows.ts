@@ -65,7 +65,7 @@ function joinWords(row: Run[]): Run[] {
 
 export class ScannedPdfError extends Error {
   constructor() {
-    super('That PDF has no text in it — it looks scanned. Copy the rows out by hand, or export the list as Excel or CSV.');
+    super('That PDF has no text in it. It looks scanned. Copy the rows out by hand, or export the list as Excel or CSV.');
     this.name = 'ScannedPdfError';
   }
 }

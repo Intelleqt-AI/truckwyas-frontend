@@ -6,93 +6,202 @@
 
 /* ===========================
    DARK MODE (Default)
+   v3 final palette: docs/brand/DESIGN-PRINCIPLES.md §3 lists every value
+   with its measured contrast. Status, text and control tokens are defined
+   here (not under .os-app-shell) so portals, auth and public pages match.
    =========================== */
 
 :root,
 [data-theme="dark"] {
-  /* Base Surfaces */
-  --bg-deep: #060709;
-  --bg-surface: #101215;
-  --bg-surface-hover: #181B20;
-  --bg-panel: rgba(255, 255, 255, 0.035);
-  --bg-sidebar: rgba(16, 18, 21, 0.5);
-  --modal-backdrop: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
 
-  /* Borders */
-  --border-subtle: #2A2E34;
-  --border-active: #3C424A;
-  --border-row: #1E2126;
+  /* Surfaces: page < sidebar < card < raised = overlay (overlay adds a border + shadow). */
+  --bg-deep: #0B0C0E;
+  --bg-sidebar: #0E0F12;
+  --bg-surface: #131518;
+  --bg-surface-hover: #181B1F;
+  --bg-raised: #1C1F24;
+  --bg-overlay: #1C1F24;
+  --bg-panel: rgba(255, 255, 255, 0.035); /* retired: alias only */
+  --modal-backdrop: rgba(0, 0, 0, 0.64);
 
-  /* Accent - Blue */
-  --accent-primary: #4D9EFF;
-  --accent-bright: #4D9EFF;
-  --accent-dim: #1A3A6B;
-  --accent-glow: rgba(77, 158, 255, 0.15);
+  /* Borders. --border-control is for every form control (1.4.11, >= 3:1). */
+  --border-row: #1D2025;
+  --border-subtle: #23262C;
+  --border-active: #2C3037;         /* = default: chips, outline buttons, overlay edge */
+  --border-default: #2C3037;
+  --border-strong: #3A3F47;
+  --border-overlay: #2C3037;
+  --border-control: #6E7682;
+  --border-control-hover: #8B919C;
+  --border-input: var(--border-control); /* alias (theme review name) */
+
+  /* Accent: data, links, focus and one emphasis per panel. Never a primary fill. */
+  --accent-primary: #6AA6FF;
+  --accent-primary-hover: #86B7FF;
+  --accent-hover: #86B7FF;
+  --accent-pressed: #5592EE;
+  --accent-bright: #86B7FF;         /* legacy alias of the hover step */
+  --accent-dim: rgba(106, 166, 255, 0.10);
+  --accent-glow: rgba(106, 166, 255, 0.15);
+  --link: #7DB2FF;
+  --on-accent: #0B0C0E;
 
   /* Text */
-  --text-primary: #EDEDED;
-  --text-secondary: #9AA1A9;
-  --text-tertiary: #6E757D;
+  --text-primary: #EDEFF2;
+  --text-secondary: #B4BAC3;
+  --text-tertiary: #9BA1AB;
+  --text-disabled: #555B64;
 
-  /* Status Colors */
-  --status-success: #4D9EFF;
-  --status-success-bg: rgba(77, 158, 255, 0.1);
-  --status-warning: #F59E0B;
-  --status-warning-bg: rgba(245, 158, 11, 0.1);
-  --status-danger: #FF4949;
-  --status-danger-bg: rgba(255, 73, 73, 0.1);
-  --status-neutral: #888888;
-  --status-neutral-bg: #1B1E23;
+  /* Primary button: near-white ink, black text. */
+  --btn-primary-bg: #EDEFF2;
+  --btn-primary-fg: #0B0C0E;
+  --btn-primary-hover: #FFFFFF;
+  --btn-primary-pressed: #D5D9DF;
+  --btn-disabled-bg: var(--bg-raised);
+  --btn-disabled-fg: var(--text-disabled);
+  --btn-danger-bg: #D93036;
+  --btn-danger-hover: #C4262C;
+  --btn-danger-fg: #FFFFFF;
+
+  /* Status: -text for words, -dot for chip dots and marks, -bg for banners only.
+     The bare --status-X tokens are text-grade so legacy text uses still pass. */
+  --status-success: #4CC38A;
+  --status-success-text: #4CC38A;
+  --status-success-dot: #3DB87E;
+  --status-success-bg: rgba(76, 195, 138, 0.10);
+  --status-warning: #E09A2D;
+  --status-warning-text: #EDB14F;
+  --status-warning-dot: #E09A2D;
+  --status-warning-bg: rgba(237, 177, 79, 0.10);
+  --status-danger: #E5534B;
+  --status-danger-text: #F47A7A;
+  --status-danger-dot: #E5534B;
+  --status-danger-bg: rgba(244, 122, 122, 0.10);
+  --status-info: #6AA6FF;
+  --status-info-text: #7DB2FF;
+  --status-info-dot: #6AA6FF;
+  --status-info-bg: rgba(106, 166, 255, 0.10);
+  --status-neutral: #9AA0AA;
+  --status-neutral-text: var(--text-secondary);
+  --status-neutral-dot: #6B717B;
+  --status-neutral-bg: var(--bg-raised);
+  --status-ok-dot: var(--status-success-dot); /* legacy alias */
+  --avatar-on-dim: #7DB2FF;
+  --badge-bg: #D93036;
+  --badge-fg: #FFFFFF;
 
   /* Header */
-  --header-bg: rgba(6, 7, 9, 0.8);
+  --header-bg: rgba(11, 12, 14, 0.85);
 
-  /* Chart colors */
-  --chart-bar: #1E2126;
-  --chart-bar-highlight: var(--accent-primary);
-  --chart-bar-gradient: var(--accent-dim);
+  /* Charts */
+  --chart-series-1: #6AA6FF;
+  --chart-bar-highlight: var(--chart-series-1);
+  --chart-bar: rgba(255, 255, 255, 0.04);   /* comparison fill (under the hatch) */
+  --chart-hatch: #6B7280;                   /* 45deg stroke + 1px outline, >= 3:1 */
+  --chart-muted: #6B7280;                   /* muted / comparison marks, >= 3:1 */
+  --chart-grid: #262A30;
+  --chart-axis: #3A3F47;
+  --chart-hover-band: rgba(255, 255, 255, 0.04);
+  --chart-negative: #F0894F;
+  --chart-bar-gradient: transparent;
 
-  /* Heatmap */
-  --heat-empty: #1E2126;
-  --heat-low: #0D2A4A;
-  --heat-medium: #1A4A8A;
-  --heat-high: var(--accent-primary);
-  --heat-max: var(--accent-primary);
+  /* Heatmap / sequential ramp (5 steps) */
+  --heat-empty: #1A1D22;
+  --heat-1: #172338;
+  --heat-2: #1F3A66;
+  --heat-3: #2F5FAD;
+  --heat-4: #5592EE;
+  --heat-5: #9CC3FF;
+  --heat-low: var(--heat-2);
+  --heat-medium: var(--heat-3);
+  --heat-high: var(--heat-4);
+  --heat-max: var(--heat-5);
 
-  /* Ambient glow */
-  --glow-color: rgba(77, 158, 255, 0.08);
-  --glow-transparent: rgba(5, 5, 5, 0);
+  /* Ambient glow (retired: glows are banned; kept so old references resolve) */
+  --glow-color: transparent;
+  --glow-transparent: transparent;
 
   /* Scrollbar */
-  --scrollbar-thumb: #2A2E34;
-  --scrollbar-thumb-hover: #3C424A;
+  --scrollbar-thumb: #2C3037;
+  --scrollbar-thumb-hover: #3A3F47;
 
-  /* Shadows */
+  /* Shadows: cards use a border, overlays use border + shadow. */
   --shadow-card: none;
   --shadow-card-hover: none;
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.02);
 
-  /* Input specific */
-  --input-bg: #191C21;
-  --input-bg-focus: var(--bg-surface);
+  /* Inputs sit one step below the card (inset reads as editable in dark). */
+  --input-bg: #0F1114;
+  --input-bg-focus: #0F1114;
 
-  /* Card */
-  --card-radius: 8px;
+  --card-radius: 12px;
 
+  /* Neutral interaction tints (hover is a surface tint, never a border change). */
+  --surface-tint-hover: rgba(255, 255, 255, 0.04);
+  --surface-tint-active: rgba(255, 255, 255, 0.07);
+
+  /* Shell */
+  --nav-active-bg: #262A31;
+  --nav-active-fg: #EDEFF2;
+  --nav-active-muted: #B4BAC3;     /* "Soon" and counts on the active item */
+  --nav-hover-bg: rgba(255, 255, 255, 0.05);
+  --nav-hover-color: var(--text-primary);
+  --nav-active-color: var(--nav-active-fg);
+  --tip-bg: #EDEFF2;
+  --tip-fg: #0B0C0E;
+  --focus-ring: rgba(106, 166, 255, 0.35);
+  --focus-outline: var(--accent-primary);
+
+  /* Emphasis tile (one per page), R5: same treatment as light. Neutral card
+     surface and border; only the figure carries accent ink. No navy fill. */
+  --emphasis-bg: var(--bg-surface);
+  --emphasis-border: var(--border-subtle);
+  --emphasis-fg: #6AA6FF;
+  --emphasis-fg-muted: #B4BAC3;
+  --emphasis-track: rgba(106, 166, 255, 0.18);
+  --emphasis-fill: #6AA6FF;
+  --emphasis-focus: #6AA6FF;
+
+  /* Alert box */
+  --alert-bg: var(--status-info-bg);
+  --alert-border: rgba(106, 166, 255, 0.25);
+
+  --status-badge-active-border: transparent;
+  --status-badge-delayed-border: transparent;
+  --bar-gradient-opacity: 0;
+  --live-dot-shadow: none;
+
+  /* Legacy: text colour on an accent fill. Primary buttons use --btn-primary-*. */
+  --btn-action-color: #0B0C0E;
+  --btn-action-shadow: none;
+  --pulse-color: rgba(106, 166, 255, 0.4);
+}
+
+/* Theme-agnostic scale (same in light + dark). */
+:root {
   /* ===========================
-     TYPE SCALE / WEIGHT / SPACING (theme-agnostic — same in light + dark)
-     Single source of truth for sizing. Six steps only; nothing off-scale.
-     Uppercase belongs ONLY to --text-micro (11px mono) micro-labels.
+     v3 TYPE SCALE / WEIGHT / SPACING
+     Bold, tight titles; small grey labels; big figures with negative tracking.
+     Uppercase belongs ONLY to --text-micro group labels (sidebar, table eyebrows).
      =========================== */
-  --text-display: 28px;   /* page hero numbers */
-  --text-title: 20px;     /* page title */
-  --text-subhead: 16px;   /* section / card heading */
+  --text-figure: 32px;    /* KPI figures: 700, -0.03em, tabular */
+  --text-display: 28px;   /* page title: 700, -0.025em */
+  --text-title: 20px;     /* sheet / dialog title: 700, -0.015em */
+  --text-subhead: 15px;   /* card title: 600, -0.01em */
   --text-body: 14px;      /* default body + inputs */
   --text-small: 13px;     /* secondary text, table cells */
-  --text-micro: 11px;     /* mono UPPERCASE micro-labels only (eyebrows, th, stat labels) */
+  --text-label: 12px;     /* small grey labels, deltas, axis text */
+  --text-micro: 11px;     /* uppercase group labels, 600, +0.06em */
 
-  --weight-regular: 400;  /* body */
-  --weight-medium: 500;   /* labels, table headers, active states */
-  --weight-semibold: 600; /* page/section headings + key figures only */
+  --tracking-figure: -0.03em;
+  --tracking-display: -0.025em;
+  --tracking-title: -0.01em;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -101,35 +210,45 @@
   --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
+  --space-10: 40px;
 
-  --pill-radius: 4px;
+  /* R3 rhythm (DESIGN-PRINCIPLES §11.1): ONE card recipe and two gaps.
+     Card padding 20 (16 on phones), 16 between sibling cards, 24 between
+     sections. Nothing else. */
+  --card-pad: 20px;
+  --card-gap: 16px;
+  --section-gap: 24px;
 
-  /* Nav item hover */
-  --nav-hover-bg: rgba(77, 158, 255, 0.05);
-  --nav-hover-color: var(--accent-primary);
-  --nav-active-bg: rgba(77, 158, 255, 0.05);
-  --nav-active-color: var(--accent-primary);
+  /* R3 control heights: 36 for every control in a page head or toolbar
+     (buttons, search, selects, segmented track), 40 for fields inside forms.
+     Coarse pointers and phones lift both to 44 (touch floor). */
+  --control-h: 36px;
+  --field-h: 40px;
 
-  /* Alert box */
-  --alert-bg: rgba(77, 158, 255, 0.05);
-  --alert-border: rgba(77, 158, 255, 0.2);
+  /* Page rhythm (one page-head geometry everywhere). Applied by
+     .tw-page-head / SectionHeader and the shell's <main>:
+       main top edge -> H1 box top      = --page-head-top
+       head block (title 34 + 4 + one subtitle line 20, reserved even when
+       there is no subtitle, so tabs never move) = --page-head-h
+       head -> tabs row                 = --head-to-tabs
+       tabs row (40) -> first content   = --tabs-to-content
+       head -> first content (no tabs)  = --head-to-content */
+  --main-pad-top: 8px;
+  --page-head-top: 24px;
+  --page-head-h: 58px;
+  --head-to-tabs: 16px;
+  --tabs-h: 40px;
+  --tabs-to-content: 24px;
+  --head-to-content: 24px;
 
-  /* Status badge border */
-  --status-badge-active-border: transparent;
-  --status-badge-delayed-border: transparent;
+  /* One content width (DESIGN-PRINCIPLES §11.8). */
+  --content-max: 1600px;
+  --form-max: 720px;
+  /* KPI tile: label 16 + figure 34 + note 16, inside the one card padding
+     (106 desktop, 98 phone). */
+  --kpi-height: calc(66px + 2 * var(--card-pad));
 
-  /* Bar gradient opacity */
-  --bar-gradient-opacity: 0.3;
-
-  /* Live dot */
-  --live-dot-shadow: 0 0 8px var(--accent-primary);
-
-  /* Button action color */
-  --btn-action-color: black;
-  --btn-action-shadow: none;
-
-  /* Pulse animation color */
-  --pulse-color: rgba(77, 158, 255, 0.4);
+  --pill-radius: var(--radius-chip, 6px);
 }
 
 /* ===========================
@@ -137,111 +256,184 @@
    =========================== */
 
 [data-theme="light"] {
-  /* Base Surfaces */
+  color-scheme: light;
+
   --bg-deep: #F3F4F6;
-  --bg-surface: #FFFFFF;
-  --bg-surface-hover: #F9FAFB;
-  --bg-panel: rgba(0, 0, 0, 0.025);
   --bg-sidebar: #FFFFFF;
-  --modal-backdrop: rgba(0, 0, 0, 0.5);
+  --bg-surface: #FFFFFF;
+  --bg-surface-hover: #F8F9FA;
+  --bg-raised: #EEF0F3;
+  --bg-overlay: #FFFFFF;
+  --bg-panel: rgba(0, 0, 0, 0.025);
+  --modal-backdrop: rgba(14, 17, 22, 0.40);
 
-  /* Borders */
-  --border-subtle: #E5E7EB;
-  --border-active: #D1D5DB;
-  --border-row: #E5E7EB;
+  --border-row: #EEF0F2;
+  --border-subtle: #E4E6EA;
+  --border-active: #D8DBE0;
+  --border-default: #D8DBE0;
+  --border-strong: #C3C7CE;
+  --border-overlay: #E4E6EA;
+  --border-control: #848B96;
+  --border-control-hover: #6B7280;
+  --border-input: var(--border-control);
 
-  /* Accent - Blue */
   --accent-primary: #2563EB;
-  --accent-bright: #3B82F6;
-  --accent-dim: #EFF6FF;
+  --accent-primary-hover: #1D4ED8;
+  --accent-hover: #1D4ED8;
+  --accent-pressed: #1A45C2;
+  --accent-bright: #1D4ED8;
+  --accent-dim: #EFF5FF;
   --accent-glow: rgba(37, 99, 235, 0.15);
+  --link: #1D4ED8;
+  --on-accent: #FFFFFF;
 
-  /* Text */
-  --text-primary: #111827;
-  --text-secondary: #374151;
-  --text-tertiary: #6B7280;
+  --text-primary: #0E1116;
+  --text-secondary: #434A55;
+  --text-tertiary: #636A75;
+  --text-disabled: #A3A8B1;
 
-  /* Status Colors */
-  --status-success: #2563EB;
-  --status-success-bg: #EFF6FF;
-  --status-warning: #F59E0B;
-  --status-warning-bg: #FFFBEB;
-  --status-danger: #EF4444;
+  --btn-primary-bg: #0E1116;
+  --btn-primary-fg: #FFFFFF;
+  --btn-primary-hover: #262B33;
+  --btn-primary-pressed: #000000;
+  --btn-disabled-bg: var(--bg-raised);
+  --btn-disabled-fg: var(--text-disabled);
+  --btn-danger-bg: #C81E1E;
+  --btn-danger-hover: #B91C1C;
+  --btn-danger-fg: #FFFFFF;
+
+  --status-success: #137A3A;
+  --status-success-text: #137A3A;
+  --status-success-dot: #15803D;
+  --status-success-bg: #ECFDF3;
+  --status-warning: #BA7607;
+  --status-warning-text: #A84C08;
+  --status-warning-dot: #BA7607;
+  --status-warning-bg: #FFF7E6;
+  --status-danger: #DC2626;
+  --status-danger-text: #C81E1E;
+  --status-danger-dot: #DC2626;
   --status-danger-bg: #FEF2F2;
-  --status-neutral: #6B7280;
-  --status-neutral-bg: #F3F4F6;
+  --status-info: #2563EB;
+  --status-info-text: #1D4ED8;
+  --status-info-dot: #2563EB;
+  --status-info-bg: #EFF5FF;
+  --status-neutral: #5F6672;
+  --status-neutral-text: var(--text-secondary);
+  --status-neutral-dot: #7D848F;
+  --status-neutral-bg: var(--bg-raised);
+  --status-ok-dot: var(--status-success-dot);
+  --avatar-on-dim: #1D4ED8;
+  --badge-bg: #C81E1E;
+  --badge-fg: #FFFFFF;
 
-  /* Header */
   --header-bg: rgba(255, 255, 255, 0.9);
 
-  /* Chart colors */
-  --chart-bar: #E5E7EB;
-  --chart-bar-highlight: #3B82F6;
+  --chart-series-1: #2563EB;
+  --chart-bar-highlight: var(--chart-series-1);
+  --chart-bar: rgba(14, 17, 22, 0.04);
+  --chart-hatch: #838A95;
+  --chart-muted: #838A95;
+  --chart-grid: #E4E6EA;
+  --chart-axis: #C3C7CE;
+  --chart-hover-band: rgba(14, 17, 22, 0.04);
+  --chart-negative: #C2410C;
   --chart-bar-gradient: transparent;
 
-  /* Heatmap */
-  --heat-empty: #F3F4F6;
-  --heat-low: #DBEAFF;
-  --heat-medium: #93C5FD;
-  --heat-high: #3B82F6;
-  --heat-max: #1D4ED8;
+  --heat-empty: #F1F3F5;
+  --heat-1: #DCE7FD;
+  --heat-2: #AFC8FB;
+  --heat-3: #6F9EF5;
+  --heat-4: #2563EB;
+  --heat-5: #1A3FA8;
+  --heat-low: var(--heat-2);
+  --heat-medium: var(--heat-3);
+  --heat-high: var(--heat-4);
+  --heat-max: var(--heat-5);
 
-  /* Ambient glow */
-  --glow-color: rgba(59, 130, 246, 0.08);
-  --glow-transparent: rgba(243, 244, 246, 0);
+  --glow-color: transparent;
+  --glow-transparent: transparent;
 
-  /* Scrollbar */
-  --scrollbar-thumb: #E5E7EB;
-  --scrollbar-thumb-hover: #D1D5DB;
+  --scrollbar-thumb: #D8DBE0;
+  --scrollbar-thumb-hover: #C3C7CE;
 
-  /* Shadows — give white cards/inputs a real lift off the grey page */
-  --shadow-card: 0 1px 3px rgba(17, 24, 39, 0.06), 0 1px 2px rgba(17, 24, 39, 0.04);
-  --shadow-card-hover: 0 4px 12px -2px rgba(17, 24, 39, 0.10);
+  --shadow-card: none;
+  --shadow-card-hover: none;
+  --shadow-pop: 0 12px 32px rgba(14, 17, 22, 0.12), 0 2px 6px rgba(14, 17, 22, 0.06);
 
-  /* Input specific — white fill on the grey page so boxes read as distinct
-     surfaces, not the same colour as the container. */
   --input-bg: #FFFFFF;
   --input-bg-focus: #FFFFFF;
 
-  /* Card */
-  --card-radius: 8px;
+  --card-radius: 12px;
 
-  /* Nav item hover */
-  --nav-hover-bg: var(--bg-deep);
+  --surface-tint-hover: rgba(14, 17, 22, 0.04);
+  --surface-tint-active: rgba(14, 17, 22, 0.07);
+
+  --nav-active-bg: #0E1116;
+  --nav-active-fg: #FFFFFF;
+  --nav-active-muted: #C3C8D0;
+  --nav-hover-bg: rgba(14, 17, 22, 0.045);
   --nav-hover-color: var(--text-primary);
-  --nav-active-bg: var(--accent-dim);
-  --nav-active-color: var(--accent-primary);
+  --nav-active-color: var(--nav-active-fg);
+  --tip-bg: #0E1116;
+  --tip-fg: #FFFFFF;
+  --focus-ring: rgba(37, 99, 235, 0.28);
+  --focus-outline: var(--accent-primary);
 
-  /* Alert box */
-  --alert-bg: var(--accent-dim);
+  /* Emphasis tile: neutral card surface and border; only the figure carries
+     accent ink. Dark uses the identical treatment (R5). */
+  --emphasis-bg: var(--bg-surface);
+  --emphasis-border: var(--border-subtle);
+  --emphasis-fg: #1D4ED8;
+  --emphasis-fg-muted: #434A55;
+  --emphasis-track: rgba(37, 99, 235, 0.14);
+  --emphasis-fill: #2563EB;
+  --emphasis-focus: #1D4ED8;
+
+  --alert-bg: var(--status-info-bg);
   --alert-border: rgba(37, 99, 235, 0.2);
 
-  /* Status badge border */
-  --status-badge-active-border: rgba(37, 99, 235, 0.2);
-  --status-badge-delayed-border: #FECACA;
-
-  /* Bar gradient opacity */
+  --status-badge-active-border: transparent;
+  --status-badge-delayed-border: transparent;
   --bar-gradient-opacity: 0;
+  --live-dot-shadow: none;
 
-  /* Live dot */
-  --live-dot-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-
-  /* Button action color */
-  --btn-action-color: white;
-  --btn-action-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
-
-  /* Pulse animation color */
+  --btn-action-color: #FFFFFF;
+  --btn-action-shadow: none;
   --pulse-color: rgba(37, 99, 235, 0.4);
 }
+
+/* Native controls (checkboxes, radios, range, date inputs) follow the theme. */
+html { accent-color: var(--accent-primary); }
 
 /* ===========================
    FONTS
    =========================== */
 
 :root {
-  --font-mono: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+  /* Two families. Identifiers (invoice and quote numbers, plates, licences)
+     use tabular sans (v3 decision): --font-mono is kept as the identifier
+     role name so every existing reference follows, and resolves to sans.
+     True code (API keys, payloads, code blocks) uses --font-code. */
+  --font-code: ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --font-mono: var(--font-sans);
+  --font-id: var(--font-sans);
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Tailwind radius scale (tailwind.config.ts) resolves from these: lg/xl = card 8,
+     md = control 6, sm = badge 4, 2xl/sheet = dialog 12. Previously undefined,
+     so every rounded-* utility collapsed to square corners. */
+  --radius: 12px;
+  --radius-sheet: 16px;
+  /* v3 shape scale (docs/design/v3/00-V3-DECISION.md, DESIGN-PRINCIPLES §3):
+     cards 12, controls 8, chips 6, dialogs and sheets 16, nested 8. */
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-chip: 6px;
+  --radius-pill: 999px;
+  --radius-dialog: 16px;
+  --radius-nested: 8px;
+  --radius-menu: 12px;
 }
 
 /* ===========================
@@ -260,16 +452,25 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
-  letter-spacing: -0.01em;
+  letter-spacing: normal;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Form controls don't inherit the page font by default (textarea falls back to
+   the UA monospace). Family only — sizes stay with each component. */
+button, input, select, textarea, optgroup {
+  font-family: inherit;
 }
 
 /* ===========================
    AMBIENT GLOW
    =========================== */
 
+/* Retired: gradient glows are a banned pattern (design principles §1). The
+   element is still rendered by the shell, so it is simply not painted. */
 .ambient-glow {
+  display: none;
   position: fixed;
   top: -20%;
   left: 50%;
@@ -315,170 +516,8 @@ body {
   border-radius: 3px;
 }
 
-/* ===========================
-   OS LAYOUT CONTAINER
-   =========================== */
-
-.os-container {
-  display: grid;
-  grid-template-columns: 60px 1fr 320px;
-  grid-template-rows: 60px 1fr;
-  height: 100vh;
-  position: relative;
-  z-index: 1;
-  overflow: hidden;
-}
-
-/* ===========================
-   HEADER
-   =========================== */
-
-.os-header {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--header-bg);
-  backdrop-filter: blur(10px);
-  /* Keep the header (and its dropdowns: notifications, profile menu) above the
-     main content's cards, which otherwise paint over absolutely-positioned
-     children of the header. */
-  position: relative;
-  z-index: 100;
-}
-
-.logo {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: -0.05em;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  text-transform: uppercase;
-}
-
-.logo span {
-  color: var(--accent-primary);
-}
-
-/* Agent Command Bar */
-.agent-command {
-  flex: 1;
-  max-width: 600px;
-  margin: 0 40px;
-  position: relative;
-}
-
-.agent-input {
-  width: 100%;
-  background: var(--input-bg);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  padding: 10px 16px 10px 40px;
-  border-radius: 2px;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  transition: all 0.2s var(--ease-out);
-}
-
-.agent-input::placeholder {
-  color: var(--text-tertiary);
-}
-
-.agent-input:focus {
-  outline: none;
-  background: var(--input-bg-focus);
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 1px var(--accent-primary), 0 0 20px var(--accent-glow);
-}
-
-.agent-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 14px;
-  height: 14px;
-  background: var(--accent-primary);
-  border-radius: 50%;
-  box-shadow: 0 0 10px var(--pulse-color);
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 var(--pulse-color); }
-  70% { box-shadow: 0 0 0 6px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
-
-/* ===========================
-   LEFT NAVIGATION
-   =========================== */
-
-.os-nav {
-  grid-column: 1 / 2;
-  grid-row: 2 / 3;
-  border-right: 1px solid var(--border-subtle);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 24px;
-  gap: 24px;
-  background: var(--bg-sidebar);
-}
-
-.nav-item {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  border-radius: 2px;
-  cursor: pointer;
-  transition: all 0.2s;
-  position: relative;
-}
-
-.nav-item:hover {
-  color: var(--nav-hover-color);
-  background: var(--nav-hover-bg);
-}
-
-.nav-item.active {
-  color: var(--nav-active-color);
-  background: var(--nav-active-bg);
-}
-
-.nav-item svg {
-  width: 20px;
-  height: 20px;
-  stroke-width: 1.5;
-}
-
-/* Tooltip */
-.nav-tooltip {
-  position: absolute;
-  left: 50px;
-  background: var(--text-primary);
-  color: var(--bg-deep);
-  padding: 4px 8px;
-  border-radius: 2px;
-  font-size: 11px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s;
-  white-space: nowrap;
-  z-index: 10;
-}
-
-.nav-item:hover .nav-tooltip {
-  opacity: 1;
-}
+/* The authenticated shell (sidebar, top bar, phone tab bar) lives in
+   src/components/shell/shell.css. */
 
 /* ===========================
    WORKSPACE
@@ -505,19 +544,18 @@ body {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   padding: 20px;
-  border-radius: var(--card-radius);
+  border-radius: var(--radius-card);
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: visible;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  box-shadow: var(--shadow-card);
+  box-shadow: none;
 }
 
-.card:hover {
-  border-color: var(--border-active);
-  box-shadow: var(--shadow-card-hover);
-}
+/* Static cards do not react to the pointer. Cards that ARE interactive opt in
+   with .card-interactive: a subtle surface tint, never a border change. */
+.card-interactive { cursor: pointer; transition: background-color 0.15s; }
+.card-interactive:hover { background-color: var(--bg-surface-hover); }
 
 .card-header {
   display: flex;
@@ -526,23 +564,28 @@ body {
   margin-bottom: 16px;
 }
 
+/* KPI tiles: label, then value directly beneath it (8px), then context. */
+.metric-card .card-header { margin-bottom: 8px; }
+
+/* Card / metric label: brand "Label" role — sans 13/20/500, sentence case. */
 .card-title {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-secondary);
   font-weight: 500;
 }
 
-/* The one true micro-label: 11px mono uppercase. The ONLY place uppercase is
-   allowed (page eyebrows, table column headers, stat-card labels). Nothing at
-   13px+ should ever be uppercase. */
+/* Muted eyebrow/label: sans 13/20, sentence case (uppercase mono eyebrows are
+   a retired legacy style). */
 .ui-label {
-  font-family: var(--font-mono);
-  font-size: var(--text-micro);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-tertiary);
   font-weight: var(--weight-medium);
 }
@@ -579,19 +622,22 @@ body {
 
 /* Metric Values */
 .metric-value {
-  /* Numbers render in the mono face everywhere — this class previously inherited
-     sans, so cards using it looked different from cards with inline mono. */
-  font-family: var(--font-mono);
+  /* Headline metrics: sans with tabular numerals (brand type role "Primary
+     metric"). Mono is reserved for identifiers. */
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
   font-size: 28px;
   font-weight: 600;
   color: var(--text-primary);
-  letter-spacing: -0.03em;
+  letter-spacing: normal;
   margin-bottom: 4px;
 }
 
 .metric-delta {
-  font-size: 12px;
-  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 20px;
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
   font-weight: 500;
   display: flex;
   align-items: center;
@@ -657,16 +703,20 @@ body {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
 }
 
 .data-table th {
   text-align: left;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--text-secondary);
-  font-weight: 600;
+  font-weight: 500;
   padding: 0 16px 12px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -691,40 +741,39 @@ body {
   color: var(--text-primary);
 }
 
+/* Numeric columns right-align (header and cells); identifiers use the 13px tabular-sans ID role. */
+.data-table th.text-right,
+.data-table td.text-right { text-align: right; }
+.data-table td.mono { font-size: 13px; font-variant-numeric: tabular-nums; }
+
 /* ===========================
    STATUS BADGES
    =========================== */
 
 .status-badge {
+  /* Chip role: 13/20 medium sans at the 6px chip radius. A tinted fill carries
+     the state; no border on top of it (one boundary treatment only). */
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 2px 8px;
-  border-radius: 100px;
-  background: var(--status-neutral-bg);
-  font-size: 11px;
+  border-radius: var(--radius-chip);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--text-secondary);
   font-weight: 500;
-  border: 1px solid transparent;
+  white-space: nowrap;
+  border: 1px solid var(--border-default);
 }
-
-.status-badge.active {
-  background: var(--status-success-bg);
-  color: var(--accent-primary);
-  border-color: var(--status-badge-active-border);
-}
-
-.status-badge.delayed {
-  background: var(--status-danger-bg);
-  color: var(--status-danger-text, var(--status-danger));
-  border-color: var(--status-badge-delayed-border);
-}
-
-.status-badge.warning {
-  background: var(--status-warning-bg);
-  color: var(--status-warning-text, var(--status-warning));
-  border-color: var(--status-warning);
-}
+/* Legacy class: same neutral chip as <StatusChip>, the dot carries the state. */
+.status-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--status-neutral-dot); flex-shrink: 0; }
+.status-badge.active::before { background: var(--status-success-dot); }
+.status-badge.delayed::before { background: var(--status-danger-dot); }
+.status-badge.warning::before { background: var(--status-warning-dot); }
 
 /* ===========================
    AGENT SIDEBAR
@@ -744,12 +793,13 @@ body {
 .agent-header {
   padding: 20px;
   border-bottom: 1px solid var(--border-subtle);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-secondary);
-  font-weight: 600;
+  font-weight: 500;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -760,8 +810,7 @@ body {
   height: 8px;
   background: var(--accent-primary);
   border-radius: 50%;
-  box-shadow: var(--live-dot-shadow);
-  animation: pulse-dot 2s infinite;
+  /* Static: pulsing dots are a banned pattern. */
 }
 
 @keyframes pulse-dot {
@@ -794,8 +843,9 @@ body {
 .feed-meta {
   display: flex;
   justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 16px;
   font-weight: 500;
   color: var(--text-tertiary);
 }
@@ -816,15 +866,16 @@ body {
   background: var(--alert-bg);
   border: 1px solid var(--alert-border);
   padding: 16px;
-  border-radius: 2px;
+  border-radius: var(--radius-nested);
   margin-top: 8px;
 }
 
 .alert-title {
   color: var(--accent-primary);
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 20px;
   font-weight: 600;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -836,11 +887,11 @@ body {
 
 .btn-action {
   margin-top: 0;
-  background: var(--accent-primary);
-  color: var(--btn-action-color);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
   border: none;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   min-height: 40px;
   font-size: 14px;
   line-height: 20px;
@@ -853,33 +904,45 @@ body {
   min-width: 120px;
   text-align: center;
   white-space: nowrap;
-  transition: opacity 0.2s;
-  box-shadow: var(--btn-action-shadow);
+  transition: background-color 0.12s;
+  box-shadow: none;
 }
 
 .btn-action:hover {
-  opacity: 0.9;
+  background: var(--btn-primary-hover);
+}
+.btn-action:active {
+  background: var(--btn-primary-pressed);
+}
+
+.btn-action:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
 }
 
 .btn-action:disabled {
-  opacity: 0.4;
+  background: var(--btn-disabled-bg);
+  color: var(--btn-disabled-fg);
   cursor: not-allowed;
   pointer-events: none;
 }
 
 .btn-ghost {
   background: transparent;
-  border: 1px solid var(--accent-primary);
-  color: var(--accent-primary);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
 }
+.btn-ghost:hover { background: var(--surface-tint-hover); border-color: var(--border-strong); }
+.btn-ghost:disabled { background: transparent; color: var(--text-disabled); }
 
 .btn-export {
   background: transparent;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   color: var(--text-secondary);
   padding: 4px 8px;
-  font-size: 10px;
-  border-radius: 2px;
+  font-size: 13px;
+  line-height: 20px;
+  border-radius: var(--radius-control);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -898,7 +961,7 @@ body {
 .heat-cell {
   aspect-ratio: 1;
   background: var(--heat-empty);
-  border-radius: 1px;
+  border-radius: 2px;
 }
 
 .heat-cell.low {
@@ -940,11 +1003,11 @@ body {
 
 .quick-quote-input {
   background: var(--input-bg);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-control);
   padding: 8px;
   color: var(--text-primary);
-  border-radius: 2px;
-  font-size: 11px;
+  border-radius: var(--radius-control);
+  font-size: 14px;
 }
 
 .quick-quote-input::placeholder {
@@ -955,8 +1018,23 @@ body {
    UTILITIES
    =========================== */
 
-.mono {
-  font-family: var(--font-mono);
+/* Identifiers: tabular sans, not monospace (v3 decision). */
+.mono, .font-mono, .tw-id {
+  font-family: var(--font-id);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+}
+
+/* True code keeps a monospace face. Setting --font-mono on the element makes
+   inline `fontFamily: var(--font-mono)` on code blocks resolve to code too. */
+code, pre, kbd, samp, .tw-code {
+  --font-mono: var(--font-code);
+  font-family: var(--font-code);
+}
+/* Developer surfaces show keys, headers and payloads: code face there. */
+.tw-main[data-route^="/settings/risk-api"],
+.tw-main[data-route^="/settings/integrations"] {
+  --font-mono: var(--font-code);
 }
 
 .text-right {
@@ -1001,54 +1079,11 @@ body {
    RESPONSIVE LAYOUT
    =========================== */
 
-@media (max-width: 1200px) {
-  .os-container {
-    grid-template-columns: 60px 1fr;
-  }
-
-  .agent-sidebar {
-    display: none;
-  }
-}
-
 @media (max-width: 768px) {
-  .os-container {
-    grid-template-columns: 1fr;
-    grid-template-rows: 60px 1fr;
-  }
-
-  .os-nav {
-    display: none;
-  }
-
-  .workspace {
-    grid-template-columns: 1fr;
-  }
-
+  .workspace { grid-template-columns: 1fr; }
   .chart-card,
   .table-card,
-  .utilization-card {
-    grid-column: span 1;
-  }
-}
-
-/* Theme Toggle */
-.theme-toggle {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: 2px;
-  background: transparent;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.theme-toggle:hover {
-  color: var(--text-primary);
-  border-color: var(--border-active);
+  .utilization-card { grid-column: span 1; }
 }
 
 /* Authenticated dashboard text roles. Public/auth defaults remain unchanged.
@@ -1062,30 +1097,31 @@ body {
 
 .os-app-shell .card-title {
   font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 24px;
+  font-size: var(--text-subhead);
+  line-height: 22px;
   font-weight: 600;
   text-transform: none;
-  letter-spacing: normal;
+  letter-spacing: var(--tracking-title);
 }
 
 .os-app-shell .metric-card .card-title,
 .os-app-shell .ui-label {
   font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--text-label);
+  line-height: 16px;
   font-weight: 500;
+  color: var(--text-tertiary);
   text-transform: none;
   letter-spacing: normal;
 }
 
 .os-app-shell .metric-value {
   font-family: var(--font-sans);
-  font-size: 28px;
-  line-height: 36px;
+  font-size: var(--text-figure);
+  line-height: 38px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  letter-spacing: normal;
+  letter-spacing: var(--tracking-figure);
 }
 
 .os-app-shell .metric-delta {
@@ -1097,131 +1133,425 @@ body {
   text-transform: none;
 }
 
-/* Authenticated shell geometry only; explicit page/inline overrides remain. */
-.os-app-shell > .os-app-main {
-  padding: 32px;
-}
-
+/* Shell geometry lives in components/shell/shell.css. */
 .os-app-shell .card {
-  padding: 24px;
-  border-radius: 8px;
+  padding: var(--card-pad);
+  border-radius: var(--radius-card);
 }
 
 .os-app-shell .btn-action {
   min-width: 0;
   min-height: 40px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
 }
 
 @media (max-width: 767px) {
-  .os-app-shell > .os-app-main { padding: 20px 16px; }
-  .os-app-shell .card { padding: 16px; }
+  .os-app-shell .card { padding: var(--card-pad); }
   .os-app-shell .btn-action { min-height: 48px; }
 }
 
-/* Authenticated status text: keep chart/background status tokens unchanged. */
-.os-app-shell {
-  --status-success-text: #86EFAC;
-  --status-warning-text: #FCD34D;
-  --status-danger-text: #FCA5A5;
-}
-[data-theme="light"] .os-app-shell,
-.os-app-shell[data-theme="light"] {
-  --status-success-text: #166534;
-  --status-warning-text: #92400E;
-  --status-danger-text: #B91C1C;
-  --text-tertiary: #626975;
-}
-[data-theme="dark"] .os-app-shell,
-.os-app-shell[data-theme="dark"] {
-  --status-success-text: #86EFAC;
-  --status-warning-text: #FCD34D;
-  --status-danger-text: #FCA5A5;
-  --text-tertiary: #8A8F98;
+
+/* Compact row actions and inline link buttons are 24-32px with a mouse, where
+   they sit inside 48px rows. On touch screens every one gets a 44px target. */
+@media (pointer: coarse) {
+  .fleet-row-action,
+  .bk-btn--sm,
+  .fin-link,
+  .viz-table-toggle,
+  .settings-control:not(.settings-switch):not([role="switch"]) {
+    /* Accessibility floor: must beat page-scoped compact sizing. */
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+  /* Switches, checkboxes and radios keep their drawn size on touch screens
+     (R4: never resize a visual control). Their 44px target is an invisible
+     ::after around them instead. Opt any other small control in with .tw-hit. */
+  .settings-switch,
+  .tw-hit {
+    position: relative;
+  }
+  .settings-switch::after,
+  .tw-hit::after {
+    content: '';
+    position: absolute;
+    /* Grow to at least 44x44 around the control's centre. */
+    inset: min(0px, calc(50% - 22px));
+  }
 }
 
-/* Authenticated shared chrome only; page content and body portals are excluded. */
-.os-app-shell .os-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+/* GLOBAL TOUCH FLOOR (R7, DESIGN-PRINCIPLES §11.6): on coarse pointers every
+   link, button, tab, menu item and segmented option gets a hit area of at
+   least 44x44 without changing its drawn size. The target is an invisible
+   absolutely positioned ::after centred on the control, so it never grows a
+   table row, a line of prose or a toolbar. Zero specificity (:where) means any
+   component rule that already uses ::after (tab width reservation, sm buttons,
+   tips) or sets its own position wins untouched.
+   Opt out: add .tw-no-hit to the control or to any ancestor (e.g. a dense
+   picker whose neighbours would steal each other's taps). Map internals
+   (Leaflet, MapLibre) are left to the map library. */
+@media (pointer: coarse) {
+  :where(a[href], button, summary, [role="button"], [role="link"], [role="tab"],
+    [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], .tw-seg__opt):where(
+    :not(.tw-no-hit, .tw-no-hit *, .leaflet-container *, .maplibregl-map *, .section-header__tab, .rdp-day, .rdp-button, input, select, textarea)) {
+    position: relative;
+  }
+  :where(a[href], button, summary, [role="button"], [role="link"], [role="tab"],
+    [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], .tw-seg__opt):where(
+    :not(.tw-no-hit, .tw-no-hit *, .leaflet-container *, .maplibregl-map *, .section-header__tab, .rdp-day, .rdp-button, input, select, textarea))::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc(50% - 22px));
+  }
+  /* A control nested in a larger one (a tip inside a clickable KPI tile, a
+     link inside a clickable card) stays above its parent's target. */
+  :where(a[href], button, [role="button"], [role="link"]) :where(a[href], button, [role="button"], [role="link"], .tw-info) { z-index: 1; }
+  /* Tabs and segmented options are also never narrower than a fingertip
+     ("All" was 39px wide, the Fleet tab 37px). Menu items are drawn 44 tall. */
+  [role="tab"], .section-header__tab, .tw-seg__opt { min-width: 44px; }
+  .tw-menu__item, .tw-rowact-menu__item,
+  [role="menu"] [role="menuitem"], [role="menu"] [role="menuitemcheckbox"], [role="menu"] [role="menuitemradio"] { min-height: 44px !important; }
 }
-.os-app-shell > .os-header {
-  gap: 16px;
-  padding: 8px 24px;
+
+/* ===========================================================================
+   V3 PRIMITIVES (docs/brand/DESIGN-PRINCIPLES.md §3, §4, §9)
+   Shared building blocks for every page. Pages compose these instead of
+   inventing card, title, label and button styles of their own.
+   =========================================================================== */
+
+/* Page head: bold tight title, one short grey line, actions on the right. */
+/* Phone rhythm: the shell's main padding and the head offset tighten together. */
+@media (max-width: 768px) {
+  :root, :root[data-theme] { --main-pad-top: 16px; --page-head-top: 16px; --head-to-tabs: 12px; --tabs-h: 44px; --tabs-to-content: 16px; --head-to-content: 16px; --card-pad: 16px; --control-h: 44px; --field-h: 44px; }
 }
-.os-app-shell .agent-command { min-width: 0; margin: 0 16px; }
-.os-app-shell .agent-input {
+@media (pointer: coarse) {
+  :root, :root[data-theme] { --control-h: 44px; --field-h: 44px; }
+}
+
+/* ONE page head (shared with components/layout/SectionHeader, which renders
+   the same geometry): H1 28/34 600 at --page-head-top, an optional one-line
+   subtitle whose line is always reserved, actions right on the title row.
+   Scoped under .os-app-shell so page-level margin tweaks cannot move it. */
+.tw-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin: calc(var(--page-head-top) - var(--main-pad-top)) 0 var(--head-to-content); }
+.os-app-shell .tw-main > .tw-page-head,
+.os-app-shell .tw-main > * > .tw-page-head,
+.os-app-shell .tw-main > * > * > .tw-page-head { margin: calc(var(--page-head-top) - var(--main-pad-top)) 0 var(--head-to-content); }
+/* A page-level tabs row placed right after the head takes the same rhythm as SectionHeader's tabs. */
+.os-app-shell .tw-main .tw-page-head:has(+ nav) { margin-bottom: var(--head-to-tabs); }
+.os-app-shell .tw-main .tw-page-head + nav { margin-bottom: var(--tabs-to-content); }
+.tw-page-head__titles { display: flex; flex-direction: column; gap: 4px; min-width: 0; min-height: var(--page-head-h); }
+.tw-title { margin: 0; font: 600 var(--text-display)/34px var(--font-sans); letter-spacing: var(--tracking-display); color: var(--text-primary); }
+.tw-subtitle { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 72ch; }
+.tw-page-head__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 34px; }
+
+/* Page toolbar (R3): search, filters and report controls. It is the FIRST
+   content block, so it sits at the page's content-start y (head bottom +
+   --head-to-content, or tabs bottom + --tabs-to-content), and every control
+   in it is --control-h tall. Count or summary text goes in __meta; right
+   aligned controls in __end.
+     <div class="tw-toolbar">
+       <input class="tw-search" …/> <Select …/> <span class="tw-toolbar__meta">42 invoices</span>
+       <div class="tw-toolbar__end"><button class="tw-btn">Export</button></div>
+     </div>
+   React: <Toolbar> in src/components/ui/Toolbar.tsx. */
+.tw-toolbar {
+  --select-h: var(--control-h);
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
+  min-height: var(--control-h); margin: 0 0 var(--card-gap); min-width: 0;
+}
+.tw-toolbar__meta { font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tw-toolbar__end { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tw-toolbar .tw-btn, .tw-toolbar .tw-input, .tw-toolbar .tw-control, .tw-toolbar .tw-search { height: var(--control-h); }
+.tw-toolbar .tw-seg { padding: 3px; }
+.tw-toolbar .tw-seg__opt { height: calc(var(--control-h) - 6px); }
+/* Head actions are head controls: 36px buttons and selects. */
+.section-header__actions, .tw-page-head__actions { --select-h: var(--control-h); }
+.section-header__actions .tw-btn, .tw-page-head__actions .tw-btn { height: var(--control-h); }
+.section-header__actions .tw-seg, .tw-page-head__actions .tw-seg { padding: 3px; }
+.section-header__actions .tw-seg__opt, .tw-page-head__actions .tw-seg__opt { height: calc(var(--control-h) - 6px); }
+@media (max-width: 767px) {
+  .tw-toolbar > .tw-search, .tw-toolbar > .tw-search-wrap { flex: 1 1 100%; }
+  .tw-toolbar__end { margin-left: 0; }
+}
+
+/* Search field: 36px in toolbars and heads, magnifier inside on the left.
+     <label class="tw-search-wrap"><svg …/><input class="tw-search" type="search" …/></label> */
+.tw-search-wrap { position: relative; display: inline-flex; align-items: center; min-width: 0; flex: 0 1 320px; }
+.tw-search-wrap > svg { position: absolute; left: 10px; width: 16px; height: 16px; color: var(--text-tertiary); pointer-events: none; }
+.tw-search {
+  height: var(--control-h); width: 100%; min-width: 0; padding: 0 12px;
+  background: var(--input-bg); color: var(--text-primary);
+  border: 1px solid var(--border-control); border-radius: var(--radius-control);
   font: 400 14px/20px var(--font-sans);
-  letter-spacing: normal;
-  padding: 8px 16px 8px 40px;
-  min-height: 40px;
-  border-radius: 6px;
 }
-.os-app-shell > .os-header .status-badge {
+.tw-search-wrap > .tw-search { padding-left: 34px; }
+.tw-search::placeholder { color: var(--text-tertiary); }
+.tw-search:hover:not(:disabled) { border-color: var(--border-control-hover); }
+.tw-search:focus { outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.tw-search::-webkit-search-cancel-button { cursor: pointer; }
+
+/* Cards: 16px radius, a hairline border in light, a surface step in dark. */
+.tw-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--card-pad);
+  min-width: 0;
+}
+.tw-card--flush { padding: 0; overflow: hidden; }
+.tw-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.tw-card__titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tw-card__title { margin: 0; display: inline-flex; align-items: center; gap: 6px; font: 600 var(--text-subhead)/22px var(--font-sans); letter-spacing: var(--tracking-title); color: var(--text-primary); }
+.tw-card__sub { margin: 0; font: 400 var(--text-label)/16px var(--font-sans); color: var(--text-tertiary); }
+
+/* Labels and figures */
+.tw-label { font: 500 var(--text-label)/16px var(--font-sans); color: var(--text-tertiary); }
+.tw-figure { font: 600 var(--text-figure)/38px var(--font-sans); letter-spacing: var(--tracking-figure); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.tw-figure__unit { font-size: 0.6em; font-weight: 600; letter-spacing: -0.01em; color: var(--text-tertiary); margin-right: 2px; }
+.tw-delta { display: inline-flex; align-items: center; gap: 4px; font: 500 var(--text-label)/16px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-tertiary); }
+.tw-delta.is-up { color: var(--status-success-text, var(--status-success)); }
+.tw-delta.is-down { color: var(--status-danger-text, var(--status-danger)); }
+.tw-delta__period { color: var(--text-tertiary); font-weight: 400; }
+
+/* Buttons */
+.tw-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: var(--control-h); padding: 0 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   font: 500 13px/20px var(--font-sans);
-  letter-spacing: normal;
-  text-transform: none;
-  padding: 4px 8px;
-  gap: 8px;
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s;
 }
-.os-app-shell .theme-toggle { width: 44px; height: 44px; flex-shrink: 0; border-radius: 6px; }
-.os-app-shell .os-profile-trigger { padding: 0; flex-shrink: 0; font-family: var(--font-sans); }
-.os-app-shell .os-profile-action {
-  display: block;
-  width: 100%;
-  min-height: 40px;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  font-weight: 400;
+.tw-btn:hover { background: var(--bg-surface-hover); border-color: var(--border-strong); }
+/* Primary is ink (black in light, near-white in dark). Accent is never a button fill. */
+.tw-btn--primary { background: var(--btn-primary-bg); border-color: var(--btn-primary-bg); color: var(--btn-primary-fg); }
+.tw-btn--primary:hover { background: var(--btn-primary-hover); border-color: var(--btn-primary-hover); }
+.tw-btn--primary:active { background: var(--btn-primary-pressed); border-color: var(--btn-primary-pressed); }
+.tw-btn:disabled, .tw-btn[aria-disabled="true"] { background: var(--btn-disabled-bg); border-color: transparent; color: var(--btn-disabled-fg); cursor: not-allowed; }
+.tw-btn--ghost { background: transparent; border-color: transparent; color: var(--text-secondary); }
+.tw-btn--ghost:hover { background: var(--nav-hover-bg); border-color: transparent; color: var(--text-primary); }
+.tw-btn:focus-visible { outline: 2px solid var(--focus-outline); outline-offset: 2px; }
+/* Small row action (list rows, Needs you). Keeps a 44px hit area on touch. */
+.tw-btn--sm { height: 28px; padding: 0 10px; font-size: 12px; line-height: 16px; position: relative; }
+@media (max-width: 768px) { .tw-btn.tw-btn--sm { height: 32px; } }
+@media (pointer: coarse) { .tw-btn--sm::after { content: ''; position: absolute; inset: -8px -4px; } }
+
+/* Segmented control (DESIGN-PRINCIPLES §11.4): THE filter/period control.
+   28px options on one raised track, neutral active chip, never accent-filled.
+   React wrapper: src/components/ui/Segmented.tsx. */
+.tw-seg { display: inline-flex; align-items: center; max-width: 100%; padding: 2px; gap: 2px; border-radius: 8px; background: var(--bg-raised); overflow-x: auto; scrollbar-width: none; vertical-align: middle; }
+.tw-seg::-webkit-scrollbar { display: none; }
+.tw-seg__opt {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 28px; padding: 0 10px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text-secondary);
+  font: 500 12px/16px var(--font-sans); cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: background-color 0.12s, color 0.12s;
 }
-.os-app-shell .os-profile-action:focus-visible,
-.os-app-shell .os-profile-trigger:focus-visible,
-.os-app-shell .theme-toggle:focus-visible,
-.os-app-shell .nav-item:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 3px;
+.tw-seg__opt:hover:not(.is-active):not(:disabled) { color: var(--text-primary); background: var(--surface-tint-hover); }
+.tw-seg__opt.is-active,
+.tw-seg__opt[aria-pressed="true"],
+.tw-seg__opt[aria-checked="true"],
+.tw-seg__opt[aria-selected="true"] {
+  background: var(--bg-surface); color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--border-default), 0 1px 2px rgba(14, 17, 22, 0.06);
 }
-.os-app-shell > .os-nav { gap: 16px; }
-.os-app-shell .nav-item { width: 44px; height: 44px; border-radius: 6px; }
-.os-app-shell .nav-tooltip { font: 400 13px/20px var(--font-sans); letter-spacing: normal; border-radius: 4px; }
-@media (max-width: 768px) {
-  .os-app-shell > .os-header { padding: 12px 16px; gap: 12px; }
-  .os-app-shell .agent-command { margin: 0; }
-  .os-app-shell .agent-input { min-height: 48px; font-size: 16px; }
-  .os-app-shell .os-profile-action { min-height: 48px; }
-  .os-app-shell > .os-nav { gap: 4px; }
-  .os-app-shell .nav-item { width: auto; height: auto; min-height: 48px; padding: 8px; }
-  .os-app-shell .nav-tooltip { font-size: 14px; }
+[data-theme="dark"] .tw-seg__opt.is-active,
+[data-theme="dark"] .tw-seg__opt[aria-pressed="true"],
+[data-theme="dark"] .tw-seg__opt[aria-checked="true"],
+[data-theme="dark"] .tw-seg__opt[aria-selected="true"] { background: #2C3037; box-shadow: none; }
+.tw-seg__opt:disabled { color: var(--text-disabled); cursor: not-allowed; }
+.tw-seg__opt:focus-visible { outline: 2px solid var(--focus-outline); outline-offset: 1px; }
+.tw-seg__count { color: var(--text-tertiary); font-variant-numeric: tabular-nums; font-weight: 500; }
+.tw-seg__opt.is-active .tw-seg__count { color: var(--text-secondary); }
+.tw-seg--sm .tw-seg__opt { height: 24px; padding: 0 8px; }
+.tw-seg--block { display: flex; width: 100%; }
+.tw-seg--block .tw-seg__opt { flex: 1 1 0; }
+/* Touch (R6): every option is a 44px target. The track loses its vertical
+   padding so it stays 44 tall beside 44px fields, and the active chip keeps its
+   inset look through an inset ring in the track colour. !important because
+   page toolbars size options from --control-h (36 - 6); this is the floor. */
+@media (pointer: coarse) {
+  .tw-seg { padding-block: 0 !important; }
+  .tw-seg__opt, .tw-seg--sm .tw-seg__opt { height: 44px !important; min-height: 44px !important; padding: 0 12px; }
+  .tw-seg__opt.is-active,
+  .tw-seg__opt[aria-pressed="true"],
+  .tw-seg__opt[aria-checked="true"],
+  .tw-seg__opt[aria-selected="true"] {
+    box-shadow: inset 0 0 0 3px var(--bg-raised), inset 0 0 0 4px var(--border-default);
+  }
+  [data-theme="dark"] .tw-seg__opt.is-active,
+  [data-theme="dark"] .tw-seg__opt[aria-pressed="true"],
+  [data-theme="dark"] .tw-seg__opt[aria-checked="true"],
+  [data-theme="dark"] .tw-seg__opt[aria-selected="true"] { box-shadow: inset 0 0 0 3px var(--bg-raised); }
 }
 
-/* On phones, anchor dropdowns to the full header rather than a wrapped icon. */
-.os-app-shell .os-profile-anchor,
-.os-app-shell .os-subscription-trigger { position: relative; }
-.os-app-shell .os-header-popover { right: 0; }
-@media (max-width: 768px) {
-  .os-app-shell .os-profile-anchor,
-  .os-app-shell .os-subscription-trigger { position: static; }
-  .os-app-shell .os-header-popover { right: 16px; }
+/* Small status pill (e.g. "Live", "Last 20 quotes"). */
+.tw-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 22px; padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font: 500 12px/16px var(--font-sans);
+  white-space: nowrap;
+}
+.tw-chip--ok { background: var(--status-success-bg); color: var(--status-success-text); }
+.tw-chip--warn { background: var(--status-warning-bg); color: var(--status-warning-text); }
+.tw-chip--bad { background: var(--status-danger-bg); color: var(--status-danger-text); }
+
+/* Status chip (DESIGN-PRINCIPLES §4): neutral outline, coloured dot, grey label.
+   React: src/components/ui/StatusChip.tsx (tone + shared status map). */
+.tw-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 22px; padding: 0 8px 0 7px; max-width: 100%;
+  border: 1px solid var(--border-default); border-radius: var(--radius-pill);
+  background: transparent; color: var(--text-secondary);
+  font: 500 12px/16px var(--font-sans); letter-spacing: normal; text-transform: none;
+  white-space: nowrap; vertical-align: middle;
+}
+.tw-status__dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--status-neutral-dot); }
+.tw-status__label { overflow: hidden; text-overflow: ellipsis; }
+.tw-status--success .tw-status__dot { background: var(--status-success-dot); }
+.tw-status--warning .tw-status__dot { background: var(--status-warning-dot); }
+.tw-status--danger .tw-status__dot { background: var(--status-danger-dot); }
+.tw-status--info .tw-status__dot { background: var(--status-info-dot); }
+.tw-status--sm { height: 20px; padding: 0 7px 0 6px; font-size: 11px; }
+
+/* Standard KPI tile (DESIGN-PRINCIPLES §11.6): label, figure, one line. 96px.
+   React: src/components/ui/KpiTile.tsx. */
+/* R3: the row sizes to its tile count (max 4 per row) and FILLS the content
+   width, so its right edge lines up with the table or card below. Pages with
+   only 1-2 figures use <KpiStats> (a stats line inside a card) or put the
+   tiles beside a related panel, never a half-empty row. KpiRow sets
+   --kpi-cols from its children; :has() covers hand-written rows. */
+.tw-kpi-row {
+  --kpi-cols: 4;
+  --kpi-gap: var(--card-gap);
+  display: grid;
+  grid-template-columns: repeat(var(--kpi-cols), minmax(0, 1fr));
+  gap: var(--kpi-gap);
+  max-width: none;
+}
+.tw-kpi-row:has(> :only-child) { --kpi-cols: 1; }
+.tw-kpi-row:has(> :nth-child(2):last-child) { --kpi-cols: 2; }
+.tw-kpi-row:has(> :nth-child(3):last-child) { --kpi-cols: 3; }
+@media (min-width: 768px) and (max-width: 1100px) {
+  .tw-kpi-row { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+}
+.tw-kpi {
+  display: flex; flex-direction: column; justify-content: space-between; gap: 0;
+  box-sizing: border-box; height: var(--kpi-height); min-width: 0; padding: var(--card-pad);
+  background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card);
+  color: var(--text-primary); text-align: left; text-decoration: none; font: inherit;
+}
+.tw-kpi--link { cursor: pointer; transition: background-color 0.12s; }
+.tw-kpi--link:hover { background: var(--bg-surface-hover); }
+.tw-kpi--link:focus-visible { outline: 2px solid var(--focus-outline); outline-offset: 2px; }
+.tw-kpi__head { display: flex; align-items: center; height: 16px; justify-content: space-between; gap: 8px; min-width: 0; }
+.tw-kpi__label { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tw-kpi__figure { font: 600 28px/34px var(--font-sans); letter-spacing: var(--tracking-figure); font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tw-kpi__note { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.tw-kpi__note--success { color: var(--status-success-text); }
+.tw-kpi__note--warning { color: var(--status-warning-text); }
+.tw-kpi__note--danger { color: var(--status-danger-text); }
+.tw-kpi--emphasis { background: var(--emphasis-bg); border-color: var(--emphasis-border); }
+.tw-kpi--emphasis .tw-kpi__label,
+.tw-kpi--emphasis .tw-kpi__note { color: var(--emphasis-fg-muted); }
+.tw-kpi--emphasis .tw-kpi__figure { color: var(--emphasis-fg); }
+.tw-kpi--emphasis:focus-visible, .tw-kpi--emphasis :focus-visible { outline-color: var(--emphasis-focus); }
+.tw-kpi--emphasis.tw-kpi--link:hover { background: var(--emphasis-bg); filter: none; }
+/* Phone: always 2 columns, never 3-up with truncated labels. An odd last
+   tile (the 3rd of 3, the 5th of 5) spans the row as a compact line:
+   label and note on the left, figure on the right. */
+@media (max-width: 767px) {
+  .tw-kpi-row, .tw-kpi-row[style] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--card-gap); max-width: none; }
+  /* The odd last tile keeps the SAME anatomy as its siblings (label, figure,
+     note stacked), spanning the row; no label-left/figure-right variant. */
+  .tw-kpi-row:has(> :only-child) { grid-template-columns: 1fr; }
+  .tw-kpi-row > .tw-kpi:nth-child(odd):last-child:not(:first-child) { grid-column: 1 / -1; }
+  .tw-kpi__figure { font-size: 24px; line-height: 30px; }
 }
 
-/* Desktop dashboard token adoption. Legacy/public and chart aliases remain separate. */
-@media (min-width: 768px) {
-  .os-app-shell {
-    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    --input-bg: var(--bg-surface);
-    --btn-action-color: #060709;
-    --border-row: #2A2E34;
-  }
-  [data-theme="light"] .os-app-shell:not([data-theme]),
-  .os-app-shell[data-theme="light"] {
-    --btn-action-color: #FFFFFF;
-    --border-row: #E5E7EB;
-  }
-  [data-theme="dark"] .os-app-shell:not([data-theme]),
-  .os-app-shell[data-theme="dark"] {
-    --btn-action-color: #060709;
-    --border-row: #2A2E34;
-  }
+/* KPI stats line (R3): 1-3 figures inside one card, hairline separated.
+   React: <KpiStats> in src/components/ui/KpiTile.tsx. */
+.tw-kpi-stats { min-width: 0; }
+.tw-kpi-stats__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.tw-kpi-stats__actions { display: flex; align-items: center; gap: 8px; }
+.tw-kpi-stats__list { display: flex; flex-wrap: wrap; margin: 0; row-gap: 16px; }
+.tw-kpi-stats__item { flex: 1 1 0; min-width: 140px; display: flex; flex-direction: column; gap: 2px; padding: 0 var(--card-pad); border-left: 1px solid var(--border-subtle); }
+.tw-kpi-stats__item:first-child { padding-left: 0; border-left: 0; }
+.tw-kpi-stats__label { display: flex; align-items: center; gap: 6px; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; }
+.tw-kpi-stats__figure { margin: 0; font: 600 20px/28px var(--font-sans); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; }
+.tw-kpi-stats__note { margin: 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+/* One or two figures (R7): the card sizes to its stats, each stat to its
+   content, so there is no empty tail. Phones: full width, two-up (below). */
+.tw-kpi-stats--fit { width: fit-content; max-width: 100%; box-sizing: border-box; }
+.tw-kpi-stats--fit .tw-kpi-stats__list { flex-wrap: nowrap; }
+.tw-kpi-stats--fit .tw-kpi-stats__item { flex: 0 1 auto; min-width: 0; padding: 0 40px; }
+.tw-kpi-stats--fit .tw-kpi-stats__item:first-child { padding-left: 0; }
+.tw-kpi-stats--fit .tw-kpi-stats__item:last-child { padding-right: 8px; }
+@media (max-width: 767px) {
+  .tw-kpi-stats--fit { width: auto; }
+  .tw-kpi-stats--fit .tw-kpi-stats__list { flex-wrap: wrap; }
+  .tw-kpi-stats__item, .tw-kpi-stats--fit .tw-kpi-stats__item { flex: 1 1 calc(50% - 1px); min-width: 0; }
+  .tw-kpi-stats--fit .tw-kpi-stats__item, .tw-kpi-stats--fit .tw-kpi-stats__item:last-child { padding: 0 var(--card-pad); }
+  .tw-kpi-stats__item:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .tw-kpi-stats__item:nth-child(even) { padding-right: 0; }
 }
+
+/* Form controls: the ONE boundary token for inputs, selects, textareas,
+   select triggers, search and date fields (WCAG 1.4.11, >= 3:1). Pages style
+   their own controls; these are the shared ones. */
+.tw-input, .tw-control {
+  height: var(--field-h); padding: 0 12px; width: 100%;
+  background: var(--input-bg); color: var(--text-primary);
+  border: 1px solid var(--border-control); border-radius: var(--radius-control);
+  font: 400 14px/20px var(--font-sans);
+}
+textarea.tw-input { height: auto; padding: 8px 12px; }
+.tw-input::placeholder { color: var(--text-tertiary); }
+.tw-input:hover:not(:disabled), .tw-control:hover:not(:disabled) { border-color: var(--border-control-hover); }
+.tw-input:focus, .tw-control:focus { outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.tw-input:disabled { color: var(--text-disabled); background: var(--bg-raised); }
+
+/* Methodology lives behind an info icon (§9). */
+.tw-info { position: relative; display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-tertiary); cursor: help; flex-shrink: 0; }
+.tw-info:hover, .tw-info:focus-visible, .tw-info[aria-expanded="true"] { color: var(--text-primary); }
+.tw-info:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
+.tw-info__pop {
+  position: absolute; z-index: 400; top: calc(100% + 8px); left: -8px;
+  width: max-content; max-width: 280px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--tip-bg); color: var(--tip-fg);
+  font: 400 12px/18px var(--font-sans); letter-spacing: normal; text-align: left; white-space: normal;
+  box-shadow: var(--shadow-pop);
+  pointer-events: none;
+}
+.tw-info__pop--end { left: auto; right: -8px; }
+/* 44px hit area on touch for the 16px (KPI) and 20px tips. */
+@media (pointer: coarse) { .tw-info::after { content: ''; position: absolute; inset: -14px; } }
+
+/* ===========================================================================
+   FORM-CONTROL BOUNDARY, TOKEN-LEVEL (DESIGN-PRINCIPLES §3, WCAG 1.4.11)
+   Many page controls are drawn with `border: 1px solid var(--border-subtle)`
+   (a card-edge colour, 1.1-1.3:1). Re-pointing the card tokens *on the
+   control element itself* makes every such border resolve to the control
+   boundary (>= 3:1) without touching page code, inline styles included.
+   Cards, dividers and wrappers keep the quiet values.
+   =========================================================================== */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+select,
+textarea,
+.tw-select-trigger,
+[role="combobox"] {
+  --border-subtle: var(--border-control);
+  --border-default: var(--border-control);
+  --border-active: var(--border-control-hover);
+}
+/* Display lives here, not inline, so page rules can hide a trigger
+   (e.g. a phone-only filter select at desktop widths). */
+.tw-select-trigger { display: flex; }

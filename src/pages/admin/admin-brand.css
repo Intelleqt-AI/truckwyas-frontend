@@ -12,3 +12,158 @@
   outline: 2px solid var(--accent-primary);
   outline-offset: -2px;
 }
+
+/* Admin tables — app-wide 12px 16px cell rhythm. The outer columns drop
+   their side padding so cell text lines up with the card title above the
+   table (cards already carry 24px padding). `!important` only overrides the
+   per-file inline cell padding for those two edge columns. */
+table.admin-table :is(th, td):first-child { padding-left: 0 !important; }
+table.admin-table :is(th, td):last-child { padding-right: 0 !important; }
+table.admin-table th { white-space: nowrap; }
+table.admin-table .num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Sidebar nav: subtle filled item, tint on hover (active item keeps its own fill). */
+.admin-nav-link:hover:not([aria-current="page"]) {
+  background: var(--surface-tint-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Generic hover tint for rows, icon buttons and interactive cards. */
+.admin-tint-hover:hover:not(:disabled) {
+  background: var(--surface-tint-hover) !important;
+}
+
+/* ---- Shell (R3): head first, full width; then the 220px section list and
+   the content, starting on the same line (same geometry as Settings). */
+.tw-admin-page { min-width: 0; }
+.tw-admin-shell { display: flex; align-items: stretch; min-height: 100%; gap: 32px; min-width: 0; }
+.tw-admin-shell__side { width: 220px; flex-shrink: 0; }
+.tw-admin-shell__nav { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; padding: 0 0 24px; }
+.tw-admin-shell__content { flex: 1; min-width: 0; padding-bottom: 60px; }
+.tw-admin-phone-nav { display: none; }
+@media (max-width: 768px) {
+  .tw-admin-shell { flex-direction: column; gap: 0; }
+  .tw-admin-shell > .tw-admin-shell__side { display: none !important; }
+  /* R4: the picker is the first content block, at the same y as every untabbed page (146). */
+  .tw-admin-phone-nav { display: block; margin: 0 0 var(--head-to-content, 16px); }
+  .tw-admin-phone-nav .tw-admin-phone-nav__trigger { width: 100%; }
+  .tw-admin-shell > .tw-admin-shell__content { padding: 0 0 24px; }
+}
+
+/* Platform health: job table beside a narrower integrations rail. minmax(0, …)
+   stops the table's min-content width from pushing the rail off-screen; both
+   cards keep their own height (no stretched, empty rail). */
+.admin-health-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: var(--card-gap, 16px);
+  align-items: start;
+}
+.admin-health-grid > * { min-width: 0; }
+/* The job table needs ~560px for Task, Status and Last started: stack the rail below until there is room. */
+@media (max-width: 1360px) {
+  .admin-health-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Demo account facts: label over value in one card (dates are not KPIs). */
+.admin-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 16px 24px;
+  margin: 0; padding: 20px;
+}
+.admin-facts dt { display: inline-flex; align-items: center; gap: 4px; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.admin-facts dd { margin: 6px 0 0; font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.admin-facts dd.admin-facts__figure { font: 600 28px/34px var(--font-sans); letter-spacing: var(--tracking-figure, -0.03em); }
+
+/* Admin overview (AdminHome.tsx): totals, then what they mean. */
+.admin-home .tw-kpi-row { margin-bottom: var(--section-gap, 24px); }
+.admin-home-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--card-gap, 16px); align-items: start; }
+.admin-home-side { display: flex; flex-direction: column; gap: var(--card-gap, 16px); min-width: 0; }
+.admin-dist { display: flex; flex-direction: column; }
+.admin-dist__row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 40px; align-items: center; gap: 16px; padding: 10px 0; border-top: 1px solid var(--border-row); }
+.admin-dist__row:first-child { border-top: 0; }
+.admin-dist__label { display: flex; flex-direction: column; min-width: 0; font: 400 14px/20px var(--font-sans); color: var(--text-primary); }
+.admin-dist__hint { font-size: 13px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.admin-dist__track { display: block; height: 6px; border-radius: 3px; background: var(--border-subtle); overflow: hidden; }
+.admin-dist__track > span { display: block; height: 100%; background: var(--text-secondary); border-radius: 3px; }
+.admin-dist__n { font: 500 14px/20px var(--font-sans); color: var(--text-primary); text-align: right; font-variant-numeric: tabular-nums; }
+/* One calm sentence instead of a stack of zero rows. */
+.admin-empty-line { display: flex; flex-direction: column; gap: 2px; margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-primary); }
+.admin-empty-line__sub { font-size: 13px; color: var(--text-secondary); }
+.admin-dist__n.is-zero { color: var(--text-tertiary); font-weight: 400; }
+@media (max-width: 1100px) { .admin-home-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Low-value admin columns give way before a table scrolls sideways. */
+@media (max-width: 1360px) { table.admin-table .adm-col-low { display: none; } }
+/* Skeleton rows take the real admin row height (12px padding, 20px line, hairline). */
+table.admin-table .ops-skel-tr td { padding: 12px 16px; height: 45px; box-sizing: border-box; border-bottom: 1px solid var(--border-row); }
+@media (max-width: 520px) { table.admin-table td[title] { max-width: 150px !important; } }
+/* Reserve the summary's two phone lines so the table below never jumps. */
+@media (max-width: 520px) { .admin-job-summary { min-height: 40px; } }
+/* Health on phones: task and status; last started rides under the task name. */
+.admin-table .adm-task__sub { display: none; }
+@media (max-width: 520px) {
+  .admin-table .adm-col-started { display: none; }
+  .admin-table td.adm-task { white-space: normal !important; max-width: none !important; }
+  .admin-table .adm-task__sub { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+}
+/* Companies on phones: name, status, orders and the row menu. */
+@media (max-width: 520px) { table.admin-table .adm-col-phone { display: none; } }
+
+/* R4 Companies on phones: fits 358 with no side scroll. Name (owner and
+   status under it), orders and the row menu; the toolbar goes full width. */
+.adm-status-sub { display: none; }
+@media (max-width: 520px) {
+  table.admin-table .adm-col-status { display: none; }
+  .adm-status-sub { display: block; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+  table.admin-table td .adm-owner { overflow-wrap: break-word; }
+  .adm-toolbar__controls { width: 100%; flex-direction: column; gap: 8px !important; }
+  .adm-toolbar__controls > * { width: 100% !important; min-width: 0 !important; }
+  .adm-toolbar__controls .adm-toolbar__search { width: 100% !important; }
+}
+
+/* R5 Admin users: even rows. The name holds one line (full name in its
+   title), the email truncates with its title; the phone sub-line stays. */
+@media (min-width: 521px) {
+  table.admin-table td.adm-user-name { white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+}
+/* R5 phones: "New user" is a compact action on the card's title row; search
+   and the status filter take the full width below it. */
+@media (max-width: 520px) {
+  .adm-toolbar:has(.adm-toolbar__new) .adm-toolbar__controls { display: contents !important; }
+  .adm-toolbar:has(.adm-toolbar__new) .adm-toolbar__title { flex: 1 1 auto; min-width: 0; }
+  .adm-toolbar .adm-toolbar__controls > .adm-toolbar__new { order: 1; width: auto !important; flex: 0 0 auto; }
+  .adm-toolbar:has(.adm-toolbar__new) .adm-toolbar__controls > :not(.adm-toolbar__new) { order: 2; flex: 1 1 100%; width: 100% !important; }
+}
+/* R6 Admin users: with Company folded after the name when mostly empty,
+   the name cell has room for "Name · Superuser · Company" on one line. */
+@media (min-width: 521px) {
+  table.admin-table td.adm-user-name { max-width: 340px; }
+}
+/* R6 Platform health: one column at every width. Beside the job table the
+   two-line Integrations card ended ~370px short of it; stacked, both cards
+   span the content width and end together. */
+.admin-health-grid { grid-template-columns: minmax(0, 1fr); }
+/* R6 touch targets: on coarse pointers the users toolbar controls are 44px. */
+@media (pointer: coarse) {
+  .adm-toolbar .admin-control,
+  .adm-toolbar .tw-select-trigger,
+  .adm-toolbar .adm-toolbar__new { height: 44px !important; min-height: 44px !important; }
+}
+
+/* R7 Users on phones: the email sits alone under the name, on one line, cut
+   with an ellipsis only when it can't fit (never broken at "@"); the role
+   (and "Inactive": the Status column folds away, like Companies) moves up
+   beside the name. */
+.adm-user-role-inline { display: none; }
+@media (max-width: 520px) {
+  .adm-user-role-inline { display: inline; font-weight: 400; color: var(--text-secondary); }
+  table.admin-table .adm-status-sub.adm-user-sub { max-width: calc(100vw - 136px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* Admin overview, Newest companies (R8): name, what they have done, date. */
+.admin-home .ah-new__row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; column-gap: 16px; }
+.admin-home .ah-new__act { font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; }
+@media (max-width: 480px) {
+  .admin-home .ah-new__row { grid-template-columns: minmax(0, 1fr) auto; }
+  .admin-home .ah-new__act { display: none; }
+}

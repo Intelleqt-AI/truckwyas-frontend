@@ -1,40 +1,48 @@
 /* OS Theme first — defines all CSS variables and layout classes */
 @import './styles/theme.css';
+@import './styles/a11y.css';
 
 /* ── React-Toastify overrides ─────────────────────────────────────────────── */
-/* Use explicit values — CSS variable refs are unreliable across the portal   */
+/* Theme tokens resolve fine across the portal (they live on <html>), and the
+   toast surface must follow the active theme — no dark toasts in light mode.
+   Body text is sans 14/20 per the brand type roles; mono is identifiers only. */
 .Toastify__toast {
-  background: #0f0f0f !important;
-  color: #ededed !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  border-radius: 3px !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.45) !important;
-  font-family: var(--font-mono), monospace !important;
-  font-size: 12px !important;
-  letter-spacing: 0.03em !important;
+  background: var(--bg-overlay) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-overlay) !important;
+  border-radius: var(--radius-card) !important;
+  box-shadow: var(--shadow-pop) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 14px !important;
+  letter-spacing: normal !important;
   min-height: 48px !important;
-  padding: 10px 14px !important;
+  padding: 12px 16px !important;
 }
 
 .Toastify__toast-body {
-  color: #ededed !important;
-  font-family: var(--font-mono), monospace !important;
-  font-size: 12px !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
 }
 
-.Toastify__toast--success { border-left: 3px solid #22c55e !important; }
-.Toastify__toast--error   { border-left: 3px solid #ef4444 !important; }
-.Toastify__toast--warning { border-left: 3px solid #f59e0b !important; }
-.Toastify__toast--info    { border-left: 3px solid #4d9eff !important; }
 
-.Toastify__progress-bar--success { background: #22c55e !important; }
-.Toastify__progress-bar--error   { background: #ef4444 !important; }
-.Toastify__progress-bar--warning { background: #f59e0b !important; }
-.Toastify__progress-bar--info    { background: #4d9eff !important; }
+.Toastify__progress-bar--success { background: var(--status-success-dot) !important; }
+.Toastify__progress-bar--error   { background: var(--status-danger-dot) !important; }
+.Toastify__progress-bar--warning { background: var(--status-warning-dot) !important; }
+.Toastify__progress-bar--info    { background: var(--status-info-dot) !important; }
 .Toastify__progress-bar          { opacity: 0.6 !important; height: 2px !important; }
 
-.Toastify__close-button { color: #6b6b6b !important; opacity: 1 !important; }
-.Toastify__close-button:hover { color: #ededed !important; }
+.Toastify__close-button {
+  color: var(--text-secondary) !important;
+  opacity: 1 !important;
+  /* Keep the dismiss target comfortably clickable. */
+  width: 24px !important;
+  height: 24px !important;
+  align-self: center !important;
+}
+.Toastify__close-button:hover { color: var(--text-primary) !important; }
+.Toastify__close-button:focus-visible { outline: 2px solid var(--focus-outline) !important; outline-offset: 2px; border-radius: 4px; }
 
 .Toastify__toast-icon svg { width: 16px !important; height: 16px !important; }
 
@@ -78,8 +86,16 @@ body {
 }
 
 /* ── Themed Select (Radix) ──────────────────────────────────────────────────── */
+/* Triggers use the form-control boundary (>= 3:1), stronger on hover. */
+.tw-select-trigger {
+  border-color: var(--border-control) !important;
+}
 .tw-select-trigger:hover {
-  border-color: var(--accent-primary) !important;
+  border-color: var(--border-control-hover) !important;
+}
+.tw-select-trigger:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
 }
 
 .tw-select-trigger[data-state="open"] {
@@ -92,15 +108,21 @@ body {
 
 .tw-select-item:hover,
 .tw-select-item[data-highlighted] {
-  background: var(--accent-glow) !important;
-  color: var(--accent-primary) !important;
+  /* Neutral surface tint on hover/keyboard highlight (design principles §3). */
+  background: var(--surface-tint-active) !important;
+  color: var(--text-primary) !important;
   outline: none !important;
 }
+.tw-select-item[data-state="checked"] { font-weight: 500; }
 
 /* ── react-day-picker: strip all injected borders/outlines ─────────────────── */
-.rdp-cell:not(.dashboard-date-cell),
-.rdp-day:not(.dashboard-date-day),
-.rdp-head_cell:not(.dashboard-date-head-cell),
+/* Calendar (components/ui/calendar.tsx) replaces rdp's own cell/day/head_cell
+   classNames, so the literal .rdp-cell/.rdp-day/.rdp-head_cell names are never
+   emitted — target the elements rdp actually renders instead. The dashboard
+   opt-in classes stay carved out so date-picker-dashboard.css owns them. */
+.rdp td:not(.dashboard-date-cell),
+.rdp th:not(.dashboard-date-head-cell),
+.rdp .rdp-day-btn:not(.dashboard-date-day),
 .rdp-button:not(.dashboard-date-day):not(.dashboard-date-nav-button) {
   border: none !important;
   outline: none !important;
@@ -120,7 +142,7 @@ body {
 }
 
 .rdp-day-btn:hover {
-  background: var(--border-subtle) !important;
+  background: var(--surface-tint-active) !important;
 }
 
 /* Today: subtle accent ring */
@@ -142,17 +164,24 @@ body {
   background: var(--accent-primary);
 }
 
-/* Selected: solid accent fill */
+/* Selected: the ink fill of the primary button (black in light, near-white
+   in dark). Accent stays for "today" and focus. */
 .rdp-day-selected {
-  background: var(--accent-primary) !important;
-  color: #ffffff !important;
-  border-radius: 6px;
+  background: var(--btn-primary-bg) !important;
+  color: var(--btn-primary-fg) !important;
+  border-radius: var(--radius-control);
   font-weight: 600;
 }
 
 .rdp-day-selected:hover {
-  background: var(--accent-primary) !important;
-  opacity: 0.9;
+  background: var(--btn-primary-hover) !important;
+}
+
+/* Days from the neighbouring months: tertiary text (>= 4.5:1), not faded. */
+.rdp-day_outside,
+.rdp-day-outside {
+  color: var(--text-tertiary) !important;
+  opacity: 1 !important;
 }
 
 /* ── Step 1: two-column responsive layout ─────────────────────────────────── */
@@ -166,7 +195,7 @@ body {
 }
 
 .step1-left {
-  padding: 20px;
+  padding: 24px;
   width: 560px;
   flex-shrink: 0;
 }

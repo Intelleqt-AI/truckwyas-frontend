@@ -1,0 +1,357 @@
+/* Finance > Reports: library of statements (src/components/reports).
+   Every rule is under .fr-* so nothing else is restyled. Tokens only. */
+
+.fr-page { --fr-gap: var(--card-gap, 16px); }
+
+/* ---------------------------------------------------------------- heads */
+.fr-library__head { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* Report head: one row under the Finance header. "Reports › Title (i)" with
+   the basis beside it, and the period/basis controls, Export and Print on the
+   right. Data starts directly below. */
+.fr-head__titles { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 12px; row-gap: 2px; min-width: 0; }
+.fr-head__title {
+  margin: 0; display: inline-flex; align-items: center; gap: 6px; min-width: 0;
+  font: 600 18px/28px var(--font-sans); letter-spacing: -0.01em; color: var(--text-primary);
+}
+.fr-crumb { color: var(--text-secondary); font-weight: 500; text-decoration: none; border-radius: 6px; }
+.fr-crumb:hover { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; }
+.fr-crumb:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.fr-crumb__sep { color: var(--text-tertiary); flex: none; }
+.fr-head__name { min-width: 0; }
+.fr-head__sub { margin: 0; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.fr-info__title { display: block; font-weight: 600; margin-bottom: 4px; }
+.fr-info__line { display: block; }
+.fr-info__line + .fr-info__line { margin-top: 6px; }
+.fr-page .tw-info__pop { max-width: 320px; }
+
+/* -------------------------------------------------------------- library */
+/* One compact list directly under the Finance tabs (the tab is the heading):
+   report, what it answers, the 12-month headline, the newest entry. */
+.fr-lib { overflow: hidden; }
+.fr-lib__head, .fr-lib__row {
+  display: grid; align-items: center; column-gap: 24px;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(180px, 220px) 120px 16px;
+  padding: 0 20px;
+}
+.fr-lib__head {
+  height: 40px; border-bottom: 1px solid var(--border-subtle);
+  font: 500 12px/16px var(--font-sans); color: var(--text-tertiary);
+}
+.fr-lib__col-fig { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; }
+/* Touch (R7): the head row is 44 tall so the column tip's 44px target fits
+   inside the card (which clips). */
+@media (pointer: coarse) {
+  .fr-lib__head { height: 44px; }
+  .fr-lib__head .tw-info::after { inset: -12px -14px; }
+}
+.fr-lib__col-latest { text-align: right; }
+.fr-lib__head > :last-child::after { content: ''; }
+.fr-lib__list { list-style: none; margin: 0; padding: 0; }
+.fr-lib__list li + li { border-top: 1px solid var(--border-row); }
+.fr-lib__row { min-height: 56px; padding-top: 8px; padding-bottom: 8px; color: var(--text-primary); text-decoration: none; }
+.fr-lib__row:hover { background: var(--bg-surface-hover); }
+.fr-lib__row:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
+.fr-lib__name { font: 500 14px/20px var(--font-sans); }
+.fr-lib__purpose { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); min-width: 0; }
+.fr-lib__fig { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; text-align: right; }
+.fr-lib__value { font: 500 14px/20px var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fr-lib__caption { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.fr-lib__latest { font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fr-lib__chev { color: var(--text-tertiary); }
+.fr-lib__skel { display: block; width: 96px; height: 14px; border-radius: 4px; background: var(--bg-raised); animation: fr-pulse 1.4s ease-in-out infinite; }
+@media (max-width: 1100px) {
+  .fr-lib__head, .fr-lib__row { grid-template-columns: minmax(0, 1fr) minmax(140px, auto) 16px; column-gap: 16px; }
+  .fr-lib__col-purpose, .fr-lib__col-latest, .fr-lib__latest { display: none; }
+  .fr-lib__row { grid-template-areas: "name fig chev" "purpose fig chev"; }
+  .fr-lib__name { grid-area: name; }
+  .fr-lib__purpose { grid-area: purpose; }
+  .fr-lib__fig { grid-area: fig; }
+  .fr-lib__chev { grid-area: chev; }
+}
+@media (max-width: 640px) {
+  .fr-lib__head, .fr-lib__row { padding: 0 16px; grid-template-columns: minmax(0, 1fr) auto 16px; column-gap: 12px; }
+  .fr-lib__row { padding-top: 10px; padding-bottom: 10px; }
+  .fr-lib__head .fr-lib__col-fig { font-size: 12px; }
+  /* Captions wrap to a second line rather than clip (R9). */
+  .fr-lib__caption { max-width: 132px; white-space: normal; overflow: visible; text-overflow: clip; }
+}
+
+/* Compact menu for a report's second setting (basis, view, as-at date). */
+.fr-choice.tw-select-trigger { flex: none; max-width: 100%; }
+.fr-choice--wide.tw-select-trigger { max-width: 280px; }
+.fr-choice .fr-choice__pre { color: var(--text-tertiary); margin-right: 6px; }
+.fr-choice .fr-choice__val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-choice > span:first-child { display: inline-flex; min-width: 0; overflow: hidden; }
+
+/* --------------------------------------------------------------- report */
+.fr-report { display: flex; flex-direction: column; gap: var(--fr-gap); min-width: 0; }
+/* Toolbar (first content block, --control-h controls, one row at desktop
+   widths) with the basis line directly under it. */
+.fr-top { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+/* Touch (R7): the basis line's info tip keeps its 44px target clear of the
+   toolbar controls above it. */
+@media (pointer: coarse) { .fr-top { gap: 14px; } }
+.fr-top > .fr-head.tw-toolbar { margin: 0; flex-wrap: nowrap; }
+/* Block text so the info tip stays on the last line of the basis, never
+   orphaned on a line of its own. */
+.fr-head__sub { display: block; }
+.fr-head__tail { white-space: nowrap; }
+.fr-head__tail > .tw-info { display: inline-flex; vertical-align: -3px; margin-left: 6px; }
+.fr-head__actions { flex: none; }
+.fr-head__actions .tw-btn { height: var(--control-h, 36px); padding: 0 12px; font-size: 13px; }
+.fr-report .fr-choice.tw-select-trigger { height: var(--control-h, 36px); min-height: var(--control-h, 36px) !important; }
+.fr-period { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.fr-period__seg { display: contents; }
+.fr-period__menu { display: none; }
+.fr-period__custom { display: inline-flex; align-items: center; gap: 8px; }
+.fr-seg { max-width: 100%; }
+.fr-report .tw-seg { padding: 3px; }
+.fr-report .tw-seg__opt { height: calc(var(--control-h, 36px) - 6px); }
+.fr-muted { color: var(--text-tertiary); font: 400 13px/20px var(--font-sans); }
+.fr-input {
+  height: var(--control-h, 36px); padding: 0 10px; min-width: 0; max-width: 100%;
+  border: 1px solid var(--border-control, var(--border-subtle)); border-radius: var(--radius-control);
+  background: var(--input-bg, var(--bg-surface)); color: var(--text-primary);
+  font: 500 13px/20px var(--font-sans);
+}
+.fr-input:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
+/* Between desktop and phone the toolbar may wrap rather than overflow. */
+@media (max-width: 1180px) { .fr-top > .fr-head.tw-toolbar { flex-wrap: wrap; } }
+
+/* ---------------------------------------------------------------- tiles */
+/* Standard KPI tiles (components/ui/KpiTile): the shared row sizes to its
+   count, so two tiles fill the row instead of leaving half of it empty. */
+.fr-tiles.tw-kpi-row { gap: var(--fr-gap); margin: 0; }
+.fr-gaps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.fr-gaps li { font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); display: flex; gap: 8px; align-items: baseline; }
+.fr-gaps li::before { content: ''; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--text-tertiary); opacity: 0.6; transform: translateY(-1px); }
+
+/* ------------------------------------------------------------ statement */
+.fr-statement { min-width: 0; }
+.fr-scrollbox { position: relative; min-width: 0; }
+.fr-scroll { overflow-x: auto; max-width: 100%; }
+.fr-scroll:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
+/* Edge fades: inside the pinned label (left) and Total (right) columns, only
+   while there is more to scroll that way. */
+.fr-scrollbox::before, .fr-scrollbox::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 28px; z-index: 2; pointer-events: none;
+  opacity: 0; transition: opacity 0.15s;
+}
+.fr-scrollbox::before { left: var(--fr-pin-l, 0px); background: linear-gradient(to right, var(--bg-surface), transparent); }
+.fr-scrollbox::after { right: var(--fr-pin-r, 0px); background: linear-gradient(to left, var(--bg-surface), transparent); }
+.fr-scrollbox.has-l::before, .fr-scrollbox.has-r::after { opacity: 1; }
+/* "Earlier months / Later months" cue, only when the table has to scroll. */
+.fr-cue { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border-row); }
+.fr-cue__btn {
+  display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 8px; border: 0; border-radius: var(--radius-control);
+  background: transparent; color: var(--text-secondary); font: 500 13px/20px var(--font-sans); cursor: pointer;
+}
+.fr-cue__btn:hover:not(:disabled) { background: var(--bg-surface-hover); color: var(--text-primary); }
+.fr-cue__btn:disabled { color: var(--text-tertiary); opacity: 0.5; cursor: default; }
+.fr-cue__btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
+@media (pointer: coarse) { .fr-cue__btn { height: 44px; } }
+.fr-units { margin: 0; font: 400 12px/18px var(--font-sans); color: var(--text-tertiary); }
+.fr-table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  font: 400 13px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.fr-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.fr-table th, .fr-table td { padding: 12px 16px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border-row); background: var(--bg-surface); }
+.fr-table thead th {
+  font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); padding-top: 14px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.fr-table tbody th { font-weight: 400; }
+.fr-table .is-num { text-align: right; }
+.fr-table .is-zero { color: var(--text-tertiary); }
+.fr-table .is-indent { padding-left: 32px; }
+.fr-table tr > :first-child { padding-left: 20px; }
+.fr-table tr > .is-indent:first-child { padding-left: 32px; }
+.fr-table tr > :last-child { padding-right: 20px; }
+.fr-table--sticky tr > :first-child { position: sticky; left: 0; z-index: 1; min-width: 180px; }
+.fr-table--sticky tr > :first-child { box-shadow: inset -1px 0 0 var(--border-row); }
+/* Total pinned right while the months scroll (only matters when scrolling). */
+.fr-statement.is-scrolling .fr-table--pin-last tr > :last-child { position: sticky; right: 0; z-index: 1; box-shadow: inset 1px 0 0 var(--border-row); }
+.fr-statement.is-scrolling .fr-table--pin-last .fr-row--section > td:last-child { position: static; box-shadow: none; }
+/* Fitted month statements: tighter cells, then no currency sign, then whole
+   rands, only as far as needed (StatementTable fit). */
+.fr-table--d1 th, .fr-table--d1 td,
+.fr-table--d2 th, .fr-table--d2 td { padding-left: 10px; padding-right: 10px; }
+.fr-table--d3 { font-size: 12px; }
+.fr-table--d3 th, .fr-table--d3 td { padding-left: 8px; padding-right: 8px; }
+.fr-table--d1 tr > :first-child, .fr-table--d2 tr > :first-child, .fr-table--d3 tr > :first-child { padding-left: 20px; }
+.fr-table--d1 tr > .is-indent:first-child, .fr-table--d2 tr > .is-indent:first-child, .fr-table--d3 tr > .is-indent:first-child { padding-left: 32px; }
+.fr-table--d1 tr > :last-child, .fr-table--d2 tr > :last-child, .fr-table--d3 tr > :last-child { padding-right: 20px; }
+/* The label column wraps long labels ("Pending approval, not deducted")
+   instead of setting the width of every row. */
+.fr-table--d1.fr-table--sticky tr > :first-child,
+.fr-table--d2.fr-table--sticky tr > :first-child,
+.fr-table--d3.fr-table--sticky tr > :first-child { min-width: 172px; max-width: 200px; white-space: normal; }
+.fr-table--d3 th, .fr-table--d3 td { padding-left: 5px; padding-right: 5px; }
+.fr-table tbody tr:not(.fr-row--section):hover > * { background: var(--bg-surface-hover); }
+
+.fr-row--section th, .fr-row--section td { padding-top: 18px; padding-bottom: 6px; border-bottom: 0; font: 600 12px/16px var(--font-sans); color: var(--text-secondary); }
+.fr-row--subtotal > * { font-weight: 600; }
+.fr-row--total > * { font-weight: 600; border-top: 1px solid var(--border-subtle); }
+.fr-row--grand > * { font-weight: 600; border-top: 1px solid var(--text-primary); border-bottom: 3px double var(--text-primary); }
+.fr-table tbody .fr-row--grand > th { font-weight: 600; }
+.fr-table tbody .fr-row--subtotal > th, .fr-table tbody .fr-row--total > th { font-weight: 600; }
+.fr-row--ratio > * { color: var(--text-tertiary); font-size: 12px; padding-top: 6px; padding-bottom: 10px; }
+.fr-row--muted > * { color: var(--text-tertiary); }
+.fr-link { color: inherit; text-decoration: none; }
+/* R7: a row's name link takes the whole label cell as its target (the cell
+   is at least 44 tall), so the cell's overflow clipping never cuts the hit
+   area down to the text. The sticky cell is the containing block. */
+@media screen {
+  .fr-table tbody th > .fr-link { position: static; }
+  .fr-table tbody th > .fr-link::after { content: ''; position: absolute; inset: 0; }
+  .fr-table:not(.fr-table--sticky) tbody th:has(> .fr-link) { position: relative; }
+}
+.fr-link:hover { color: var(--accent-primary); text-decoration: underline; text-underline-offset: 3px; }
+.fr-link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
+.fr-statement__foot { padding: 12px var(--card-pad, 20px) 14px; display: flex; flex-direction: column; gap: 4px; }
+.fr-check { margin: 0; display: flex; gap: 8px; align-items: flex-start; font: 400 12px/18px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.fr-check svg { flex: none; margin-top: 2px; color: var(--status-success-text, var(--status-success)); }
+.fr-check.is-off { color: var(--status-warning-text, var(--status-warning)); }
+.fr-check__dot { flex: none; width: 8px; height: 8px; margin: 5px 3px 0; border-radius: 50%; background: currentColor; }
+
+/* ------------------------------------------------------------- statement parties */
+.fr-parties { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.fr-parties > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fr-parties strong { font: 600 14px/20px var(--font-sans); color: var(--text-primary); overflow-wrap: anywhere; }
+
+/* --------------------------------------------------------------- states */
+.fr-state {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
+  padding: 24px var(--card-pad, 20px); background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card);
+}
+.fr-state p { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+.fr-partial { margin: 0 0 12px; font: 500 13px/20px var(--font-sans); color: var(--status-warning-text, var(--status-warning)); }
+.fr-skel { background: var(--bg-raised); border-radius: var(--radius-card); border-color: transparent; animation: fr-pulse 1.4s ease-in-out infinite; }
+.fr-skel--head { height: 56px; width: 40%; }
+.fr-skel--table { height: 420px; }
+@keyframes fr-pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .fr-skel { animation: none; } }
+
+.fr-print-head { display: none; }
+
+/* --------------------------------------------------------------- phones */
+@media (max-width: 640px) {
+  .fr-top > .fr-head.tw-toolbar { flex-wrap: wrap; gap: 8px; }
+  .fr-period { flex: 1 1 auto; flex-wrap: wrap; min-width: 0; }
+  /* Menus size to their label and share the row; a third that does not fit
+     wraps to a full row rather than cutting a label ("Invoice b…"). */
+  .fr-head > .fr-choice.tw-select-trigger { flex: 1 1 auto; min-width: 0; }
+  /* The customer name is a name, not an ID: its menu takes the whole row. */
+  .fr-head > .fr-choice--wide.tw-select-trigger { flex: 1 1 100%; max-width: none; }
+  .fr-period__seg { display: none; }
+  .fr-period__menu { display: contents; }
+  .fr-head .fr-period .fr-choice.tw-select-trigger { flex: 1 1 auto; min-width: 0; }
+  /* A full-width view seg goes last, so Export and Print stay on the first
+     row beside the menus instead of dropping to a row of their own. */
+  .fr-head > .fr-seg-wrap, .fr-head .fr-seg { flex: 1 1 100%; order: 3; }
+  .fr-head .tw-seg { width: 100%; }
+  .fr-head .tw-seg__opt { flex: 1 1 0; }
+  /* Export and Print move to the page head's "⋯" menu (FinanceReports), so
+     the toolbar holds only the report's settings: no row of buttons. */
+  .fr-head__actions.tw-toolbar__end { display: none; }
+  .fr-period__custom { flex: 1 1 100%; }
+  .fr-period__custom .fr-input { flex: 1 1 0; }
+  .fr-parties { grid-template-columns: minmax(0, 1fr); }
+  .fr-table .fr-col--wide { display: none; }
+  /* Headers may take two lines on a phone ("61 to 90 / days"); figures set the width. */
+  .fr-table thead th:not(:first-child) { white-space: normal; vertical-align: bottom; min-width: 56px; }
+  /* Phone: the label column is pinned and capped so a month or two and the
+     pinned Total stay in view; a long label wraps onto a second line
+     ("Maintenance and / repairs") instead of being cut off. */
+  .fr-table--sticky tr > :first-child,
+  .fr-table--d1.fr-table--sticky tr > :first-child,
+  .fr-table--d2.fr-table--sticky tr > :first-child,
+  .fr-table--d3.fr-table--sticky tr > :first-child { min-width: 112px; max-width: 124px; overflow: hidden; white-space: normal; overflow-wrap: break-word; }
+  .fr-table th, .fr-table td,
+  .fr-table--d1 th, .fr-table--d1 td, .fr-table--d2 th, .fr-table--d2 td, .fr-table--d3 th, .fr-table--d3 td { padding-left: 8px; padding-right: 8px; }
+  .fr-table tr > :first-child, .fr-table tr > .is-indent:first-child,
+  .fr-table[class*="--d"] tr > :first-child, .fr-table[class*="--d"] tr > .is-indent:first-child { padding-left: 12px; }
+  .fr-table .is-indent, .fr-table[class*="--d"] .is-indent { padding-left: 12px; }
+  .fr-table tr > :last-child, .fr-table[class*="--d"] tr > :last-child { padding-right: 12px; }
+  .fr-cue { padding: 4px 8px; }
+  /* Compact month statements (StatementTable compactPhone): figures such as
+     "R 12,3k" in equal month columns (--fr-col-w, set in JS) so a whole
+     number of months sits between the pinned label and Total; the scroll
+     snaps month by month, so no figure is ever cut mid-number. The spare
+     pixels go to the label column (--fr-lab-w). */
+  .fr-table--d4 { font-size: 12px; }
+  .fr-table.fr-table--d4 th, .fr-table.fr-table--d4 td { padding-left: 4px; padding-right: 4px; }
+  .fr-table.fr-table--d4 tr > :first-child, .fr-table.fr-table--d4 tr > .is-indent:first-child { padding-left: 12px; padding-right: 6px; }
+  .fr-table.fr-table--d4 tr > :last-child { padding-right: 12px; }
+  .fr-table--d4.fr-table--sticky tr > :first-child { min-width: var(--fr-lab-w, 96px); max-width: var(--fr-lab-w, 96px); width: var(--fr-lab-w, 96px); box-sizing: border-box; }
+  .fr-table--d4 tr:not(.fr-row--section) > :not(:first-child) { min-width: var(--fr-col-w, 0px); max-width: var(--fr-col-w, none); width: var(--fr-col-w, auto); box-sizing: border-box; }
+  .fr-table--d4.fr-table--pin-last tr:not(.fr-row--section) > :last-child { min-width: 0; max-width: none; width: auto; }
+  .fr-table--d4 thead th:not(:first-child) { scroll-snap-align: start; }
+  .fr-table--d4.fr-table--pin-last thead th:last-child { scroll-snap-align: none; }
+  .fr-scroll:has(> .fr-table--d4) { scroll-snap-type: x mandatory; scroll-padding-left: var(--fr-pin-l, 0px); scroll-padding-right: var(--fr-pin-r, 0px); }
+  .fr-scrollbox:has(.fr-table--d4)::before, .fr-scrollbox:has(.fr-table--d4)::after { width: 6px; }
+}
+
+/* ---------------------------------------------------------------- print */
+@media print {
+  body:has(.fr-report) .tw-side,
+  body:has(.fr-report) .section-header,
+  body:has(.fr-report) .fr-noprint,
+  body:has(.fr-report) .tw-top,
+  body:has(.fr-report) nav { display: none !important; }
+  body:has(.fr-report) .os-app-shell.tw-shell { display: block !important; height: auto !important; }
+  body:has(.fr-report) .os-app-shell.tw-shell > .tw-main { overflow: visible !important; height: auto !important; padding: 0 !important; }
+  body:has(.fr-report) { background: #fff !important; }
+  .fr-report { --bg-surface: #fff; --bg-surface-hover: #fff; --text-primary: #000; --text-secondary: #333; --text-tertiary: #555; --border-subtle: #bbb; --border-row: #ddd; color: #000; gap: 10px; }
+  .fr-print-head { display: flex; justify-content: space-between; gap: 16px; font: 500 11px/16px var(--font-sans); color: #333; border-bottom: 1px solid #999; padding-bottom: 6px; }
+  .tw-kpi, .fr-state, .fr-parties, .tw-card { border-color: #bbb !important; background: #fff !important; }
+  .fr-tiles .tw-kpi { height: auto; padding: 10px 12px; }
+  .fr-tiles .tw-kpi__figure { font-size: 18px; line-height: 24px; }
+  .fr-crumb, .fr-crumb__sep { display: none; }
+  .fr-scroll { overflow: visible; }
+  .fr-table { font-size: 10px; line-height: 14px; }
+  .fr-table th, .fr-table td { padding: 5px 6px; }
+  .fr-table--sticky tr > :first-child { position: static; }
+  .fr-table tr { break-inside: avoid; }
+  .tw-info { display: none; }
+  @page { size: A4 landscape; margin: 12mm; }
+}
+.fr-seg-wrap { display: contents; }
+.fr-stats.tw-kpi-stats { padding: var(--card-pad); }
+
+/* ------------------------------------------------ phone stacked statements
+   A statement that cannot fit a phone (the customer statement, the cash
+   book, a one-row age table) becomes a stacked list: every figure on screen,
+   no columns off to the side. The table stays for wider screens and print. */
+.fr-stack { display: none; }
+@media (max-width: 640px) {
+  .fr-statement.has-stack > .fr-scrollbox,
+  .fr-statement.has-stack > .fr-cue { display: none; }
+  .fr-stack { display: block; list-style: none; margin: 0; padding: 0; }
+  /* Ledger row: what it is and the amount; the date and the running
+     balance; the reference on its own full-width line. */
+  .fr-stack__row {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: baseline;
+    min-height: 44px; padding: 10px 16px; border-top: 1px solid var(--border-row);
+  }
+  .fr-stack__row:first-child { border-top: 0; }
+  .fr-stack__title { font: 500 14px/20px var(--font-sans); color: var(--text-primary); min-width: 0; }
+  .fr-stack__amt { font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+  .fr-stack__sub { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fr-stack__bal { text-align: right; }
+  .fr-stack__ref { grid-column: 1 / -1; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+  .fr-stack__ref .fr-link { font-size: 12px; line-height: 16px; }
+  .fr-stack__row.fr-stack--subtotal { border-top-color: var(--border-subtle); }
+  .fr-stack__row.fr-stack--grand { border-top: 1px solid var(--border-subtle); padding-top: 12px; padding-bottom: 12px; }
+  .fr-stack--grand .fr-stack__title, .fr-stack--grand .fr-stack__amt { font-weight: 600; font-size: 16px; line-height: 24px; }
+  /* 'pairs': a heading, then one label/value line per figure. */
+  .fr-stack__pairs { margin: 0; padding: 4px 16px 8px; }
+  .fr-stack__pairs + .fr-stack__pairs { border-top: 1px solid var(--border-subtle); }
+  .fr-stack__pairs > div { display: flex; justify-content: space-between; gap: 12px; min-height: 36px; align-items: center; border-top: 1px solid var(--border-row); }
+  .fr-stack__pairs > .fr-stack__pairs-head { border-top: 0; min-height: 40px; }
+  .fr-stack__pairs dt { font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+  .fr-stack__pairs-head dt { font-weight: 500; color: var(--text-primary); }
+  .fr-stack__pairs dd { margin: 0; font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fr-stack__pairs > .is-last dt, .fr-stack__pairs > .is-last dd { font-weight: 600; color: var(--text-primary); }
+}

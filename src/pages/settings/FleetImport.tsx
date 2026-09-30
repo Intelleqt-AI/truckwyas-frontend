@@ -1,13 +1,23 @@
+import { StatusChip } from '@/components/ui/StatusChip';
+import { formatDateTime } from '@/lib/formatters';
 import { useState, useRef } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import useFetch from "@/hooks/useFetch";
 import { usePost } from "@/hooks/usePost";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
+import '@/pages/table-heading-roles.css';
+import { SettingsShell } from "./SettingsShell";
+import {
+  SettingsPageHeader,
+  settingsCardStyle,
+  settingsCardHeaderStyle,
+  settingsCardTitleStyle,
+  settingsCardBodyStyle,
+  settingsSecondaryButtonStyle,
+  settingsBadgeStyle,
+} from "./settingsUi";
 import {
   Upload,
   FileSpreadsheet,
@@ -208,91 +218,79 @@ export default function FleetImport() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("en-ZA", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateTime(dateString);
+  };
+
+  const STATUS_TEXT: Record<string, string> = {
+    success: 'var(--status-success-text)',
+    error: 'var(--status-danger-text)',
+    processing: 'var(--status-warning-text)',
   };
 
   const getStatusIcon = (status: string) => {
+    const style = { width: 20, height: 20, flexShrink: 0, color: STATUS_TEXT[status] };
     switch (status) {
       case "success":
-        return <CheckCircle2 className="w-5 h-5 text-success" />;
+        return <CheckCircle2 aria-hidden="true" style={style} />;
       case "error":
-        return <XCircle className="w-5 h-5 text-destructive" />;
+        return <XCircle aria-hidden="true" style={style} />;
       case "processing":
-        return <AlertCircle className="w-5 h-5 text-warning animate-pulse" />;
+        return <AlertCircle aria-hidden="true" style={style} />;
       default:
         return null;
     }
   };
 
+  const STATUS_LABEL: Record<string, string> = { success: 'Success', error: 'Error', processing: 'Processing' };
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "success":
-        return (
-          <Badge className="bg-success text-white hover:bg-success">
-            Success
-          </Badge>
-        );
-      case "error":
-        return (
-          <Badge className="bg-destructive text-white hover:bg-destructive">
-            Error
-          </Badge>
-        );
-      case "processing":
-        return (
-          <Badge className="bg-warning text-white hover:bg-warning">
-            Processing
-          </Badge>
-        );
-      default:
-        return null;
-    }
+    if (!STATUS_LABEL[status]) return null;
+    return (
+      <StatusChip tone={status === 'success' ? 'success' : status === 'error' ? 'danger' : 'warning'} label={STATUS_LABEL[status]} size="sm" />
+    );
   };
+
+  const dropBorder = isDemo ? 'var(--border-subtle)' : isDragging ? 'var(--accent-primary)' : 'var(--border-active)';
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-2xl font-semibold text-foreground">
-          Import Trip Data
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Upload CSV or Excel files to import trip data into your fleet
-        </p>
-      </div>
+    <SettingsShell activeId="integrations">
+    <div className="settings-wide" style={{ minWidth: 0 }}>
+      <SettingsPageHeader
+        title="Import trip data"
+        description="Upload CSV or Excel files to import trip data into your fleet"
+      />
 
-      {/* Upload Card */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg">Upload File</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* File Upload Zone */}
+      {/* Upload */}
+      <section style={settingsCardStyle} aria-labelledby="fleet-upload-title">
+        <div style={settingsCardHeaderStyle}>
+          <h2 id="fleet-upload-title" style={settingsCardTitleStyle}>Upload file</h2>
+        </div>
+        <div style={{ ...settingsCardBodyStyle, display: 'grid', gap: 24 }}>
+          {/* File upload zone — also reachable by keyboard (Enter/Space). */}
           <div
+            role="button"
+            tabIndex={isDemo ? -1 : 0}
+            aria-disabled={isDemo || undefined}
+            aria-label={selectedFile ? `Selected file ${selectedFile.name}` : 'Choose a CSV or Excel file to import'}
+            className="settings-control"
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={handleFileInputClick}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleFileInputClick(); }
+            }}
             title={isDemo ? "Not available in the demo" : undefined}
-            className={`
-              border-2 border-dashed rounded-lg p-12 text-center
-              transition-colors
-              ${
-                isDemo
-                  ? "cursor-not-allowed opacity-50 border-border"
-                  : `cursor-pointer ${
-                      isDragging
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary hover:bg-muted/30"
-                    }`
-              }
-            `}
+            style={{
+              border: `2px dashed ${dropBorder}`,
+              borderRadius: 'var(--radius-nested)',
+              padding: 40,
+              textAlign: 'center',
+              cursor: isDemo ? 'not-allowed' : 'pointer',
+              opacity: isDemo ? 0.6 : 1,
+              background: isDragging ? 'var(--accent-dim)' : 'transparent',
+              transition: 'border-color 0.15s, background 0.15s',
+            }}
           >
             <input
               ref={fileInputRef}
@@ -300,27 +298,32 @@ export default function FleetImport() {
               accept=".csv,.xlsx,.xls"
               onChange={handleFileInputChange}
               disabled={isDemo}
-              className="hidden"
+              style={{ display: 'none' }}
             />
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: '50%', marginBottom: 4,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'var(--accent-dim)', color: 'var(--accent-primary)',
+              }}>
                 {selectedFile ? (
-                  <FileSpreadsheet className="w-6 h-6 text-primary" />
+                  <FileSpreadsheet aria-hidden="true" style={{ width: 24, height: 24 }} />
                 ) : (
-                  <Upload className="w-6 h-6 text-primary" />
+                  <Upload aria-hidden="true" style={{ width: 24, height: 24 }} />
                 )}
               </div>
               {selectedFile ? (
                 <>
-                  <p className="text-sm font-medium text-foreground">
+                  <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>
                     {selectedFile.name}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p style={{ margin: 0, fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
                     {(selectedFile.size / 1024).toFixed(2)} KB
                   </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <button
+                    type="button"
+                    className="settings-control"
+                    style={{ ...settingsSecondaryButtonStyle, marginTop: 4 }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedFile(null);
@@ -328,15 +331,15 @@ export default function FleetImport() {
                       setColumnMapping({});
                     }}
                   >
-                    Change File
-                  </Button>
+                    Change file
+                  </button>
                 </>
               ) : (
                 <>
-                  <p className="text-sm font-medium text-foreground">
+                  <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>
                     Drop your file here, or click to browse
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p style={{ margin: 0, fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
                     Supports CSV and Excel files (.csv, .xlsx, .xls)
                   </p>
                 </>
@@ -344,127 +347,122 @@ export default function FleetImport() {
             </div>
           </div>
 
-          {/* Preview Data */}
+          {/* Preview */}
           {previewData && previewData.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-foreground">
-                  Preview (First 3 rows)
+            <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <h3 style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
+                  Preview (first 3 rows)
                 </h3>
                 <a
                   href="/assets/fleet-import-template.csv"
                   download
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                  className="settings-control"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, lineHeight: '20px', color: 'var(--status-info-text)', textDecoration: 'none', minHeight: 40 }}
                 >
-                  <Download className="w-3 h-3" />
-                  Download Template
+                  <Download aria-hidden="true" style={{ width: 16, height: 16 }} />
+                  Download template
                 </a>
               </div>
-              <div className="border rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/30 border-b">
-                      <tr>
-                        {Object.keys(previewData[0]).map((header) => (
-                          <th
-                            key={header}
-                            className="px-4 py-3 text-left font-sans text-[13px] leading-5 font-medium tracking-normal text-muted-foreground"
-                          >
-                            {header}
-                          </th>
+              <div className="settings-scroll-region" role="region" aria-label="Import preview" tabIndex={0} style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)', overflowX: 'auto' }}>
+                <table className="table-heading-roles settings-table">
+                  <thead>
+                    <tr>
+                      {Object.keys(previewData[0]).map((header) => (
+                        <th key={header} scope="col" style={{ textAlign: 'left' }}>{header}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.map((row, index) => (
+                      <tr key={index} style={{ borderTop: index > 0 ? '1px solid var(--border-row)' : 'none' }}>
+                        {Object.values(row).map((value, colIndex) => (
+                          <td key={colIndex} style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
+                            {value}
+                          </td>
                         ))}
                       </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {previewData.map((row, index) => (
-                        <tr key={index} className="hover:bg-muted/20">
-                          {Object.values(row).map((value, colIndex) => (
-                            <td
-                              key={colIndex}
-                              className="px-4 py-3 text-foreground"
-                            >
-                              {value}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
 
-          {/* Import Button */}
           {selectedFile && (
-            <Button
+            <button
+              type="button"
+              className="btn-action settings-control"
               onClick={handleImport}
               disabled={isUploading || isDemo}
               title={isDemo ? "Not available in the demo" : undefined}
-              className="w-full"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' }}
             >
               {isUploading ? (
                 <>
-                  <AlertCircle className="w-4 h-4 mr-2 animate-spin" />
-                  Importing...
+                  <AlertCircle aria-hidden="true" className="animate-spin" style={{ width: 16, height: 16 }} />
+                  Importing…
                 </>
               ) : (
                 <>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Import Data
+                  <Upload aria-hidden="true" style={{ width: 16, height: 16 }} />
+                  Import data
                 </>
               )}
-            </Button>
+            </button>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      {/* Import History */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg">Import History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center py-6"><Loader size={20} /></div>
-          ) : importHistory && importHistory.length > 0 ? (
-            <div className="space-y-3">
-              {importHistory.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between py-3 border-b last:border-0"
-                >
-                  <div className="flex items-center gap-3">
-                    {getStatusIcon(item.status)}
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {item.filename}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {item.status === "success"
-                          ? `${item.records_imported} records imported`
-                          : item.status === "error"
-                          ? item.error_message || "Import failed"
-                          : "Processing..."}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {getStatusBadge(item.status)}
-                    <span className="text-xs text-muted-foreground">
-                      {formatDate(item.uploaded_at)}
-                    </span>
+      {/* Import history */}
+      <section style={settingsCardStyle} aria-labelledby="fleet-history-title">
+        <div style={settingsCardHeaderStyle}>
+          <h2 id="fleet-history-title" style={settingsCardTitleStyle}>Import history</h2>
+        </div>
+        {isLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--card-pad, 20px)' }}><Loader size={20} /></div>
+        ) : importHistory && importHistory.length > 0 ? (
+          <ul style={{ listStyle: 'none', margin: 0, padding: '4px 0' }}>
+            {importHistory.map((item, i) => (
+              <li
+                key={item.id}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+                  padding: '12px var(--card-pad, 20px)',
+                  borderBottom: i < importHistory.length - 1 ? '1px solid var(--border-row)' : 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                  {getStatusIcon(item.status)}
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>
+                      {item.filename}
+                    </p>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: '20px', color: item.status === 'error' ? 'var(--status-danger-text)' : 'var(--text-tertiary)' }}>
+                      {item.status === "success"
+                        ? `${item.records_imported} records imported`
+                        : item.status === "error"
+                        ? item.error_message || "Import failed"
+                        : "Processing…"}
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-10 text-sm text-muted-foreground">
-              No import history yet. Upload your first file to get started.
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {getStatusBadge(item.status)}
+                  <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
+                    {formatDate(item.uploaded_at)}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div style={{ padding: '32px 24px', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+            No import history yet. Upload your first file to get started.
+          </div>
+        )}
+      </section>
     </div>
+    </SettingsShell>
   );
 }

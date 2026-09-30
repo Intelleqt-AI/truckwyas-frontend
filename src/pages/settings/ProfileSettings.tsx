@@ -2,65 +2,17 @@ import "./profile-form.css";
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData } from "@/lib/Api";
 import { useAuth } from "@/lib/AuthContext";
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsCardBodyStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from './settingsUi';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 'var(--card-radius)',
-  marginBottom: 16,
-};
-
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: '16px 20px 12px',
-  borderBottom: '1px solid var(--border-subtle)',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  lineHeight: '24px',
-  margin: 0,
-  textTransform: 'none',
-  letterSpacing: 'normal',
-  color: 'var(--text-secondary)',
-  fontWeight: 600,
-};
-
-const sectionBodyStyle: React.CSSProperties = {
-  padding: '20px',
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 13,
-  lineHeight: '20px',
-  fontWeight: 500,
-  textTransform: 'none',
-  letterSpacing: 'normal',
-  color: 'var(--text-primary)',
-  marginBottom: 6,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  background: 'var(--input-bg)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 6,
-  minHeight: 48,
-  minWidth: 0,
-  padding: '10px 12px',
-  color: 'var(--text-primary)',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  lineHeight: '24px',
-  transition: 'border-color 0.15s',
-};
-
+const sectionStyle = settingsCardStyle;
+const sectionHeaderStyle = settingsCardHeaderStyle;
+const sectionTitleStyle = settingsCardTitleStyle;
+const sectionBodyStyle = settingsCardBodyStyle;
+const labelStyle = settingsLabelStyle;
+// 40px / 14px on desktop like every other settings section; the shell's
+// <=640px rule lifts it to 48px / 16px for touch and iOS focus-zoom.
+const inputStyle = settingsInputStyle;
 
 const gridStyle: React.CSSProperties = {
   display: 'grid',
@@ -136,76 +88,62 @@ export function ProfileSettings() {
   };
 
   return (
-    <div className="tw-profile-settings" style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
-          Profile settings
-        </h1>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-          Manage your personal information and account preferences
-        </div>
-      </div>
+    <div className="tw-profile-settings" style={{ maxWidth: 'var(--form-max, 720px)' }}>
+      <SettingsPageHeader title="Profile" description="Your name, contact details and preferences" />
 
-      {/* Profile picture */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
-          <h2 style={sectionTitleStyle}>Profile picture</h2>
-        </div>
-        <div style={{ ...sectionBodyStyle, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt="Profile"
-              style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-            />
-          ) : (
-            <div style={{
-              width: 52, height: 52, borderRadius: '50%',
-              background: 'var(--accent-dim)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 600,
-              color: 'var(--accent-primary)', flexShrink: 0,
-            }}>
-              {(form.first_name[0] || '') + (form.last_name[0] || '') || 'AU'}
-            </div>
-          )}
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/gif"
-              style={{ display: 'none' }}
-              onChange={handleAvatarChange}
-              disabled={isDemo}
-            />
-            <button
-              style={{
-                background: 'none', border: '1px solid var(--border-subtle)',
-                color: 'var(--text-secondary)', padding: '6px 12px',
-                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 6, minHeight: 40,
-                cursor: (uploadingAvatar || isDemo) ? 'not-allowed' : 'pointer',
-                letterSpacing: 'normal',
-                opacity: (uploadingAvatar || isDemo) ? 0.6 : 1,
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingAvatar || isDemo}
-              title={isDemo ? 'Fixed in demo mode' : undefined}
-            >
-              {uploadingAvatar ? 'Uploading…' : 'Change picture'}
-            </button>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
-              JPG, GIF or PNG. Max size 2MB.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Personal information */}
+      {/* Personal information, with the picture as its first row (R8: no one-line card). */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <h2 style={sectionTitleStyle}>Personal information</h2>
         </div>
         <div style={sectionBodyStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', paddingBottom: 20, marginBottom: 20, borderBottom: '1px solid var(--border-subtle)' }}>
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt="Profile"
+                style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+              />
+            ) : (
+              <div style={{
+                width: 52, height: 52, borderRadius: '50%',
+                background: 'var(--accent-dim)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 600,
+                color: 'var(--avatar-on-dim, var(--accent-primary))', flexShrink: 0,
+              }}>
+                {(form.first_name[0] || '') + (form.last_name[0] || '') || 'AU'}
+              </div>
+            )}
+            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+              <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>Picture</div>
+              <div style={{ ...settingsHelpStyle, marginTop: 0 }}>JPG, GIF or PNG, up to 2 MB.</div>
+            </div>
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif"
+                style={{ display: 'none' }}
+                onChange={handleAvatarChange}
+                disabled={isDemo}
+              />
+              <button
+                type="button"
+                className="settings-control"
+                style={{
+                  ...settingsSecondaryButtonStyle,
+                  cursor: (uploadingAvatar || isDemo) ? 'not-allowed' : 'pointer',
+                  opacity: (uploadingAvatar || isDemo) ? 0.6 : 1,
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar || isDemo}
+                title={isDemo ? 'Fixed in demo mode' : undefined}
+              >
+                {uploadingAvatar ? 'Uploading…' : 'Change picture'}
+              </button>
+            </div>
+          </div>
           <div className="tw-profile-fields" style={{ ...gridStyle, marginBottom: 16 }}>
             <div>
               <label htmlFor="profile-first_name" style={labelStyle}>First name</label>
@@ -243,7 +181,7 @@ export function ProfileSettings() {
             <div>
               <label htmlFor="profile-timezone" style={labelStyle}>Timezone</label>
               <Select value={form.timezone} onValueChange={val => set('timezone', val)}>
-                <SelectTrigger id="profile-timezone" style={{ ...inputStyle, outline: undefined }}>
+                <SelectTrigger id="profile-timezone" style={inputStyle}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -257,7 +195,7 @@ export function ProfileSettings() {
             <div>
               <label htmlFor="profile-language" style={labelStyle}>Language</label>
               <Select value={form.language} onValueChange={val => set('language', val)}>
-                <SelectTrigger id="profile-language" style={{ ...inputStyle, outline: undefined }}>
+                <SelectTrigger id="profile-language" style={inputStyle}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -268,11 +206,11 @@ export function ProfileSettings() {
               </Select>
             </div>
           </div>
-          <div className="tw-profile-fields" style={{ ...gridStyle, marginBottom: 20 }}>
+          <div className="tw-profile-fields" style={gridStyle}>
             <div>
               <label htmlFor="profile-date_format" style={labelStyle}>Date format</label>
               <Select value={form.date_format} onValueChange={val => set('date_format', val)}>
-                <SelectTrigger id="profile-date_format" style={{ ...inputStyle, outline: undefined }}>
+                <SelectTrigger id="profile-date_format" style={inputStyle}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -283,18 +221,21 @@ export function ProfileSettings() {
               </Select>
             </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              className="btn-action"
-              onClick={handleSave}
-              disabled={saving || isDemo}
-              title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
-            >
-              {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
-            </button>
-          </div>
         </div>
+      </div>
+      {/* One save pattern across Settings (R9): the sticky save bar, as on
+          Company details. It saves every card on this page. */}
+      <div className="cs-savebar">
+        <span className="cs-savebar__note">{saved ? 'Saved.' : 'Applies to your account only.'}</span>
+        <button
+          className="btn-action settings-control"
+          onClick={handleSave}
+          disabled={saving || isDemo}
+          title={isDemo ? 'Fixed in demo mode' : undefined}
+          style={{ opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+        >
+          {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
+        </button>
       </div>
     </div>
   );

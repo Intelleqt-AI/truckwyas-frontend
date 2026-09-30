@@ -1,0 +1,616 @@
+/* Fleet record pages: one page per vehicle and per driver
+   (VehicleFinancialProfile.tsx, DriverProfile.tsx, components/fleet-detail).
+   Tight type, big numbers with short labels, compact panels with generous
+   space between them. Theme tokens only; mono only for identifiers. */
+.fleet-detail {
+  /* R3 rhythm: 16px between sibling cards, card padding from --card-pad. */
+  --fd-gap: var(--card-gap, 16px);
+  --fd-pad: var(--card-pad, 20px);
+  --fd-panel-bg: var(--bg-surface);
+  --fd-line: var(--border-subtle);
+  --fd-row-line: var(--border-row);
+  min-width: 0;
+  max-width: 1600px;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+}
+.fleet-detail .fd-mono { font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
+.fleet-detail .fd-strong { color: var(--text-primary); font-weight: 500; }
+
+/* ---------------------------------------------------------------- header */
+.fleet-detail .fd-head { margin-bottom: var(--head-to-content, 24px); }
+.fleet-detail .fd-crumb { display: flex; align-items: center; gap: 8px; min-width: 0; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); margin-bottom: 12px; }
+.fleet-detail .fd-crumb a { color: var(--text-secondary); text-decoration: none; display: inline-flex; align-items: center; min-height: 24px; }
+.fleet-detail .fd-crumb a:hover { color: var(--text-primary); }
+.fleet-detail .fd-crumb a:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
+.fleet-detail .fd-crumb [aria-current] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fleet-detail .fd-head__row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; }
+.fleet-detail .fd-head__id { min-width: 0; }
+.fleet-detail .fd-head__title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fleet-detail .fd-head__title { margin: 0; font: 600 var(--text-display, 28px)/34px var(--font-sans); letter-spacing: var(--tracking-display, -0.025em); color: var(--text-primary); }
+.fleet-detail .fd-head__meta { margin: 4px 0 0; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-head__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Buttons (the status control is the shared .tw-seg) */
+.fleet-detail .fd-button {
+  min-height: var(--control-h, 36px); padding: 0 14px; font-size: 14px;
+  background: var(--fd-panel-bg); border: 1px solid var(--fd-line); border-radius: var(--radius-control, 8px);
+  color: var(--text-primary); font: 500 14px/20px var(--font-sans); cursor: pointer; white-space: nowrap;
+}
+.fleet-detail .fd-button:hover:not(:disabled) { background: var(--bg-surface-hover); }
+.fleet-detail .fd-button:focus-visible,
+.fleet-detail .fd-link:focus-visible,
+.fleet-detail .fd-info__btn:focus-visible,
+.fleet-detail .fd-table tbody tr:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
+/* ----------------------------------------------------------- money strip */
+/* The strip is a row of standard KPI tiles (components/ui/KpiTile). */
+.fleet-detail .fd-strip { margin-bottom: var(--fd-gap); }
+.fleet-detail .fd-strip .tw-kpi-row { margin: 0; }
+.fleet-detail .fd-strip .fd-tag { margin-left: 6px; }
+/* No delivered loads: one line and one action instead of a strip of zeros. */
+.fleet-detail .fd-empty-line {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  margin-bottom: var(--fd-gap); padding: 16px var(--fd-pad);
+}
+.fleet-detail .fd-empty-line__text { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+
+/* Qualifier tag and the (i) methodology tip */
+.fleet-detail .fd-tag {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 6px; flex-shrink: 0;
+  border: 1px solid var(--fd-line); border-radius: 4px;
+  font: 500 11px/16px var(--font-sans); letter-spacing: 0.01em; color: var(--text-tertiary); white-space: nowrap;
+}
+.fd-info { position: relative; display: inline-flex; vertical-align: middle; }
+.fd-info__btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; padding: 0; margin: -2px 0; border: 0; border-radius: 50%;
+  background: none; color: var(--text-tertiary); cursor: help;
+}
+.fd-info__btn:hover, .fd-info__btn[aria-expanded="true"] { color: var(--text-primary); }
+@media (pointer: coarse) {
+  .fd-info__btn { width: 32px; height: 32px; margin: -8px -6px; }
+}
+.fd-info__pop {
+  position: fixed; z-index: 1100; width: min(280px, calc(100vw - 32px)); box-sizing: border-box;
+  padding: 10px 12px; border-radius: 8px;
+  background: var(--bg-raised, var(--bg-surface)); border: 1px solid var(--border-active, var(--border-subtle));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  font: 400 13px/20px var(--font-sans); color: var(--text-secondary); text-align: left;
+  letter-spacing: normal; text-transform: none; white-space: normal;
+}
+
+/* ------------------------------------------------------------------ body */
+.fleet-detail .fd-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 380px); gap: var(--fd-gap); align-items: start; }
+.fleet-detail .fd-main, .fleet-detail .fd-side { display: flex; flex-direction: column; gap: var(--fd-gap); min-width: 0; }
+.fleet-detail .fd-main { container-type: inline-size; container-name: fd-main; }
+/* The rail stays in view beside a longer main column, so the unequal
+   heights read as a rail and not as a dead gap. */
+.fleet-detail .fd-body:not(.fd-body--wide) > .fd-side { position: sticky; top: 24px; }
+/* Few loads: one column; each Details group lays its rows across the width. */
+.fleet-detail .fd-body--wide { grid-template-columns: minmax(0, 1fr); }
+/* Wide Details: the groups sit side by side, each a straight column of
+   label/value rows, so every row lines up (no ragged third column). */
+.fleet-detail .fd-body--wide .fd-groups {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 20px 40px; align-items: start;
+}
+.fleet-detail .fd-body--wide .fd-groups > .fd-group + .fd-group { margin-top: 0; }
+
+.fleet-detail .fd-panel {
+  min-width: 0; padding: 20px var(--fd-pad) var(--fd-pad);
+  background: var(--fd-panel-bg); border: 1px solid var(--fd-line); border-radius: var(--radius-card, 12px);
+}
+.fleet-detail .fd-panel--flush { padding-bottom: 4px; }
+.fleet-detail .fd-panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.fleet-detail .fd-panel__titles { min-width: 0; }
+.fleet-detail .fd-panel__title { display: flex; align-items: center; gap: 6px; margin: 0; font: 600 15px/22px var(--font-sans); letter-spacing: -0.005em; color: var(--text-primary); }
+.fleet-detail .fd-panel__sub { margin: 2px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-panel__aside { flex-shrink: 0; }
+.fleet-detail .fd-aside-figure { font: 600 15px/22px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.fleet-detail .fd-empty { margin: 0; padding: 16px 0 12px; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+
+.fleet-detail .fd-bars { margin: 0 -4px 0 0; }
+
+/* Mini figures under the chart */
+.fleet-detail .fd-mini {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px 24px;
+  margin: 16px calc(var(--fd-pad) * -1) 0; padding: 16px var(--fd-pad) 0; border-top: 1px solid var(--fd-row-line);
+}
+.fleet-detail .fd-mini__item { min-width: 0; }
+.fleet-detail .fd-mini dt { font: 400 12px/16px var(--font-sans); color: var(--text-secondary); white-space: nowrap; }
+.fleet-detail .fd-mini dd {
+  display: flex; align-items: center; gap: 6px; margin: 4px 0 0;
+  font: 600 16px/22px var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; color: var(--text-primary); white-space: nowrap;
+}
+.fleet-detail .fd-mini dd.is-missing { color: var(--text-tertiary); font-weight: 400; }
+
+/* Details: grouped, tight label/value rows */
+.fleet-detail .fd-group + .fd-group { margin-top: 20px; }
+.fleet-detail .fd-group__title {
+  display: flex; align-items: center; gap: 6px; margin: 0 0 4px;
+  font: 500 12px/16px var(--font-sans); color: var(--text-tertiary);
+}
+.fleet-detail .fd-rows { margin: 0; }
+.fleet-detail .fd-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  min-height: 36px; border-bottom: 1px solid var(--fd-row-line);
+}
+.fleet-detail .fd-row:last-child { border-bottom: 0; }
+.fleet-detail .fd-row dt { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); white-space: nowrap; }
+.fleet-detail .fd-row dd {
+  display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; margin: 0;
+  font: 500 13px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary);
+  text-align: right; overflow-wrap: anywhere;
+}
+.fleet-detail .fd-row dd.is-missing { color: var(--text-tertiary); font-weight: 400; }
+.fleet-detail .fd-row dd.is-danger { color: var(--status-danger-text); }
+.fleet-detail .fd-row dd.is-warning { color: var(--status-warning-text); }
+.fleet-detail .fd-row__note { display: inline-flex; }
+.fleet-detail .fd-row dd.fd-mono { font-family: var(--font-sans); font-weight: 400; font-variant-numeric: tabular-nums; }
+.fleet-detail .fd-missing {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  margin: 0; padding: 8px 0 0; font: 400 12px/18px var(--font-sans); color: var(--text-tertiary);
+}
+.fleet-detail .fd-rows + .fd-missing { border-top: 1px solid var(--fd-row-line); }
+.fleet-detail .fd-missing__lead { color: var(--text-secondary); }
+.fleet-detail .fd-link--inline { min-height: 24px; padding: 0 4px; margin-right: -4px; flex-shrink: 0; font-size: 12px; }
+@media (pointer: coarse) { .fleet-detail .fd-link--inline { min-height: 44px; margin: -10px -4px -10px 0; } }
+
+/* Alerts: real issues only, dot + text + when */
+.fleet-detail .fd-alerts { padding-bottom: 12px; }
+.fleet-detail .fd-alerts .fd-panel__head { margin-bottom: 4px; }
+.fleet-detail .fd-alerts__list { list-style: none; margin: 0; padding: 0; }
+.fleet-detail .fd-alert { display: flex; align-items: center; gap: 10px; min-height: 40px; border-bottom: 1px solid var(--fd-row-line); font: 500 13px/20px var(--font-sans); color: var(--text-primary); }
+.fleet-detail .fd-alert:last-child { border-bottom: 0; }
+.fleet-detail .fd-alert__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.fleet-detail .fd-alert.is-danger .fd-alert__dot { background: var(--status-danger-dot); }
+.fleet-detail .fd-alert.is-warning .fd-alert__dot { background: var(--status-warning-dot); }
+.fleet-detail .fd-alert__text { flex: 1; min-width: 0; }
+.fleet-detail .fd-alert__when { font-weight: 400; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ----------------------------------------------------------- loads table */
+.fleet-detail .fd-table-scroll { overflow-x: auto; margin: 0 calc(var(--fd-pad) * -1); }
+.fleet-detail .fd-table-scroll:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
+.fleet-detail .fd-table { width: 100%; border-collapse: collapse; table-layout: auto; }
+.fleet-detail .fd-table th {
+  height: 36px; padding: 0 12px; text-align: left; white-space: nowrap;
+  font: 500 12px/16px var(--font-sans); color: var(--text-tertiary);
+  border-top: 1px solid var(--fd-row-line); border-bottom: 1px solid var(--fd-row-line);
+}
+.fleet-detail .fd-table td {
+  height: 48px; padding: 0 12px; box-sizing: border-box;
+  font: 400 13px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-secondary);
+  white-space: nowrap; border-bottom: 1px solid var(--fd-row-line);
+}
+.fleet-detail .fd-table tbody tr:last-child td { border-bottom: 0; }
+.fleet-detail .fd-table tbody tr { cursor: pointer; }
+.fleet-detail .fd-table tbody tr:hover { background: var(--bg-surface-hover); }
+.fleet-detail .fd-table th:first-child, .fleet-detail .fd-table td:first-child { padding-left: var(--fd-pad); }
+.fleet-detail .fd-table th:last-child, .fleet-detail .fd-table td:last-child { padding-right: var(--fd-pad); }
+.fleet-detail .fd-table .is-num { text-align: right; }
+.fleet-detail .fd-table .fd-ellipsis { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.fleet-detail .fd-cell-sub { display: none; }
+.fleet-detail .fd-table-foot { display: flex; justify-content: center; border-top: 1px solid var(--fd-row-line); margin: 0 calc(var(--fd-pad) * -1); padding: 4px 0 0; }
+.fleet-detail .fd-link { min-height: 36px; padding: 0 12px; border: 0; background: none; cursor: pointer; font: 500 13px/20px var(--font-sans); color: var(--accent-primary); border-radius: 6px; }
+.fleet-detail .fd-link:hover { text-decoration: underline; }
+
+/* ---------------------------------------------------------------- states */
+.fleet-detail .fd-skel { border-radius: 6px; background: var(--bg-surface-hover); }
+.fleet-detail .fd-strip .fd-skel { background: var(--bg-surface-hover); }
+/* Not found (404): the Invoice/Quote pattern. Its own class, so the
+   12px "missing field" row style (.fd-missing) never applies to it. */
+.fleet-detail .fd-notfound .load-error__icon { color: var(--text-tertiary); }
+
+/* ------------------------------------------------------------ responsive */
+/* The loads table sheds its least useful columns as the main column narrows. */
+@container fd-main (max-width: 860px) {
+  .fleet-detail .fd-table .fd-col-customer { display: none; }
+}
+@container fd-main (max-width: 620px) {
+  .fleet-detail .fd-table .fd-col-dist { display: none; }
+}
+@media (max-width: 1100px) {
+  .fleet-detail .fd-body { grid-template-columns: minmax(0, 1fr); }
+  .fleet-detail .fd-body:not(.fd-body--wide) > .fd-side { position: static; }
+}
+@media (max-width: 640px) {
+  .fleet-detail { --fd-pad: 16px; --fd-gap: 16px; }
+  .fleet-detail .fd-head__title { font-size: 24px; line-height: 30px; }
+  .fleet-detail .fd-head__row { align-items: stretch; flex-direction: column; }
+  .fleet-detail .fd-head__actions { width: 100%; }
+  .fleet-detail .fd-head__actions .fd-status-seg { max-width: 100%; overflow-x: auto; }
+  .fleet-detail .fd-button { min-height: var(--control-h, 44px); }
+  .fleet-detail .fd-panel { padding: 16px var(--fd-pad); }
+  .fleet-detail .fd-panel--flush { padding-bottom: 4px; }
+  /* Phone table: load + route stacked, revenue, status. */
+  .fleet-detail .fd-table .fd-col-opt,
+  .fleet-detail .fd-table .fd-col-route { display: none; }
+  .fleet-detail .fd-table td { height: 56px; }
+  .fleet-detail .fd-cell-sub { display: block; max-width: 44vw; overflow: hidden; text-overflow: ellipsis; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+  .fleet-detail .fd-row dt { white-space: normal; }
+}
+@media (max-width: 767px) {
+  .fd-input { font-size: 16px; min-height: 48px; }
+}
+
+/* Edit drawer */
+.fd-drawer { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; font-family: var(--font-sans); }
+.fd-drawer__backdrop { position: absolute; inset: 0; background: var(--modal-backdrop); }
+.fd-drawer__panel {
+  position: relative;
+  width: 440px;
+  max-width: 100%;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle); /* sheet edge, not an accent rail */
+  padding: 24px;
+  overflow-y: auto;
+}
+.fd-drawer__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.fd-drawer__actions { display: flex; gap: 12px; margin-top: 24px; }
+.fd-icon-button {
+  width: 44px; height: 44px;
+  margin: -10px -10px -10px 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: none; border-radius: var(--radius-control, 8px);
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+}
+.fd-icon-button:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+.fd-field { margin-bottom: 16px; }
+.fd-label { display: block; margin-bottom: 6px; font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fd-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  background: var(--input-bg, var(--bg-surface));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control, 8px);
+  color: var(--text-primary);
+  font: 400 14px/20px var(--font-sans);
+  box-sizing: border-box;
+}
+.fd-input:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.fd-error {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control, 8px);
+  background: var(--status-danger-bg);
+  color: var(--status-danger-text);
+  font: 400 14px/20px var(--font-sans);
+}
+.fd-drawer .fd-card__title { margin: 0; font: 600 16px/24px var(--font-sans); color: var(--text-primary); }
+.fd-drawer .fd-button {
+  min-height: 40px; padding: 8px 16px;
+  background: none; border: 1px solid var(--border-subtle); border-radius: var(--radius-control, 8px);
+  color: var(--text-primary); font: 400 14px/20px var(--font-sans); cursor: pointer;
+}
+
+/* Phone loads table: tighter inner cells so Load, Revenue and Status fit without a sideways scroll. */
+@media (max-width: 640px) {
+  .fleet-detail .fd-table th, .fleet-detail .fd-table td { padding-left: 8px; padding-right: 8px; }
+  .fleet-detail .fd-table th:first-child, .fleet-detail .fd-table td:first-child { padding-left: var(--fd-pad); }
+  .fleet-detail .fd-table th:last-child, .fleet-detail .fd-table td:last-child { padding-right: var(--fd-pad); }
+}
+
+/* ======================================================= Round 4: record
+   Vehicle and driver pages (owner redesign). Head, then one "Now" line, then
+   a main column (Performance, Loads, Condition) beside a sticky rail
+   (Compliance, the linked driver or truck, the facts). Below 1100px the two
+   columns dissolve and the cards stack in the order the owner acts on them:
+   Now, Compliance, Performance, Loads, Condition, Driver/Truck, Facts. */
+.fleet-detail .fd-record {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+  gap: var(--fd-gap); align-items: start;
+}
+.fleet-detail .fd-record > .fd-side { position: sticky; top: 24px; }
+@media (max-width: 1100px) {
+  .fleet-detail .fd-record { display: flex; flex-direction: column; align-items: stretch; }
+  .fleet-detail .fd-record > .fd-main,
+  .fleet-detail .fd-record > .fd-side { display: contents; }
+  .fleet-detail .fd-record .fd-o-todo { order: 1; }
+  .fleet-detail .fd-record .fd-o-perf { order: 2; }
+  .fleet-detail .fd-record .fd-o-loads { order: 3; }
+  .fleet-detail .fd-record .fd-o-condition { order: 4; }
+  .fleet-detail .fd-record .fd-o-driver { order: 5; }
+  .fleet-detail .fd-record .fd-o-contact { order: 6; }
+  .fleet-detail .fd-record .fd-o-facts { order: 7; }
+}
+.fleet-detail .fd-record > .fd-main,
+.fleet-detail .fd-record > .fd-side { min-width: 0; }
+
+/* Shared quiet bits */
+.fleet-detail .fd-muted { color: var(--text-tertiary); font-weight: 400; }
+.fleet-detail .fd-struck { text-decoration: line-through; color: var(--text-tertiary); }
+.fleet-detail .fd-inline-link { color: var(--accent-primary); text-decoration: none; font-weight: 500; }
+.fleet-detail .fd-inline-link:hover { text-decoration: underline; }
+.fleet-detail .fd-inline-link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
+/* Row and card actions: quiet outline, 32px drawn, 44px touch target. */
+.fleet-detail .fd-ghost {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  height: 32px; padding: 0 12px; border: 1px solid var(--fd-line); border-radius: var(--radius-control, 8px);
+  background: none; color: var(--text-primary); font: 500 13px/20px var(--font-sans); cursor: pointer; white-space: nowrap;
+}
+.fleet-detail .fd-ghost:hover { background: var(--bg-surface-hover); }
+.fleet-detail .fd-ghost:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.fleet-detail .fd-ghost::after { content: ''; position: absolute; inset: -6px -2px; }
+.fleet-detail .fd-ghost--row { height: 28px; padding: 0 10px; font-size: 12px; }
+.fleet-detail .fd-row__note { margin-left: 6px; font-weight: 400; }
+
+/* Initials avatar (driver), leading the Contact card. */
+.fleet-detail .fd-person { display: flex; align-items: center; gap: 12px; padding: 4px 0 12px; border-bottom: 1px solid var(--fd-row-line); }
+.fleet-detail .fd-person__text { display: flex; flex-direction: column; min-width: 0; }
+.fleet-detail .fd-person__name { font: 500 14px/20px var(--font-sans); color: var(--text-primary); }
+.fleet-detail .fd-person__sub { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fleet-detail .fd-avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg-surface-hover); border: 1px solid var(--fd-line);
+  font: 600 13px/1 var(--font-sans); letter-spacing: 0.02em; color: var(--text-secondary);
+}
+
+/* Now line */
+.fleet-detail .fd-now {
+  display: flex; align-items: center; gap: 12px; min-height: 52px; box-sizing: border-box;
+  margin-bottom: var(--fd-gap); padding: 8px 12px 8px var(--fd-pad);
+  background: var(--fd-panel-bg); border: 1px solid var(--fd-line); border-radius: var(--radius-card, 12px);
+}
+.fleet-detail .fd-now__label { flex-shrink: 0; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fleet-detail .fd-now__text { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-now__sentence { min-width: 0; }
+.fleet-detail .fd-now__text strong { font-weight: 500; color: var(--text-primary); }
+.fleet-detail .fd-now__warn { color: var(--status-warning-text); font-weight: 500; }
+.fleet-detail .fd-now__action { flex-shrink: 0; display: inline-flex; align-items: center; }
+.fleet-detail .fd-now--skel { align-items: center; }
+
+/* Performance */
+.fleet-detail .fd-perf { container-type: inline-size; }
+.fleet-detail .fd-perf .fd-panel__head { margin-bottom: 12px; }
+.fleet-detail .fd-perf__figs {
+  display: grid; grid-template-columns: repeat(var(--figs, 4), minmax(0, 1fr)); margin: 0;
+}
+.fleet-detail .fd-perf__fig { min-width: 0; padding: 4px 16px 4px 16px; border-left: 1px solid var(--fd-row-line); }
+.fleet-detail .fd-perf__fig:first-child { padding-left: 0; border-left: 0; }
+.fleet-detail .fd-perf__fig dt { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fleet-detail .fd-perf__fig dd { margin: 4px 0 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fleet-detail .fd-perf__value {
+  font: 600 20px/28px var(--font-sans); letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+  color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fleet-detail .fd-perf__fig.is-lead .fd-perf__value { font-size: 28px; line-height: 34px; letter-spacing: var(--tracking-figure, -0.02em); color: var(--emphasis-fg, var(--accent-primary)); }
+.fleet-detail .fd-perf__fig:not(.is-lead) dd { padding-top: 6px; }
+.fleet-detail .fd-perf__note { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); overflow-wrap: anywhere; }
+.fleet-detail .fd-perf__trend { margin: 16px calc(var(--fd-pad) * -1) 0; padding: 16px var(--fd-pad) 0; border-top: 1px solid var(--fd-row-line); }
+.fleet-detail .fd-perf__trend .fd-bars { margin: 0; }
+.fleet-detail .fd-perf__empty { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.fleet-detail .fd-perf__empty-text { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+@container (max-width: 560px) {
+  .fleet-detail .fd-perf__figs { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; }
+  .fleet-detail .fd-perf__fig:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .fleet-detail .fd-perf__fig.is-lead { grid-column: 1 / -1; }
+  .fleet-detail .fd-perf__fig.is-lead ~ .fd-perf__fig:nth-child(odd) { padding-left: 16px; border-left: 1px solid var(--fd-row-line); }
+  .fleet-detail .fd-perf__fig.is-lead ~ .fd-perf__fig:nth-child(even) { padding-left: 0; border-left: 0; }
+}
+
+/* Meter: 0-100, ticks cut at 40 / 60 / 80 (the bands); neutral fill,
+   danger only below the action threshold (40). */
+.fleet-detail .fd-meter { position: relative; display: block; height: 6px; border-radius: 3px; background: var(--bg-surface-hover); overflow: hidden; }
+.fleet-detail .fd-meter--lg { height: 8px; border-radius: 4px; }
+.fleet-detail .fd-meter__fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--text-tertiary); border-radius: inherit; }
+.fleet-detail .fd-meter--lg .fd-meter__fill { background: var(--text-secondary); }
+.fleet-detail .fd-meter__fill.is-action { background: var(--status-danger-dot); }
+.fleet-detail .fd-meter__tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--fd-panel-bg); }
+
+/* Condition */
+.fleet-detail .fd-condition__overall { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 4px 10px; }
+.fleet-detail .fd-condition__score { font: 600 28px/34px var(--font-sans); letter-spacing: var(--tracking-figure, -0.02em); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.fleet-detail .fd-condition__band { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-condition__band.is-action, .fleet-detail .fd-condition__n.is-action { color: var(--status-danger-text); }
+.fleet-detail .fd-condition__overall .fd-meter { grid-column: 1 / -1; margin-top: 8px; }
+.fleet-detail .fd-condition__parts { list-style: none; margin: 16px 0 0; padding: 12px 0 0; border-top: 1px solid var(--fd-row-line); display: grid; gap: 4px; }
+.fleet-detail .fd-condition__part { display: grid; grid-template-columns: minmax(0, 1fr) minmax(80px, 40%) 3ch; align-items: center; gap: 12px; min-height: 36px; }
+.fleet-detail .fd-condition__label { display: flex; flex-direction: column; min-width: 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-condition__note { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fleet-detail .fd-condition__n { text-align: right; font: 500 13px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+
+/* Compliance to-dos */
+.fleet-detail .fd-todo { padding-bottom: 8px; }
+.fleet-detail .fd-todo .fd-panel__head { margin-bottom: 4px; }
+.fleet-detail .fd-todo__list { list-style: none; margin: 0; padding: 0; }
+.fleet-detail .fd-todo__item { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 0; border-bottom: 1px solid var(--fd-row-line); }
+.fleet-detail .fd-todo__item:last-child { border-bottom: 0; }
+.fleet-detail .fd-todo__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-sizing: border-box; }
+.fleet-detail .fd-todo__item.is-danger .fd-todo__dot { background: var(--status-danger-dot); }
+.fleet-detail .fd-todo__item.is-warning .fd-todo__dot { background: var(--status-warning-dot); }
+.fleet-detail .fd-todo__item.is-ok .fd-todo__dot { background: var(--status-success-dot); }
+.fleet-detail .fd-todo__item.is-missing .fd-todo__dot { border: 1.5px solid var(--text-tertiary); background: transparent; }
+.fleet-detail .fd-todo__body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fleet-detail .fd-todo__title { font: 500 13px/20px var(--font-sans); color: var(--text-primary); }
+.fleet-detail .fd-todo__item.is-danger .fd-todo__title { color: var(--status-danger-text); }
+.fleet-detail .fd-todo__detail { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+
+/* Facts and link cards. A link card only ever sits in the rail; where the
+   columns need it gone it folds into the facts card as a row (R8), so it is
+   never stretched across the main column. */
+.fleet-detail .fd-linkcard__title { margin-bottom: 8px; }
+.fleet-detail .fd-linkcard__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
+.fleet-detail .fd-linkcard__body { display: flex; flex-direction: column; min-width: 0; }
+.fleet-detail .fd-linkcard__primary { font: 500 14px/20px var(--font-sans); color: var(--text-primary); overflow-wrap: anywhere; }
+.fleet-detail .fd-linkcard__secondary { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fleet-detail .fd-facts .fd-panel__head { margin-bottom: 4px; }
+.fleet-detail .fd-facts .fd-rows + .fd-rows { border-top: 1px solid var(--fd-row-line); }
+/* A folded link card (R8): the facts card's first line, full card width.
+   Label, then the linked record with its one qualifier under it, left-aligned
+   so the name sits next to its label even when the card is wide. */
+.fleet-detail .fd-factlead {
+  display: flex; align-items: flex-start; gap: 16px; padding: 8px 0;
+  border-bottom: 1px solid var(--fd-row-line);
+}
+.fleet-detail .fd-factlead__label { flex: none; width: 112px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-linkfact { display: flex; flex-direction: column; min-width: 0; }
+.fleet-detail .fd-linkfact__main { display: inline-flex; align-items: center; gap: 8px; font: 500 13px/20px var(--font-sans); color: var(--text-primary); overflow-wrap: anywhere; }
+.fleet-detail .fd-linkfact__note { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+
+/* Loads: optional columns shed as the card narrows (the nearest container
+   is the main column on desktop, the card itself once the columns stack). */
+@container (max-width: 940px) { .fleet-detail .fd-table .fd-col-customer { display: none; } }
+@container (max-width: 800px) { .fleet-detail .fd-table .fd-col-dist { display: none; } }
+@container (max-width: 620px) { .fleet-detail .fd-table .fd-col-perkm { display: none; } }
+@media (max-width: 1100px) {
+  .fleet-detail .fd-record .fd-panel { container-type: inline-size; }
+}
+
+@media (max-width: 640px) {
+  .fleet-detail .fd-now { padding: 10px 12px 10px var(--fd-pad); gap: 8px 12px; }
+  .fleet-detail .fd-now__label { display: none; }
+  .fleet-detail .fd-perf__fig.is-lead .fd-perf__value { font-size: 24px; line-height: 30px; }
+  .fleet-detail .fd-todo__item { min-height: 56px; }
+}
+.fleet-detail .fd-break { overflow-wrap: anywhere; }
+
+/* Condition with no scores: the head alone. */
+.fleet-detail .fd-condition .fd-panel__head:last-child { margin-bottom: 0; }
+/* Facts in the main column (a truck with no loads): two columns of rows. */
+.fleet-detail .fd-facts--wide .fd-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; }
+.fleet-detail .fd-facts--wide .fd-row:last-child { border-bottom: 1px solid var(--fd-row-line); }
+.fleet-detail .fd-facts--wide .fd-row:nth-last-child(-n+2):nth-child(odd),
+.fleet-detail .fd-facts--wide .fd-row:last-child { border-bottom: 0; }
+@media (max-width: 1100px) { .fleet-detail .fd-facts--wide .fd-rows { display: block; } .fleet-detail .fd-facts--wide .fd-row:not(:last-child) { border-bottom: 1px solid var(--fd-row-line); } }
+.fleet-detail .fd-avatar { width: 40px; height: 40px; font-size: 14px; }
+@media (max-width: 640px) { .fleet-detail .fd-hide-phone { display: none; } }
+.fleet-detail .fd-now .fd-inline-link.fd-mono { white-space: nowrap; }
+
+/* ======================================================= Round 5 */
+/* Stale work: neutral sentence, one amber dot (never a chip, never "current"). */
+.fleet-detail .fd-now__dot { display: inline-block; width: 8px; height: 8px; margin: 0 8px 1px 0; border-radius: 50%; vertical-align: middle; background: var(--status-warning-dot); }
+.fleet-detail a.fd-ghost { text-decoration: none; }
+
+/* Performance notes stack one fact per line; the pending-cost consequence
+   reads in normal text, in danger only when it turns the margin negative. */
+.fleet-detail .fd-perf__note { display: flex; flex-direction: column; gap: 2px; }
+/* R9: the consequence line reads at 13px in the neutral secondary colour;
+   only the figure itself ("−R 1 416") carries the danger colour. */
+.fleet-detail .fd-perf__if { font-size: 13px; line-height: 18px; color: var(--text-secondary); }
+.fleet-detail .fd-perf__if-figure { font-weight: 500; font-variant-numeric: tabular-nums; }
+.fleet-detail .fd-perf__if-figure.is-loss { color: var(--status-danger-text); }
+.fleet-detail .fd-perf__fig.is-quiet .fd-perf__value { font: 500 15px/28px var(--font-sans); letter-spacing: 0; color: var(--text-secondary); }
+
+/* Monthly trend: trailing empty months trimmed, said once under the bars. */
+.fleet-detail .fd-bars__note { margin: 4px 0 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+
+/* Condition: one compact row per score: label, meter, score, band. The
+   label column is as wide as its longest label, so the meter starts right
+   after it and the card has no horizontal void. */
+.fleet-detail .fd-condition__parts {
+  list-style: none; margin: 4px 0 0; padding: 0; border-top: 0;
+  display: grid; grid-template-columns: max-content minmax(96px, 1fr) 3ch max-content; column-gap: 16px; row-gap: 0;
+}
+.fleet-detail .fd-condition__part { display: contents; }
+.fleet-detail .fd-condition__part > * { align-self: center; min-height: 36px; display: flex; align-items: center; }
+.fleet-detail .fd-condition__part > .fd-meter { display: block; min-height: 0; }
+.fleet-detail .fd-condition__label { flex-direction: column; align-items: flex-start; justify-content: center; font: 400 13px/18px var(--font-sans); color: var(--text-secondary); padding: 6px 0; }
+.fleet-detail .fd-condition__part.is-lead .fd-condition__label { color: var(--text-primary); font-weight: 500; }
+.fleet-detail .fd-condition__n { justify-content: flex-end; font: 500 13px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.fleet-detail .fd-condition__part.is-lead .fd-condition__n { font: 600 18px/24px var(--font-sans); letter-spacing: -0.01em; }
+.fleet-detail .fd-condition__band { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fleet-detail .fd-condition__band.is-action { color: var(--status-danger-text); font-weight: 500; }
+
+/* One load: a single line (no table, no repeated money). */
+.fleet-detail .fd-oneload {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap;
+  margin: 0 calc(var(--fd-pad) * -1); padding: 12px var(--fd-pad);
+  min-height: 56px; box-sizing: border-box; border-top: 1px solid var(--fd-row-line);
+  color: inherit; text-decoration: none; border-radius: 0 0 var(--radius-card, 12px) var(--radius-card, 12px);
+}
+.fleet-detail .fd-oneload:hover { background: var(--bg-surface-hover); }
+.fleet-detail .fd-oneload:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
+.fleet-detail .fd-oneload__id { display: flex; flex-direction: column; min-width: 0; font: 400 14px/20px var(--font-sans); }
+.fleet-detail .fd-oneload__route { font: 400 13px/18px var(--font-sans); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; }
+.fleet-detail .fd-oneload__meta { display: inline-flex; align-items: center; gap: 12px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fleet-detail .fd-oneload__amount { color: var(--text-tertiary); }
+
+/* A fact the head subtitle drops on phones returns in the facts card there only. */
+.fleet-detail .fd-show-phone { display: none; }
+@media (max-width: 640px) { .fleet-detail .fd-row.fd-show-phone { display: flex; } }
+
+/* Touch: every card action is 44px tall to the finger. The button box grows
+   to 44 (measurable), the outline stays drawn at 32 (28 for row Adds), and
+   negative margins keep the layout where it was. */
+@media (pointer: coarse) {
+  .fleet-detail .fd-ghost { height: 44px; margin: -6px 0; border-color: transparent; background: none; isolation: isolate; }
+  .fleet-detail .fd-ghost::before {
+    content: ''; position: absolute; inset: 6px 0; z-index: -1; pointer-events: none;
+    border: 1px solid var(--fd-line); border-radius: var(--radius-control, 8px);
+  }
+  .fleet-detail .fd-ghost:hover { background: none; }
+  .fleet-detail .fd-ghost:hover::before { background: var(--bg-surface-hover); }
+  .fleet-detail .fd-ghost::after { display: none; }
+  .fleet-detail .fd-ghost--row { height: 44px; margin: -8px 0; position: relative; z-index: 1; }
+  .fleet-detail .fd-ghost--row::before { inset: 8px 0; }
+  /* R9: rows are 36px apart, so two missing facts in a row (Odometer, Last
+     maintenance) overlapped their 44px Adds and the later one covered the
+     first (46x36 hit). A row carrying an Add is 44px on touch, so each Add
+     owns its full 44 without overlapping a neighbour. */
+  .fleet-detail .fd-row:has(> dd > .fd-ghost--row) { min-height: 44px; }
+  .fleet-detail .fd-row > dd > .fd-ghost--row { margin: 0; }
+  .fd-info__btn { width: 44px; height: 44px; margin: -12px -12px; }
+}
+
+/* Condition in the rail (or any narrow card): the band word steps aside;
+   the score's colour and the row's accessible name still carry it. */
+.fleet-detail .fd-condition { container-type: inline-size; }
+@container (max-width: 400px) {
+  .fleet-detail .fd-condition__parts { grid-template-columns: max-content minmax(64px, 1fr) 3ch; column-gap: 12px; }
+  .fleet-detail .fd-condition__band { display: none; }
+}
+.fleet-detail .fd-panel--flush .fd-oneload { margin-bottom: -4px; }
+.fleet-detail .fd-condition__overall-n { font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.fleet-detail .fd-panel__sub .fd-condition__band { font: inherit; color: inherit; }
+.fleet-detail .fd-panel__sub .fd-condition__band.is-action { color: var(--status-danger-text); font-weight: 500; }
+/* When Per km steps aside, Revenue is the last column: it gets the card's
+   right padding (16 on phones), not the 8px between columns. */
+@container (max-width: 620px) { .fleet-detail .fd-table .fd-col-rev { padding-right: var(--fd-pad); } }
+@media (max-width: 640px) { .fleet-detail .fd-table th.fd-col-rev, .fleet-detail .fd-table td.fd-col-rev { padding-right: var(--fd-pad); } }
+/* Two figures on a narrow card: the second takes the full row too. */
+@container (max-width: 560px) {
+  .fleet-detail .fd-perf__fig.is-lead + .fd-perf__fig:last-child { grid-column: 1 / -1; padding-left: 0; border-left: 0; }
+}
+
+/* ======================================================= Round 6 */
+/* Condition in the wide main column: the scores sit side by side like the
+   Performance figures (label, score and band, then the meter), so no row
+   runs a long empty track from a short label (R6 UX: close the gap). The
+   rail keeps the compact one-row-per-score list. */
+@container (min-width: 560px) {
+  .fleet-detail .fd-condition__parts {
+    grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+    column-gap: 0; margin-top: 4px;
+  }
+  .fleet-detail .fd-condition__part {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "label label" "n band" "meter meter";
+    column-gap: 8px; row-gap: 0; align-content: start; align-items: end; padding: 4px 16px; border-left: 1px solid var(--fd-row-line);
+  }
+  .fleet-detail .fd-condition__part:first-child { padding-left: 0; border-left: 0; }
+  .fleet-detail .fd-condition__part > * { min-height: 0; }
+  .fleet-detail .fd-condition__label { grid-area: label; padding: 0; display: block; font: 400 13px/20px var(--font-sans); }
+  .fleet-detail .fd-condition__label .fd-condition__note { display: inline; }
+  .fleet-detail .fd-condition__label .fd-condition__note::before { content: ' · '; }
+  .fleet-detail .fd-condition__n { grid-area: n; justify-content: flex-start; align-self: end; margin-top: 2px; font: 600 20px/28px var(--font-sans); letter-spacing: -0.01em; }
+  .fleet-detail .fd-condition__band { grid-area: band; align-self: end; padding-bottom: 5px; }
+  .fleet-detail .fd-condition__part > .fd-meter { grid-area: meter; margin-top: 8px; }
+}
+
+/* ======================================================= Round 7 */
+.fleet-detail .fd-nowrap { white-space: nowrap; }
+/* Touch: text links keep their size and get a 44px hit area (R7), in the
+   Now line, the linked-record cards and the Contact rows (e-mail, phone). */
+@media (pointer: coarse) {
+  .fleet-detail .fd-inline-link { position: relative; }
+  .fleet-detail .fd-inline-link::after {
+    content: ''; position: absolute; top: calc(50% - 22px); bottom: calc(50% - 22px); left: min(-4px, calc(50% - 22px)); right: min(-4px, calc(50% - 22px));
+  }
+}
+/* Fleet comparison under Revenue per km: two lines at most (R7). */
+.fleet-detail .fd-perf__narrow { display: none; }
+@container (max-width: 700px) { .fleet-detail .fd-perf__wide { display: none; } .fleet-detail .fd-perf__narrow { display: inline; } }

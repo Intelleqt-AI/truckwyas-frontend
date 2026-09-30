@@ -1,11 +1,135 @@
-/* Keep the quote and its actions visible without changing their order or behavior. */
+/* Quote detail: one screen at 1440 where the data allows. Left, the job in
+   one card (customer, route, cargo) and the map; right, a sticky rail with
+   the price (the only place the total appears) and the customer tools. */
 .quote-detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--card-gap, 24px);
+  align-items: start;
 }
+/* The rail sticks beside the longer quote column (top set by useStickyRail). */
+.quote-detail-grid > .quote-detail-rail { position: sticky; top: 24px; display: flex; flex-direction: column; gap: var(--card-gap, 16px); }
 .quote-detail-grid > * { min-width: 0; }
-.quote-detail-grid .card { min-width: 0; overflow-wrap: anywhere; }
-@media (max-width: 900px) {
+.qd-main { display: flex; flex-direction: column; gap: var(--card-gap, 16px); min-width: 0; }
+@media (max-width: 1000px) {
   .quote-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .quote-detail-grid > .quote-detail-rail { position: static; }
 }
+
+/* Definition list: auto columns, label over value. */
+.qd-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 16px 24px; margin: 0; }
+.qd-fact--email { grid-column: span 2; }
+@media (max-width: 520px) { .qd-fact--email { grid-column: 1 / -1; } }
+.qd-facts dd { margin: 0; }
+.qd-fact { min-width: 0; }
+.qd-fact--wide { grid-column: 1 / -1; }
+/* R9: the customer always sits in the Job card. In a narrow main column
+   (1280 with the sidebar open) the auto grid drops to three columns and the
+   customer and cargo rows each wrap, so the Job card outgrew the rail; four
+   tighter columns keep each on one row. */
+.qd-main { container: qd-main / inline-size; }
+@container qd-main (min-width: 540px) and (max-width: 700px) {
+  .qd-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 16px; }
+}
+.qd-rule { border: 0; height: 1px; background: var(--border-row); margin: 20px 0; }
+.qd-route-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px 24px; }
+/* R10: a one-leg route shares its row with the load facts (two columns
+   of facts in the right half), so the Job card has no blank half. The
+   halves match the four-column customer grid above (col 3 starts at the
+   same x). Narrow main columns stack: route, then the facts. */
+.qd-route-row--single { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.qd-route-row--single .qd-facts--load { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@container qd-main (max-width: 539px) {
+  .qd-route-row--single { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .qd-route-row--single .qd-facts--load { border-top: 1px solid var(--border-row); margin-top: 20px; padding-top: 20px; }
+}
+/* Emails wrap at "@" and dots (<wbr>), never inside a word. */
+.qd-email { overflow-wrap: normal; word-break: normal; }
+.bk-card.qd-map { padding: 0; overflow: hidden; }
+.qd-map > * { border-radius: 0; }
+
+/* Price card */
+.qd-total {
+  margin-top: 4px;
+  font: 600 var(--text-figure, 28px)/36px var(--font-sans);
+  letter-spacing: var(--tracking-figure, -0.02em);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.qd-sub { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 4px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.qd-fuel {
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 12px 0 0; padding: 8px 0 0;
+  border-top: 1px solid var(--border-row);
+  font: 400 13px/20px var(--font-sans); color: var(--text-secondary);
+}
+.qd-fuel .bk-dot { flex-shrink: 0; transform: translateY(-1px); }
+.qd-price-rows { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--border-row); }
+.qd-price-rows .bk-kv { padding: 6px 0; }
+.qd-link {
+  font: 400 13px/20px var(--font-sans); color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding: 8px 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-nested, 8px); background: var(--bg-deep, var(--bg-surface));
+}
+.qd-btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.qd-tools { display: flex; flex-wrap: wrap; gap: 4px; justify-content: space-between; }
+.qd-tools .bk-btn { padding-left: 8px; padding-right: 8px; }
+
+/* ---- Round 3 ---- */
+.quote-detail-grid { gap: var(--card-gap, 16px); }
+/* Tools sit in a quiet card instead of floating as bare text under the rail. */
+.bk-card.qd-tools { padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-start; }
+.bk-card.qd-tools .bk-btn--quiet-danger { margin-left: auto; }
+.qd .bk-btn.qd-tools-edit { display: none; }
+/* Phone: the shared head keeps the primary on the title row and moves
+   Change status and Edit quote into its "⋯" menu (SectionHeader), so the
+   tools card no longer needs its own Edit copy. */
+
+/* ---- Round 5: phone head ---- */
+/* The status chips sit on the title row on wider screens and at the start of
+   the subtitle on phones, so "Send" stays on the title row (not in "⋯"). */
+.qd-head-chips { display: inline-flex; align-items: center; gap: 8px; }
+.qd-desc-chips { display: none; }
+@media (max-width: 768px) {
+  .qd-head-chips { display: none; }
+  .qd-desc-chips { display: inline-flex; gap: 4px; vertical-align: 1px; margin-right: 8px; }
+  /* Short visible label; the full one stays the text (menus, screen readers). */
+  .qd-label-long { display: inline-flex; align-items: center; font-size: 0; line-height: 0; }
+  .qd-label-long::after { content: attr(data-short); font-size: 14px; line-height: 20px; }
+}
+/* The quote number takes the long-ID size (24px, as the shared head's level 4)
+   so "Send" fits beside it on a 390 phone instead of moving into "⋯". */
+@media (max-width: 480px) {
+  .qd .section-header .section-header__title { font-size: 24px; letter-spacing: -0.02em; }
+}
+
+/* ---- Round 6 ---- */
+/* Phones: the subtitle keeps to one line (chip and customer); the route is
+   the Job card's first fact below. */
+@media (max-width: 768px) { .qd-desc-route { display: none; } }
+.bk-card.qd-map--empty { display: flex; align-items: center; justify-content: center; padding: var(--card-pad, 20px); text-align: center; box-sizing: border-box; }
+.bk-card.qd-map--empty { min-height: min-content; }
+.bk-card.qd-map--empty .bk-help { max-width: 60ch; margin: 0; }
+@media (max-width: 1000px) { .bk-card.qd-map--empty { height: auto !important; } }
+/* The empty map slot reads as a map area (tinted), not a blank white card. */
+.bk-card.qd-map--empty { background: var(--bg-deep, var(--bg-surface-hover)); border-style: dashed; }
+
+/* ---- Round 11 ---- */
+/* Converted quote: one line under the total names its booking. */
+.qd-booked {
+  margin: 12px 0 0; padding: 8px 0 0;
+  border-top: 1px solid var(--border-row);
+  font: 400 13px/20px var(--font-sans); color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+/* Touch floor: the booking link's box grows to 44px without moving the line. */
+.qd-booked .bk-link { display: inline-block; padding: 12px 0; margin: -12px 0; }
+
+/* ---- Round 12 ---- */
+/* Info tips inside the price card sit on the text line (Not itemised, margin). */
+.qd .bk-kv__label .tw-info,
+.qd-margin-na .tw-info { vertical-align: -5px; margin-left: 2px; }
+.qd-margin-na { white-space: nowrap; }
+/* Touch: the margin tip's 48px hit area clears the booking link's 44px box. */
+@media (pointer: coarse) { .qd-sub:has(.tw-info) + .qd-booked { margin-top: 20px; } }

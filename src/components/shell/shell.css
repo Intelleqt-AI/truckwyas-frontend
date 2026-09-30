@@ -1,0 +1,460 @@
+/* ===========================================================================
+   TruckWys v3 shell: labelled grouped sidebar, top bar, phone tab bar.
+   Tokens come from src/styles/theme.css (v3 section). No page styles here.
+   =========================================================================== */
+
+.tw-shell {
+  --tw-side-w: 232px;
+  --tw-top-h: 64px;
+  display: grid;
+  grid-template-columns: var(--tw-side-w) minmax(0, 1fr);
+  grid-template-rows: var(--tw-top-h) minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+}
+.tw-shell.is-railed { --tw-side-w: 64px; }
+
+/* ---------------------------------------------------------------- sidebar */
+.tw-side {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  padding: 0 12px 12px;
+  overflow: hidden;
+  z-index: 110;
+}
+.tw-side__brand {
+  height: var(--tw-top-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 0 0 8px;
+}
+/* Wordmark at full strength; the company chip below carries the tenant. */
+.tw-side__logo { display: block; height: 20px; overflow: hidden; flex-shrink: 0; }
+.tw-side__logo img { display: block; height: 20px; width: auto; }
+
+/* Company chip: the customer's logo (or initial) + name; opens the company menu. */
+.tw-company { position: relative; margin: 4px 0 12px; }
+.tw-side__company {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.tw-side__company:hover, .tw-side__company[aria-expanded="true"] { background: var(--bg-surface-hover); border-color: var(--border-default); }
+.tw-side__company:focus-visible { outline: 2px solid var(--focus-outline); outline-offset: 2px; }
+.tw-side__company-mark {
+  width: 28px; height: 28px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: 7px;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+  font: 600 12px/1 var(--font-sans);
+  overflow: hidden;
+}
+.tw-side__company-mark.has-logo { background: #FFFFFF; box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.tw-side__company-mark img { width: 100%; height: 100%; object-fit: contain; padding: 2px; }
+.tw-side__company-name {
+  flex: 1;
+  font: 600 13px/18px var(--font-sans);
+  color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
+}
+.tw-side__company-chev { flex-shrink: 0; color: var(--text-tertiary); }
+.tw-side .tw-company__menu { top: calc(100% + 6px); left: 0; right: auto; width: 100%; min-width: 208px; }
+.tw-shell.is-railed .tw-side .tw-company__menu { top: 0; left: calc(100% + 10px); width: 232px; }
+
+.tw-nav { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1; scrollbar-width: none; }
+.tw-nav::-webkit-scrollbar { display: none; }
+.tw-nav__group { display: flex; flex-direction: column; gap: 2px; }
+.tw-nav__group-label {
+  font: 600 11px/16px var(--font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding: 0 10px 6px;
+  white-space: nowrap;
+}
+.tw-nav__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font: 500 14px/20px var(--font-sans);
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  width: 100%;
+  transition: background-color 0.12s, color 0.12s;
+}
+.tw-nav__item:hover { background: var(--nav-hover-bg); color: var(--text-primary); }
+.tw-nav__item.is-active { background: var(--nav-active-bg); color: var(--nav-active-fg); }
+.tw-nav__item.is-active .tw-nav__icon { color: var(--nav-active-fg); }
+/* Keyboard focus only (never after a mouse click), drawn inset so it sits
+   inside the item and does not double up with the active pill. */
+.tw-nav__item:focus { outline: none; }
+.tw-nav__item:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-outline, var(--accent-primary)); }
+.tw-nav__item.is-active:focus-visible { box-shadow: inset 0 0 0 2px var(--nav-active-bg), inset 0 0 0 4px var(--focus-outline, var(--accent-primary)); }
+.tw-nav__icon { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-tertiary); transition: color 0.12s; }
+.tw-nav__item:hover .tw-nav__icon { color: var(--text-primary); }
+/* Equal specificity to the :hover rule above, so without this, hovering the
+   active pill flipped its icon from --nav-active-fg to --text-primary — in
+   light theme those are the same background/icon pair, so the icon vanished
+   into its own pill (#0E1116 on #0E1116). */
+.tw-nav__item.is-active:hover .tw-nav__icon { color: var(--nav-active-fg); }
+.tw-nav__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tw-nav__item.is-muted:not(.is-active) { color: var(--text-tertiary); }
+.tw-nav__soon {
+  font: 500 11px/16px var(--font-sans);
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  color: var(--text-tertiary);
+}
+/* On the active (ink) pill the tertiary grey drops to 3.5:1; use the pill's own muted step. */
+.tw-nav__item.is-active .tw-nav__soon { color: var(--nav-active-muted); border-color: currentColor; }
+.tw-nav__item.is-active { font-weight: 500; }
+.tw-nav__item.is-danger { color: var(--status-danger-text); }
+.tw-nav__item.is-danger .tw-nav__icon { color: inherit; }
+
+.tw-side__foot { display: flex; flex-direction: column; gap: 2px; padding-top: 12px; border-top: 1px solid var(--border-subtle); margin-top: 12px; }
+.tw-side__status {
+  position: relative;
+  display: flex; align-items: center; gap: 8px;
+  min-height: 32px; padding: 0 10px;
+  border: 0; background: transparent; border-radius: var(--radius-control);
+  font: 500 12px/16px var(--font-sans);
+  color: var(--text-tertiary);
+  text-align: left;
+  white-space: nowrap;
+}
+.tw-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--status-ok-dot); flex-shrink: 0; }
+.tw-side__status.is-warn .tw-dot { background: var(--status-warning-dot); }
+.tw-side__status.is-neutral .tw-dot { background: var(--status-neutral-dot); }
+.tw-side__status.is-bad .tw-dot { background: var(--status-danger-dot); }
+.tw-side__status.is-warn { color: var(--status-warning-text); }
+.tw-side__status.is-bad { color: var(--status-danger-text); }
+
+/* Tooltips (rail labels, status detail) */
+.tw-tip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--tip-bg);
+  color: var(--tip-fg);
+  font: 500 12px/16px var(--font-sans);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+  z-index: 300;
+}
+.tw-tip--wide { white-space: normal; width: 240px; top: auto; bottom: 0; transform: none; font-weight: 400; line-height: 18px; padding: 8px 10px; }
+.tw-nav__item:hover > .tw-tip,
+.tw-side__company:hover > .tw-tip,
+.tw-side__company:focus-visible > .tw-tip,
+.tw-nav__item:focus-visible > .tw-tip,
+.tw-side__toggle:hover > .tw-tip,
+.tw-side__status:hover > .tw-tip,
+.tw-side__status:focus-visible > .tw-tip { opacity: 1; }
+
+/* Rail (collapsed): icons only, labels in tooltips. Overflow must show tips. */
+.tw-shell.is-railed .tw-side { padding: 0 12px 12px; overflow: visible; }
+.tw-shell.is-railed .tw-side .tw-nav { overflow: visible; }
+.tw-shell.is-railed .tw-side__brand { flex-direction: column; justify-content: center; padding: 0; gap: 0; }
+.tw-shell.is-railed .tw-side__logo { width: 17px; }
+.tw-shell.is-railed .tw-side__toggle { display: none; }
+.tw-shell.is-railed:not([data-rail-forced]) .tw-side__brand:hover .tw-side__logo { display: none; }
+.tw-shell.is-railed .tw-side__brand:hover .tw-side__toggle { display: grid; }
+.tw-shell.is-railed .tw-side__company { justify-content: center; padding: 6px 0; background: transparent; border-color: transparent; }
+.tw-shell.is-railed .tw-side .tw-side__company-name,
+.tw-shell.is-railed .tw-side .tw-side__company-chev,
+.tw-shell.is-railed .tw-side .tw-nav__label,
+.tw-shell.is-railed .tw-side .tw-nav__soon,
+.tw-shell.is-railed .tw-side .tw-side__status-label { display: none; }
+.tw-shell.is-railed .tw-side .tw-nav__group-label { display: none; }
+.tw-shell.is-railed .tw-side .tw-nav__group + .tw-nav__group { border-top: 1px solid var(--border-subtle); padding-top: 12px; }
+.tw-shell.is-railed .tw-side .tw-nav { gap: 12px; }
+.tw-shell.is-railed .tw-side .tw-nav__item { justify-content: center; padding: 0; min-height: 40px; }
+.tw-shell.is-railed .tw-side .tw-side__status { justify-content: center; padding: 0; }
+@media (max-width: 1100px) {
+  /* Tablet: the rail is forced, so the expand control is not offered. */
+  .tw-shell.is-railed .tw-side__brand:hover .tw-side__logo { display: block; }
+  .tw-shell.is-railed .tw-side__brand:hover .tw-side__toggle { display: none; }
+}
+
+/* ---------------------------------------------------------------- top bar */
+.tw-shell > .tw-top {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: var(--tw-top-h);
+  padding: 0 32px;
+  background: var(--bg-deep);
+  border-bottom: 0;
+  backdrop-filter: none;
+  position: relative;
+  z-index: 100;
+}
+.tw-top__mark { display: none; }
+/* Top-bar Ask box. Its own class names: the page toolbar search is .tw-search. */
+.tw-topsearch { position: relative; flex: 1; max-width: 420px; min-width: 0; }
+.tw-topsearch__icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-tertiary); pointer-events: none; }
+.tw-topsearch__input {
+  display: block;
+  width: 100%;
+  height: var(--control-h, 36px);
+  padding: 0 56px 0 36px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-control);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: 400 14px/20px var(--font-sans);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.tw-topsearch__input::placeholder { color: var(--text-tertiary); }
+.tw-topsearch__input:hover { border-color: var(--border-control-hover); }
+.tw-topsearch__input:focus { outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.tw-kbd {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  font: 500 11px/16px var(--font-sans);
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+.tw-top__actions { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.tw-icon-btn {
+  position: relative;
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border: 0; border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+.tw-icon-btn:hover { background: var(--nav-hover-bg); color: var(--text-primary); }
+.tw-icon-btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.tw-side__toggle { width: 32px; height: 32px; color: var(--text-tertiary); }
+.tw-top__ask { display: none; }
+
+/* Notification bell: quieter at the v3 icon size. */
+.tw-top .dashboard-notification-trigger { width: 36px !important; height: 36px !important; min-width: 36px !important; min-height: 36px !important; border-radius: var(--radius-control) !important; }
+.tw-top .dashboard-notification-trigger:hover { background: var(--nav-hover-bg); color: var(--text-primary) !important; }
+.tw-top .dashboard-notification-icon { width: 18px !important; height: 18px !important; }
+/* Unread count: a small neutral ink badge, not an alarm. It sits off the
+   glyph's top-right corner (anchored from the centre so a wider "9+" grows
+   outward, away from the bell) and never covers the bell itself. */
+.tw-top .dashboard-notification-count { background: var(--text-primary) !important; color: var(--bg-surface) !important; top: 2px !important; right: auto !important; left: calc(50% + 5px) !important; min-width: 14px !important; height: 14px !important; padding: 0 3px !important; font-size: 9px !important; line-height: 14px !important; font-weight: 600 !important; letter-spacing: 0; box-shadow: 0 0 0 1.5px var(--bg-deep); }
+
+.tw-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 10px;
+  border-radius: 999px;
+  font: 500 12px/16px var(--font-sans);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.tw-pill--warn { background: var(--status-warning-bg); color: var(--status-warning-text); }
+
+.tw-profile { position: relative; margin-left: 0; } /* R6: 40px centre spacing like bell to theme */
+.tw-profile__trigger {
+  display: grid; place-items: center;
+  width: 36px; height: 36px; padding: 0;
+  border: 0; border-radius: var(--radius-control);
+  background: transparent; cursor: pointer; color: var(--text-primary);
+  text-align: left;
+}
+.tw-profile__trigger:hover { background: var(--nav-hover-bg); }
+.tw-profile__trigger:focus:not(:focus-visible) { outline: none; }
+.tw-profile__trigger:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.tw-avatar {
+  width: 32px; height: 32px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  display: grid; place-items: center;
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  font: 600 12px/1 var(--font-sans);
+  letter-spacing: 0.02em;
+}
+.tw-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.tw-menu {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  width: 260px; max-width: calc(100vw - 32px);
+  padding: 6px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-overlay);
+  border-radius: var(--radius-menu, 12px);
+  box-shadow: var(--shadow-pop);
+  z-index: 1000;
+}
+.tw-menu__sep { height: 1px; margin: 6px 4px; background: var(--border-subtle); }
+.tw-menu__head { padding: 8px 10px 10px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 6px; }
+.tw-menu__name { font: 600 14px/20px var(--font-sans); color: var(--text-primary); overflow-wrap: anywhere; }
+.tw-menu__email { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); overflow-wrap: anywhere; margin-top: 2px; }
+.os-app-shell .tw-menu__item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  min-height: 36px; padding: 8px 10px;
+  border: 0; background: transparent; border-radius: 8px;
+  text-align: left; cursor: pointer;
+  font: 500 13px/20px var(--font-sans);
+  color: var(--text-secondary);
+}
+.os-app-shell .tw-menu__item svg { color: var(--text-tertiary); flex-shrink: 0; }
+.os-app-shell .tw-menu__item:hover,
+.os-app-shell .tw-menu__item:focus-visible { background: var(--surface-tint-active); color: var(--text-primary); outline: none; }
+.os-app-shell .tw-menu__item:focus-visible { box-shadow: inset 0 0 0 2px var(--focus-outline); }
+.os-app-shell .tw-menu__item--danger,
+.os-app-shell .tw-menu__item--danger svg { color: var(--status-danger-text); }
+.os-app-shell .tw-menu__item--danger:hover { color: var(--status-danger-text); }
+.os-app-shell .tw-menu__item.is-danger,
+.os-app-shell .tw-menu__item.is-danger .tw-menu-icon { color: var(--status-danger-text); }
+.os-app-shell .tw-menu__item .tw-menu-icon { display: inline-flex; color: var(--text-tertiary); }
+.os-app-shell .tw-menu__item .tw-rowact-menu__label { flex: 1 1 auto; }
+.tw-menu [role="separator"] { height: 1px; margin: 6px 4px; background: var(--border-subtle); }
+
+/* ------------------------------------------------------------------- main */
+.os-app-shell.tw-shell > .tw-main {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--main-pad-top, 8px) 32px 48px;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+/* ----------------------------------------------------------- phone tab bar */
+.tw-tabbar { display: none; }
+.tw-sheet-backdrop { display: none; }
+
+@media (max-width: 768px) {
+  .tw-shell,
+  .tw-shell.is-railed {
+    --tw-top-h: 56px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--tw-top-h) minmax(0, 1fr) auto;
+  }
+  .tw-side { display: none; }
+  .tw-shell > .tw-top { grid-column: 1; padding: 0 8px 0 16px; gap: 8px; border-bottom: 1px solid var(--border-subtle); }
+  /* The 20px wordmark is a 44px tall link (padding in, margin out), so the
+     drawn mark and the bar do not move. */
+  .tw-top__mark { display: block; height: 44px; padding-block: 12px; margin-block: -12px; box-sizing: border-box; overflow: hidden; }
+  .tw-top__mark img { height: 20px; width: auto; display: block; }
+  .tw-top .tw-topsearch { display: none !important; }
+  /* Phones switch theme from the More sheet and the account menu. */
+  .tw-top__theme { display: none; }
+  .tw-top__ask { display: grid; }
+  .tw-icon-btn, .tw-top .dashboard-notification-trigger { width: 44px; height: 44px; min-width: 44px !important; min-height: 44px !important; }
+  .tw-profile { margin-left: 0; }
+  .tw-profile__trigger { width: 44px; height: 44px; }
+  .os-app-shell.tw-shell > .tw-main { grid-column: 1; padding: var(--main-pad-top, 16px) 16px 32px; }
+
+  .tw-tabbar {
+    grid-column: 1;
+    grid-row: 3;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg-sidebar);
+    border-top: 1px solid var(--border-subtle);
+    z-index: 120;
+  }
+  .tw-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    min-height: 52px; min-width: 0;
+    border: 0; background: transparent; border-radius: var(--radius-control);
+    color: var(--text-tertiary);
+    font: 500 11px/14px var(--font-sans);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .tw-tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tw-tab.is-active { color: var(--text-primary); }
+  .tw-tab.is-active svg { color: var(--text-primary); }
+  .tw-tab.is-active { font-weight: 600; }
+  .tw-tab:focus { outline: none; }
+  .tw-tab:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: -2px; }
+
+  .tw-sheet-backdrop {
+    display: block;
+    position: fixed; inset: 0;
+    background: var(--modal-backdrop);
+    z-index: 1100;
+    animation: tw-fade 0.15s ease-out;
+  }
+  .tw-sheet {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
+    padding: 8px 12px calc(16px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg-overlay);
+    border-top: 1px solid var(--border-overlay);
+    border-radius: var(--radius-dialog) var(--radius-dialog) 0 0;
+    display: flex; flex-direction: column; gap: 16px;
+    animation: tw-rise 0.2s var(--ease-out);
+    outline: none;
+  }
+  .tw-sheet__head { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 0 10px; }
+  .tw-sheet__title { font: 600 18px/24px var(--font-sans); letter-spacing: -0.01em; }
+  .tw-sheet__group { display: flex; flex-direction: column; gap: 2px; }
+  .tw-sheet .tw-nav__item { min-height: 48px; font-size: 15px; }
+  .tw-sheet .tw-nav__icon { width: 18px; height: 18px; }
+  .tw-sheet .tw-side__status { padding-bottom: 4px; }
+}
+@keyframes tw-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tw-rise { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .tw-sheet, .tw-sheet-backdrop { animation: none; }
+}
+
+/* One content width (DESIGN-PRINCIPLES §11.8): pages fill main up to 1600px,
+   left-aligned with the top bar. Page-specific caps and centring go away. */
+.os-app-shell.tw-shell > .tw-main > * { max-width: var(--content-max, 1600px); }
+
+/* Two-state item in the phone "More" sheet (Dark theme: On/Off). */
+.tw-nav__state { margin-left: auto; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }

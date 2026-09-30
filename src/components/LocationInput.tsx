@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { fetchData, postData } from '@/lib/Api';
+import { History } from 'lucide-react';
 
 interface Suggestion {
   label: string;
@@ -50,6 +51,33 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
   const [lng, setLng] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Presentation only (R11): the list may be wider than a narrow field so a
+  // place's suburb isn't cut off (at least 320px on phones, 400px on wider
+  // screens), kept inside the viewport with a 16px gutter by shifting it
+  // left when the field sits near the right edge.
+  const [listBox, setListBox] = useState<{ left: number; width: number } | null>(null);
+  const listOpen = open && suggestions.length > 0;
+  useLayoutEffect(() => {
+    if (!listOpen || !inputRef.current) return;
+    const place = () => {
+      const r = inputRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const vw = document.documentElement.clientWidth;
+      const gutter = 16;
+      const floor = vw <= 640 ? 320 : 400;
+      const width = Math.round(Math.max(r.width, Math.min(floor, vw - 2 * gutter)));
+      let left = 0;
+      if (r.left + width > vw - gutter) left = vw - gutter - width - r.left;
+      if (r.left + left < gutter) left = gutter - r.left;
+      setListBox({ left: Math.round(left), width });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [listOpen]);
+  // Rows are 44px on phones and touch screens (the touch floor).
+  const coarse = typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 768px), (pointer: coarse)').matches;
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -151,11 +179,12 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
     border: 'none',
     padding: 0,
     marginTop: 4,
-    fontFamily: 'var(--font-mono)',
-    fontSize: 10,
+    fontFamily: 'var(--font-sans)',
+    fontSize: 13,
+    lineHeight: '20px',
     color: 'var(--accent-primary)',
     cursor: 'pointer',
-    letterSpacing: '0.04em',
+    letterSpacing: 'normal',
     display: 'block',
     textAlign: 'right' as const,
   };
@@ -198,8 +227,12 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
   }
 
   return (
-    <div ref={containerRef} style={{ position: 'relative' }}>
+    <div ref={containerRef}>
+      {/* The list anchors to the input's own box, not to the wrapper that
+          also holds the GPS link, so it opens directly under the field. */}
+      <div style={{ position: 'relative' }}>
       <input
+        ref={inputRef}
         type="text"
         placeholder={placeholder}
         value={value}
@@ -209,6 +242,10 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
           else if (!value) fetchRecentOnFocus();
           onFocus?.();
         }}
+        onKeyDown={e => {
+          // Escape closes the list only; the typed text stays as it is.
+          if (e.key === 'Escape' && open) { e.preventDefault(); e.stopPropagation(); setOpen(false); }
+        }}
         style={style}
         autoComplete="off"
       />
@@ -216,21 +253,21 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
         <div style={{
           position: 'absolute', right: 10, top: '50%',
           transform: 'translateY(-50%)',
-          fontSize: 10, color: 'var(--text-tertiary)',
-          fontFamily: 'var(--font-mono)', pointerEvents: 'none',
+          fontSize: 13, color: 'var(--text-secondary)',
+          fontFamily: 'var(--font-sans)', pointerEvents: 'none',
         }}>
           ...
         </div>
       )}
       {open && suggestions.length > 0 && (
         <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0,
+          position: 'absolute', top: 'calc(100% + 4px)',
+          ...(listBox ? { left: listBox.left, width: listBox.width } : { left: 0, right: 0 }),
           background: 'var(--bg-surface)',
           border: '1px solid var(--border-subtle)',
-          borderTop: 'none',
-          borderRadius: '0 0 4px 4px',
+          borderRadius: 'var(--radius-control)',
+          boxShadow: 'var(--shadow-pop)',
           zIndex: 1100, maxHeight: 220, overflowY: 'auto',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         }}>
           {suggestions.map((s, i) => (
             <div
@@ -238,36 +275,40 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
               onMouseDown={() => handleSelect(s)}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                padding: '9px 12px', fontSize: 12, cursor: 'pointer',
-                color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
-                borderBottom: i < suggestions.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-                lineHeight: 1.4,
+                padding: coarse ? '12px 12px' : '10px 12px', minHeight: coarse ? 44 : 40, boxSizing: 'border-box', fontSize: 14, cursor: 'pointer',
+                color: 'var(--text-primary)', fontFamily: 'var(--font-sans)',
+                borderBottom: i < suggestions.length - 1 ? '1px solid var(--border-row)' : 'none',
+                lineHeight: '20px',
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-elevated)')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-tint-hover)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
-              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-                {s.is_recent && <span title="Used before" style={{ flexShrink: 0, opacity: 0.6 }}>🕘</span>}
-                {s.label}
+              {/* The row is a flex box, which never ellipsises its own text:
+                  the label gets an inner span that wraps to at most two lines
+                  (R11: the suburb is what tells rows apart), full text in title. */}
+              <span title={s.label} style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {s.is_recent && <span title="Used before" aria-label="Used before" style={{ flexShrink: 0, display: 'inline-flex', color: 'var(--text-secondary)' }}><History size={14} aria-hidden="true" /></span>}
+                <span style={{ minWidth: 0, overflow: 'hidden', display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflowWrap: 'anywhere' }}>{s.label}</span>
               </span>
               {s.cross_border && (
                 <span
-                  title={`Cross-border — ${s.country || 'outside South Africa'}`}
+                  title={`Cross-border: ${s.country || 'outside South Africa'}`}
                   style={{
-                    flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
-                    padding: '2px 6px', borderRadius: 3,
+                    flexShrink: 0, fontSize: 13, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal',
+                    padding: '2px 8px', borderRadius: 'var(--radius-chip)', whiteSpace: 'nowrap',
                     color: 'var(--status-warning-text, var(--status-warning))',
                     background: 'color-mix(in srgb, var(--status-warning) 15%, transparent)',
                     border: '1px solid var(--status-warning)',
                   }}
                 >
-                  {(s.country_code || 'INTL').replace('ZAF', '')} · CROSS-BORDER
+                  {(s.country_code || 'INTL').replace('ZAF', '')} · Cross-border
                 </span>
               )}
             </div>
           ))}
         </div>
       )}
+      </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button type="button" style={{ ...toggleLink, marginTop: 4 }} onClick={switchToGps}>
           Enter GPS coordinates →
@@ -293,10 +334,10 @@ function ResolvedInfo({ text }: { text: string }) {
       {show && (
         <div style={{
           position: 'absolute', bottom: '100%', right: 0, zIndex: 20, marginBottom: 6,
-          background: '#fff', border: '1px solid var(--border-subtle)',
-          borderRadius: 4, padding: '8px 12px',
-          fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)',
-          whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--radius-control)', padding: '8px 12px',
+          fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)',
+          whiteSpace: 'nowrap',
           pointerEvents: 'none',
         }}>
           {text}

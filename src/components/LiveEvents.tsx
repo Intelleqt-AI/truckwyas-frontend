@@ -35,6 +35,8 @@ function currentUserId(): string | null {
   }
 }
 
+const BURST_WINDOW_MS = 8000;
+
 const EVENT_TITLES: Record<string, string> = {
   // Bookings / Loads
   'booking.created':    'New booking',
@@ -68,6 +70,7 @@ const EVENT_TITLES: Record<string, string> = {
 export function LiveEvents() {
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
+  const burstRef = useRef<Record<string, { id: string; count: number; at: number }>>({});
   // The user's push preferences: toasts for a category the user disabled are
   // suppressed (the event still refreshes screens via tw:live-event, and the
   // bell keeps the full history). Null until loaded — show everything.
@@ -134,13 +137,23 @@ export function LiveEvents() {
           const mutedByPrefs = !!category && !!prefs && prefs[category] === false;
           if (msg.message && !isOwnAction && !mutedByPrefs) {
             const label = EVENT_TITLES[msg.event] || 'Update';
-            const text = label === msg.message ? label : `${label} — ${msg.message}`;
+            // The message already says what happened; the label is only a fallback.
+            const single = String(msg.message || label);
             const ntype = (msg.data?.type || '').toLowerCase();
-            // event_id (uuid per event) as toastId dedupes replayed frames.
-            const opts = msg.data?.event_id ? { toastId: msg.data.event_id } : undefined;
-            if (ntype === 'success') toast.success(text, opts);
-            else if (ntype === 'alert') toast.error(text, opts);
-            else toast.info(text, opts);
+            // Bursts of the same event collapse into one counted toast instead of a stack.
+            const now = Date.now();
+            const burst = burstRef.current[msg.event];
+            if (burst && now - burst.at < BURST_WINDOW_MS && toast.isActive(burst.id)) {
+              burst.count += 1;
+              burst.at = now;
+              toast.update(burst.id, { render: `${label} (${burst.count})` });
+            } else {
+              const id = String(msg.data?.event_id || `${msg.event}-${now}`);
+              burstRef.current[msg.event] = { id, count: 1, at: now };
+              if (ntype === 'success') toast.success(single, { toastId: id });
+              else if (ntype === 'alert') toast.error(single, { toastId: id });
+              else toast.info(single, { toastId: id });
+            }
           }
         }
       };

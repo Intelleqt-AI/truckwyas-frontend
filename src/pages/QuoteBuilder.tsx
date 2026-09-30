@@ -1,10 +1,16 @@
+import "@/components/layout/section-header.css";
+import SectionHeader from "@/components/layout/SectionHeader";
 import "./quote-invoice-roles.css";
+import { localDateISO } from '@/lib/dates';
+import "./quote-builder-controls.css";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, patchData, fetchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatNumber, formatDateTime, normaliseFigures, sentenceCaseLabel } from "@/lib/formatters";
+import { DatePicker } from "@/components/ui/date-picker";
+import { resolveDieselPrice, dieselBasisNote, liveDieselHint } from "@/lib/dieselPrice";
 import { LocationInput, type LocationCoords } from "@/components/LocationInput";
 import { RouteMapView } from "@/components/RouteMapView";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -14,11 +20,12 @@ import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { AIChatPanel, type ChatMessage } from "@/components/AIChatPanel";
 import { useAuth } from "@/lib/AuthContext";
 import { isSubscriptionBlocked, subscriptionStatusDetail } from "@/lib/subscriptionStatus";
-import { MessageCircle, Map, Info, Sparkles, Maximize2, Mic, Square, X, Plus, GripVertical, ChevronDown, ChevronUp } from "lucide-react";
+import { MessageCircle, Map, Info, Sparkles, Maximize2, Mic, Square, X, Plus, GripVertical, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Loader } from "@/components/Loader";
+import QuoteSendPreview from "@/components/QuoteSendPreview";
 
 /**
  * QuoteBuilder — the redesigned single-page quote flow.
@@ -123,14 +130,14 @@ function SortableStopRow({ stop, index, inputStyle, onLocationChange, onRemove }
       opacity: removing ? 0 : (isDragging ? 0.5 : 1),
       zIndex: isDragging ? 2 : "auto",
     }}>
-      <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--accent-primary)", color: "var(--btn-action-color)", fontSize: 10, fontFamily: "var(--font-mono)", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-raised)", color: "var(--text-primary)", boxShadow: "inset 0 0 0 1px var(--border-default)", fontSize: 11, fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         {index + 1}
       </span>
       <span {...attributes} {...listeners} title="Drag to reorder"
         style={{ width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", cursor: "grab", color: "var(--text-tertiary)", flexShrink: 0, touchAction: "none" }}>
         <GripVertical size={14} />
       </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="qb-loc" style={{ flex: 1, minWidth: 0 }}>
         <LocationInput value={stop.location} onChange={onLocationChange} placeholder="Stop location" style={inputStyle} />
       </div>
       <button type="button" onClick={handleRemoveClick} title="Remove stop"
@@ -139,7 +146,7 @@ function SortableStopRow({ stop, index, inputStyle, onLocationChange, onRemove }
           width: 20, height: 20, marginTop: 6, borderRadius: "50%",
           display: "flex", alignItems: "center", justifyContent: "center", border: "none",
           background: hoverRemove ? "var(--status-danger-bg)" : "transparent",
-          color: "var(--status-danger)", cursor: "pointer", flexShrink: 0,
+          color: "var(--status-danger-text, var(--status-danger))", cursor: "pointer", flexShrink: 0,
           transition: "background 120ms ease",
         }}>
         <X size={14} />
@@ -157,11 +164,9 @@ function StopPickPill({ index, active, filled, onSelect, onRemove }: {
   const [hovered, setHovered] = useState(false);
   return (
     <div style={{ position: "relative" }} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <button onClick={onSelect}
-        style={{ height: 24, minWidth: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", padding: "0 8px", borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap",
-          border: `1px solid ${active || filled ? "var(--accent-primary)" : "var(--border-subtle)"}`,
-          background: active ? "var(--status-success-bg)" : "transparent",
-          color: active || filled ? "var(--accent-primary)" : "var(--text-tertiary)" }}>
+      <button type="button" onClick={onSelect} aria-pressed={active} aria-label={`Stop ${index + 1}`}
+        className={`tw-seg__opt${active ? " is-active" : ""}`} style={{ minWidth: 28, fontVariantNumeric: "tabular-nums" }}>
+        <span className={`qb-pin qb-pin--stop${filled ? " is-set" : ""}`} aria-hidden="true" />
         {index + 1}
       </button>
       {hovered && (
@@ -202,6 +207,25 @@ interface RouteData {
   toll_breakdown?: TollBreakdownItem[]; warnings?: string[];
   origin_resolved?: string; dest_resolved?: string;
   stops_count?: number;
+}
+
+// ---- display-only formatting (render strings only; never read back into
+// state or any calculation) ----
+/** Vehicle capacity at render: "20 t", "7,5 t" (house style, not "20.00t"). */
+const capLabel = (c: unknown) => `${formatNumber(Number(c), { maximumFractionDigits: 1 })}\u00a0t`;
+/** One-decimal figure in house style: "32,6". */
+const oneDp = (n: number) => formatNumber(n, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+/** True below a width (presentation only: picks a shorter placeholder). */
+function useNarrow(maxPx: number) {
+  const q = `(max-width: ${maxPx}px)`;
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia(q).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(q);
+    const on = () => setNarrow(mq.matches);
+    on(); mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [q]);
+  return narrow;
 }
 
 export default function QuoteBuilder() {
@@ -268,7 +292,7 @@ export default function QuoteBuilder() {
   const [tripType, setTripType] = useState<"ONE_WAY" | "ROUND_TRIP">("ONE_WAY");
   const [notes, setNotes] = useState("");
   const [validUntil, setValidUntil] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10);
+    const d = new Date(); d.setDate(d.getDate() + 7); return localDateISO(d);
   });
   // Which field the next map click fills. Auto-advances to the empty one so a
   // "click collection, click delivery" flow needs no manual toggling — but stays
@@ -313,6 +337,27 @@ export default function QuoteBuilder() {
   // AIChatPanel) instead of a one-shot toast with no way to reply to it.
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
+  // Presentation only: where the assistant's launcher button is placed. It is
+  // an ordinary icon button in the Describe bar, and moves into the price bar
+  // while that bar shows, so it never floats over a field or the bar.
+  // The slot is picked in a passive effect (same pass as the other mount
+  // effects), and the Describe bar's slot reserves its box, so the launcher
+  // arriving never moves anything.
+  const nlChatSlotRef = useRef<HTMLSpanElement | null>(null);
+  const barChatSlotRef = useRef<HTMLSpanElement | null>(null);
+  const [chatSlot, setChatSlot] = useState<HTMLSpanElement | null>(null);
+  useEffect(() => { setChatSlot(barChatSlotRef.current ?? nlChatSlotRef.current); });
+  // Presentation only (R10): the in-page map is 50px shorter while the
+  // "+ Add stop" row shows, so the map card stays close to the cost card's
+  // height instead of ending ~80px below it. Leaflet only
+  // re-measures on a window resize, so nudge it after the height changes
+  // (before the async route draw fits the view).
+  const inlineMapH = pickupCoords && deliveryCoords && stops.length === 0 ? 250 : 300;
+  useEffect(() => {
+    const r = requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
+    return () => cancelAnimationFrame(r);
+  }, [inlineMapH]);
+  const narrowNl = useNarrow(640);
   // In-progress "create this client/vehicle type" mini-conversation (see
   // backend/core/services/quote_entity_chat.py) — round-tripped every turn
   // since the endpoint is otherwise stateless. declinedEntities remembers
@@ -331,6 +376,9 @@ export default function QuoteBuilder() {
   const { data: customersRaw } = useQuery({ queryKey: ["customers"], queryFn: () => fetchData("api/v1/customers/") });
   const { data: vehicleTypesRaw } = useQuery({ queryKey: ["vehicle-types"], queryFn: () => fetchData("api/v1/vehicle-types/") });
   const { data: modelStats } = useQuery({ queryKey: ["quote-model-stats"], queryFn: () => fetchData("/api/v1/quotes/model-stats/") });
+  // Live diesel for the company's fuel zone. A failure just means no live
+  // price (the company setting is used, as before) — never blocks the quote.
+  const { data: liveFuel } = useQuery({ queryKey: ["fuel-price-current"], queryFn: () => fetchData("api/v1/fuel-prices/current/").catch(() => null), staleTime: 10 * 60 * 1000 });
 
   const customers: any[] = customersRaw?.results || customersRaw || [];
   // Available types, de-duplicated by name (the fleet can have several vehicles of one type).
@@ -354,17 +402,20 @@ export default function QuoteBuilder() {
   const winModel = modelStats?.win_model;
 
   const selectedVT = useMemo(() => vehicleTypes.find((v: any) => v.name === vehicleType), [vehicleTypes, vehicleType]);
-  // Fuel price comes from the company's own per-fuel-type defaults, keyed by
-  // the SELECTED vehicle type's fuel type — not a separately-fetched live
-  // diesel price, and not always Diesel regardless of what's actually chosen.
+  // Fuel price is keyed by the SELECTED vehicle type's fuel type, not always
+  // Diesel. Non-diesel types use the company's per-fuel-type default.
   const companyFuelPriceField = (FUEL_PRICE_FIELD_BY_TYPE as Record<string, string>)[selectedVT?.fuel_type || 'Diesel'] || 'fuel_price_per_litre';
-  const fuelPricePerL = Number(companyProfile?.[companyFuelPriceField]) || Number(companyProfile?.fuel_price_per_litre) || 21.7;
+  // Diesel: the live price for the company's zone, unless the fleet has set
+  // its own price (anything other than the untouched 23.50 model default) —
+  // see src/lib/dieselPrice.ts. Other fuel types are unchanged.
+  const isDieselPricing = companyFuelPriceField === 'fuel_price_per_litre';
+  const diesel = resolveDieselPrice({ company: companyProfile, live: liveFuel });
+  const fuelPricePerL = (isDieselPricing ? diesel.price : null) || Number(companyProfile?.[companyFuelPriceField]) || Number(companyProfile?.fuel_price_per_litre) || 21.7;
   // Diesel is gazetted per zone (coastal ports vs inland, ~R0.87/L apart), so
-  // say which one this price is. Only diesel is split that way, so the note is
-  // omitted for the other fuel types.
-  const fuelZoneNote = companyFuelPriceField === 'fuel_price_per_litre'
-    ? (companyProfile?.fuel_zone === 'COASTAL' ? ' · coastal' : ' · inland')
-    : '';
+  // say which one this price is and where it came from (live / your price).
+  // Only diesel is split that way, so the note is omitted for other fuel types.
+  const fuelZoneNote = isDieselPricing ? dieselBasisNote(diesel) : '';
+  const liveDieselHintText = isDieselPricing ? liveDieselHint(diesel) : null;
   // With no vehicle type picked there is no reference tonnage to scale fuel
   // from, and a flat figure would price a 5t load and a 30t load identically.
   // So infer the truck the load will run on from the load itself: of the types
@@ -456,7 +507,7 @@ export default function QuoteBuilder() {
       Math.pow(1 + (Number(x.vt.fuel_consumption_sensitivity_pct) || 2) / 100, t - x.cap);
     const out: string[] = [
       spare <= 0
-        ? `Rated for ${x.cap}t — an exact fit for this ${t}t load.`
+        ? `Rated for ${x.cap}t, an exact fit for this ${t}t load.`
         : `Rated for ${x.cap}t, so it carries this ${t}t load with ${spare}t to spare.`,
     ];
     if (wanted !== "general") {
@@ -464,7 +515,7 @@ export default function QuoteBuilder() {
         ? `Built for ${cargoClassLabel(wanted)}, which is what your cargo describes.`
         : x.cls === "general"
           ? `General freight. Your cargo reads as ${cargoClassLabel(wanted)}, so a purpose-built truck would suit it better if you have one.`
-          : `Built for ${cargoClassLabel(x.cls)}, not the ${cargoClassLabel(wanted)} your cargo describes — check before using it.`);
+          : `Built for ${cargoClassLabel(x.cls)}, not the ${cargoClassLabel(wanted)} your cargo describes. Check before using it.`);
     } else {
       out.push(x.cls === "general"
         ? "General freight, so it carries most cargo."
@@ -538,6 +589,10 @@ export default function QuoteBuilder() {
   // True only when a specific type was chosen, so the UI can say what a number
   // was actually based on rather than implying a truck that isn't picked.
   const hasVehicleType = !!vehicleType;
+  // Display only (R11): one spelling of a truck name across the form, the
+  // same sentence case as the suggestions and the quote detail. The stored
+  // value (vehicleType, option values) is unchanged.
+  const vtLabel = sentenceCaseLabel(vehicleType);
 
   // ---- derived costs ----
   const route = routeData?.routes?.[selectedRouteIndex] || null;
@@ -571,14 +626,14 @@ export default function QuoteBuilder() {
   const weightBlockedMessage = (() => {
     if (!vehicleCapacityTons || Number(weight) <= vehicleCapacityTons) return null;
     if (Number(weight) <= vehicleCapacityTons * OVERLOAD_TOLERANCE) {
-      return `${weight}t exceeds the ${vehicleType}'s rated capacity of ${vehicleCapacityTons}t. Even within the legal 5% tolerance this is an overload — pick a larger vehicle or reduce the weight.`;
+      return `${weight}t exceeds the ${vtLabel}'s rated capacity of ${vehicleCapacityTons}t. Even within the legal 5% tolerance this is an overload. Pick a larger vehicle or reduce the weight.`;
     }
-    return `${weight}t is well beyond the ${vehicleType}'s ${vehicleCapacityTons}t capacity. This needs an abnormal-load permit (route approval, possibly escorts) and can't be priced through a standard quote.`;
+    return `${weight}t is well beyond the ${vtLabel}'s ${vehicleCapacityTons}t capacity. This needs an abnormal-load permit (route approval, possibly escorts) and can't be priced through a standard quote.`;
   })();
   const baseRateSource = (() => {
     const v = Number(baseRatePerKm);
     if (!(v > 0)) return null;
-    if (hasVehicleType && Number(selectedVT?.base_rate) === v) return `From ${vehicleType}`;
+    if (hasVehicleType && Number(selectedVT?.base_rate) === v) return `From ${vtLabel}`;
     if (Number(companyProfile?.default_base_rate_per_km) === v) return "From company settings";
     return "Custom rate";
   })();
@@ -754,7 +809,7 @@ export default function QuoteBuilder() {
     if (aiPrediction?.reason === "model_curve_unusable")
       return {
         title: "AI pricing needs a bit more data at this price point.",
-        detail: "Priced on your company rate for now — try a nearby price and the AI should pick back up.",
+        detail: "Priced on your company rate for now. Try a nearby price and the AI should pick back up.",
       };
     switch (winBlocker) {
       case "needs_lost_quotes":
@@ -762,7 +817,7 @@ export default function QuoteBuilder() {
         // won quotes is exactly what will not help from here.
         return {
           title: "AI pricing needs some lost quotes too.",
-          detail: "A model can't learn what loses a deal until some quotes are marked lost — or left to expire.",
+          detail: "A model can't learn what loses a deal until some quotes are marked lost or left to expire.",
         };
       case "needs_won_quotes":
         return {
@@ -772,7 +827,7 @@ export default function QuoteBuilder() {
       case "awaiting_retrain":
         return {
           title: "AI pricing is training tonight.",
-          detail: "Enough quotes have closed — the model builds on the next nightly run.",
+          detail: "Enough quotes have closed. The model builds on the next nightly run.",
         };
       case "ml_unavailable":
         return {
@@ -800,12 +855,27 @@ export default function QuoteBuilder() {
     // Floored at 0: serviceCharge has no visible line item in the cost
     // breakdown, so letting it go negative would silently apply a hidden
     // discount below full cost with no on-screen explanation.
-    if (suggestedPrice && suggestedPrice > 0) { setServiceCharge(prev => Math.max(0, prev + (suggestedPrice - total))); toast.success("Applied AI-recommended price"); }
+    if (suggestedPrice && suggestedPrice > 0) { setServiceCharge(prev => Math.max(0, prev + (suggestedPrice - total))); toast.success("Applied the suggested price"); }
   };
   // serviceCharge is only ever written by applyOptimal (or the form reset) —
   // there's no other manual markup control — so it's purely the AI delta.
   // Zeroing it drops the total back to directCost, the real cost-based price.
   const cancelAiPrice = () => { setServiceCharge(0); toast.success("Reverted to actual price"); };
+
+  // ---- one price (display only: no pricing maths changes here) ----
+  // `total` is the one price that is saved and sent (buildPayload's
+  // total_amount); the price bar next to Send always shows it as "Quote price".
+  // The suggestion is an option: "Use" runs applyOptimal, which moves `total`
+  // onto it. applyOptimal never takes the price below costs (the markup floors
+  // at 0), so a suggestion under the cost floor is explained, never offered.
+  const suggestionBelowCost = suggestedPrice != null && suggestedPrice > 0 && suggestedPrice < directCost - 0.5;
+  const suggestionState: "loading" | "unavailable" | "below-cost" | "applied" | "offer" =
+    optimizing ? "loading"
+      : !analysis || !suggestedPrice || suggestedPrice <= 0 ? "unavailable"
+      : suggestionBelowCost ? "below-cost"
+      : alreadyApplied ? "applied"
+      : "offer";
+  const suggestionBasis = aiAwaitingData ? "cost + 25%" : aiAvailable ? (aiPrediction?.model_scope === "user" ? "from your quotes" : "from platform quotes") : "for this lane";
 
   // ---- natural-language input (typed or transcribed from voice) ----
   // Shared by the top quick-fill bar and the AI chat panel — both are just
@@ -851,10 +921,10 @@ export default function QuoteBuilder() {
       if (f.delivery_date) setDeliveryDate(f.delivery_date);
       if (f.valid_until) setValidUntil(f.valid_until);
       if (f.trip_type === "ONE_WAY" || f.trip_type === "ROUND_TRIP") setTripType(f.trip_type);
-      setChatMessages(prev => [...prev, { role: "assistant", text: res?.reply || "Got it — updated the form.", link: res?.link || undefined }]);
+      setChatMessages(prev => [...prev, { role: "assistant", text: res?.reply || "Got it. I updated the form.", link: res?.link || undefined }]);
       if (!textOverride) setNlText("");
     } catch {
-      setChatMessages(prev => [...prev, { role: "assistant", text: "Sorry, I couldn't read that — try rephrasing or use the fields directly." }]);
+      setChatMessages(prev => [...prev, { role: "assistant", text: "Sorry, I couldn't read that. Try rephrasing or use the fields directly." }]);
     }
     finally { setNlBusy(false); }
   };
@@ -940,7 +1010,7 @@ export default function QuoteBuilder() {
     setRouteData(null); setSelectedRouteIndex(0); setRouteBlockedMessage(null);
     setAnalysis(null); setGuard(null); setBenchmark(null);
     setChatMessages([]); setChatOpen(false); setPendingEntity(null); setDeclinedEntities([]);
-    { const d = new Date(); d.setDate(d.getDate() + 7); setValidUntil(d.toISOString().slice(0, 10)); }
+    { const d = new Date(); d.setDate(d.getDate() + 7); setValidUntil(localDateISO(d)); }
     if (isEditing) navigate("/bookings/quotes/new", { replace: true });
     toast.success("Started a new quote");
   };
@@ -1018,12 +1088,27 @@ export default function QuoteBuilder() {
   });
 
   // ---- explicit save / send ----
+  // Why the quote can't be saved or sent yet (null when it can). Shared by
+  // save() and the Send button, which checks before opening the preview.
+  const saveBlocker = (): string | null => {
+    if (!customerId) return "Pick a client first";
+    if (!ready) return "Add collection, delivery and weight";
+    if (routeBlockedMessage) return routeBlockedMessage;
+    if (weightBlockedMessage) return weightBlockedMessage;
+    if (isDemoQuotaExceeded) return "You've used this demo session's one free quote. Log out and log back in (or click \"View Demo\" again) to start a fresh session.";
+    return null;
+  };
+  // Send emails the client: it opens a preview first and sends only on confirm.
+  const [sendPreviewOpen, setSendPreviewOpen] = useState(false);
+  const openSendPreview = () => {
+    const blocker = saveBlocker();
+    if (blocker) { toast.error(blocker); return; }
+    setSendPreviewOpen(true);
+  };
+
   const save = async (send: boolean) => {
-    if (!customerId) { toast.error("Pick a client first"); return; }
-    if (!ready) { toast.error("Add collection, delivery and weight"); return; }
-    if (routeBlockedMessage) { toast.error(routeBlockedMessage); return; }
-    if (weightBlockedMessage) { toast.error(weightBlockedMessage); return; }
-    if (isDemoQuotaExceeded) { toast.error("You've used this demo session's one free quote. Log out and log back in (or click \"View Demo\" again) to start a fresh session."); return; }
+    const blocker = saveBlocker();
+    if (blocker) { toast.error(blocker); return; }
     setSaving(true);
     try {
       let quoteId = savedQuoteId || (isEditing ? Number(editId) : null);
@@ -1031,7 +1116,7 @@ export default function QuoteBuilder() {
       else { const res = await postData({ url: "api/v1/quotes/", data: buildPayload(send ? "SENT" : "DRAFT") }); quoteId = res?.id; }
       if (send && quoteId) {
         const r = await postData({ url: `api/v1/quotes/${quoteId}/send_to_customer/`, data: {} }).catch(() => null);
-        toast.success(r?.email_sent ? "Quote sent to client" : "Quote saved — email pending");
+        toast.success(r?.email_sent ? "Quote sent to client" : "Quote saved. Email pending.");
       } else toast.success("Quote saved as draft");
       localStorage.removeItem(DRAFT_KEY);
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
@@ -1057,9 +1142,9 @@ export default function QuoteBuilder() {
   // ---- map panel (shared between the inline card and the expanded modal) ----
   const renderMapPanel = (height: number, expandButton?: React.ReactNode, closeButton?: React.ReactNode) => (
     <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)" }}>
-        <span style={{ fontSize: 12, color: "var(--text-tertiary)", display: "flex", alignItems: "center", gap: 6 }}>
-          <Map size={13} />
+      <div className="qb-maphead">
+        <span className="qb-maphead__hint">
+          <Map size={13} aria-hidden="true" style={{ flexShrink: 0 }} />
           {(() => {
             // pickMode is "pickup", "delivery", or a stop's id — resolve
             // whichever one is currently selected to its display label and
@@ -1073,37 +1158,33 @@ export default function QuoteBuilder() {
             const activeFilled = pickMode === "pickup" ? !!pickupCoords
               : pickMode === "delivery" ? !!deliveryCoords
               : !!activeStop?.coords;
+            // Same gesture on both: Leaflet reads a double-tap as its dblclick.
+            // Only the verb changes, by input type (CSS, no logic).
+            const verb = <><span className="qb-hint-mouse">Double-click</span><span className="qb-hint-touch">Double-tap</span></>;
             return activeFilled || !activeLabel
-              ? "Double-click the map to move a pin, or search above"
-              : <>Double-click the map to set <b style={{ color: "var(--text-secondary)" }}>{activeLabel}</b></>;
+              ? <span>{verb} the map to move a pin, or search above</span>
+              : <span>{verb} the map to set <b style={{ fontWeight: 500, color: "var(--text-primary)" }}>{activeLabel}</b></span>;
           })()}
         </span>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <button onClick={() => setPickMode("pickup")}
-            style={{ height: 24, display: "inline-flex", alignItems: "center", fontSize: 12, fontFamily: "var(--font-sans)", padding: "0 8px", borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap",
-              border: `1px solid ${pickMode === "pickup" || pickupCoords ? "#16a34a" : "var(--border-subtle)"}`,
-              background: pickMode === "pickup" ? "color-mix(in srgb, #16a34a 12%, transparent)" : "transparent",
-              color: pickMode === "pickup" || pickupCoords ? "#16a34a" : "var(--text-tertiary)" }}>
+        <div className="qb-maphead__tools">
+          <div className="tw-seg tw-seg--sm qb-picks" role="group" aria-label="Which point the map sets">
+          <button type="button" onClick={() => setPickMode("pickup")} aria-pressed={pickMode === "pickup"}
+            className={`tw-seg__opt${pickMode === "pickup" ? " is-active" : ""}`}>
+            <span className={`qb-pin qb-pin--from${pickupCoords ? " is-set" : ""}`} aria-hidden="true" />
             Collection
           </button>
           {stops.map((stop, i) => (
             <StopPickPill key={stop.id} index={i} active={pickMode === stop.id} filled={!!stop.coords}
               onSelect={() => setPickMode(stop.id)} onRemove={() => removeStop(stop.id)} />
           ))}
-          {pickupCoords && deliveryCoords && (
-            <button type="button" onClick={addStop} title="Add stop"
-              style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, borderRadius: 4, cursor: "pointer", flexShrink: 0,
-                border: "1px solid var(--border-subtle)", background: "transparent", color: "var(--accent-primary)" }}>
-              <Plus size={13} />
-            </button>
-          )}
-          <button onClick={() => setPickMode("delivery")}
-            style={{ height: 24, display: "inline-flex", alignItems: "center", fontSize: 12, fontFamily: "var(--font-sans)", padding: "0 8px", borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap",
-              border: `1px solid ${pickMode === "delivery" || deliveryCoords ? "#dc2626" : "var(--border-subtle)"}`,
-              background: pickMode === "delivery" ? "color-mix(in srgb, #dc2626 12%, transparent)" : "transparent",
-              color: pickMode === "delivery" || deliveryCoords ? "#dc2626" : "var(--text-tertiary)" }}>
+          {/* No bare "+" between the two targets: "+ Add stop" under the
+              map is the one way to add a stop (R10). */}
+          <button type="button" onClick={() => setPickMode("delivery")} aria-pressed={pickMode === "delivery"}
+            className={`tw-seg__opt${pickMode === "delivery" ? " is-active" : ""}`}>
+            <span className={`qb-pin qb-pin--to${deliveryCoords ? " is-set" : ""}`} aria-hidden="true" />
             Delivery
           </button>
+          </div>
           {expandButton}
           {closeButton}
         </div>
@@ -1123,9 +1204,8 @@ export default function QuoteBuilder() {
       {pickupCoords && deliveryCoords && (
         <div style={{ padding: "10px", borderTop: "1px solid var(--border-subtle)" }}>
           {stops.length === 0 ? (
-            <button type="button" onClick={addStop}
-              style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", padding: 0, color: "var(--accent-primary)", cursor: "pointer", fontSize: 12, fontWeight: 500 }}>
-              <Plus size={12} /> Add stop
+            <button type="button" onClick={addStop} className="qb-textbtn">
+              <Plus size={12} aria-hidden="true" /> Add stop
             </button>
           ) : (
             <div>
@@ -1133,7 +1213,7 @@ export default function QuoteBuilder() {
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer", marginBottom: stopsExpanded ? 8 : 0 }}>
                 <span style={{ ...labelS, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {stops.length} stop{stops.length > 1 ? "s" : ""}
-                  {!stopsExpanded && ` — ${stops.map(s => s.location || "…").join(" → ")}`}
+                  {!stopsExpanded && `: ${stops.map(s => s.location || "…").join(" → ")}`}
                 </span>
                 {stopsExpanded ? <ChevronUp size={14} color="var(--text-tertiary)" /> : <ChevronDown size={14} color="var(--text-tertiary)" />}
               </div>
@@ -1143,8 +1223,8 @@ export default function QuoteBuilder() {
                   <div style={{ position: "absolute", left: 9, top: 10, bottom: 10, width: 1, background: "var(--border-subtle)" }} />
 
                   <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-surface)", border: "2px solid #16a34a", flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 400 }}>{pickup || "Collection"}</span>
+                    <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-surface)", border: "2px solid var(--accent-primary)", flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", fontWeight: 400 }}>{pickup || "Collection"}</span>
                   </div>
 
                   <DndContext sensors={stopSensors} onDragEnd={handleStopDragEnd}>
@@ -1154,7 +1234,7 @@ export default function QuoteBuilder() {
                           key={stop.id}
                           stop={stop}
                           index={i}
-                          inputStyle={{ ...inputS, fontFamily: "var(--font-sans)", padding: "7px 10px" }}
+                          inputStyle={{ ...inputS, fontFamily: "var(--font-sans)", padding: "7px 10px", minHeight: 0 }}
                           onLocationChange={(v, c) => updateStop(stop.id, { location: v, coords: c || null })}
                           onRemove={() => removeStop(stop.id)}
                         />
@@ -1162,13 +1242,13 @@ export default function QuoteBuilder() {
                     </SortableContext>
                   </DndContext>
 
-                  <button type="button" onClick={addStop} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", padding: "0 0 10px 28px", color: "var(--accent-primary)", cursor: "pointer", fontSize: 12, fontWeight: 500 }}>
-                    <Plus size={12} /> Add stop
+                  <button type="button" onClick={addStop} className="qb-textbtn" style={{ position: "relative", margin: "0 0 10px 28px" }}>
+                    <Plus size={12} aria-hidden="true" /> Add stop
                   </button>
 
                   <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-surface)", border: "2px solid #dc2626", flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 400 }}>{delivery || "Delivery"}</span>
+                    <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-surface)", border: "2px solid var(--text-primary)", flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", fontWeight: 400 }}>{delivery || "Delivery"}</span>
                   </div>
                 </div>
               )}
@@ -1182,14 +1262,14 @@ export default function QuoteBuilder() {
             <Tooltip key={i}>
               <TooltipTrigger asChild>
                 <button
+                  type="button"
                   onClick={() => setSelectedRouteIndex(i)}
-                  style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 13, lineHeight: "20px", padding: "5px 9px", borderRadius: 4, cursor: "pointer",
-                    border: `1px solid ${i === selectedRouteIndex ? "var(--accent-primary)" : "var(--border-subtle)"}`,
-                    background: i === selectedRouteIndex ? "var(--status-success-bg)" : "var(--bg-surface)", color: i === selectedRouteIndex ? "var(--accent-primary)" : "var(--text-secondary)" }}>
+                  aria-pressed={i === selectedRouteIndex}
+                  className="qb-routeopt">
                   {r.label || r.summary || `Route ${i + 1}`} · {Math.round(r.distance_km)} km
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top" style={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", fontSize: 12, padding: "10px 12px", maxWidth: 220 }}>
+              <TooltipContent side="top" style={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", fontSize: 13, lineHeight: "20px", padding: "10px 12px", maxWidth: 220, borderRadius: 8 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "3px 12px" }}>
                   <span style={{ color: "var(--text-tertiary)" }}>Distance</span><span>{Math.round(r.distance_km)} km</span>
                   <span style={{ color: "var(--text-tertiary)" }}>Duration</span><span>{formatDuration(r.duration_minutes ?? r.duration_min)}</span>
@@ -1210,9 +1290,9 @@ export default function QuoteBuilder() {
           only one option rather than silently showing nothing. */}
       {routeData?.routes?.length === 1 && (routeData.stops_count ?? stops.length) > 0 && (
         <div style={{ padding: 10, borderTop: "1px solid var(--border-subtle)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--status-success-bg)", border: "1px solid var(--accent-primary)", borderRadius: 4 }}>
-            <Map size={13} color="var(--accent-primary)" />
-            <span style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 13, lineHeight: "20px", fontWeight: 600, color: "var(--accent-primary)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--bg-raised)", borderRadius: "var(--radius-nested, 8px)" }}>
+            <Map size={13} color="var(--text-tertiary)" aria-hidden="true" />
+            <span style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 13, lineHeight: "20px", fontWeight: 500, color: "var(--text-primary)" }}>
               Route via {routeData.stops_count ?? stops.length} stop{(routeData.stops_count ?? stops.length) > 1 ? "s" : ""} · {Math.round(routeData.routes[0].distance_km)} km · {formatDuration(routeData.routes[0].duration_minutes)}
             </span>
           </div>
@@ -1225,60 +1305,71 @@ export default function QuoteBuilder() {
   );
 
   // ---- styles ----
-  const cardS: React.CSSProperties = { background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, boxShadow: "var(--shadow-card)" };
+  // Principles v2: 1px border, no shadow, 12px card radius.
+  const cardS: React.CSSProperties = { background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-card, 12px)", boxShadow: "none" };
   // Brand label role: 13/20/500 sans, sentence case (label strings are
   // authored in sentence case; no uppercase transform).
-  const labelS: React.CSSProperties = { fontSize: 13, lineHeight: "20px", fontWeight: 500, fontFamily: "var(--font-sans)", color: "var(--text-tertiary)", letterSpacing: "normal", textTransform: "none" };
+  const labelS: React.CSSProperties = { fontSize: 13, lineHeight: "20px", fontWeight: 500, fontFamily: "var(--font-sans)", color: "var(--text-secondary)", letterSpacing: "normal", textTransform: "none" };
+  // Field label row: label left, an optional quiet "New" text button right.
+  const fieldLabelS: React.CSSProperties = { ...labelS, marginBottom: 6, minHeight: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 };
   // Marks a field required for the cost calculation to run (see `ready`).
   const Req = () => <span style={{ display: "inline-block", width: 4, height: 4, borderRadius: "50%", background: "var(--status-danger)", marginLeft: 5, verticalAlign: "middle" }} />;
-  const inputS: React.CSSProperties = { background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: 6, padding: "9px 11px", color: "var(--text-primary)", fontSize: 14, lineHeight: "20px", width: "100%" };
-  const dot = (c: string): React.CSSProperties => ({ width: 7, height: 7, borderRadius: 2, background: c, flexShrink: 0 });
+  const inputS: React.CSSProperties = { background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-control, 8px)", padding: "9px 11px", color: "var(--text-primary)", fontSize: 14, lineHeight: "20px", fontFamily: "var(--font-sans)", width: "100%", minHeight: "var(--field-h, 40px)", boxSizing: "border-box" };
 
   // All four AI fields (recommended price, margin, win probability, sweet-spot)
   // come from the same analyze response — show them together only once it has
   // landed; until then every field renders the same spinner.
-  const aiLoading = optimizing || !analysis;
+  const aiLoading = optimizing;
+  const aiUnavailable = (
+    <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 10 }}>Not available right now</div>
+  );
   const aiSpinner = (
     <div style={{ marginTop: 10 }}>
       <Loader size={18} />
     </div>
   );
 
+  // Same condition the price bar renders on (display only).
+  const showPriceBar = !billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0;
+
   return (
-    <div className="qi-form" style={{ maxWidth: 1080, margin: "0 auto" }}>
+    <div className={`qi-form qb-controls${showPriceBar ? " qb-has-pricebar" : ""}`}>
       {/* header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
-        <div>
-          <div style={labelS}>Operations</div>
-          <h1 style={{ fontSize: 22, lineHeight: "28px", fontWeight: 600, color: "var(--text-primary)", margin: "4px 0 0" }}>{isEditing ? "Edit quote" : "New quote"}</h1>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", display: "flex", alignItems: "center", gap: 6 }}>
-            {saving ? "Saving…" : lastSavedAt ? `Saved to browser ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Auto-saves to this browser as you work"}
-            <span style={dot(saving ? "var(--status-warning)" : lastSavedAt ? "var(--status-success)" : "var(--text-tertiary)")} />
-          </div>
-          <button onClick={startNew} title="Clear every field and start a fresh quote (this one stays saved)"
-            style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "transparent", color: "var(--accent-primary)", border: "1px solid var(--accent-primary)", borderRadius: 6, padding: "9px 12px", cursor: "pointer" }}>
+      {/* Same page head as every page (layout only): H1 on the title row,
+          one grey line under it, actions on the right. */}
+      {/* The shared page head: breadcrumb back to Quotes on the subtitle
+          line, with the autosave state as a quiet status after it (never
+          over the title). One head action; Send lives in the price bar. */}
+      <SectionHeader
+        title={isEditing ? "Edit quote" : "New quote"}
+        back={isEditing ? { to: `/bookings/quotes/${editId}`, label: "Quote" } : { to: "/bookings/quotes", label: "Quotes" }}
+        description={
+          <span className="qb-savestate" aria-live="polite">
+            {saving ? "Saving…" : lastSavedAt ? `Saved in this browser at ${formatDateTime(lastSavedAt).split(", ")[1]}` : "Auto-saves in this browser"}
+          </span>
+        }
+        actions={
+          <button type="button" className="tw-btn" onClick={startNew} title="Clear every field and start a fresh quote (this one stays saved)">
             Clear &amp; new quote
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Resume-unsaved banner — opt-in, only before the first DB save */}
       {resumable && !isEditing && (
-        <div style={{ ...cardS, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 14px", marginBottom: 12, borderColor: "var(--accent-primary)" }}>
-          <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+        <div className="qb-resume" style={{ ...cardS, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, padding: "12px 16px", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", minWidth: 0 }}>
             You have an unsaved quote from earlier{resumable.pickup ? ` (${resumable.pickup}${resumable.delivery ? ` → ${resumable.delivery}` : ""})` : ""}.
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={applyResumable} style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 6, padding: "9px 12px", cursor: "pointer" }}>Resume</button>
-            <button onClick={discardResumable} style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "transparent", color: "var(--text-tertiary)", border: "1px solid var(--border-subtle)", borderRadius: 6, padding: "9px 12px", cursor: "pointer" }}>Discard</button>
+            <button type="button" className="tw-btn tw-btn--ghost" onClick={discardResumable}>Discard</button>
+            <button type="button" className="tw-btn tw-btn--primary" onClick={applyResumable}>Resume</button>
           </div>
         </div>
       )}
 
       {/* NL input — typed or voice */}
-      <div style={{ ...cardS, display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 14, background: "var(--bg-surface-hover)", minHeight: 44 }}>
+      <div className="qb-nl" style={{ ...cardS, border: "1px solid var(--border-control)", display: "flex", alignItems: "center", gap: 8, padding: "8px 8px 8px 14px", marginBottom: 16, minHeight: 44 }}>
         {voice.recording ? (
           <>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--status-danger)", flexShrink: 0, animation: "pulse-dot 1s infinite" }} />
@@ -1287,7 +1378,7 @@ export default function QuoteBuilder() {
                 <div key={i} style={{ width: 3, height: h, borderRadius: 2, background: "var(--accent-primary)" }} />
               ))}
             </div>
-            <button onClick={voice.stop} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "var(--status-danger)", color: "#fff", border: "none", borderRadius: 6, padding: "9px 14px", cursor: "pointer" }}>
+            <button onClick={voice.stop} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "var(--status-danger)", color: "#fff", border: "none", borderRadius: "var(--radius-control, 8px)", padding: "9px 14px", cursor: "pointer" }}>
               <Square size={12} fill="#fff" /> Stop
             </button>
           </>
@@ -1300,37 +1391,44 @@ export default function QuoteBuilder() {
           </div>
         ) : (
           <>
-            <MessageCircle size={16} color="var(--text-tertiary)" />
+            <MessageCircle size={16} color="var(--text-tertiary)" aria-hidden="true" className="qb-nl__icon" style={{ flexShrink: 0 }} />
             <input value={nlText} onChange={e => setNlText(e.target.value)} onKeyDown={e => e.key === "Enter" && submitNL()}
-              placeholder="Describe it — “20t steel, JHB to Cape Town, flatbed, Tuesday”" style={{ ...inputS, border: "none", background: "transparent" }} />
+              placeholder={narrowNl ? "Describe the load" : "Describe it, e.g. “20t steel, JHB to Cape Town, flatbed, Tuesday”"} aria-label="Describe the load" style={{ ...inputS, border: "none", background: "transparent", paddingLeft: 4, minWidth: 0 }} />
             <button type="button" onClick={voice.start} title="Record voice" aria-label="Record voice"
-              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface)", color: "var(--accent-primary)", cursor: "pointer", flexShrink: 0, padding: 0 }}>
+              className="tw-btn qb-nl__mic">
               <Mic size={16} />
             </button>
-            <button onClick={() => submitNL()} disabled={nlBusy || !nlText.trim()} style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 6, padding: "9px 14px", cursor: "pointer", opacity: nlText.trim() ? 1 : 0.5 }}>{nlBusy ? "Reading…" : "Fill"}</button>
+            <button type="button" onClick={() => submitNL()} disabled={nlBusy || !nlText.trim()} className="tw-btn qb-nl__fill">{nlBusy ? "Reading…" : "Fill"}</button>
           </>
         )}
+        {/* Assistant launcher slot (filled by AIChatPanel via a portal). */}
+        {!showPriceBar && <span ref={nlChatSlotRef} className="qb-chatslot qb-chatslot--nl" />}
       </div>
 
       {/* 1 — inputs */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+      {/* One 4-column grid for every field row (inputs, details, cargo/trip),
+          same template and gap, so field edges line up row to row. */}
+      <div className="qb-grid qb-grid--inputs" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16, marginBottom: 16 }}>
         <div>
-          <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Client<Req /></span>{!authUser?.is_demo && <span onClick={() => navigate("/customers")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span>}</div>
-          <select value={customerId} onChange={e => setCustomerId(e.target.value)} style={inputS}>
-            <option value="">Select client…</option>
-            {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <div style={fieldLabelS}><span>Client<Req /></span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New client" onClick={() => navigate("/customers")}><Plus size={12} aria-hidden="true" />New</button>}</div>
+          <div className="qb-select">
+            <select value={customerId} onChange={e => setCustomerId(e.target.value)} style={inputS} data-empty={customerId ? undefined : ""} aria-label="Client">
+              <option value="">Select client…</option>
+              {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <ChevronDown size={14} className="qb-select__chev" aria-hidden="true" />
+          </div>
         </div>
         <div>
-          <div style={{ ...labelS, marginBottom: 5 }}>Weight (t)<Req /></div>
-          <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} />
+          <div style={fieldLabelS}><span>Weight (t)<Req /></span></div>
+          <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} aria-label="Weight in tonnes" />
         </div>
-        <div>
-          <div style={{ ...labelS, marginBottom: 5 }}>Collection<Req /></div>
+        <div className="qb-loc">
+          <div style={fieldLabelS}><span>Collection<Req /></span></div>
           <LocationInput value={pickup} onChange={(v, c) => { setPickup(v); setPickupCoords(c || null); }} placeholder="City / address" style={inputS} />
         </div>
-        <div>
-          <div style={{ ...labelS, marginBottom: 5 }}>Delivery<Req /></div>
+        <div className="qb-loc">
+          <div style={fieldLabelS}><span>Delivery<Req /></span></div>
           <LocationInput value={delivery} onChange={(v, c) => { setDelivery(v); setDeliveryCoords(c || null); }} placeholder="City / address" style={inputS} />
         </div>
       </div>
@@ -1344,20 +1442,33 @@ export default function QuoteBuilder() {
         <div style={{ ...cardS, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", marginBottom: 12, borderColor: "var(--status-warning)", background: "var(--status-warning-bg)" }}>
           <Info size={14} color="var(--status-warning)" style={{ flexShrink: 0 }} />
           <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-            This location is outside South Africa, but your company isn't set up for cross-border routes (Settings → Company Details). This quote will be refused once calculated — pick a domestic location or ask an admin to enable cross-border routes.
+            This location is outside South Africa, but your company isn't set up for cross-border routes (Settings → Company Details). This quote will be refused once calculated. Pick a domestic location or ask an admin to enable cross-border routes.
           </span>
         </div>
       )}
 
       {/* details */}
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-          <div>
-            <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Vehicle type</span>{!authUser?.is_demo && <span onClick={() => navigate("/fleet/vehicles")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span>}</div>
-            <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS}>
+      <div style={{ marginBottom: 24 }}>
+        <div className="qb-grid qb-grid--details" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16 }}>
+          {/* The app's shared DatePicker: it hands back the same "yyyy-MM-dd"
+              string the native date input did, straight to the same setter. */}
+          {([
+            ["qb-date-pickup", "Pickup date", pickupDate, setPickupDate],
+            ["qb-date-delivery", "Delivery date", deliveryDate, setDeliveryDate],
+            ["qb-date-valid", "Valid until", validUntil, setValidUntil],
+          ] as const).map(([id, label, value, set]) => (
+            <div key={id} role="group" aria-labelledby={id} className="qb-date">
+              <div style={fieldLabelS}><span id={id}>{label}</span></div>
+              <DatePicker value={value} onChange={set} style={{ minHeight: "var(--field-h, 40px)", boxSizing: "border-box" }} />
+            </div>
+          ))}
+          <div className="qb-vehicle">
+            <div style={fieldLabelS}><span>Vehicle type</span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New vehicle type" onClick={() => navigate("/fleet/vehicles")}><Plus size={12} aria-hidden="true" />New</button>}</div>
+            <div className="qb-select">
+            <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS} aria-label="Vehicle type">
               <option value="">Not decided yet</option>
               {vehicleTypes.map((v: any) => (
-                <option key={v.id || v.name} value={v.name}>{v.name}{Number(v.capacity) > 0 ? ` (${v.capacity}t)` : ""}</option>
+                <option key={v.id || v.name} value={v.name}>{sentenceCaseLabel(v.name)}{Number(v.capacity) > 0 ? ` (${capLabel(v.capacity)})` : ""}</option>
               ))}
               {/* The options above only cover types with a vehicle free today.
                   A suggested or already-saved type outside that set still has to
@@ -1367,44 +1478,47 @@ export default function QuoteBuilder() {
                 .filter((n, i, a) => a.indexOf(n) === i)
                 .map((n) => {
                   const v = allVehicleTypes.find((x: any) => x.name === n);
-                  return <option key={n} value={n}>{n}{Number(v?.capacity) > 0 ? ` (${v.capacity}t)` : ""}</option>;
+                  return <option key={n} value={n}>{sentenceCaseLabel(n)}{Number(v?.capacity) > 0 ? ` (${capLabel(v.capacity)})` : ""}</option>;
                 })}
             </select>
+            <ChevronDown size={14} className="qb-select__chev" aria-hidden="true" />
+            </div>
           </div>
-          <div><div style={{ ...labelS, marginBottom: 5 }}>Pickup date</div><input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)} style={inputS} /></div>
-          <div><div style={{ ...labelS, marginBottom: 5 }}>Delivery date</div><input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} style={inputS} /></div>
-          <div><div style={{ ...labelS, marginBottom: 5 }}>Valid until</div><input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} style={inputS} /></div>
-          {/* Spans the grid: sits directly under the Vehicle type field but
-              gets the full form width, so the options stay on one line. */}
-          <div style={{ gridColumn: "1 / -1" }}>
+          {/* Spans the grid on the row right under Vehicle type (the last
+              field of the row above), aligned to its end, so the options stay
+              on one line. Markup order = visual order at every width (R11):
+              dates, Vehicle type, these suggestions, then Cargo and Trip, so
+              Tab never jumps back up a row. Rendered only when there is
+              something to show, so an empty row adds no second grid gap. */}
+          {suggestions.length > 0 && <div className="qb-suggest-row" style={{ gridColumn: "1 / -1", marginTop: -8 }}>
           {/* Offered, not applied. Accepting one is a real selection, so the
               rate, the capacity check and the lane benchmark all switch on
               together — the same as picking it from the list by hand. */}
           {suggestions.length > 0 && (
-            <div style={{ marginTop: 3, display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px 14px", fontSize: 13, lineHeight: 1.6 }}>
+            <div className="qb-suggest" style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px 16px", fontSize: 13, lineHeight: "20px" }}>
               {/* Label sits on the same line as the options: it's a lead-in, not
                   a field heading, so it keeps the form's spacing tight. */}
-              <span style={{ ...labelS, textTransform: "none", letterSpacing: "normal" }}>
-                Suggested for this {weight}t load:
+              <span style={labelS}>
+                Suggested for this {capLabel(weight)} load:
               </span>
               {suggestions.map((x) => (
                 <span key={x.vt.id || x.vt.name} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                   <button
                     type="button"
                     onClick={() => applyVehicleType(x.vt.name)}
-                    style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "var(--accent-primary)", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2, textAlign: "left" }}
+                    className="qb-textbtn qb-textbtn--pick"
                   >
-                    {x.vt.name} ({x.cap}t)
+                    {/* Display only: sentence case, as on the quote detail. */}
+                    {sentenceCaseLabel(x.vt.name)} ({capLabel(x.cap)})
                   </button>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button type="button" title={`Why ${x.vt.name} suits this load`}
-                        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>
-                        <Info size={9} />
+                      <button type="button" title={`Why ${sentenceCaseLabel(x.vt.name)} suits this load`} aria-label={`Why ${sentenceCaseLabel(x.vt.name)} suits this load`} className="qb-info">
+                        <Info size={14} aria-hidden="true" />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" style={{ width: 270, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
-                      <div style={{ ...labelS, marginBottom: 8 }}>{x.vt.name}</div>
+                    <PopoverContent align="start" style={{ width: 270, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
+                      <div style={{ ...labelS, marginBottom: 8 }}>{sentenceCaseLabel(x.vt.name)}</div>
                       {suggestionReasons(x).map((reason, ri) => (
                         <div key={ri} style={{ display: "flex", gap: 7, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 6 }}>
                           <span style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>&middot;</span>
@@ -1417,35 +1531,37 @@ export default function QuoteBuilder() {
               ))}
             </div>
           )}
-          </div>
-          <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Cargo</div><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} /></div>
-          <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Trip</div>
-            <div style={{ display: "flex", gap: 6 }}>
-              {(["ONE_WAY", "ROUND_TRIP"] as const).map(t => <button key={t} onClick={() => setTripType(t)} style={{ ...inputS, width: "auto", flex: 1, cursor: "pointer", background: tripType === t ? "var(--accent-primary)" : "var(--input-bg)", color: tripType === t ? "var(--btn-action-color)" : "var(--text-secondary)", fontWeight: tripType === t ? 500 : 400 }}>{t === "ONE_WAY" ? "One way" : "Round"}</button>)}
+          </div>}
+          <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span>Cargo</span></div><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} aria-label="Cargo" /></div>
+          <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span id="qb-trip-label">Trip</span></div>
+            {/* The shared segmented control: neutral track, raised active option. */}
+            <div className="tw-seg tw-seg--block qb-trip" role="group" aria-labelledby="qb-trip-label">
+              {(["ONE_WAY", "ROUND_TRIP"] as const).map(t => <button key={t} type="button" onClick={() => setTripType(t)} aria-pressed={tripType === t} className={`tw-seg__opt${tripType === t ? " is-active" : ""}`}>{t === "ONE_WAY" ? "One way" : "Round"}</button>)}
             </div>
           </div>
         </div>
       </div>
 
       {/* 2 — map + cost */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 14, marginBottom: 14 }}>
+      {/* Top-aligned: each card is as tall as its content (no stretched card). */}
+      <div className="qb-grid qb-grid--mapcost" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", alignItems: "start", gap: 16, marginBottom: 16 }}>
           <div style={{ ...cardS, overflow: "hidden" }}>
-            {renderMapPanel(300, (
+            {/* The "+ Add stop" row (43px) joins the card once both points
+                are set; the map gives up that height (and a little more),
+                so the card ends within 48px of the checklist cost card
+                instead of ~80px below it (R10). */}
+            {renderMapPanel(inlineMapH, (
               <Dialog>
                 <DialogTrigger asChild>
-                  <button type="button" title="Expand map"
-                    style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: 4, cursor: "pointer",
-                      border: "1px solid var(--border-subtle)", background: "transparent", color: "var(--text-tertiary)" }}>
-                    <Maximize2 size={12} />
+                  <button type="button" title="Expand map" aria-label="Expand map" className="qb-iconbtn">
+                    <Maximize2 size={14} aria-hidden="true" />
                   </button>
                 </DialogTrigger>
-                <DialogContent style={{ ...cardS, borderRadius: 12, width: "min(1400px, 95vw)", padding: 0 }} hideClose>
+                <DialogContent style={{ ...cardS, borderRadius: "var(--radius-dialog, 16px)", width: "min(1400px, 95vw)", padding: 0 }} hideClose>
                   {renderMapPanel(Math.round(Math.min(window.innerHeight * 0.78, 780)), undefined, (
                     <DialogClose asChild>
-                      <button type="button" title="Close"
-                        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: 4, cursor: "pointer",
-                          border: "1px solid var(--border-subtle)", background: "var(--bg-surface)", color: "var(--text-secondary)" }}>
-                        <X size={13} />
+                      <button type="button" title="Close" aria-label="Close map" className="qb-iconbtn">
+                        <X size={14} aria-hidden="true" />
                       </button>
                     </DialogClose>
                   ))}
@@ -1453,14 +1569,17 @@ export default function QuoteBuilder() {
               </Dialog>
             ))}
           </div>
-          <div style={{ ...cardS, padding: "14px 16px" }}>
-            <h2 style={{ margin: "0 0 8px", fontSize: 16, lineHeight: "24px", fontWeight: 600, fontFamily: "var(--font-sans)", letterSpacing: "normal", color: "var(--text-primary)" }}>Cost breakdown · {vehicleType || "no truck picked"}</h2>
+          <section className="qb-cost" aria-labelledby="qb-cost-title" style={{ ...cardS, padding: "var(--card-pad, 20px)" }}>
+            <div className="qb-cost__head">
+              <h2 id="qb-cost-title" className="qb-cost__title">Cost breakdown</h2>
+              <p className="qb-cost__sub">{vehicleType ? `On your ${vtLabel} rates` : "No truck picked, so company defaults"}</p>
+            </div>
             {billingBlocked && (
               <div style={{
-                padding: 14, marginBottom: ready ? 14 : 0, borderRadius: 6,
+                padding: 14, marginBottom: ready ? 14 : 0, borderRadius: "var(--radius-nested, 8px)",
                 background: "var(--status-danger-bg)", border: "1px solid var(--status-danger)",
               }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--status-danger)", marginBottom: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--status-danger-text, var(--status-danger))", marginBottom: 4 }}>
                   Quoting is blocked
                 </div>
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", marginBottom: 10 }}>
@@ -1474,27 +1593,48 @@ export default function QuoteBuilder() {
                 </button>
               </div>
             )}
-            {!billingBlocked && !ready && (
-              <div style={{ padding: "30px 4px", textAlign: "center", color: "var(--text-tertiary)" }}>
-                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)" }}>Add a client, collection, delivery and weight</div>
-                <div style={{ fontSize: 13, lineHeight: "20px", marginTop: 6 }}>Costs and the AI quote appear here automatically.</div>
-              </div>
-            )}
+            {!billingBlocked && !ready && (() => {
+              // Empty state: what pricing still needs, read from the same four
+              // inputs `ready` checks (display only).
+              const clientName = customers.find((c: any) => String(c.id) === String(customerId))?.name;
+              // Third item: text typed but no suggestion picked yet (pricing
+              // waits for a picked match, so the row asks for one).
+              const needs: [string, string | null, string?][] = [
+                ["Client", customerId ? (clientName || "Chosen") : null],
+                ["Collection", pickup && pickupCoords ? pickup : null, pickup],
+                ["Delivery", delivery && deliveryCoords ? delivery : null, delivery],
+                ["Weight", Number(weight) > 0 ? `${weight} t` : null],
+              ];
+              return (
+                <div className="qb-need">
+                  <ul className="qb-need__list" aria-label="Needed to price this quote">
+                    {needs.map(([k, v, typed]) => (
+                      <li key={k} className={`qb-need__row${v ? " is-done" : typed ? " is-typed" : ""}`}>
+                        <span className="qb-need__mark" aria-hidden="true">{v ? <Check size={12} strokeWidth={2.5} /> : null}</span>
+                        <span className="qb-need__k">{k}</span>
+                        <span className="qb-need__v" title={v || typed || undefined}>{v || (typed ? "Typed · pick a match" : "Needed")}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="qb-need__foot">Fuel, tolls, driver allowance, base rate and a suggested price follow as soon as all four are in.</p>
+                </div>
+              );
+            })()}
             {!billingBlocked && ready && isDemoQuotaExceeded && (
               <div style={{ padding: "20px 4px" }}>
-                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Demo quota reached</div>
+                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-danger-text, var(--status-danger))", fontWeight: 600, marginBottom: 6 }}>Demo quota reached</div>
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)" }}>You've used this demo session's one free quote. Log out and log back in (or click &quot;View Demo&quot; again) to start a fresh session.</div>
               </div>
             )}
             {!billingBlocked && ready && !isDemoQuotaExceeded && routeBlockedMessage && (
               <div style={{ padding: "20px 4px" }}>
-                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Route not allowed</div>
+                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-danger-text, var(--status-danger))", fontWeight: 600, marginBottom: 6 }}>Route not allowed</div>
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)" }}>{routeBlockedMessage}</div>
               </div>
             )}
             {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && weightBlockedMessage && (
               <div style={{ padding: "20px 4px" }}>
-                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Overloaded for this vehicle</div>
+                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-danger-text, var(--status-danger))", fontWeight: 600, marginBottom: 6 }}>Overloaded for this vehicle</div>
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)" }}>{weightBlockedMessage}</div>
               </div>
             )}
@@ -1505,36 +1645,41 @@ export default function QuoteBuilder() {
             )}
             {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && !calculatingRoute && (<>
               {[
-                { key: "fuel", l: `Fuel — ${fuelConsumption.toFixed(1)} L/100km @ R${Number(fuelPricePerL).toFixed(2)}${fuelZoneNote}${fuelBasisNote}`, v: fuelCost, c: "var(--status-danger)" },
+                { key: "fuel", l: `Fuel: ${oneDp(fuelConsumption)} L/100 km at ${formatCurrency(fuelPricePerL)}/L${fuelZoneNote}${fuelBasisNote}`, v: fuelCost, c: "var(--status-danger)" },
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
                 ...(crossBorderCost > 0 ? [{ key: "cb", l: "Cross-border / weighbridge", v: crossBorderCost, c: "#2BB6A6" }] : []),
                 { key: "driver", l: "Driver allowance", v: driverAllowance, c: "var(--text-tertiary)" },
-                { key: "base", l: `Base rate (${hasVehicleType ? vehicleType : "company default"} · R${baseRatePerKm}/km)`, v: baseCost, c: "var(--accent-primary)" },
+                { key: "base", l: `Base rate (${hasVehicleType ? vtLabel : "company default"} · ${formatCurrency(baseRatePerKm)}/km)`, v: baseCost, c: "var(--accent-primary)" },
               ].map((r, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border-row)", fontSize: 13 }}>
-                  <span style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={dot(r.c)} />{r.l}
+                <div key={i} className="qb-cost__row">
+                  <span className="qb-cost__label">
+                    {r.key === "fuel" && liveDieselHintText ? (
+                      <span style={{ display: "flex", flexDirection: "column" }}>
+                        <span>{r.l}</span>
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{normaliseFigures(liveDieselHintText)}</span>
+                      </span>
+                    ) : r.l}
                     {r.key === "fuel" && (
                       <Popover>
                         <PopoverTrigger asChild>
                           <button type="button" title="How this fuel figure was worked out"
-                            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1 }}>
-                            <Info size={11} />
+                            className="qb-info">
+                            <Info size={14} aria-hidden="true" />
                           </button>
                         </PopoverTrigger>
-                        <PopoverContent align="start" style={{ width: 280, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                        <PopoverContent align="start" style={{ width: 280, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
                           <div style={{ ...labelS, marginBottom: 8 }}>How this fuel figure is worked out</div>
                           {fuelRefCapacityTons > 0 ? (<>
                             <div style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 10 }}>
                               {hasVehicleType
-                                ? `Your ${vehicleType}'s own consumption, adjusted for this load.`
-                                : `No truck is picked, so this uses ${fuelBasisVT?.name} — the most economical type in your fleet that can carry ${weight}t.`}
+                                ? `Your ${vtLabel}'s own consumption, adjusted for this load.`
+                                : `No truck is picked, so this uses ${sentenceCaseLabel(fuelBasisVT?.name)}, the most economical type in your fleet that can carry ${weight}t.`}
                             </div>
                             {[
-                              ["Truck used", `${fuelBasisVT?.name ?? "—"} (${fuelRefCapacityTons}t)`],
-                              ["Its rated burn", `${fuelConsumptionRef.toFixed(1)} L/100km at ${fuelRefCapacityTons}t`],
-                              ["This load", `${weight || 0}t`],
-                              ["Weight effect", `${(fuelSensitivity * 100).toFixed(1)}% per tonne`],
+                              ["Truck used", `${fuelBasisVT?.name ? sentenceCaseLabel(fuelBasisVT.name) : "—"} (${capLabel(fuelRefCapacityTons)})`],
+                              ["Its rated burn", `${oneDp(fuelConsumptionRef)} L/100 km at ${capLabel(fuelRefCapacityTons)}`],
+                              ["This load", capLabel(weight || 0)],
+                              ["Weight effect", `${oneDp(fuelSensitivity * 100)}% per tonne`],
                             ].map(([k, v]) => (
                               <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0" }}>
                                 <span style={{ color: "var(--text-tertiary)" }}>{k}</span>
@@ -1543,20 +1688,21 @@ export default function QuoteBuilder() {
                             ))}
                             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--border-subtle)", fontWeight: 600 }}>
                               <span>Burn for this load</span>
-                              <span style={{ fontVariantNumeric: "tabular-nums" }}>{fuelConsumption.toFixed(1)} L/100km</span>
+                              <span style={{ fontVariantNumeric: "tabular-nums" }}>{oneDp(fuelConsumption)} L/100 km</span>
                             </div>
                           </>) : (
                             <div style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 10 }}>
                               Nothing in your fleet has a rated capacity to work from, so this uses a
-                              standard {fuelConsumption.toFixed(1)} L/100km with no adjustment for weight.
+                              standard {oneDp(fuelConsumption)} L/100 km with no adjustment for weight.
                               Set a capacity on your vehicle types to price this properly.
                             </div>
                           )}
                           <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border-row)" }}>
                             {[
-                              ["Distance", `${Math.round(chargeDistance)} km${legs === 2 ? " (round trip)" : ""}`],
-                              ["Diesel used", `${Math.round(chargeDistance * fuelConsumption / 100)} L`],
-                              ["Diesel price", `R${Number(fuelPricePerL).toFixed(2)}/L${fuelZoneNote.replace(' · ', ' ')}`],
+                              ["Distance", `${formatNumber(Math.round(chargeDistance))} km${legs === 2 ? " (round trip)" : ""}`],
+                              ["Diesel used", `${formatNumber(Math.round(chargeDistance * fuelConsumption / 100))} L`],
+                              ["Diesel price", `${formatCurrency(fuelPricePerL)}/L${fuelZoneNote.replace(' · ', ' ')}`],
+                              ...(liveDieselHintText ? [["Live diesel", normaliseFigures(liveDieselHintText.replace(/^Live diesel: /, ''))]] : []),
                             ].map(([k, v]) => (
                               <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0" }}>
                                 <span style={{ color: "var(--text-tertiary)" }}>{k}</span>
@@ -1571,7 +1717,7 @@ export default function QuoteBuilder() {
                           {!hasVehicleType && fuelRefCapacityTons > 0 && (
                             <div style={{ color: "var(--text-tertiary)", marginTop: 10, lineHeight: 1.5 }}>
                               This is a fleet-wide estimate, picked so the figure doesn't jump
-                              around as you change the weight.{suggestions.length ? ` Choose ${suggestions[0].vt.name} above to price on the truck you'd actually send.` : " Pick a vehicle type to price on that truck exactly."}
+                              around as you change the weight.{suggestions.length ? ` Choose ${sentenceCaseLabel(suggestions[0].vt.name)} above to price on the truck you'd actually send.` : " Pick a vehicle type to price on that truck exactly."}
                             </div>
                           )}
                         </PopoverContent>
@@ -1581,11 +1727,11 @@ export default function QuoteBuilder() {
                       <Popover>
                         <PopoverTrigger asChild>
                           <button type="button" title="Toll breakdown"
-                            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1 }}>
-                            <Info size={11} />
+                            className="qb-info">
+                            <Info size={14} aria-hidden="true" />
                           </button>
                         </PopoverTrigger>
-                        <PopoverContent align="start" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                        <PopoverContent align="start" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
                           <div style={{ ...labelS, marginBottom: 8 }}>Toll plazas on this route</div>
                           {tollBreakdown.length === 0 ? (
                             <div style={{ color: "var(--text-tertiary)" }}>No SANRAL plazas matched on this route.</div>
@@ -1627,11 +1773,11 @@ export default function QuoteBuilder() {
                         <Popover>
                           <PopoverTrigger asChild>
                             <button type="button" title="Cross-border breakdown"
-                              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1 }}>
-                              <Info size={11} />
+                              className="qb-info">
+                              <Info size={14} aria-hidden="true" />
                             </button>
                           </PopoverTrigger>
-                          <PopoverContent align="start" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                          <PopoverContent align="start" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
                             <div style={{ ...labelS, marginBottom: 8 }}>
                               Cross-border charges{routeData?.countries?.length ? ` · crosses ${routeData.countries.join("→")}` : ""}
                             </div>
@@ -1654,28 +1800,34 @@ export default function QuoteBuilder() {
                       );
                     })()}
                   </span>
-                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatCurrency(r.v)}</span>
+                  <span className="qb-cost__value">{formatCurrency(r.v)}</span>
                 </div>
               ))}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 10, paddingTop: 12, borderTop: "1px solid var(--border-subtle)" }}>
-                <span style={labelS}>Quote total</span>
+              {serviceCharge > 0 && (
+                <div className="qb-cost__row">
+                  <span className="qb-cost__label">Markup (suggested price in use)</span>
+                  <span className="qb-cost__value">{formatCurrency(serviceCharge)}</span>
+                </div>
+              )}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, paddingTop: 12 }}>
+                <span style={labelS}>Quote price</span>
                 <span style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, color: "var(--text-primary)" }}>{formatCurrency(total)}</span>
               </div>
-              <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 8 }}>{Math.round(distance)} km {legs === 2 ? `one way · ${Math.round(chargeDistance)} km round trip` : "one way"} · live diesel · {hasVehicleType ? `your ${vehicleType} settings` : "your company defaults"}{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
-              <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Tolls</div><input type="number" value={tollManuallyEdited ? editableTollCost : String(tollCost)} onChange={e => { setEditableTollCost(e.target.value); setTollManuallyEdited(true); }} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
-                <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Driver</div><input type="number" value={driverAllowanceInput} onChange={e => setDriverAllowanceInput(e.target.value)} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ ...labelS, marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+              <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 8 }}>{formatNumber(Math.round(distance))} km {legs === 2 ? `one way · ${formatNumber(Math.round(chargeDistance))} km round trip` : "one way"} · live diesel · {hasVehicleType ? `your ${vtLabel} settings` : "your company defaults"}{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
+              <div className="qb-cost__adjust">
+                <div style={{ flex: 1, minWidth: 0 }}><div style={{ ...fieldLabelS, marginBottom: 4 }}><span>Tolls</span></div><input type="number" value={tollManuallyEdited ? editableTollCost : String(tollCost)} onChange={e => { setEditableTollCost(e.target.value); setTollManuallyEdited(true); }} aria-label="Tolls" className="qb-mini" style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
+                <div style={{ flex: 1, minWidth: 0 }}><div style={{ ...fieldLabelS, marginBottom: 4 }}><span>Driver</span></div><input type="number" value={driverAllowanceInput} onChange={e => setDriverAllowanceInput(e.target.value)} aria-label="Driver allowance" className="qb-mini" style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ ...fieldLabelS, marginBottom: 4 }}>
                     <span>R/km</span>
                     <Popover>
                       <PopoverTrigger asChild>
                         <button type="button" title="Where this rate comes from"
-                          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>
-                          <Info size={11} />
+                          className="qb-info">
+                          <Info size={14} aria-hidden="true" />
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent align="end" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                      <PopoverContent align="end" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
                         <div style={{ ...labelS, marginBottom: 8 }}>Base rate per km</div>
                         <div style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
                           What this quote charges per kilometre, before fuel, tolls and allowances.
@@ -1689,16 +1841,16 @@ export default function QuoteBuilder() {
                           <span style={{ color: "var(--text-tertiary)" }}>Company default</span>
                           <span style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
                             {Number(companyProfile?.default_base_rate_per_km) > 0
-                              ? `R${Number(companyProfile.default_base_rate_per_km).toFixed(2)}`
+                              ? formatCurrency(companyProfile.default_base_rate_per_km)
                               : "not set"}
                           </span>
                         </div>
                         {hasVehicleType && (
                           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, paddingTop: 5 }}>
-                            <span style={{ color: "var(--text-tertiary)" }}>{vehicleType}</span>
+                            <span style={{ color: "var(--text-tertiary)" }}>{vtLabel}</span>
                             <span style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
                               {Number(selectedVT?.base_rate) > 0
-                                ? `R${Number(selectedVT.base_rate).toFixed(2)}`
+                                ? formatCurrency(selectedVT.base_rate)
                                 : "not set"}
                             </span>
                           </div>
@@ -1714,7 +1866,9 @@ export default function QuoteBuilder() {
                     type="number"
                     value={baseRatePerKm}
                     onChange={e => setBaseRatePerKm(e.target.value)}
-                    style={{ ...inputS, fontSize: 13, padding: "6px 8px" }}
+                    aria-label="Base rate per km"
+                    className="qb-mini"
+                    style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }}
                   />
                   {baseRateSource && (
                     <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 4 }}>
@@ -1724,12 +1878,12 @@ export default function QuoteBuilder() {
                 </div>
               </div>
             </>)}
-          </div>
+          </section>
       </div>
 
       {/* 3 — AI quote */}
       {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 && (
-        <div style={{ ...cardS, border: "1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border-subtle))", marginBottom: 14 }}>
+        <div style={{ ...cardS, overflow: "hidden", marginBottom: 16 }}>
           {/* still learning — shown first, above the price block, while there's no
               qualifying model at either tier. Shows both tiers' progress so the
               user can see whether it's THEIR data or the platform's that's short. */}
@@ -1739,7 +1893,7 @@ export default function QuoteBuilder() {
                 <Sparkles size={16} color="var(--status-warning)" style={{ flexShrink: 0 }} />
                 <div>
                   <b>{awaitingCopy.title}</b>
-                  <span style={{ color: "var(--text-secondary)" }}> Priced on true cost + {hasVehicleType ? `your ${vehicleType} base rate` : "your company default base rate"} for now.{awaitingCopy.detail && ` ${awaitingCopy.detail}`}</span>
+                  <span style={{ color: "var(--text-secondary)" }}> Priced on true cost + {hasVehicleType ? `your ${vtLabel} base rate` : "your company default base rate"} for now.{awaitingCopy.detail && ` ${awaitingCopy.detail}`}</span>
                 </div>
               </div>
               {winModel && (
@@ -1768,44 +1922,47 @@ export default function QuoteBuilder() {
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
+          <div className="qb-grid qb-grid--ai" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
               <div style={{ ...labelS, display: "flex", alignItems: "center", gap: 6 }}>
-                {aiAwaitingData ? "Suggested price" : "Recommended price"}
+                Suggested price
                 {aiAvailable && (
                   <span
                     title={`Trained on ${aiPrediction.training_samples?.toLocaleString?.() ?? aiPrediction.training_samples} ${aiPrediction.model_scope === "user" ? "of your own" : "platform-wide"} closed quotes`}
                     style={{
-                      fontSize: 11, lineHeight: "16px", fontWeight: 600, padding: "1px 6px", borderRadius: 10, textTransform: "none", letterSpacing: 0,
-                      background: aiPrediction.model_scope === "user" ? "color-mix(in srgb, var(--accent-primary) 18%, transparent)" : "var(--bg-surface-hover)",
-                      color: aiPrediction.model_scope === "user" ? "var(--accent-primary)" : "var(--text-tertiary)",
+                      fontSize: 13, lineHeight: "20px", fontWeight: 500, padding: "0 6px", borderRadius: "var(--radius-chip, 6px)", textTransform: "none", letterSpacing: 0,
+                      background: "var(--bg-raised)",
+                      color: "var(--text-secondary)",
                     }}
                   >
-                    {aiPrediction.model_scope === "user" ? "Personal AI" : "Platform AI"}
+                    {aiPrediction.model_scope === "user" ? "From your quotes" : "From platform quotes"}
                   </span>
                 )}
               </div>
-              {aiLoading ? aiSpinner : (<>
-                <div style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, color: aiAwaitingData ? undefined : "var(--accent-primary)", marginTop: 4 }}>{suggestedPrice ? formatCurrency(suggestedPrice) : formatCurrency(total)}</div>
-                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 2 }}>{aiAwaitingData ? "true cost + 25%" : "to this client"}</div>
+              {aiLoading ? aiSpinner : !analysis || !suggestedPrice ? aiUnavailable : (<>
+                {/* An option, not the price: the price that is sent is the Quote price next to Send. */}
+                <div style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 22, lineHeight: "30px", fontWeight: 600, color: "var(--text-primary)", marginTop: 4 }}>{formatCurrency(suggestedPrice)}</div>
+                <div style={{ fontSize: 13, lineHeight: "20px", color: suggestionBelowCost ? "var(--status-warning-text, var(--status-warning))" : "var(--text-tertiary)", marginTop: 2 }}>
+                  {suggestionBelowCost ? `Below your costs of ${formatCurrency(directCost)}` : alreadyApplied ? "In use as your quote price" : aiAwaitingData ? "true cost + 25%" : "to this client"}
+                </div>
               </>)}
             </div>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
-              <div style={labelS}>Margin</div>
-              {aiLoading ? aiSpinner : aiAwaitingData ? (
+              <div style={labelS}>Margin at suggested price</div>
+              {aiLoading ? aiSpinner : !analysis ? aiUnavailable : aiAwaitingData ? (
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
               ) : (<>
                 <div style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, marginTop: 4 }}>{opt?.optimal_margin_pct ? `${Math.round(opt.optimal_margin_pct)}%` : `${marginPct}%`}</div>
-                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-success)", marginTop: 2 }}>{formatCurrency(opt?.expected_profit ?? ((suggestedPrice || total) - directCost))} profit</div>
+                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--status-success-text, var(--status-success))", marginTop: 2 }}>{formatCurrency(opt?.expected_profit ?? ((suggestedPrice || total) - directCost))} profit</div>
               </>)}
             </div>
             <div style={{ padding: "16px 18px" }}>
-              <div style={labelS}>Win probability</div>
-              {aiLoading ? aiSpinner : aiAwaitingData ? (
+              <div style={labelS}>Win chance at suggested price</div>
+              {aiLoading ? aiSpinner : !analysis ? aiUnavailable : aiAwaitingData ? (
                 <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
               ) : (<>
                 <div style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, marginTop: 4 }}>{opt?.win_probability_at_optimal != null ? `${Math.round(opt.win_probability_at_optimal * 100)}%` : "—"}</div>
-                <div style={{ marginTop: 6, height: 5, borderRadius: 3, background: "var(--bg-surface-hover)", overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.round((opt?.win_probability_at_optimal || 0) * 100)}%`, background: "var(--accent-primary)" }} /></div>
+                <div style={{ marginTop: 6, height: 5, borderRadius: 3, background: "var(--bg-raised)", overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.round((opt?.win_probability_at_optimal || 0) * 100)}%`, background: "var(--accent-primary)" }} /></div>
               </>)}
             </div>
           </div>
@@ -1814,30 +1971,81 @@ export default function QuoteBuilder() {
           {guard && guard.risk_level && guard.risk_level !== "SAFE" && (
             <div style={{ padding: "10px 18px", borderTop: "1px solid var(--border-row)", background: guard.risk_level === "AT_RISK" ? "var(--status-danger-bg)" : "var(--status-warning-bg)", fontSize: 13 }}>
               <b style={{ color: guard.risk_level === "AT_RISK" ? "var(--status-danger)" : "var(--status-warning)" }}>{guard.risk_level === "AT_RISK" ? "At risk" : "Caution"}</b>
-              <span style={{ color: "var(--text-secondary)" }}> · {(guard.explanations || guard.warnings || [])[0]}{guard.suggestions?.[0] ? ` — ${guard.suggestions[0]}` : ""}</span>
+              <span style={{ color: "var(--text-secondary)" }}> · {(guard.explanations || guard.warnings || [])[0]}{guard.suggestions?.[0] ? `. ${guard.suggestions[0]}` : ""}</span>
             </div>
           )}
 
-          {/* actions */}
-          <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "14px 18px", borderTop: "1px solid var(--border-row)" }}>
-            {!aiLoading && suggestedPrice != null && suggestedPrice > 0 && !alreadyApplied && <button onClick={applyOptimal} style={{ fontSize: 14, fontWeight: 500, background: "transparent", border: "1px solid var(--accent-primary)", color: "var(--accent-primary)", borderRadius: 4, padding: "9px 14px", cursor: "pointer" }}>Apply recommended</button>}
-            {!aiLoading && alreadyApplied && (
-              <>
-                <span style={{ fontSize: 13, color: "var(--status-success)" }}>✓ AI price applied</span>
-                <button onClick={cancelAiPrice} style={{ fontSize: 14, background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 4, padding: "10px 16px", cursor: "pointer" }}>Use actual price</button>
-              </>
-            )}
-            <button onClick={() => save(true)} disabled={saving} style={{ fontSize: 14, fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 4, padding: "10px 16px", cursor: "pointer" }}>Send quote to client</button>
-            <button onClick={() => save(false)} disabled={saving} style={{ fontSize: 14, background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 4, padding: "10px 16px", cursor: "pointer" }}>Save as draft</button>
-            {benchmark?.market_avg_rate ? <span style={{ marginLeft: "auto", fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)" }}>Benchmark: {formatCurrency(benchmark.market_avg_rate)} avg · {benchmark.recommendation || ""}</span> : null}
-          </div>
+          {/* Send, Save and Use-suggested live in the price bar below, next to the one price. */}
+          {benchmark?.market_avg_rate ? (
+            <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border-row)", fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)" }}>
+              Benchmark: {formatCurrency(benchmark.market_avg_rate)} avg · {benchmark.recommendation || ""}
+            </div>
+          ) : null}
         </div>
       )}
 
-      {/* notes */}
-      {ready && <div style={{ marginBottom: 40 }}><div style={{ ...labelS, marginBottom: 5 }}>Notes (optional)</div><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Anything for the client or your team…" style={{ ...inputS, resize: "vertical" }} /></div>}
+      {/* notes: above the price bar so they are filled in before sending */}
+      {ready && <div style={{ marginBottom: 16 }}><div style={fieldLabelS}><label htmlFor="qb-notes">Notes (optional)</label></div><textarea id="qb-notes" value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Anything for the client or your team…" style={{ ...inputS, resize: "vertical" }} /></div>}
 
-      <AIChatPanel messages={chatMessages} busy={nlBusy} open={chatOpen} onOpenChange={setChatOpen} onSend={(t, lang) => submitNL(t, lang)} />
+      {/* One price, next to Send. Sticky so Send stays in reach while scrolling. */}
+      {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 && (
+        <section className="qb-pricebar" aria-label="Quote price and send">
+          <div className="qb-pricebar__price">
+            <span className="qb-pricebar__label">Quote price</span>
+            <span className="qb-pricebar__figure" aria-live="polite">{formatCurrency(total)}</span>
+            <span className="qb-pricebar__sub">Excl. VAT · what the client is sent{serviceCharge > 0 ? " · includes markup" : ""}</span>
+          </div>
+          <div className="qb-pricebar__suggest" aria-live="polite">
+            {suggestionState === "loading" && <span className="qb-pricebar__muted">Working out a suggested price…</span>}
+            {suggestionState === "unavailable" && <span className="qb-pricebar__muted">No suggested price for this quote</span>}
+            {suggestionState === "below-cost" && suggestedPrice != null && (
+              <span className="qb-pricebar__warn">Suggested {formatCurrency(suggestedPrice)} is below your costs ({formatCurrency(directCost)}), so it isn't offered</span>
+            )}
+            {suggestionState === "offer" && suggestedPrice != null && (
+              <>
+                <span>Suggested: <b className="qb-pricebar__num">{formatCurrency(suggestedPrice)}</b> <span className="qb-pricebar__muted">({suggestionBasis})</span></span>
+                <button type="button" className="tw-btn qb-pricebar__use" onClick={applyOptimal}>Use</button>
+              </>
+            )}
+            {suggestionState === "applied" && (
+              <>
+                <span>Using the suggested price</span>
+                {serviceCharge > 0 && (
+                  <button type="button" className="tw-btn tw-btn--ghost qb-pricebar__use" onClick={cancelAiPrice}>Use cost price ({formatCurrency(directCost)})</button>
+                )}
+              </>
+            )}
+          </div>
+          <div className="qb-pricebar__actions">
+            <button type="button" className="tw-btn" onClick={() => save(false)} disabled={saving}>Save as draft</button>
+            <button type="button" className="tw-btn tw-btn--primary" onClick={openSendPreview} disabled={saving}>Send quote</button>
+            {/* Assistant launcher slot while the bar shows (see nlChatSlotRef). */}
+            <span ref={barChatSlotRef} className="qb-chatslot" />
+          </div>
+        </section>
+      )}
+
+      {sendPreviewOpen && (() => {
+        const client = customers.find((c: any) => String(c.id) === String(customerId));
+        return (
+          <QuoteSendPreview
+            quote={{
+              customer_name: client?.name,
+              customer_email: client ? (client.email || null) : null,
+              pickup_location: pickup,
+              delivery_location: delivery,
+              pickup_date: pickupDate || null,
+              total_amount: round2(total),
+              valid_until: validUntil,
+            }}
+            sending={saving}
+            onCancel={() => setSendPreviewOpen(false)}
+            onConfirm={async () => { await save(true); setSendPreviewOpen(false); }}
+          />
+        );
+      })()}
+
+      <AIChatPanel messages={chatMessages} busy={nlBusy} open={chatOpen} onOpenChange={setChatOpen} onSend={(t, lang) => submitNL(t, lang)} launcherSlot={chatSlot} />
     </div>
   );
 }

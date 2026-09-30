@@ -1,0 +1,77 @@
+/* Admin: AI price check cost (AiUsagePanel) and Rate updates
+   (RateUpdatesPanel). v3 cards (.tw-card, padded head); tables sit inside the
+   card padding (admin-table drops the outer cell padding) and fit at 390
+   without side scroll: low-value columns fold into a second line on phones. */
+
+.aiu { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--card-gap, 16px); min-width: 0; }
+.aiu > * { min-width: 0; }
+
+.aiu-table, .ru-table { width: 100%; border-collapse: collapse; font: 400 14px/20px var(--font-sans); }
+.aiu-table th, .ru-table th {
+  padding: 0 16px 8px; text-align: left; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-row);
+}
+.aiu-table td, .ru-table td {
+  padding: 12px 16px; vertical-align: top; color: var(--text-primary);
+  border-bottom: 1px solid var(--border-row);
+}
+.aiu-table tbody tr:last-child td, .ru-table tbody tr:last-child td { border-bottom: 0; padding-bottom: 0; }
+.aiu-sub { display: block; margin-top: 2px; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.aiu-zar { display: block; margin-top: 2px; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.aiu-nowrap { white-space: nowrap; }
+.aiu-error-text { font-size: 13px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.aiu-phone-only { display: none; }
+.aiu-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.aiu-line { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+.aiu-line__strong { font-weight: 600; color: var(--text-primary); }
+.aiu-retry { margin-top: 16px; }
+.aiu-errorline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; }
+
+/* Skeleton figures and cells: the loaded figures take the same boxes. */
+.aiu-skel { pointer-events: none; display: inline-block; width: 88px; max-width: 100%; height: 12px; border-radius: 4px; background: var(--bg-raised); vertical-align: middle; animation: aiu-pulse 1.4s ease-in-out infinite; }
+.tw-kpi-stats__figure .aiu-skel { height: 20px; width: 96px; }
+.aiu-skel--note { width: 140px; }
+@keyframes aiu-pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .aiu-skel { animation: none; } }
+
+/* Rate updates */
+.ru-label { font-weight: 500; }
+.ru-arrow { color: var(--text-tertiary); }
+.ru-new strong { font-weight: 600; }
+.ru-srclink {
+  display: inline-flex; align-items: center; height: 32px; padding: 0 10px; box-sizing: border-box; position: relative;
+  border: 1px solid var(--border-default); border-radius: var(--radius-chip, 6px);
+  font: 500 12px/16px var(--font-sans); color: var(--link); text-decoration: none; white-space: nowrap;
+}
+.ru-srclink:hover { border-color: var(--border-strong); background: var(--bg-surface-hover); }
+.ru-srclink:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
+.ru-act { white-space: nowrap; text-align: right !important; }
+.ru-act .tw-btn + .tw-btn { margin-left: 8px; }
+.ru-table td { vertical-align: middle; }
+
+@media (max-width: 640px) {
+  .aiu-col-wide { display: none; }
+  .aiu-phone-only { display: block; }
+  .aiu-table th, .aiu-table td { padding-left: 8px; padding-right: 8px; }
+  /* Rate updates: one stacked block per change. */
+  .ru-table thead { display: none; }
+  .ru-table, .ru-table tbody { display: block; }
+  .ru-row {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "what what" "cur new" "src src" "act act";
+    gap: 8px 12px; padding: 12px 0; border-bottom: 1px solid var(--border-row);
+  }
+  .ru-row:last-child { border-bottom: 0; padding-bottom: 0; }
+  table.admin-table.ru-table .ru-row > td { display: block; padding: 0 !important; border: 0 !important; text-align: left !important; }
+  .ru-what { grid-area: what; }
+  .ru-cur { grid-area: cur; color: var(--text-tertiary) !important; }
+  .ru-new { grid-area: new; }
+  .ru-new .aiu-sub { display: inline; margin-left: 6px; }
+  table.admin-table.ru-table .ru-row > td.ru-src { grid-area: src; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+  .ru-act { margin-top: 4px; }
+  .ru-src .aiu-sub { margin: 0; }
+  table.admin-table.ru-table .ru-row > td.ru-act { grid-area: act; display: flex; gap: 8px; }
+  .ru-act .tw-btn { flex: 1 1 0; height: 44px; }
+  .ru-act .tw-btn + .tw-btn { margin-left: 0; }
+}
+.ru-srctext { font: 400 13px/20px var(--font-sans); color: var(--status-warning-text); }

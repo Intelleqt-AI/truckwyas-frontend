@@ -1,38 +1,28 @@
-import '@/pages/table-heading-roles.css';
 import '@/pages/admin/admin-brand.css';
+import '@/pages/admin/ai-admin.css';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
-import { SkeletonRows } from '@/components/fleet-detail/ContentSkeleton';
 import { KpiStats } from '@/components/ui/KpiTile';
 import { InfoTip } from '@/components/ui/InfoTip';
-import { formatDateTime, formatNumber, MISSING } from '@/lib/formatters';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { formatDate, formatDateTime, formatMoney, formatMoneyWhole, formatNumber, MISSING } from '@/lib/formatters';
 
-// OpenAI token/cost usage for the quote AI price-analysis feature only (not
-// a platform-wide LLM-cost dashboard: Copilot chat and the other ~11 LLM
-// call sites elsewhere in the app don't track usage/cost yet).
+// OpenAI cost of the quote price check only (not a platform-wide LLM-cost
+// dashboard: Copilot chat and the other LLM call sites don't track cost yet).
+// Two backend shapes are supported:
+//  - per-check (PR #113): every quote check was a paid web search, so the
+//    panel shows checks, cost per user and failed runs;
+//  - stored figures (the redesign): quote checks are free lookups and the only
+//    spend is the monthly refresh job, so the panel shows those runs.
 
-// Same table recipe as the other admin panels (JobHealthPanel, UsersTable).
-const cardStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
-const sectionTitleStyle: React.CSSProperties = {
-  fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16,
-};
-const thStyle: React.CSSProperties = { textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' };
-const tdStyle: React.CSSProperties = {
-  padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
-};
-const numStyle: React.CSSProperties = { ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
-const numThStyle: React.CSSProperties = { ...thStyle, textAlign: 'right' };
+// Rand figures are estimates. The backend may send its own rate; otherwise a
+// fixed planning rate is used, and the tip says so.
+const PLANNING_USD_ZAR = 18;
 
-// Sub-$1 amounts round to "$0,00" at 2dp, which hides real per-user cost:
-// use 4dp below $1, 2dp otherwise. en-ZA figures ("US$ 0,0123").
-const formatUsd = (n: number) => {
-  const dp = Math.abs(n) < 1 ? 4 : 2;
-  return `US$\u00A0${formatNumber(n, { minimumFractionDigits: dp, maximumFractionDigits: dp })}`;
-};
-const formatCount = (n: number) => formatNumber(n, { maximumFractionDigits: 0 });
-const fmtDate = (dateStr?: string | null) => (dateStr ? formatDateTime(dateStr) : MISSING);
-
-interface Totals { calls: number; success_calls: number; failed_calls: number; total_cost_usd: number; total_tokens: number; }
+interface Totals {
+  calls?: number; success_calls?: number; failed_calls?: number; total_cost_usd: number; total_tokens?: number;
+  refresh_runs?: number;
+}
 interface ByUserRow {
   user_id: number; name: string; email: string; company_id: number | null; company_name: string | null;
   calls: number; total_cost_usd: number;
@@ -40,104 +30,260 @@ interface ByUserRow {
 interface RecentFailure {
   id: number; created_at: string; quote_id: number | null; failed_at_call: string; error_message: string; triggered_by__username: string | null;
 }
+interface MonthRow { month: string; total_calls?: number; runs?: number; total_cost_usd: number; }
+interface RefreshJob {
+  id: number; started_at?: string | null; ran_at?: string | null; finished_at?: string | null; status?: string | null;
+  total_cost_usd?: number | null; cost_usd?: number | null;
+  figures_checked?: number | null; items_checked?: number | null;
+  proposals?: number | null; proposed_updates?: number | null;
+}
 interface AiUsageResponse {
   all_time: Totals; this_month: Totals;
-  by_month: { month: string; total_calls: number; total_cost_usd: number }[];
-  by_user: ByUserRow[];
-  recent_failures: RecentFailure[];
+  by_month?: MonthRow[];
+  by_user?: ByUserRow[];
+  recent_failures?: RecentFailure[];
+  refresh_jobs?: RefreshJob[];
+  usd_zar_rate?: number | null;
 }
 
-const totalsNote = (t: Totals) =>
-  `${formatCount(t.calls)} calls · ${formatCount(t.failed_calls)} failed · ${formatCount(t.total_tokens)} tokens`;
+const count = (n?: number | null) => formatNumber(n ?? 0, { maximumFractionDigits: 0 });
+// US$ at 2 dp everywhere (4 dp in the tooltip), rand whole.
+const usd = (n?: number | null) => `US$\u00A0${formatNumber(n ?? 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const usdExact = (n?: number | null) => `US$ ${formatNumber(n ?? 0, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`;
+const monthLabel = (m: string) => formatDate(`${m}-01`, { day: undefined });
+const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
+
+function UsdCell({ value, rate }: { value?: number | null; rate: number }) {
+  return (
+    <td className="num" title={usdExact(value)}>
+      {usd(value)}
+      <span className="aiu-zar">≈ {formatMoneyWhole((value ?? 0) * rate)}</span>
+    </td>
+  );
+}
 
 export default function AiUsagePanel() {
-  const { data, isLoading } = useQuery<AiUsageResponse>({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery<AiUsageResponse>({
     queryKey: ['admin-ai-usage'],
     queryFn: () => fetchData('api/v1/admin/ai-usage/'),
     refetchInterval: 60_000,
+    retry: 1,
   });
 
-  const byUser = [...(data?.by_user ?? [])].sort((a, b) => b.total_cost_usd - a.total_cost_usd);
+  const rate = Number(data?.usd_zar_rate) > 0 ? Number(data!.usd_zar_rate) : PLANNING_USD_ZAR;
+  const rateNote = Number(data?.usd_zar_rate) > 0
+    ? `Rand figures use the server's rate of ${formatNumber(rate, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per US$.`
+    : `Rand figures are estimates at R ${formatNumber(rate, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per US$, a fixed planning rate, not a live exchange rate.`;
+  const jobs = data?.refresh_jobs ?? [];
+  const storedModel = Array.isArray(data?.refresh_jobs);
+  const byUser = [...(data?.by_user ?? [])].filter((r) => r.calls > 0).sort((a, b) => b.total_cost_usd - a.total_cost_usd);
   const failures = data?.recent_failures ?? [];
+  const months = [...(data?.by_month ?? [])].sort((a, b) => b.month.localeCompare(a.month)).slice(0, 12);
+
+  const totalsNote = (t?: Totals) => {
+    if (!t) return '';
+    const zar = `≈ ${formatMoneyWhole(t.total_cost_usd * rate)}`;
+    if (storedModel) return `${zar} · ${plural(t.refresh_runs ?? 0, 'refresh run')}`;
+    return `${zar} · ${plural(t.calls ?? 0, 'check')}${t.failed_calls ? ` · ${count(t.failed_calls)} failed` : ''}`;
+  };
+  const perCheck = !storedModel && data && (data.all_time.calls ?? 0) > 0
+    ? data.all_time.total_cost_usd / (data.all_time.calls ?? 1) : null;
+
+  const tip = (
+    <InfoTip label="What this counts">
+      OpenAI cost of the quote price check only. {storedModel
+        ? 'Price checks on quotes use stored figures and cost nothing; the spend is the monthly job that re-checks toll tariffs and the driver allowance on their source pages.'
+        : 'Every price check on a quote runs a paid web search.'} Copilot chat and other AI features aren't tracked here yet. {rateNote}
+    </InfoTip>
+  );
+
+  if (isError) {
+    return (
+      <section className="tw-card aiu-error" aria-labelledby="aiu-error-title">
+        <div className="tw-card__head">
+          <div className="tw-card__titles">
+            <h2 id="aiu-error-title" className="tw-card__title">AI price check cost</h2>
+          </div>
+        </div>
+        <p className="aiu-line">
+          <span className="aiu-line__strong">Couldn't load usage.</span> Nothing is lost. Try again in a moment.
+        </p>
+        <button type="button" className="tw-btn aiu-retry" onClick={() => refetch()} disabled={isFetching}>
+          {isFetching ? 'Retrying…' : 'Retry'}
+        </button>
+      </section>
+    );
+  }
+
+  const skel = <span className="aiu-skel" aria-hidden="true" />;
+  const statItems = [
+    {
+      label: 'This month', aside: tip,
+      figure: data ? <span title={usdExact(data.this_month.total_cost_usd)}>{usd(data.this_month.total_cost_usd)}</span> : skel,
+      note: data ? totalsNote(data.this_month) : <span className="aiu-skel aiu-skel--note" aria-hidden="true" />,
+    },
+    {
+      label: 'All time',
+      figure: data ? <span title={usdExact(data.all_time.total_cost_usd)}>{usd(data.all_time.total_cost_usd)}</span> : skel,
+      note: data ? totalsNote(data.all_time) : <span className="aiu-skel aiu-skel--note" aria-hidden="true" />,
+    },
+    ...(perCheck != null ? [{
+      label: 'Per check',
+      figure: <span title={usdExact(perCheck)}>{usd(perCheck)}</span>,
+      note: `≈ ${formatMoney(perCheck * rate)} on average`,
+    }] : []),
+  ];
 
   return (
-    <div style={{ display: 'grid', gap: 'var(--card-gap, 16px)' }}>
-      {data && (
-        <KpiStats
-          title="AI price check cost"
-          aria-label="AI price check cost"
-          items={[
-            { label: 'This month', figure: formatUsd(data.this_month.total_cost_usd), note: totalsNote(data.this_month) },
-            { label: 'All time', figure: formatUsd(data.all_time.total_cost_usd), note: totalsNote(data.all_time) },
-          ]}
-        />
-      )}
+    <div className="aiu" aria-busy={isLoading || undefined}>
+      <KpiStats title="AI price check cost" aria-label="AI price check cost" items={statItems} />
 
-      <div className="card" style={cardStyle}>
-        <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
-          Usage by user
-          <InfoTip label="What this counts">
-            OpenAI cost of the quote builder's AI price check only. Copilot chat and other AI features aren't tracked here yet.
-          </InfoTip>
-        </h2>
-        <div className="admin-scroll-region" role="region" aria-label="AI price check usage by user" tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+      {(isLoading || months.length > 0) && (
+        <section className="tw-card" aria-labelledby="aiu-months-title">
+          <div className="tw-card__head">
+            <div className="tw-card__titles">
+              <h2 id="aiu-months-title" className="tw-card__title">By month</h2>
+              <p className="tw-card__sub">Last 12 months, US$ with a rand estimate</p>
+            </div>
+          </div>
+          <table className="admin-table aiu-table">
             <thead>
-              <tr>
-                <th style={thStyle}>Name</th>
-                <th style={thStyle}>Email</th>
-                <th style={thStyle}>Company</th>
-                <th style={numThStyle}>Calls</th>
-                <th style={numThStyle}>Cost</th>
-              </tr>
+              <tr><th scope="col">Month</th><th scope="col" className="num">{storedModel ? 'Refresh runs' : 'Checks'}</th><th scope="col" className="num">Cost</th></tr>
             </thead>
             <tbody>
-              {isLoading && <SkeletonRows rows={5} cols={5} />}
-              {byUser.map(row => (
-                <tr key={row.user_id}>
-                  <td style={tdStyle}>{row.name}</td>
-                  <td style={{ ...tdStyle, color: 'var(--text-secondary)' }}>{row.email}</td>
-                  <td style={tdStyle}>{row.company_name || MISSING}</td>
-                  <td style={numStyle}>{formatCount(row.calls)}</td>
-                  <td style={numStyle}>{formatUsd(row.total_cost_usd)}</td>
+              {isLoading && [0, 1, 2].map((i) => (
+                <tr key={i} aria-hidden="true"><td>{skel}</td><td className="num">{skel}</td><td className="num">{skel}</td></tr>
+              ))}
+              {months.map((m) => (
+                <tr key={m.month}>
+                  <td>{monthLabel(m.month)}</td>
+                  <td className="num">{count(m.runs ?? m.total_calls)}</td>
+                  <UsdCell value={m.total_cost_usd} rate={rate} />
                 </tr>
               ))}
-              {!isLoading && byUser.length === 0 && (
-                <tr><td style={{ ...tdStyle, color: 'var(--text-secondary)' }} colSpan={5}>No AI price checks yet.</td></tr>
-              )}
             </tbody>
           </table>
-        </div>
-      </div>
+        </section>
+      )}
 
-      {failures.length > 0 && (
-        <div className="card" style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Recent failures</h2>
-          <div className="admin-scroll-region" role="region" aria-label="Recent AI price check failures" tabIndex={0} style={{ overflowX: 'auto' }}>
-            <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+      {storedModel && (
+        <section className="tw-card" aria-labelledby="aiu-jobs-title">
+          <div className="tw-card__head">
+            <div className="tw-card__titles">
+              <h2 id="aiu-jobs-title" className="tw-card__title">Monthly rate refresh</h2>
+              <p className="tw-card__sub">Runs that re-check tolls and allowances</p>
+            </div>
+          </div>
+          {jobs.length === 0 ? (
+            <p className="aiu-line">No refresh has run yet.</p>
+          ) : (
+            <table className="admin-table aiu-table">
               <thead>
                 <tr>
-                  <th style={thStyle}>When</th>
-                  <th style={thStyle}>User</th>
-                  <th style={thStyle}>Quote</th>
-                  <th style={thStyle}>Failed at</th>
-                  <th style={thStyle}>Error</th>
+                  <th scope="col">Ran</th>
+                  <th scope="col" className="aiu-col-wide">Status</th>
+                  <th scope="col" className="num aiu-col-wide">Checked</th>
+                  <th scope="col" className="num">Updates</th>
+                  <th scope="col" className="num">Cost</th>
                 </tr>
               </thead>
               <tbody>
-                {failures.map(f => (
-                  <tr key={f.id}>
-                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmtDate(f.created_at)}</td>
-                    <td style={tdStyle}>{f.triggered_by__username || MISSING}</td>
-                    <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums' }}>{f.quote_id ?? MISSING}</td>
-                    <td style={tdStyle}>{f.failed_at_call || MISSING}</td>
-                    <td style={{ ...tdStyle, fontSize: 13, color: 'var(--text-secondary)' }}>{f.error_message}</td>
+                {jobs.map((j) => {
+                  const when = j.ran_at || j.started_at;
+                  const status = (j.status || '').toLowerCase();
+                  const tone = status === 'failed' ? 'danger' : status === 'running' ? 'info' : 'success';
+                  return (
+                    <tr key={j.id}>
+                      <td>
+                        {when ? formatDate(when) : MISSING}
+                        <span className="aiu-sub aiu-phone-only">{status ? `${status[0].toUpperCase()}${status.slice(1)}` : ''}</span>
+                      </td>
+                      <td className="aiu-col-wide">{status ? <StatusChip tone={tone} label={`${status[0].toUpperCase()}${status.slice(1)}`} /> : MISSING}</td>
+                      <td className="num aiu-col-wide">{count(j.figures_checked ?? j.items_checked)}</td>
+                      <td className="num">{count(j.proposals ?? j.proposed_updates)}</td>
+                      <UsdCell value={j.total_cost_usd ?? j.cost_usd} rate={rate} />
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
+
+      {!storedModel && (isLoading || byUser.length > 0 || data) && (
+        <section className="tw-card" aria-labelledby="aiu-users-title">
+          <div className="tw-card__head">
+            <div className="tw-card__titles">
+              <h2 id="aiu-users-title" className="tw-card__title">By user</h2>
+              <p className="tw-card__sub">All time, most spend first</p>
+            </div>
+          </div>
+          {!isLoading && byUser.length === 0 ? (
+            <p className="aiu-line">No price checks yet.</p>
+          ) : (
+            <table className="admin-table aiu-table">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col" className="aiu-col-wide">Company</th>
+                  <th scope="col" className="num">Checks</th>
+                  <th scope="col" className="num">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading && [0, 1, 2].map((i) => (
+                  <tr key={i} aria-hidden="true"><td>{skel}</td><td className="aiu-col-wide">{skel}</td><td className="num">{skel}</td><td className="num">{skel}</td></tr>
+                ))}
+                {byUser.map((row) => (
+                  <tr key={row.user_id}>
+                    <td>
+                      {row.name || row.email}
+                      <span className="aiu-sub">{row.email}</span>
+                      <span className="aiu-sub aiu-phone-only">{row.company_name || 'No company'}</span>
+                    </td>
+                    <td className="aiu-col-wide">{row.company_name || MISSING}</td>
+                    <td className="num">{count(row.calls)}</td>
+                    <UsdCell value={row.total_cost_usd} rate={rate} />
                   </tr>
                 ))}
               </tbody>
             </table>
+          )}
+        </section>
+      )}
+
+      {failures.length > 0 && (
+        <section className="tw-card" aria-labelledby="aiu-fail-title">
+          <div className="tw-card__head">
+            <div className="tw-card__titles">
+              <h2 id="aiu-fail-title" className="tw-card__title">Recent failures</h2>
+              <p className="tw-card__sub">Raw error text, for platform admins</p>
+            </div>
           </div>
-        </div>
+          <table className="admin-table aiu-table aiu-table--fail">
+            <thead>
+              <tr>
+                <th scope="col">When</th>
+                <th scope="col" className="aiu-col-wide">Stage</th>
+                <th scope="col">Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {failures.map((f) => (
+                <tr key={f.id}>
+                  <td className="aiu-nowrap">
+                    {formatDateTime(f.created_at)}
+                    <span className="aiu-sub">{[f.triggered_by__username, f.quote_id ? `quote ${f.quote_id}` : null].filter(Boolean).join(' · ') || MISSING}</span>
+                    <span className="aiu-sub aiu-phone-only">{f.failed_at_call || MISSING}</span>
+                  </td>
+                  <td className="aiu-col-wide">{f.failed_at_call || MISSING}</td>
+                  <td className="aiu-error-text">{f.error_message}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
       )}
     </div>
   );

@@ -1447,9 +1447,19 @@ code, pre, kbd, samp, .tw-code {
   background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card);
   color: var(--text-primary); text-align: left; text-decoration: none; font: inherit;
 }
-.tw-kpi--link { cursor: pointer; transition: background-color 0.12s; }
+.tw-kpi--link { position: relative; cursor: pointer; transition: background-color 0.12s; }
 .tw-kpi--link:hover { background: var(--bg-surface-hover); }
-.tw-kpi--link:focus-visible { outline: 2px solid var(--focus-outline); outline-offset: 2px; }
+/* Clickable tile: an empty link/button stretched over the tile carries the
+   click and focus; the aside (an InfoTip) sits above it as its own control. */
+.tw-kpi__hit {
+  position: absolute; inset: -1px; z-index: 0;
+  margin: 0; padding: 0; border: 0; border-radius: var(--radius-card);
+  background: transparent; cursor: pointer; font: inherit; color: inherit;
+}
+.tw-kpi__hit:focus-visible { outline: 2px solid var(--focus-outline); outline-offset: 2px; }
+.tw-kpi--link .tw-kpi__head, .tw-kpi--link .tw-kpi__figure, .tw-kpi--link .tw-kpi__note { pointer-events: none; }
+.tw-kpi__aside { display: inline-flex; flex-shrink: 0; }
+.tw-kpi--link .tw-kpi__aside { position: relative; z-index: 1; pointer-events: auto; }
 .tw-kpi__head { display: flex; align-items: center; height: 16px; justify-content: space-between; gap: 8px; min-width: 0; }
 .tw-kpi__label { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tw-kpi__figure { font: 600 28px/34px var(--font-sans); letter-spacing: var(--tracking-figure); font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

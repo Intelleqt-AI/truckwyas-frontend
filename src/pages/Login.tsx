@@ -21,6 +21,12 @@ const PROOF_POINTS = [
   "See who owes you, and for how long",
 ];
 
+// The shared public demo account behind "Just exploring? View demo". Also
+// imported by pages/Demo.tsx (the /demo deep link the marketing site's
+// "Open the demo" button uses), so both sign in through the exact same
+// credentials and the same useLogin mutation.
+export const DEMO_CREDENTIALS = { username: "demo@truckwys.com", password: "TruckDemo2026!" } as const;
+
 const Login = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -99,7 +105,7 @@ const Login = () => {
   };
 
   const handleDemoLogin = () => {
-    const demoCredentials = { username: "demo@truckwys.com", password: "TruckDemo2026!" };
+    const demoCredentials = { ...DEMO_CREDENTIALS };
     setError(null);
     setValidationErrors({});
     setFormData(demoCredentials);

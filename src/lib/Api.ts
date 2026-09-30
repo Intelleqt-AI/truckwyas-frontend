@@ -51,7 +51,8 @@ api.interceptors.response.use(
       localStorage.removeItem('access');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+      // /demo handles a stale session itself (it asks, then signs in fresh).
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login') && window.location.pathname !== '/demo') {
         window.location.href = '/login';
       }
     }

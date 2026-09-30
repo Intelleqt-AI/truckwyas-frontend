@@ -135,7 +135,8 @@ export interface RouteMapViewProps {
   /** Precise coords already known for each end (from search selection or a prior map click). Preferred over re-geocoding the text. */
   pickupCoords?: PointCoords | null;
   deliveryCoords?: PointCoords | null;
-  height?: number;
+  /** Pixels, or a CSS length such as "100%" to fill a sized parent. */
+  height?: number | string;
   /**
    * Polyline of the currently selected route, as [lat, lon] pairs. When present
    * this is drawn verbatim — it's the exact route the backend priced — and the
@@ -235,6 +236,17 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
 
   // Bumped after map init so the draw effect below runs once the map is ready.
   const [ready, setReady] = useState(0);
+  // Leaflet only re-measures on a window resize. When the container is sized
+  // by its parent (height="100%"), it can change size on its own, so tell
+  // Leaflet whenever it does or the tiles stop short of the new edge.
+  useEffect(() => {
+    const inst = mapInstanceRef.current;
+    const el = mapDivRef.current;
+    if (!inst || !el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => inst.map.invalidateSize());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ready]);
   // Stable key for the geometry so the effect only re-runs on an actual change.
   const geomKey = geometry && geometry.length > 1
     ? `${geometry.length}:${geometry[0].join()}:${geometry[geometry.length - 1].join()}`

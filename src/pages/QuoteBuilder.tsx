@@ -1186,7 +1186,18 @@ export default function QuoteBuilder() {
   };
 
   // ---- map panel (shared between the inline card and the expanded modal) ----
-  const renderMapPanel = (height: number, expandButton?: React.ReactNode, closeButton?: React.ReactNode) => (
+  // `fill`: the map grows to fill its card (the in-page card is stretched to
+  // the cost card's height), with `height` as its minimum.
+  const renderMapPanel = (height: number, expandButton?: React.ReactNode, closeButton?: React.ReactNode, fill = false) => {
+    const map = (
+      <RouteMapView pickup={pickup} delivery={delivery} pickupCoords={pickupCoords} deliveryCoords={deliveryCoords} height={fill ? "100%" : height}
+        onMapClick={handleMapClick}
+        stops={stops.filter(s => s.coords).map(s => ({ lat: s.coords!.lat, lon: s.coords!.lon, label: s.location }))}
+        geometry={route?.geometry && route.geometry.length > 1
+          ? route.geometry.map(p => [p.lat, p.lon] as [number, number])
+          : undefined} />
+    );
+    return (
     <>
       <div className="qb-maphead">
         <span className="qb-maphead__hint">
@@ -1235,12 +1246,11 @@ export default function QuoteBuilder() {
           {closeButton}
         </div>
       </div>
-      <RouteMapView pickup={pickup} delivery={delivery} pickupCoords={pickupCoords} deliveryCoords={deliveryCoords} height={height}
-        onMapClick={handleMapClick}
-        stops={stops.filter(s => s.coords).map(s => ({ lat: s.coords!.lat, lon: s.coords!.lon, label: s.location }))}
-        geometry={route?.geometry && route.geometry.length > 1
-          ? route.geometry.map(p => [p.lat, p.lon] as [number, number])
-          : undefined} />
+      {fill ? (
+        <div style={{ position: "relative", flex: "1 1 auto", minHeight: height }}>
+          <div style={{ position: "absolute", inset: 0 }}>{map}</div>
+        </div>
+      ) : map}
       {/* Stops — optional intermediate points between Collection and Delivery,
           actually routed through (RouteCalculatorView chains them into the
           TomTom call) and reflected in distance/fuel/toll/base-rate. Right
@@ -1348,7 +1358,8 @@ export default function QuoteBuilder() {
         </div>
       )}
     </>
-  );
+    );
+  };
 
   // ---- styles ----
   // Principles v2: 1px border, no shadow, 12px card radius.
@@ -1576,13 +1587,10 @@ export default function QuoteBuilder() {
       </div>
 
       {/* 2 — map + cost */}
-      {/* Top-aligned: each card is as tall as its content (no stretched card). */}
-      <div className="qb-grid qb-grid--mapcost" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", alignItems: "start", gap: 16, marginBottom: 16 }}>
-          <div style={{ ...cardS, overflow: "hidden" }}>
-            {/* The "+ Add stop" row (43px) joins the card once both points
-                are set; the map gives up that height (and a little more),
-                so the card ends within 48px of the checklist cost card
-                instead of ~80px below it (R10). */}
+      {/* Stretched: both cards share the row's height, and the map grows to
+          fill its card (never below inlineMapH), so the two always line up. */}
+      <div className="qb-grid qb-grid--mapcost" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", alignItems: "stretch", gap: 16, marginBottom: 16 }}>
+          <div style={{ ...cardS, overflow: "hidden", display: "flex", flexDirection: "column" }}>
             {renderMapPanel(inlineMapH, (
               <Dialog>
                 <DialogTrigger asChild>
@@ -1600,7 +1608,7 @@ export default function QuoteBuilder() {
                   ))}
                 </DialogContent>
               </Dialog>
-            ))}
+            ), undefined, true)}
           </div>
           <section className="qb-cost" aria-labelledby="qb-cost-title" style={{ ...cardS, padding: "var(--card-pad, 20px)" }}>
             <div className="qb-cost__head">
@@ -1885,11 +1893,17 @@ export default function QuoteBuilder() {
                           What this quote charges per kilometre, before fuel, tolls and allowances.
                         </div>
                         <div style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginTop: 8 }}>
-                          A vehicle type's own rate is used whenever one is picked. With no type &mdash;
-                          or a type that has no rate of its own &mdash; the quote falls back to your
+                          A vehicle type's own rate is used whenever one is picked. With no type,
+                          or a type that has no rate of its own, the quote falls back to your
                           company default.
                         </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border-row)" }}>
+                        {baseRateSource && (
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border-row)" }}>
+                            <span style={{ color: "var(--text-tertiary)" }}>In use</span>
+                            <span style={{ flexShrink: 0 }}>{baseRateSource}</span>
+                          </div>
+                        )}
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, paddingTop: 5, ...(baseRateSource ? {} : { marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border-row)" }) }}>
                           <span style={{ color: "var(--text-tertiary)" }}>Company default</span>
                           <span style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
                             {Number(companyProfile?.default_base_rate_per_km) > 0
@@ -1922,11 +1936,6 @@ export default function QuoteBuilder() {
                     className="qb-mini"
                     style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }}
                   />
-                  {baseRateSource && (
-                    <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 4 }}>
-                      {baseRateSource}
-                    </div>
-                  )}
                 </div>
               </div>
             </>)}
@@ -1971,13 +1980,10 @@ export default function QuoteBuilder() {
           benchmark={benchmark}
           guard={guard}
           billingBlocked={billingBlocked}
-          saving={saving}
           quoteId={savedQuoteId || (isEditing ? Number(editId) : null)}
           hasAppliedAi={aiApplied !== null}
           onApply={applyAiRecommendation}
           onCancelApplied={undoAiRecommendation}
-          onSend={openSendPreview}
-          onSaveDraft={() => save(false)}
         />
       )}
 

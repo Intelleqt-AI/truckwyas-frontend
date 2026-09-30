@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { postData } from "@/lib/Api";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatMoney, formatNumber, formatPercent, MISSING } from "@/lib/formatters";
 import { Loader } from "@/components/Loader";
-import { Sparkles, AlertTriangle, ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { StatusChip } from "@/components/ui/StatusChip";
+import { ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
+import "./ai-price-analysis.css";
 
 // ---- API contract (must match compute_pricing() in
 // backend/core/services/quote_ai_pricing.py exactly). Every price, margin
@@ -74,9 +77,10 @@ const ALL_MINE_KEY = choiceKey({});
 const ITEM_LABELS: Record<string, string> = {
   fuel: "Fuel", tolls: "Tolls", driver_allowance: "Driver allowance", base_rate: "Base rate", cross_border: "Cross-border",
 };
-const rateText = (n?: number | null) => (n == null ? "—" : `R ${Number(n).toFixed(2)}/km`);
-const perLitre = (n?: number | null) => (n == null ? "—" : `R ${Number(n).toFixed(2)}/L`);
-const num = (n?: number | null) => (n == null ? "—" : Number(n).toLocaleString(undefined, { maximumFractionDigits: 1 }));
+// en-ZA figures from the shared formatters ("R 21,50/L", "1 234,5").
+const rateText = (n?: number | null) => (n == null ? MISSING : `${formatMoney(Number(n))}/km`);
+const perLitre = (n?: number | null) => (n == null ? MISSING : `${formatMoney(Number(n))}/L`);
+const num = (n?: number | null) => (n == null ? MISSING : formatNumber(Number(n), { maximumFractionDigits: 1 }));
 
 // What the panel says when there's no win probability to show.
 const WIN_REASON_COPY: Record<string, string> = {
@@ -85,6 +89,25 @@ const WIN_REASON_COPY: Record<string, string> = {
   outside_training_range: "Model hasn't seen quotes like this yet",
   prediction_failed: "Couldn't score this quote",
 };
+
+// One source link drawn as the site's own favicon (fetched from the site
+// itself, no third-party favicon service). Falls back to the site's initial
+// when there is none, including one that "loads" as an empty image.
+function SourceLogo({ source }: { source: AIPriceReviewReference }) {
+  const [failed, setFailed] = useState(false);
+  let host = "";
+  try { host = new URL(source.url).hostname; } catch { /* not a URL: initial only */ }
+  const name = source.title || host || source.url;
+  return (
+    <a className="aip-src" href={source.url} target="_blank" rel="noopener noreferrer"
+      title={name} aria-label={`${name} (opens in a new tab)`}>
+      {host && !failed
+        ? <img src={`https://${host}/favicon.ico`} alt="" width={16} height={16} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)}
+            onLoad={(e) => { const i = e.currentTarget; if (!i.naturalWidth || !i.naturalHeight) setFailed(true); }} />
+        : <span aria-hidden="true">{(host.replace(/^www\./, "") || name).charAt(0).toUpperCase()}</span>}
+    </a>
+  );
+}
 
 interface AIPriceAnalysisPanelProps {
   // False while the form isn't ready — the panel stays mounted (keeping its
@@ -124,14 +147,11 @@ interface AIPriceAnalysisPanelProps {
   benchmark: any;
   guard: any;
   billingBlocked: boolean;
-  saving: boolean;
   quoteId?: number | null;
   // True while an applied AI price can still be undone ("Use actual price").
   hasAppliedAi: boolean;
   onApply: (review: AIPriceReviewResponse, key: string) => void;
   onCancelApplied: () => void;
-  onSend: () => void;
-  onSaveDraft: () => void;
 }
 
 export function AIPriceAnalysisPanel(props: AIPriceAnalysisPanelProps) {
@@ -139,8 +159,8 @@ export function AIPriceAnalysisPanel(props: AIPriceAnalysisPanelProps) {
     active, routeReady, routeError, onOpenFuelSettings, routeData, route, total, chargeDistance, oneWayDistance, legs, tripType, durationMinutes,
     origin, destination, vehicleType, weightKg, customerId, fuelCost, fuelLitres, fuelConsumption, fuelPricePerL,
     fuelType, fuelZone, tollCost, driverAllowance, crossBorderCost, baseRatePerKm, pickupDate,
-    benchmark, guard, billingBlocked, saving, quoteId, hasAppliedAi,
-    onApply, onCancelApplied, onSend, onSaveDraft,
+    benchmark, guard, billingBlocked, quoteId, hasAppliedAi,
+    onApply, onCancelApplied,
   } = props;
 
   const aiAutoFiredRef = useRef(false);
@@ -232,7 +252,7 @@ export function AIPriceAnalysisPanel(props: AIPriceAnalysisPanelProps) {
         ? res
         : { success: false, message: res?.__error?.status === 429
             ? (res.__error.data?.message || res.__error.data?.detail || "Please wait a few seconds, then Re-check with AI.")
-            : "AI price verification is temporarily unavailable — please try again shortly." };
+            : "The AI price check is unavailable. Try again shortly." };
       setNotice(null);
       setReview(next);
       setReviewLaneSig(sigAtRequest);
@@ -266,15 +286,6 @@ export function AIPriceAnalysisPanel(props: AIPriceAnalysisPanelProps) {
 
   useEffect(() => () => { if (tickRef.current) clearInterval(tickRef.current); }, []);
 
-  const cardS: React.CSSProperties = {
-    background: "var(--bg-surface)",
-    border: "1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border-subtle))",
-    borderRadius: 4, marginBottom: 14,
-  };
-  const labelS: React.CSSProperties = { fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.04em", textTransform: "uppercase" };
-  const linkS: React.CSSProperties = { color: "var(--text-tertiary)", textDecoration: "underline" };
-  const smallBtnS: React.CSSProperties = { fontSize: 12, background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 4, padding: "5px 9px", cursor: "pointer", whiteSpace: "nowrap" };
-
   const ok = review?.success === true && !!review.combinations && !!review.cost_breakdown;
   const hasRunOnce = review !== null;
   const breakdown = (review?.cost_breakdown || {}) as Record<ItemKey, AIPriceReviewItem>;
@@ -305,24 +316,23 @@ export function AIPriceAnalysisPanel(props: AIPriceAnalysisPanelProps) {
   const needsApply = ok && !isStale && !!combo && quoteKey !== currentKey;
 
   const anyAiChosen = TOPICS.some((t) => choices[t] === "ai");
-  const headlineLabel = !ok ? "" : anyAiChosen
-    ? "Recommended price"
+  // Label + one note under the headline price (no sentence restating it).
+  const headlineLabel = anyAiChosen ? "Recommended price" : "Your price";
+  const headlineNote = !ok ? "" : anyAiChosen
+    ? "With the AI figures you picked"
     : toggleable.length > 0
-      ? "Your price — AI changes switched off"
+      ? "AI changes switched off"
       : review?.verification_status === "unverified"
-        ? "Your price — AI couldn't verify market figures"
-        : "Your price — no market-verified changes";
+        ? "Market figures couldn't be verified"
+        : "No market changes needed";
 
   const toggle = (t: ItemKey) => setChoices((c) => ({ ...c, [t]: c[t] === "ai" ? "mine" : "ai" }));
 
-  const sourceLinks = (sources: AIPriceReviewReference[]) => sources.length > 0 && (
-    <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>
-      {sources.map((s, i) => (
-        <span key={s.url}>
-          <a href={s.url} target="_blank" rel="noopener noreferrer" style={linkS}>{s.title}</a>
-          {i < sources.length - 1 ? " · " : ""}
-        </span>
-      ))}
+  // Sources as their site logos; the name is the tooltip and the label.
+  const sourceLinks = (sources: AIPriceReviewReference[], lead?: string) => sources.length > 0 && (
+    <div className="aip-sources">
+      {lead && <span>{lead}</span>}
+      {sources.map((s) => <SourceLogo key={s.url} source={s} />)}
     </div>
   );
 
@@ -335,34 +345,29 @@ export function AIPriceAnalysisPanel(props: AIPriceAnalysisPanelProps) {
   };
   const aiSubLine = (t: ItemKey, item: AIPriceReviewItem) => {
     const d = item.detail || {};
-    if (item.verdict === "could_not_verify") return "your figure kept";
-    if (t === "fuel") return `official ${d.zone ?? ""} ${perLitre(d.market_price_per_litre)} × ${num(d.litres)} L`;
-    if (t === "tolls") return `published ${formatCurrency(d.market_one_way_zar ?? 0)} one way${(d.legs ?? 1) > 1 ? ` × ${d.legs}` : ""}`;
+    if (item.verdict === "could_not_verify") return "Your figure kept";
+    if (t === "fuel") return `Official ${d.zone ? `${String(d.zone).toLowerCase()} ` : ""}${perLitre(d.market_price_per_litre)} × ${num(d.litres)} L`;
+    if (t === "tolls") return `Published ${formatCurrency(d.market_one_way_zar ?? 0)} one way${(d.legs ?? 1) > 1 ? ` × ${d.legs}` : ""}`;
     if (t === "driver_allowance") {
-      return `R ${Number(d.rate_per_day_zar).toFixed(2)}/day × ${d.days} day${d.days === 1 ? "" : "s"} (≈${d.hours_per_day} driving h/day)`;
+      return `${formatMoney(Number(d.rate_per_day_zar))}/day × ${d.days} day${d.days === 1 ? "" : "s"} (about ${num(d.hours_per_day)} driving h a day)`;
     }
     if (t === "base_rate") {
-      const band = `benchmark band ${rateText(d.market_low_per_km)} – ${rateText(d.market_high_per_km)}`;
+      const band = `Benchmark ${rateText(d.market_low_per_km)} to ${rateText(d.market_high_per_km)}`;
       return item.toggleable ? `${rateText(d.ai_rate_per_km)} × ${num(d.distance_km)} km · ${band}` : band;
     }
     return null;
   };
   const verificationLine = (item: AIPriceReviewItem) => item.verification === "verified"
-    ? <span style={{ color: "var(--status-success)" }}>checked on source page</span>
-    : <span style={{ color: "var(--status-warning)" }}>not verified — {item.verification_note}</span>;
-
-  const DETAIL_GRID = "minmax(110px, 1fr) minmax(130px, 1fr) minmax(160px, 1.2fr) minmax(110px, auto)";
-  const priceCell = (amount: number, sub: React.ReactNode, tone: "chosen" | "plain" | "muted", extra?: React.ReactNode) => (
-    <div>
-      <div style={{
-        fontFamily: "var(--font-mono)", fontSize: 12.5, fontWeight: tone === "chosen" ? 600 : 400,
-        color: tone === "chosen" ? "var(--accent-primary)" : tone === "muted" ? "var(--text-tertiary)" : "var(--text-primary)",
-      }}>
-        {formatCurrency(amount)}
+    ? <div className="aip-check"><StatusChip tone="success" size="sm" label="Verified on source" /></div>
+    : (
+      <div className="aip-check">
+        <StatusChip tone="warning" size="sm" label="Not verified" />
+        {item.verification_note && <span className="aip-sub" style={{ marginTop: 0 }}>{item.verification_note}</span>}
       </div>
-      {sub && <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{sub}</div>}
-      {extra && <div style={{ fontSize: 11, marginTop: 1 }}>{extra}</div>}
-    </div>
+    );
+
+  const amount = (value: number, tone: "chosen" | "plain" | "muted" = "plain") => (
+    <div className={`aip-amt${tone === "chosen" ? " is-chosen" : tone === "muted" ? " is-muted" : ""}`}>{formatCurrency(value)}</div>
   );
 
   // Base rate -> price -> margin, holding the chosen fuel/tolls/driver fixed.
@@ -370,10 +375,10 @@ export function AIPriceAnalysisPanel(props: AIPriceAnalysisPanelProps) {
     if (!ok || !combo) return [];
     const d = breakdown.base_rate?.detail || {};
     const candidates: { rate: number; label: string }[] = [
-      { rate: d.market_low_per_km, label: "market low" },
-      { rate: d.market_high_per_km, label: "market high" },
-      { rate: d.your_rate_per_km, label: "yours" },
-      { rate: combo.base_rate_per_km, label: "selected" },
+      { rate: d.market_low_per_km, label: "Market low" },
+      { rate: d.market_high_per_km, label: "Market high" },
+      { rate: d.your_rate_per_km, label: "Yours" },
+      { rate: combo.base_rate_per_km, label: "Selected" },
     ].filter((r) => r.rate != null && Number(r.rate) > 0);
     const byRate = new Map<string, { rate: number; labels: string[] }>();
     for (const c of candidates) {
@@ -385,22 +390,22 @@ export function AIPriceAnalysisPanel(props: AIPriceAnalysisPanelProps) {
     return [...byRate.values()].sort((a, b) => a.rate - b.rate).map((r) => {
       const base = Math.round(chargeDistance * r.rate);
       const price = combo.pass_through_zar + base;
-      return { ...r, price, margin: price > 0 ? (base / price) * 100 : 0, selected: r.labels.includes("selected") };
+      return { ...r, price, margin: price > 0 ? (base / price) * 100 : 0, selected: r.labels.includes("Selected") };
     });
   })();
   const showScenarios = scenarioRows.length > 1;
 
   const winModel = review?.win_model;
-  // Scored for the client / pickup date / weight at check time — a change
+  // Scored for the client / pickup date / weight at check time: a change
   // there never leaves the old probability looking current.
   // Only matters when there is a probability to go stale.
   const winStale = reviewWinSig !== null && reviewWinSig !== winSig
     && !!winModel?.available && combo?.win_probability != null;
   const winP = winStale ? null : combo?.win_probability;
   const winCaption = winStale
-    ? "Client, date or weight changed — Re-check to update"
+    ? "Client, date or weight changed. Re-check to update."
     : winModel?.available && winP != null
-      ? `${winModel.scope === "user" ? "Personal AI" : "Platform AI"} · ${winModel.training_samples} closed quotes`
+      ? `${winModel.scope === "user" ? "From your quotes" : "From platform quotes"} · ${formatNumber(winModel.training_samples, { maximumFractionDigits: 0 })} closed`
       : WIN_REASON_COPY[winModel?.reason || ""] || WIN_REASON_COPY.not_enough_history;
   const fuelDetail = breakdown.fuel?.detail || {};
   const fuelSettingStale = ok && breakdown.fuel?.verdict === "needs_adjustment"
@@ -408,132 +413,125 @@ export function AIPriceAnalysisPanel(props: AIPriceAnalysisPanelProps) {
   const crossBorder = review?.cross_border_zar ?? 0;
   const yourTotal = combos[ALL_MINE_KEY]?.price_zar;
 
+  // One chip for how much of the review was checked on its source pages.
+  const verifyChip = !ok || isStale ? null
+    : review?.verification_status === "verified" ? <StatusChip tone="success" label="Verified" />
+    : review?.verification_status === "partially_verified" ? <StatusChip tone="warning" label="Partly verified" />
+    : <StatusChip tone="neutral" label="Not verified" />;
+  const busy = loading && isRecheck;
+  const guardLine = guard ? [(guard.explanations || guard.warnings || [])[0], guard.suggestions?.[0]].filter(Boolean).join(". ") : "";
+  const showFoot = needsApply || hasAppliedAi;
+
   if (!active) return null;
 
   return (
-    <div style={cardS}>
-      {/* market rate — above the AI analysis itself, per spec */}
-      {benchmark?.market_avg_rate ? (
-        <div style={{ padding: "10px 18px", borderBottom: "1px solid var(--border-row)", fontSize: 12.5, color: "var(--text-tertiary)" }}>
-          Market benchmark: <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>{formatCurrency(benchmark.market_avg_rate)}</span> avg
-          {benchmark.recommendation ? ` · ${benchmark.recommendation}` : ""}
+    <section className="tw-card tw-card--flush aip" aria-labelledby="aip-title">
+      <div className="aip__head">
+        <div className="tw-card__titles">
+          <h2 id="aip-title" className="tw-card__title">
+            AI price check
+            <InfoTip label="How the AI price check works">
+              Checks today's official fuel price, this lane's benchmark, current toll tariffs and the driver allowance. Each figure is checked on its source page. Prices, margins and win chance are calculated by TruckWys, not the AI.
+            </InfoTip>
+          </h2>
+          <p className="tw-card__sub">Fuel, tolls, driver and rate against the market</p>
         </div>
-      ) : null}
+        {hasRunOnce && (
+          <div className="aip__tools">
+            {verifyChip}
+            <button type="button" className="tw-btn tw-btn--sm" onClick={() => runReview(true)}
+              disabled={loading || billingBlocked || !routeReady}
+              title={routeReady ? undefined : "Waiting for the route for these inputs"}>
+              {loading ? "Checking…" : routeReady ? "Re-check" : "Waiting for route…"}
+            </button>
+          </div>
+        )}
+      </div>
 
-      <div style={{ padding: "16px 18px" }}>
+      <div className={`aip__body${busy ? " is-busy" : ""}`}>
         {!hasRunOnce && loading && !isRecheck ? (
-          <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-            <Sparkles size={18} color="var(--accent-primary)" style={{ flexShrink: 0, marginTop: 2 }} />
+          <div className="aip-msg" aria-live="polite">
+            <Loader size={20} />
             <div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>AI is reviewing this quote…</div>
-              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 3 }}>
-                Checking today's official fuel price and this lane's benchmark, and searching the current toll tariffs and driver allowance — each figure is checked on its source page.
-              </div>
-              <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
-                <Loader size={16} />
-                <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)" }}>{elapsedSec}s</span>
-              </div>
+              <p className="aip-msg__title">Checking market prices</p>
+              <p className="aip-msg__text">Fuel, tolls and driver allowance, each on its source page. <span className="aip-msg__time">{elapsedSec} s</span></p>
             </div>
           </div>
         ) : !hasRunOnce ? (
-          <div style={{ fontSize: 13, color: routeError ? "var(--status-warning)" : "var(--text-tertiary)" }}>
+          <p className={`aip-note${routeError ? " aip-note--warn" : " aip-note--muted"}`}>
             {routeError
-              ? "The route couldn't be calculated, so the AI check can't run yet — change an address or the vehicle to retry."
-              : "Preparing AI price check…"}
-          </div>
+              ? "The route couldn't be calculated. Change an address or the truck to retry."
+              : "Preparing the price check…"}
+          </p>
         ) : !ok ? (
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-start", opacity: loading && isRecheck ? 0.5 : 1 }}>
-            <AlertTriangle size={16} color="var(--status-warning)" style={{ flexShrink: 0, marginTop: 1 }} />
+          <div className="aip-msg">
             <div>
-              <div style={{ fontWeight: 600, fontSize: 13.5 }}>AI analysis unavailable right now</div>
-              <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 2 }}>
-                {review?.message || "Couldn't complete AI price verification — you can still send or save this quote manually."}
-              </div>
+              <p className="aip-msg__title">Price check unavailable</p>
+              <p className="aip-msg__text">{review?.message || "You can still save or send this quote."}</p>
             </div>
           </div>
         ) : isStale ? (
           // Never show an old AI price as if it were current.
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-start", opacity: loading && isRecheck ? 0.5 : 1 }}>
-            <AlertTriangle size={16} color="var(--status-warning)" style={{ flexShrink: 0, marginTop: 1 }} />
+          <div className="aip-msg">
             <div>
-              <div style={{ fontWeight: 600, fontSize: 13.5 }}>Quote changed after the AI check</div>
-              <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 2 }}>
-                Re-check with AI for a price that matches this route and these figures.
-              </div>
+              <p className="aip-msg__title">Quote changed after the check</p>
+              <p className="aip-msg__text">Re-check for a price that matches this route and these figures.</p>
             </div>
           </div>
         ) : combo && (
-          <div style={{ opacity: loading && isRecheck ? 0.5 : 1, transition: "opacity 150ms ease" }}>
-            {/* headline: price (click for details) | margin | win probability — one line */}
-            <div style={{ display: "flex", gap: 32, alignItems: "flex-start", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => setDetailsOpen((v) => !v)}
-                title="Show how this price was built"
-                style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
-              >
-                <div style={labelS}>{headlineLabel}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, color: "var(--accent-primary)" }}>
-                    {formatCurrency(combo.price_zar)}
-                  </span>
-                  {detailsOpen ? <ChevronUp size={16} color="var(--text-tertiary)" /> : <ChevronDown size={16} color="var(--text-tertiary)" />}
-                </div>
-                <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>Click for the full breakdown</div>
-              </button>
-              <div>
-                <div style={labelS}>Margin</div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{combo.margin_pct}%</div>
-                <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                  {formatCurrency(combo.margin_zar)} after fuel, tolls &amp; driver
-                </div>
+          <>
+            {benchmark?.market_avg_rate ? (
+              <p className="aip-note aip-note--muted" style={{ marginBottom: 12 }}>
+                Market benchmark <span className="aip-note__num">{formatCurrency(benchmark.market_avg_rate)}</span> average
+                {benchmark.recommendation ? ` · ${benchmark.recommendation}` : ""}
+              </p>
+            ) : null}
+
+            <div className="aip-figs">
+              <div className="aip-fig">
+                <div className="aip-fig__label">{headlineLabel}</div>
+                <div className="aip-fig__value">{formatCurrency(combo.price_zar)}</div>
+                <div className="aip-fig__note">{headlineNote}</div>
               </div>
-              <div>
-                <div style={labelS}>Win probability</div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>
-                  {winModel?.available && winP != null ? `${Math.round(winP * 100)}%` : "—"}
-                </div>
-                <div style={{ fontSize: 11.5, color: winStale ? "var(--status-warning)" : "var(--text-tertiary)" }}>{winCaption}</div>
+              <div className="aip-fig">
+                <div className="aip-fig__label">Margin</div>
+                <div className="aip-fig__value">{formatPercent(combo.margin_pct)}</div>
+                <div className="aip-fig__note">{formatCurrency(combo.margin_zar)} after fuel, tolls and driver</div>
+              </div>
+              <div className="aip-fig">
+                <div className="aip-fig__label">Win chance</div>
+                <div className="aip-fig__value">{winModel?.available && winP != null ? formatPercent(winP * 100, 0) : MISSING}</div>
+                <div className={`aip-fig__note${winStale ? " is-warn" : ""}`}>{winCaption}</div>
               </div>
             </div>
 
-            {review!.price_reasoning && (
-              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 10, maxWidth: 640 }}>{review!.price_reasoning}</div>
-            )}
-            {review!.honesty_note && (
-              <div style={{ fontSize: 12.5, color: "var(--status-warning)", marginTop: 4, maxWidth: 640 }}>{review!.honesty_note}</div>
-            )}
-            {fuelSettingStale && (
-              <div style={{ fontSize: 12.5, color: "var(--status-warning)", marginTop: 4, maxWidth: 640 }}>
-                Your company fuel price ({perLitre(fuelDetail.your_price_per_litre)}) is below today's official
-                {" "}{perLitre(fuelDetail.market_price_per_litre)} — every quote is under-priced on fuel until it's updated.
-                {onOpenFuelSettings && (
-                  <>{" "}<button type="button" onClick={onOpenFuelSettings}
-                    style={{ fontSize: 12.5, background: "transparent", border: "none", padding: 0, color: "var(--accent-primary)", textDecoration: "underline", cursor: "pointer" }}>
-                    Update it in Settings
-                  </button></>
+            {(review!.price_reasoning || review!.honesty_note || fuelSettingStale) && (
+              <div className="aip-notes">
+                {review!.price_reasoning && <p className="aip-note">{review!.price_reasoning}</p>}
+                {review!.honesty_note && <p className="aip-note aip-note--warn">{review!.honesty_note}</p>}
+                {fuelSettingStale && (
+                  <p className="aip-note aip-note--warn">
+                    Your fuel price ({perLitre(fuelDetail.your_price_per_litre)}) is below today's official {perLitre(fuelDetail.market_price_per_litre)}, so every quote is under-priced on fuel.
+                    {onOpenFuelSettings && <>{" "}<button type="button" className="aip-link" onClick={onOpenFuelSettings}>Update it in settings</button></>}
+                  </p>
                 )}
               </div>
             )}
 
             {/* base rate -> price -> margin */}
             {showScenarios && (
-              <div style={{ marginTop: 12, overflowX: "auto" }}>
-                <table style={{ borderCollapse: "collapse", fontSize: 12.5, minWidth: 360 }}>
+              <div className="aip-scroll">
+                <table className="aip-table aip-table--scen">
                   <thead>
-                    <tr>
-                      {["Base rate", "Price", "Margin", ""].map((h) => (
-                        <th key={h} style={{ ...labelS, textAlign: "left", padding: "4px 14px 4px 0", fontWeight: 500 }}>{h}</th>
-                      ))}
-                    </tr>
+                    <tr><th>Base rate</th><th className="is-end">Price</th><th className="is-end">Margin</th><th /></tr>
                   </thead>
                   <tbody>
                     {scenarioRows.map((s) => (
-                      <tr key={s.rate} style={{ fontWeight: s.selected ? 600 : 400, color: s.selected ? "var(--accent-primary)" : "var(--text-primary)" }}>
-                        <td style={{ padding: "3px 14px 3px 0", fontFamily: "var(--font-mono)" }}>{rateText(s.rate)}</td>
-                        <td style={{ padding: "3px 14px 3px 0", fontFamily: "var(--font-mono)" }}>{formatCurrency(s.price)}</td>
-                        <td style={{ padding: "3px 14px 3px 0", fontFamily: "var(--font-mono)" }}>{s.margin.toFixed(1)}%</td>
-                        <td style={{ padding: "3px 0", fontSize: 11.5, color: "var(--text-tertiary)", fontWeight: 400 }}>{s.labels.join(" · ")}</td>
+                      <tr key={s.rate} className={s.selected ? "is-selected" : undefined}>
+                        <td className="is-num">{rateText(s.rate)}</td>
+                        <td className="is-num is-end">{formatCurrency(s.price)}</td>
+                        <td className="is-num is-end">{formatPercent(s.margin)}</td>
+                        <td className="is-muted" style={{ fontWeight: 400 }}>{s.labels.join(" · ")}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -541,153 +539,145 @@ export function AIPriceAnalysisPanel(props: AIPriceAnalysisPanelProps) {
               </div>
             )}
 
+            <button type="button" className="aip-toggle" onClick={() => setDetailsOpen((v) => !v)} aria-expanded={detailsOpen}>
+              {detailsOpen ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
+              {detailsOpen ? "Hide breakdown" : "Show breakdown"}
+            </button>
+
             {/* in-depth: your figure vs the AI's, per item, with citations */}
             {detailsOpen && (
-              <div style={{ marginTop: 12, overflowX: "auto" }}>
-                <div style={{ display: "grid", gap: 6, minWidth: 560 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: DETAIL_GRID, gap: 12, padding: "0 12px" }}>
-                    {["Item", "Your price", "AI analysis price", "Action"].map((h, i) => (
-                      <span key={h} style={{ ...labelS, textAlign: i === 3 ? "right" : "left" }}>{h}</span>
-                    ))}
-                  </div>
-                  {TOPICS.filter((t) => breakdown[t]).map((t) => {
-                    const item = breakdown[t];
-                    const d = item.detail || {};
-                    const choice = choices[t];
-                    const open = openItems.has(t);
-                    const toggleOpen = () => setOpenItems((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(t)) next.delete(t); else next.add(t);
-                      return next;
-                    });
-                    return (
-                      <div key={t} style={{ padding: "9px 12px", background: "var(--bg-surface-hover)", borderRadius: 4 }}>
-                        <div style={{ display: "grid", gridTemplateColumns: DETAIL_GRID, gap: 12, alignItems: "start" }}>
-                          <button type="button" onClick={toggleOpen} aria-expanded={open}
-                            title={open ? "Hide details" : "Show how this was checked"}
-                            style={{ display: "flex", alignItems: "center", gap: 4, background: "transparent", border: "none", padding: 0,
-                              cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>
-                            {open ? <ChevronDown size={14} color="var(--text-tertiary)" /> : <ChevronRight size={14} color="var(--text-tertiary)" />}
-                            {ITEM_LABELS[t]}
-                          </button>
-                          {priceCell(item.current_value_zar, yourSubLine(t, d), item.toggleable && choice === "mine" ? "chosen" : "plain")}
-                          {priceCell(item.ai_value_zar, aiSubLine(t, item), item.toggleable ? (choice === "ai" ? "chosen" : "muted") : "plain", verificationLine(item))}
-                          <div style={{ textAlign: "right" }}>
-                            {item.toggleable ? (
-                              <button type="button" onClick={() => toggle(t)} style={smallBtnS}>
-                                {choice === "ai" ? "Use my price" : "Use AI price"}
+              <>
+                <div className="aip-scroll" style={{ marginTop: 12 }}>
+                  <table className="aip-table aip-table--items">
+                    <thead>
+                      <tr><th>Item</th><th>Your price</th><th>AI price</th><th className="is-end" /></tr>
+                    </thead>
+                    <tbody>
+                      {TOPICS.filter((t) => breakdown[t]).map((t) => {
+                        const item = breakdown[t];
+                        const d = item.detail || {};
+                        const choice = choices[t];
+                        const open = openItems.has(t);
+                        const toggleOpen = () => setOpenItems((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(t)) next.delete(t); else next.add(t);
+                          return next;
+                        });
+                        const yourSub = yourSubLine(t, d);
+                        const aiSub = aiSubLine(t, item);
+                        const hasMore = (t === "tolls" && Array.isArray(d.plazas) && d.plazas.length > 0) || !!item.reason || (item.sources || []).length > 0;
+                        return [
+                          <tr key={t}>
+                            <td>
+                              <button type="button" className="aip-item" onClick={toggleOpen} aria-expanded={open} disabled={!hasMore}
+                                style={hasMore ? undefined : { cursor: "default" }}
+                                title={hasMore ? (open ? "Hide details" : "Show how this was checked") : undefined}>
+                                {hasMore && (open ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />)}
+                                {ITEM_LABELS[t]}
                               </button>
-                            ) : (
-                              <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>
-                            )}
-                          </div>
-                        </div>
-                        {open && (
-                        <div style={{ marginTop: 8, marginLeft: 6, paddingLeft: 12, borderLeft: "2px solid var(--border-subtle)" }}>
-                        {t === "tolls" && Array.isArray(d.plazas) && d.plazas.length > 0 && (
-                          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", display: "grid", gap: 2 }}>
-                            {d.toll_class && <div>{d.toll_class}, one way:</div>}
-                            {d.plazas.map((p: any) => (
-                              <div key={p.plaza} style={{ fontFamily: "var(--font-mono)" }}>
-                                {p.plaza}: yours {p.your_tariff_zar != null ? formatCurrency(p.your_tariff_zar) : "—"} · published{" "}
-                                {p.market_tariff_zar != null ? formatCurrency(p.market_tariff_zar) : "—"}
-                                <span style={{ fontFamily: "inherit", color: p.verified ? "var(--status-success)" : "var(--status-warning)" }}>
-                                  {" "}· {p.verified ? "confirmed on source" : p.note}
-                                </span>
-                              </div>
-                            ))}
-                            {Array.isArray(d.other_plazas_mentioned) && d.other_plazas_mentioned.length > 0 && (
-                              <div>Also mentioned, not on this route (not priced): {d.other_plazas_mentioned.join(", ")}</div>
-                            )}
-                          </div>
-                        )}
-                        {item.reason && (
-                          <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 6 }}>{item.reason}</div>
-                        )}
-                        {sourceLinks(item.sources || [])}
-                        </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {crossBorder > 0 && (
-                    <div style={{ padding: "9px 12px", background: "var(--bg-surface-hover)", borderRadius: 4 }}>
-                      <div style={{ display: "grid", gridTemplateColumns: DETAIL_GRID, gap: 12, alignItems: "start" }}>
-                        <span style={{ fontSize: 13, fontWeight: 500 }}>{ITEM_LABELS.cross_border}</span>
-                        {priceCell(crossBorder, null, "plain")}
-                        {priceCell(crossBorder, "not AI-checked", "plain")}
-                        <div style={{ textAlign: "right", fontSize: 12, color: "var(--text-tertiary)" }}>—</div>
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ display: "grid", gridTemplateColumns: DETAIL_GRID, gap: 12, padding: "9px 12px", borderTop: "1px solid var(--border-subtle)" }}>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>Total</span>
-                    {priceCell(yourTotal ?? 0, "your figures", "plain")}
-                    {priceCell(combo.price_zar, anyAiChosen ? "= recommended price" : "= your price", "chosen")}
-                    <span />
-                  </div>
+                            </td>
+                            <td>
+                              {amount(item.current_value_zar, item.toggleable && choice === "mine" ? "chosen" : "plain")}
+                              {yourSub && <div className="aip-sub">{yourSub}</div>}
+                            </td>
+                            <td>
+                              {amount(item.ai_value_zar, item.toggleable ? (choice === "ai" ? "chosen" : "muted") : "plain")}
+                              {aiSub && <div className="aip-sub">{aiSub}</div>}
+                              {verificationLine(item)}
+                            </td>
+                            <td className="is-end">
+                              {item.toggleable && (
+                                <button type="button" className="tw-btn tw-btn--sm" onClick={() => toggle(t)}>
+                                  {choice === "ai" ? "Use mine" : "Use AI"}
+                                </button>
+                              )}
+                            </td>
+                          </tr>,
+                          open && hasMore && (
+                            <tr key={`${t}-more`} className="aip-more">
+                              <td colSpan={4}>
+                                <div className="aip-more__body">
+                                  {t === "tolls" && Array.isArray(d.plazas) && d.plazas.length > 0 && (
+                                    <>
+                                      {d.toll_class && <div className="aip-plaza">{d.toll_class}, one way</div>}
+                                      {d.plazas.map((p: any) => (
+                                        <div key={p.plaza} className="aip-plaza">
+                                          {p.plaza}: yours {p.your_tariff_zar != null ? formatCurrency(p.your_tariff_zar) : MISSING} · published{" "}
+                                          {p.market_tariff_zar != null ? formatCurrency(p.market_tariff_zar) : MISSING}
+                                          {" · "}
+                                          <span style={{ color: p.verified ? "var(--status-success-text)" : "var(--status-warning-text)" }}>
+                                            {p.verified ? "confirmed on source" : p.note}
+                                          </span>
+                                        </div>
+                                      ))}
+                                      {Array.isArray(d.other_plazas_mentioned) && d.other_plazas_mentioned.length > 0 && (
+                                        <div className="aip-plaza">Also mentioned, not on this route (not priced): {d.other_plazas_mentioned.join(", ")}</div>
+                                      )}
+                                    </>
+                                  )}
+                                  {item.reason && <p className="aip-note">{item.reason}</p>}
+                                  {sourceLinks(item.sources || [], "Sources")}
+                                </div>
+                              </td>
+                            </tr>
+                          ),
+                        ];
+                      })}
+                      {crossBorder > 0 && (
+                        <tr>
+                          <td style={{ fontWeight: 500 }}>{ITEM_LABELS.cross_border}</td>
+                          <td>{amount(crossBorder)}</td>
+                          <td>{amount(crossBorder)}<div className="aip-sub">Not checked by AI</div></td>
+                          <td />
+                        </tr>
+                      )}
+                      <tr className="is-total">
+                        <td>Total</td>
+                        <td>{amount(yourTotal ?? 0)}<div className="aip-sub" style={{ fontWeight: 400 }}>Your figures</div></td>
+                        <td>{amount(combo.price_zar, "chosen")}<div className="aip-sub" style={{ fontWeight: 400 }}>{anyAiChosen ? "Recommended price" : "Your price"}</div></td>
+                        <td />
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-                {review!.return_leg && (
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 10, padding: "8px 12px", border: "1px dashed var(--border-subtle)", borderRadius: 4 }}>
-                    One-way trip: if the truck comes back empty, the return costs about{" "}
-                    <b style={{ fontFamily: "var(--font-mono)" }}>{formatCurrency(review!.return_leg.total_zar)}</b>{" "}
-                    (fuel {formatCurrency(review!.return_leg.fuel_zar)} · tolls {formatCurrency(review!.return_leg.tolls_zar)} ·
-                    driver {formatCurrency(review!.return_leg.driver_zar)}). It isn't in the price — the base rate has to cover it.
-                  </div>
-                )}
-                {references.length > 0 && (
-                  <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 8 }}>
-                    Sources:{" "}
-                    {references.map((ref, i) => (
-                      <span key={ref.url}>
-                        <a href={ref.url} target="_blank" rel="noopener noreferrer" style={linkS}>{ref.title}</a>
-                        {i < references.length - 1 ? " · " : ""}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+                <div className="aip-notes">
+                  {review!.return_leg && (
+                    <p className="aip-note">
+                      One-way trip: an empty run home costs about{" "}
+                      <span className="aip-note__num">{formatCurrency(review!.return_leg.total_zar)}</span>{" "}
+                      (fuel {formatCurrency(review!.return_leg.fuel_zar)} · tolls {formatCurrency(review!.return_leg.tolls_zar)} · driver {formatCurrency(review!.return_leg.driver_zar)}). It isn't in the price, so the base rate has to cover it.
+                    </p>
+                  )}
+                  {sourceLinks(references, "Sources")}
+                </div>
+              </>
             )}
-          </div>
+          </>
         )}
       </div>
 
-      {/* revenue guard — unchanged */}
+      {/* revenue guard */}
       {guard && guard.risk_level && guard.risk_level !== "SAFE" && (
-        <div style={{ padding: "10px 18px", borderTop: "1px solid var(--border-row)", background: guard.risk_level === "AT_RISK" ? "var(--status-danger-bg)" : "var(--status-warning-bg)", fontSize: 13 }}>
-          <b style={{ color: guard.risk_level === "AT_RISK" ? "var(--status-danger)" : "var(--status-warning)" }}>{guard.risk_level === "AT_RISK" ? "At risk" : "Caution"}</b>
-          <span style={{ color: "var(--text-secondary)" }}> · {(guard.explanations || guard.warnings || [])[0]}{guard.suggestions?.[0] ? ` — ${guard.suggestions[0]}` : ""}</span>
+        <div className={`aip-banner aip-banner--${guard.risk_level === "AT_RISK" ? "danger" : "warning"}`}>
+          <span className="aip-banner__label">{guard.risk_level === "AT_RISK" ? "At risk" : "Caution"}</span>
+          {guardLine && ` · ${guardLine}`}
         </div>
       )}
 
-      {notice && (
-        <div style={{ padding: "8px 18px", borderTop: "1px solid var(--border-row)", fontSize: 12.5, color: "var(--status-warning)" }}>{notice}</div>
-      )}
+      {notice && <div className="aip-notice" role="status">{notice}</div>}
 
-      {/* actions */}
-      <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "14px 18px", borderTop: "1px solid var(--border-row)", flexWrap: "wrap" }}>
-        {needsApply && (
-          <button onClick={() => onApply(review!, currentKey)} style={{ fontSize: 14, fontWeight: 500, background: "transparent", border: "1px solid var(--accent-primary)", color: "var(--accent-primary)", borderRadius: 4, padding: "9px 14px", cursor: "pointer" }}>Apply recommended</button>
-        )}
-        {hasAppliedAi && ok && !isStale && !needsApply && (
-          <span style={{ fontSize: 13, color: "var(--status-success)" }}>AI price applied</span>
-        )}
-        {hasAppliedAi && (
-          <button onClick={onCancelApplied} style={{ fontSize: 14, background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 4, padding: "10px 16px", cursor: "pointer" }}>Use actual price</button>
-        )}
-        {hasRunOnce && !loading && (
-          <button onClick={() => runReview(true)} disabled={billingBlocked || !routeReady}
-            title={routeReady ? undefined : "Waiting for the route for these inputs"}
-            style={{ fontSize: 13, background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 4, padding: "8px 12px", cursor: routeReady ? "pointer" : "default", opacity: routeReady ? 1 : 0.6 }}>
-            {routeReady ? "Re-check with AI" : "Waiting for route…"}
-          </button>
-        )}
-        {hasRunOnce && loading && isRecheck && (
-          <button disabled style={{ fontSize: 13, background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-tertiary)", borderRadius: 4, padding: "8px 12px" }}>Re-checking…</button>
-        )}
-        <button onClick={onSend} disabled={saving} style={{ fontSize: 14, fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 4, padding: "10px 16px", cursor: "pointer" }}>Send quote to client</button>
-        <button onClick={onSaveDraft} disabled={saving} style={{ fontSize: 14, background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 4, padding: "10px 16px", cursor: "pointer" }}>Save as draft</button>
-      </div>
-    </div>
+      {/* Save and Send live in the price bar below, next to the one price. */}
+      {showFoot && (
+        <div className="aip__foot">
+          {needsApply && (
+            <button type="button" className="tw-btn" onClick={() => onApply(review!, currentKey)}>Apply recommended</button>
+          )}
+          {hasAppliedAi && ok && !isStale && !needsApply && <StatusChip tone="success" label="AI price applied" />}
+          {hasAppliedAi && (
+            <button type="button" className="tw-btn tw-btn--ghost" onClick={onCancelApplied}>Use actual price</button>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

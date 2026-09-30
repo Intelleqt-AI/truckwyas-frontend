@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { FitText } from '@/components/ui/FitText';
 import { formatMoneyWhole } from '@/lib/formatters';
 
 /**
@@ -25,7 +26,7 @@ export function FinTile({ label, info, value, valueTitle, sub, subTone, action, 
         {label}
         {info && <InfoTip>{info}</InfoTip>}
       </h2>
-      <div className={`fin-tile__value${small ? ' fin-tile__value--sm' : ''}`} title={valueTitle}>{value}</div>
+      <FitText as="div" className={`fin-tile__value${small ? ' fin-tile__value--sm' : ''}`} title={valueTitle}>{value}</FitText>
       <div className="fin-tile__foot">
         {sub != null && sub !== '' && (
           <span className={`fin-tile__sub${subTone === 'danger' ? ' fin-text-danger' : ''}`}>{sub}</span>

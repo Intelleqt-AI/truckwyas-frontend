@@ -1,4 +1,5 @@
 import { Children, type CSSProperties, type ReactNode } from 'react';
+import { FitText } from './FitText';
 
 /**
  * v3 standard KPI tile (DESIGN-PRINCIPLES §11.6). Label, figure, one line.
@@ -43,7 +44,7 @@ export function KpiTile({ label, figure, note, tone = 'neutral', emphasis, aside
         <span className="tw-kpi__label">{label}</span>
         {aside}
       </span>
-      <span className="tw-kpi__figure">{figure}</span>
+      <FitText className="tw-kpi__figure">{figure}</FitText>
       {note !== undefined && note !== null && note !== '' && (
         <span className={`tw-kpi__note tw-kpi__note--${tone}`}>{note}</span>
       )}

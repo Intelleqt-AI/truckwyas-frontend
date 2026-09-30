@@ -9,11 +9,15 @@ import { formatDate, formatDateTime, formatMoney, formatMoneyWhole, formatNumber
 
 // OpenAI cost of the quote price check only (not a platform-wide LLM-cost
 // dashboard: Copilot chat and the other LLM call sites don't track cost yet).
-// Two backend shapes are supported:
+// Backend shapes supported:
 //  - per-check (PR #113): every quote check was a paid web search, so the
 //    panel shows checks, cost per user and failed runs;
-//  - stored figures (the redesign): quote checks are free lookups and the only
-//    spend is the monthly refresh job, so the panel shows those runs.
+//  - stored figures (backend PR #114): quote checks compare with stored
+//    figures and cost nothing; the only spend is the monthly refresh job's
+//    lookups. The response adds `by_trigger`:
+//    {check|refresh|auto|manual: {calls, total_cost_usd}} (all time), where
+//    auto/manual are the older paid web-search checks, kept as history;
+//  - `refresh_jobs` (an earlier guess at the redesign) still renders if sent.
 
 // Rand figures are estimates. The backend may send its own rate; otherwise a
 // fixed planning rate is used, and the tip says so.
@@ -37,8 +41,11 @@ interface RefreshJob {
   figures_checked?: number | null; items_checked?: number | null;
   proposals?: number | null; proposed_updates?: number | null;
 }
+interface TriggerTotals { calls: number; total_cost_usd: number; }
+type Trigger = 'check' | 'refresh' | 'auto' | 'manual';
 interface AiUsageResponse {
   all_time: Totals; this_month: Totals;
+  by_trigger?: Partial<Record<Trigger | string, TriggerTotals>>;
   by_month?: MonthRow[];
   by_user?: ByUserRow[];
   recent_failures?: RecentFailure[];
@@ -75,7 +82,17 @@ export default function AiUsagePanel() {
     ? `Rand figures use the server's rate of ${formatNumber(rate, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per US$.`
     : `Rand figures are estimates at R ${formatNumber(rate, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per US$, a fixed planning rate, not a live exchange rate.`;
   const jobs = data?.refresh_jobs ?? [];
-  const storedModel = Array.isArray(data?.refresh_jobs);
+  const hasJobs = Array.isArray(data?.refresh_jobs);
+  const byTrigger = data?.by_trigger && typeof data.by_trigger === 'object' ? data.by_trigger : null;
+  const trig = (k: Trigger): TriggerTotals => ({ calls: byTrigger?.[k]?.calls ?? 0, total_cost_usd: byTrigger?.[k]?.total_cost_usd ?? 0 });
+  // Stored-figure backend: by_trigger (PR #114), or the older refresh_jobs guess.
+  const storedModel = !!byTrigger || hasJobs;
+  const legacy = { calls: trig('auto').calls + trig('manual').calls, total_cost_usd: trig('auto').total_cost_usd + trig('manual').total_cost_usd };
+  const triggerRows = byTrigger ? [
+    { key: 'check', label: 'Price checks on quotes', note: 'Stored figures, no OpenAI call', ...trig('check') },
+    { key: 'refresh', label: 'Rate refresh lookups', note: 'Monthly job, web search', ...trig('refresh') },
+    ...(legacy.calls > 0 ? [{ key: 'legacy', label: 'Older web-search checks', note: 'Before stored figures, history', ...legacy }] : []),
+  ] : [];
   const byUser = [...(data?.by_user ?? [])].filter((r) => r.calls > 0).sort((a, b) => b.total_cost_usd - a.total_cost_usd);
   const failures = data?.recent_failures ?? [];
   const months = [...(data?.by_month ?? [])].sort((a, b) => b.month.localeCompare(a.month)).slice(0, 12);
@@ -83,7 +100,8 @@ export default function AiUsagePanel() {
   const totalsNote = (t?: Totals) => {
     if (!t) return '';
     const zar = `≈ ${formatMoneyWhole(t.total_cost_usd * rate)}`;
-    if (storedModel) return `${zar} · ${plural(t.refresh_runs ?? 0, 'refresh run')}`;
+    if (hasJobs && !byTrigger) return `${zar} · ${plural(t.refresh_runs ?? 0, 'refresh run')}`;
+    if (byTrigger) return `${zar} · ${plural(t.calls ?? 0, 'run')}${t.failed_calls ? ` · ${count(t.failed_calls)} failed` : ''}`;
     return `${zar} · ${plural(t.calls ?? 0, 'check')}${t.failed_calls ? ` · ${count(t.failed_calls)} failed` : ''}`;
   };
   const perCheck = !storedModel && data && (data.all_time.calls ?? 0) > 0
@@ -92,7 +110,7 @@ export default function AiUsagePanel() {
   const tip = (
     <InfoTip label="What this counts">
       OpenAI cost of the quote price check only. {storedModel
-        ? 'Price checks on quotes use stored figures and cost nothing; the spend is the monthly job that re-checks toll tariffs and the driver allowance on their source pages.'
+        ? 'Price checks on quotes compare with stored figures and cost nothing. The spend is the monthly job that re-checks toll tariffs and the driver allowance on their source pages. Runs count both.'
         : 'Every price check on a quote runs a paid web search.'} Copilot chat and other AI features aren't tracked here yet. {rateNote}
     </InfoTip>
   );
@@ -136,7 +154,35 @@ export default function AiUsagePanel() {
 
   return (
     <div className="aiu" aria-busy={isLoading || undefined}>
-      <KpiStats title="AI price check cost" aria-label="AI price check cost" items={statItems} />
+      {/* The stats line and the checks-vs-refresh split answer the same
+          question (what did it cost), so they share a row on wide screens. */}
+      <div className={byTrigger ? 'aiu-top' : undefined}>
+        <KpiStats title="AI price check cost" aria-label="AI price check cost" items={statItems} />
+        {byTrigger && (
+        <section className="tw-card" aria-labelledby="aiu-trig-title">
+          <div className="tw-card__head">
+            <div className="tw-card__titles">
+              <h2 id="aiu-trig-title" className="tw-card__title">Checks vs refresh</h2>
+              <p className="tw-card__sub">All time, what each kind of run cost</p>
+            </div>
+          </div>
+          <table className="admin-table aiu-table">
+            <thead>
+              <tr><th scope="col">Run</th><th scope="col" className="num">Runs</th><th scope="col" className="num">Cost</th></tr>
+            </thead>
+            <tbody>
+              {triggerRows.map((r) => (
+                <tr key={r.key}>
+                  <td>{r.label}<span className="aiu-sub">{r.note}</span></td>
+                  <td className="num">{count(r.calls)}</td>
+                  <UsdCell value={r.total_cost_usd} rate={rate} />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+        )}
+      </div>
 
       {(isLoading || months.length > 0) && (
         <section className="tw-card" aria-labelledby="aiu-months-title">
@@ -148,7 +194,7 @@ export default function AiUsagePanel() {
           </div>
           <table className="admin-table aiu-table">
             <thead>
-              <tr><th scope="col">Month</th><th scope="col" className="num">{storedModel ? 'Refresh runs' : 'Checks'}</th><th scope="col" className="num">Cost</th></tr>
+              <tr><th scope="col">Month</th><th scope="col" className="num">{byTrigger ? 'Runs' : hasJobs ? 'Refresh runs' : 'Checks'}</th><th scope="col" className="num">Cost</th></tr>
             </thead>
             <tbody>
               {isLoading && [0, 1, 2].map((i) => (
@@ -166,7 +212,7 @@ export default function AiUsagePanel() {
         </section>
       )}
 
-      {storedModel && (
+      {hasJobs && (
         <section className="tw-card" aria-labelledby="aiu-jobs-title">
           <div className="tw-card__head">
             <div className="tw-card__titles">
@@ -211,12 +257,12 @@ export default function AiUsagePanel() {
         </section>
       )}
 
-      {!storedModel && (isLoading || byUser.length > 0 || data) && (
+      {(!storedModel ? (isLoading || byUser.length > 0 || data) : byUser.length > 0) && (
         <section className="tw-card" aria-labelledby="aiu-users-title">
           <div className="tw-card__head">
             <div className="tw-card__titles">
               <h2 id="aiu-users-title" className="tw-card__title">By user</h2>
-              <p className="tw-card__sub">All time, most spend first</p>
+              <p className="tw-card__sub">{byTrigger ? 'All time, runs they started' : 'All time, most spend first'}</p>
             </div>
           </div>
           {!isLoading && byUser.length === 0 ? (
@@ -227,7 +273,7 @@ export default function AiUsagePanel() {
                 <tr>
                   <th scope="col">Name</th>
                   <th scope="col" className="aiu-col-wide">Company</th>
-                  <th scope="col" className="num">Checks</th>
+                  <th scope="col" className="num">{byTrigger ? 'Runs' : 'Checks'}</th>
                   <th scope="col" className="num">Cost</th>
                 </tr>
               </thead>

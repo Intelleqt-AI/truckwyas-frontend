@@ -22,6 +22,10 @@ export type VerificationKind = "official" | "benchmark" | "source" | "unverified
 export interface AIPriceReviewReference { title: string; url: string; }
 export interface TollPlazaCheck {
   plaza: string; your_tariff_zar?: number | null; market_tariff_zar?: number | null; verified?: boolean; note?: string | null;
+  // Stored-figure backend: which road the plaza is on and the schedule it belongs to.
+  route?: string | null; effective_from?: string | null; verified_at?: string | null;
+  source_url?: string | null; source_name?: string | null;
+  published_tariff_incl_vat_zar?: number | null; matches_yours?: boolean | null;
 }
 // One loose shape for the four items' `detail` (each item fills its own part).
 export interface AIPriceItemDetail {
@@ -32,8 +36,9 @@ export interface AIPriceItemDetail {
   // tolls
   legs?: number; toll_class?: string | null; plazas?: TollPlazaCheck[]; other_plazas_mentioned?: string[];
   your_one_way_zar?: number | null; market_one_way_zar?: number | null; vat_basis?: string | null;
-  // driver allowance
-  rate_per_day_zar?: number | null; allowance_label?: string | null; days?: number | null; hours_per_day?: number | null;
+  sanral_class?: number | null; schedule_from?: string | null;
+  // driver allowance (rate_per_day_zar is the older name of rate_per_night_zar)
+  rate_per_night_zar?: number | null; rate_per_day_zar?: number | null; allowance_label?: string | null; days?: number | null; hours_per_day?: number | null;
   nights?: number | null; allowance_basis?: string | null;
   // base rate
   distance_km?: number; your_rate_per_km?: number | null; ai_rate_per_km?: number | null;
@@ -189,7 +194,7 @@ function failureText(f: Failure, secsLeft: number | null): { title: string; text
       : { title: "Price check isn't available right now", text: "Your quote works as normal." };
     case "cooldown": return { title: "Checked a moment ago", text: wait };
     case "throttled": return { title: "Too many checks this minute", text: wait };
-    case "budget": return { title: "Price checks are paused", text: "The daily limit has been reached. Your quote works as normal." };
+    case "budget": return { title: "Today's price checks are used up", text: "Your company has reached its daily limit. Checks start again at midnight, and your quote works as normal." };
     default: return { title: "Couldn't check market prices", text: "Your quote is unaffected. Try again in a minute." };
   }
 }
@@ -657,9 +662,14 @@ export function AIPriceAnalysisPanel(props: AIPriceAnalysisPanelProps) {
       if ((d.legs ?? 1) > 1 && d.market_one_way_zar != null) lines.push(`Published: ${formatMoney(d.market_one_way_zar)} one way × ${d.legs}`);
     } else if (t === "driver_allowance") {
       const lead = d.allowance_label ? `${clean(d.allowance_label)}: ` : "";
-      if (d.rate_per_day_zar != null && d.nights != null) {
-        lines.push(`${lead}${formatMoney(d.rate_per_day_zar)} a night × ${d.nights} night${d.nights === 1 ? "" : "s"} away`);
-        if (d.days != null) lines.push(`${d.days} driving day${d.days === 1 ? "" : "s"}, about ${num1(d.hours_per_day)} driving hours a day`);
+      const perNight = d.rate_per_night_zar ?? d.rate_per_day_zar;
+      if (perNight != null && d.nights != null) {
+        lines.push(d.nights === 0
+          ? `${lead}${formatMoney(perNight)} a night, none due: the trip fits in one driving day`
+          : `${lead}${formatMoney(perNight)} a night × ${d.nights} night${d.nights === 1 ? "" : "s"} away`);
+        if (d.days != null) lines.push(`${d.days} driving day${d.days === 1 ? "" : "s"}, at most ${num1(d.hours_per_day)} driving hours a day`);
+      } else if (d.rate_per_night_zar != null) {
+        lines.push(`${lead}${formatMoney(d.rate_per_night_zar)} a night away`);
       } else if (d.rate_per_day_zar != null && d.days != null) {
         lines.push(`${lead}${formatMoney(d.rate_per_day_zar)}/day × ${d.days} day${d.days === 1 ? "" : "s"}, about ${num1(d.hours_per_day)} driving hours a day`);
       }
@@ -695,8 +705,12 @@ export function AIPriceAnalysisPanel(props: AIPriceAnalysisPanelProps) {
                   {plazas.map((p) => (
                     <li key={p.plaza} className="aip-plaza">
                       <span className={`aip-dot${p.verified ? " is-ok" : " is-warn"}`} aria-hidden="true" />
-                      {p.plaza}: yours {p.your_tariff_zar != null ? formatMoney(p.your_tariff_zar) : MISSING}, published {p.market_tariff_zar != null ? formatMoney(p.market_tariff_zar) : MISSING}
-                      <span className="aip-plaza__note">{p.verified ? "confirmed" : "not confirmed"}</span>
+                      {p.route ? `${clean(p.route)} ` : ""}{p.plaza}: yours {p.your_tariff_zar != null ? formatMoney(p.your_tariff_zar) : MISSING}, published {p.market_tariff_zar != null ? formatMoney(p.market_tariff_zar) : MISSING}
+                      <span className="aip-plaza__note">
+                        {p.verified
+                          ? (p.effective_from ? `tariff from ${formatDate(p.effective_from)}` : "confirmed")
+                          : (clean(p.note) || "not confirmed")}
+                      </span>
                     </li>
                   ))}
                   {Array.isArray(d.other_plazas_mentioned) && d.other_plazas_mentioned.length > 0 && (

@@ -90,13 +90,14 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
               <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}</p>
             )}
             <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}>Checked {formatDateTime(last.ran_at)} · next check tomorrow at{'\u00a0'}{nextCheck(last.ran_at)}</p>
+            <div className="acct-tiles__label">Checked</div>
             <div className="acct-tiles acct-tiles--3">
               {SCOPES.map(sc => {
                 const n = sc.scope === 'INVOICE' ? last.checked.invoices : sc.scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;
                 const bad = differences.filter(d => d.scope === sc.scope).length;
                 return (
                   <div key={sc.scope}>
-                    <span>{sc.scope === 'MONTH' ? 'Months' : sc.scope === 'CUSTOMER' ? 'Customers' : 'Invoices'} checked</span>
+                    <span>{sc.scope === 'MONTH' ? 'Months' : sc.scope === 'CUSTOMER' ? 'Customers' : 'Invoices'}</span>
                     <strong>{(n ?? 0).toLocaleString('en-ZA')}</strong>
                     {differences.length > 0 && <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>}
                   </div>
@@ -149,11 +150,10 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                         {d.local_url ? <Link className="acct-link" to={d.local_url}>{head}</Link> : <span className="acct-row__title">{head}</span>}
                         {rest.length > 0 && <span className="acct-row__sub"> · {rest.join(' · ')}</span>}
                       </span>
-                      <strong className={`acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : 'Status differs'}</strong>
+                      <strong className={`acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <StatusChip tone="warning" label="Status differs" size="sm" />}</strong>
                     </div>
                     <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)}</div>
-                    <div className="acct-row__sub">TruckWys{'\u00a0'}{showValue(d.truckwys)}</div>
-                    <div className="acct-row__sub">{cfg.short}{'\u00a0'}{showValue(d.provider)}</div>
+                    <dl className="acct-diff-kv"><dt>TruckWys</dt><dd>{showValue(d.truckwys)}</dd><dt>{cfg.short}</dt><dd>{showValue(d.provider)}</dd></dl>
                     {d.provider_url && <a className="acct-link" style={{ fontSize: 13 }} href={d.provider_url} target="_blank" rel="noopener noreferrer">Open in {cfg.short} <ExternalLink size={12} aria-hidden="true" /></a>}
                   </li>
                 );

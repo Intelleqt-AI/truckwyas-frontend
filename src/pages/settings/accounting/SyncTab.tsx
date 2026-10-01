@@ -149,19 +149,19 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
                     <div className="acct-row__title">{e.last_error || 'No reason given'}</div>
                     <div className="acct-row__sub" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                       <span>{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} <DocLink url={e.local_url}>{e.label}</DocLink></span>
-                      <StatusChip tone={meta.tone} label={e.status === 'ERROR' && e.next_attempt_at ? `Retrying · next try ${nextTry(e.next_attempt_at)}` : meta.label} size="sm" />
+                      <StatusChip tone={meta.tone} label={e.status === 'ERROR' && e.next_attempt_at ? `Needs a fix · retry ${nextTry(e.next_attempt_at)}` : meta.label} size="sm" />
                     </div>
                   </div>
                   <div className="acct-row__actions">
                     {/* The usual cause is a mapping or a contact: fix that first, then retry. */}
                     {onOpen && /account|tax|vat|tracking/i.test(e.last_error) && (
-                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => onOpen('mapping')}>Fix in Accounts and VAT</button>
+                      <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={() => onOpen('mapping')}>Fix in Accounts and VAT</button>
                     )}
                     {onOpen && /contact/i.test(e.last_error) && (
-                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => onOpen('contacts')}>Fix in Contacts</button>
+                      <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={() => onOpen('contacts')}>Fix in Contacts</button>
                     )}
                     {canWrite && (
-                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => retry(e)} disabled={retrying === e.id}>
+                      <button type="button" className="tw-btn tw-btn--sm tw-btn--ghost" onClick={() => retry(e)} disabled={retrying === e.id}>
                         {retrying === e.id ? 'Retrying…' : 'Retry now'}
                       </button>
                     )}

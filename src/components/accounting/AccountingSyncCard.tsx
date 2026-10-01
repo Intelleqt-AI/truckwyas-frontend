@@ -34,8 +34,8 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         )}
         {(sync.status === 'ERROR' || sync.status === 'DEAD' || sync.status === 'BLOCKED') && (
           <div className="fin-dl__row">
-            <dt>Latest change failed</dt>
-            <dd style={{ textAlign: 'right', color: 'var(--status-warning-text)' }}>{sync.last_error ? sync.last_error.replace(/\.$/, '') : 'Not sent'}</dd>
+            <dt>Pending</dt>
+            <dd>1 change, see above</dd>
           </div>
         )}
         <div className="fin-dl__row">
@@ -44,7 +44,7 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         </div>
       </dl>
       {sync.url && (
-        <a href={sync.url} target="_blank" rel="noopener noreferrer" className="acct-link" style={{ marginTop: 12, fontSize: 13 }}>
+        <a href={sync.url} target="_blank" rel="noopener noreferrer" className="tw-btn" style={{ marginTop: 12, alignSelf: 'flex-start' }}>
           Open {what} in {name}
           <ExternalLink size={12} aria-hidden="true" />
         </a>
@@ -83,7 +83,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
         {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? "We retry once it's fixed." : 'Fix it, then retry.'}
       </div>
       <Link to={`/settings/integrations/accounting?tab=${/account|tax|vat|tracking/i.test(sync.last_error) ? 'mapping' : 'sync'}`} className="tw-btn fl-notice__action">
-        {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix in Accounts and VAT' : 'View sync issue'}
+        {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix account mapping' : 'View sync issue'}
       </Link>
     </div>
   );
@@ -96,7 +96,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
  */
 export function PaymentSourceBadge({ source, managed = false }: { source?: string | null; managed?: boolean }) {
   const manual = !source || source === 'MANUAL';
-  if (managed) return <span className="acct-source-note"> · {manual ? 'Recorded before Xero' : `From ${source === 'BANK' ? 'bank feed' : providerConfig(source).short}`}</span>;
+  if (managed) return <span className="acct-source-note"> · {manual ? 'Recorded in TruckWys' : `From ${source === 'BANK' ? 'bank feed' : providerConfig(source).short}`}</span>;
   if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;
   return <span className="acct-source-badge">{label}</span>;

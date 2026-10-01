@@ -217,12 +217,13 @@ export function OrgPicker({ connection }: { connection: Connection }) {
           <div className="acct-empty">No organisations came back from {cfg.short}. Use a different login and try again.</div>
         ) : single ? (
           <div className="acct-row acct-org acct-org--confirm">
+            <span className="acct-org__radio"><input type="radio" className="acct-radio" checked readOnly aria-label={`${single.name} selected`} /></span>
             <span className="acct-org__mark"><ProviderLogo provider={connection.provider} /></span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-row__title" style={{ display: 'block' }}>{single.name}</span>
               <span className="acct-row__sub">Books in {single.currency || 'ZAR'}</span>
             </span>
-            <span className="acct-org__radio"><input type="radio" className="acct-radio" checked readOnly aria-label={`${single.name} selected`} /></span>
+            <span />
           </div>
         ) : (
           <div role="radiogroup" aria-labelledby="acct-org-title">
@@ -245,15 +246,13 @@ export function OrgPicker({ connection }: { connection: Connection }) {
         )}
         {unavailable.map(t => (
           <div key={t.tenant_id} className="acct-row acct-org acct-org--confirm is-disabled">
+            <span className="acct-org__radio"><input type="radio" className="acct-radio" disabled aria-label={`${t.name} can't be linked`} /></span>
             <span className="acct-org__mark"><ProviderLogo provider={connection.provider} /></span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
               <span className="acct-row__sub">Books in {t.currency} · only ZAR books can be linked</span>
             </span>
-            <span className="acct-org__radio" style={{ gap: 8, alignItems: 'center' }}>
-              <StatusChip tone="neutral" label="Not supported" size="sm" />
-              <input type="radio" className="acct-radio" disabled aria-label={`${t.name} can't be linked`} />
-            </span>
+            <StatusChip tone="neutral" label="Not supported" size="sm" />
           </div>
         ))}
         <div className="acct-formfoot">

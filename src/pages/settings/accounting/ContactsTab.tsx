@@ -114,7 +114,7 @@ export function ContactsTab({ connection }: { connection: Connection }) {
           <div className="acct-only-phone" style={{ flex: '1 1 160px', minWidth: 0 }}>
             <Select value={status} onValueChange={v => setStatus(v as StatusFilter)}>
               <SelectTrigger aria-label="Status" style={{ minHeight: 36, height: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
-              <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'All statuses' : o.label} ({o.count ?? 0})</SelectItem>)}</SelectContent>
+              <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'Status: all' : o.label} ({o.count ?? 0})</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="acct-kind-filter">
@@ -193,7 +193,7 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   } else if (row.status === 'SKIPPED') {
     match = <div className="acct-row__sub">Not synced. Their documents stay in TruckWys only and show as sync errors.</div>;
   } else {
-    match = <div className="acct-row__sub">Pick an existing {providerName} contact, or we'll create one.{row.candidates.length ? ` ${row.candidates.length} possible.` : ''}</div>;
+    match = <div className="acct-row__sub">Pick a {providerName} contact, or we'll create one.</div>;
   }
 
   const menu: RowActionItem[] = [];

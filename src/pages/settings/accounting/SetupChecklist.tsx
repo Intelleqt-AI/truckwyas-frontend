@@ -18,7 +18,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: connection.status === 'ACTIVE' ? 'done' : 'bad',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status !== 'ACTIVE'
-        ? 'Your sign-in expired.'
+        ? 'Your sign-in expired. Use Reconnect above.'
         : `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`,
     },
     {
@@ -94,18 +94,14 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
               <StepMarker look={it.look} n={i + 1} auto={auto} />
               <div style={{ minWidth: 0 }}>
                 <div className="acct-check__title"><span className="acct-sr">Step {i + 1}: </span>{it.title}</div>
-                <div className="acct-check__desc">{it.desc}{(() => {
-                  const st = blocked && it.key === 'connect' ? 'Action needed' : blocked && it.tab && it.look !== 'done' ? 'Paused' : auto && it.look !== 'done' ? 'Automatic' : null;
-                  return st ? <span className={`acct-step-inline${st === 'Action needed' ? ' is-urgent' : ''}`}> · {st}</span> : null;
-                })()}</div>
+                <div className="acct-check__desc">{it.desc}</div>
+                {auto && it.look !== 'done' && !blocked && <div className="acct-step-inline">Automatic</div>}
               </div>
               {it.tab && it.action && !(blocked && it.look !== 'done') ? (
                 <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>
                   {it.action}
                 </button>
-              ) : blocked && it.key === 'connect' ? <span className="acct-step-auto is-urgent">Action needed</span>
-                : blocked && it.tab && it.look !== 'done' ? <span className="acct-step-auto">Paused</span>
-                : auto && it.look !== 'done' ? <span className="acct-step-auto">Automatic</span>
+              ) : auto && it.look !== 'done' && !blocked ? <span className="acct-step-auto">Automatic</span>
                 : <span />}
             </li>
           );
@@ -121,6 +117,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
 function StepMarker({ look, n, auto }: { look: StepLook; n: number; auto: boolean }) {
   if (look === 'done') return <span className="acct-step-num is-done" aria-hidden="true"><Check size={12} strokeWidth={2.5} /></span>;
   if (look === 'warn') return <span className="acct-step-num is-warn" aria-hidden="true">!</span>;
+  if (look === 'bad' && n === 1) return <span className="acct-step-num is-urgent" aria-hidden="true">1</span>;
   if (look === 'bad') return <span className="acct-step-num is-bad" aria-hidden="true"><X size={12} strokeWidth={2.5} /></span>;
   if (look === 'busy') return <span className="acct-step-num is-busy" aria-hidden="true"><Loader2 size={12} className="animate-spin" /></span>;
   return <span className={`acct-step-num${auto ? ' is-auto' : ''}`} aria-hidden="true">{n}</span>;

@@ -232,9 +232,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         actions={(canWrite && pendingSuggestions.length > 0) || canWrite ? <>
           {canWrite && pendingSuggestions.length > 0 && (
             <button type="button" className="tw-btn tw-btn--primary" onClick={applyAllSuggestions}>
-              {m.missing.length > pendingSuggestions.length
-                ? `Apply suggestions for ${pendingSuggestions.length} of ${m.missing.length}`
-                : `Apply ${pendingSuggestions.length === 1 ? 'suggestion' : `${pendingSuggestions.length} suggestions`}`}
+              {`Apply ${pendingSuggestions.length === 1 ? 'suggestion' : `${pendingSuggestions.length} suggestions`}`}
             </button>
           )}
           <button type="button" className="tw-btn" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>

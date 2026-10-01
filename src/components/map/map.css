@@ -1,0 +1,318 @@
+/* ==========================================================================
+   Map chrome (Leaflet) for RouteMapView and ExpandableRouteMap.
+   Look only: tile URLs, providers and request behaviour live in the
+   components and are unchanged. Everything here reads theme tokens, so a
+   live theme switch (html[data-theme]) restyles markers, lines and controls
+   without remounting the map.
+   ========================================================================== */
+
+.tw-map {
+  --map-accent: var(--accent-primary, #2563EB);
+  --map-ink: var(--text-primary, #0E1116);
+  --map-muted: var(--text-tertiary, #636A75);
+  --map-neutral: var(--text-secondary, #434A55);
+  --map-surface: var(--bg-surface, #FFFFFF);
+  --map-casing: #FFFFFF;
+  --map-halo: color-mix(in srgb, var(--map-accent) 22%, transparent);
+  --map-chip-bg: color-mix(in srgb, var(--bg-surface, #FFFFFF) 82%, transparent);
+  --map-border: var(--border-default, #D8DBE0);
+  --map-shadow: 0 1px 2px rgba(14, 17, 22, 0.16);
+
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle, #E4E6EA);
+  border-radius: var(--radius-nested, 8px);
+  background: var(--bg-raised, #EEF0F3);
+  font-family: var(--font-sans);
+}
+
+/* Dark is the default theme (:root) unless html says light. */
+:root:not([data-theme="light"]) .tw-map {
+  --map-casing: #0B0C0E;
+  --map-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+/* Leaflet's own grey backdrop shows while tiles load; use the surface token. */
+.tw-map .leaflet-container,
+.tw-map.leaflet-container {
+  background: var(--bg-raised, #EEF0F3);
+  font-family: var(--font-sans);
+}
+
+/* No double border where the map sits flush inside a bordered card/dialog
+   (Quote Detail card, Quote Builder map card, the expand dialogs). */
+.bk-card.qd-map .tw-map,
+.qb-grid--mapcost .tw-map,
+[role="dialog"] .tw-map {
+  border: 0;
+  border-radius: 0;
+}
+
+/* --- Dark theme for raster OSM tiles: filter the base tile layer only.
+   Markers, route lines, tooltips and overlays live in other panes and are
+   never filtered. --- */
+:root:not([data-theme="light"]) .tw-map--osm .tw-map-base {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9) saturate(0.6);
+}
+
+/* Route fits use quarter zoom steps (RouteMapView), so tiles are drawn
+   scaled. Leaflet's own seam fix (plus-lighter) then adds the antialiased
+   tile edges together into bright hairlines on light tiles; plain blending
+   shows none. */
+.tw-map .leaflet-container img.leaflet-tile,
+.tw-map.leaflet-container img.leaflet-tile { mix-blend-mode: normal; }
+
+/* --- Focus: token ring instead of the browser/Leaflet blue glow. --- */
+.tw-map .leaflet-container:focus,
+.tw-map.leaflet-container:focus { outline: none; }
+.tw-map .leaflet-container:focus-visible,
+.tw-map.leaflet-container:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--focus-outline, #2563EB);
+}
+.tw-map a:focus-visible,
+.tw-map button:focus-visible,
+.tw-map-btn:focus-visible,
+.tw-map-chip:focus-visible {
+  outline: 2px solid var(--focus-outline, #2563EB);
+  outline-offset: 2px;
+}
+
+/* --- Zoom control: separate rounded icon buttons on the surface token. --- */
+.tw-map .leaflet-bar.leaflet-bar {
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tw-map .leaflet-top.leaflet-left .leaflet-control { margin: 8px 0 0 8px; }
+.tw-map .leaflet-bar.leaflet-bar a,
+.tw-map .leaflet-bar.leaflet-bar a:first-child,
+.tw-map .leaflet-bar.leaflet-bar a:last-child {
+  width: 32px;
+  height: 32px;
+  line-height: 30px;
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--text-primary, #0E1116);
+  background: var(--bg-surface, #FFFFFF);
+  border: 1px solid var(--map-border);
+  border-radius: var(--radius-control, 8px);
+  box-shadow: var(--map-shadow);
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.tw-map .leaflet-bar.leaflet-bar a:hover {
+  background: var(--bg-surface-hover, #F8F9FA);
+  border-color: var(--border-strong, #C3C7CE);
+}
+.tw-map .leaflet-bar.leaflet-bar a.leaflet-disabled {
+  color: var(--text-tertiary, #636A75);
+  background: var(--bg-surface, #FFFFFF);
+  opacity: 0.6;
+}
+
+/* --- Attribution: required by the OSM/TomTom licences; kept, made quiet. --- */
+.tw-map .leaflet-control-attribution {
+  margin: 0 6px 6px 0 !important;
+  padding: 1px 6px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--text-tertiary, #636A75);
+  background: var(--map-chip-bg);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  border-radius: var(--radius-chip, 6px);
+}
+.tw-map .leaflet-control-attribution a { color: inherit; text-decoration: none; }
+.tw-map .leaflet-control-attribution a:hover { color: var(--text-secondary, #434A55); text-decoration: underline; }
+
+/* --- Tooltips --- */
+.tw-map .leaflet-tooltip {
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 16px;
+  font-family: var(--font-sans);
+  color: var(--text-primary, #0E1116);
+  background: var(--bg-overlay, #FFFFFF);
+  border: 1px solid var(--border-overlay, #E4E6EA);
+  border-radius: var(--radius-chip, 6px);
+  box-shadow: var(--shadow-pop, 0 4px 12px rgba(0, 0, 0, 0.12));
+}
+.tw-map .leaflet-tooltip-top::before { border-top-color: var(--bg-overlay, #FFFFFF); }
+.tw-map .leaflet-tooltip-bottom::before { border-bottom-color: var(--bg-overlay, #FFFFFF); }
+.tw-map .leaflet-tooltip-left::before { border-left-color: var(--bg-overlay, #FFFFFF); }
+.tw-map .leaflet-tooltip-right::before { border-right-color: var(--bg-overlay, #FFFFFF); }
+
+/* --- Route lines (stroke from tokens; CSS beats Leaflet's attributes). --- */
+.tw-map path.tw-route-casing { stroke: var(--map-casing); stroke-opacity: 0.9; }
+.tw-map path.tw-route { stroke: var(--map-accent); stroke-opacity: 1; }
+/* Estimated route (R8): same dashed semantics, but accent dashes on a soft
+   casing so it reads against roads on light tiles (accent on the casing and
+   on OSM land is > 4:1; the old muted grey read as another road). */
+.tw-map path.tw-route--preview {
+  stroke: var(--map-accent);
+  stroke-opacity: 1;
+}
+.tw-map path.tw-route-casing--preview { stroke: var(--map-casing); stroke-opacity: 0.75; }
+
+/* The legend for a dashed route: one quiet chip, bottom left (the zoom
+   buttons are top left, expand top right, attribution bottom right). The fit
+   padding in RouteMapView keeps pins clear of it. */
+.tw-map.tw-map--estimated::after {
+  content: 'Estimated route';
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 800;
+  padding: 2px 8px 2px 26px;
+  font: 500 11px/16px var(--font-sans);
+  color: var(--text-secondary, #434A55);
+  background:
+    linear-gradient(90deg, var(--map-accent) 0 5px, transparent 5px 8px, var(--map-accent) 8px 13px) 8px 50% / 13px 3px no-repeat,
+    var(--map-chip-bg);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--border-subtle, #E4E6EA);
+  border-radius: var(--radius-chip, 6px);
+  pointer-events: none;
+}
+.tw-map path.tw-route--return { stroke: var(--map-neutral); stroke-opacity: 0.9; }
+
+/* --- Markers (divIcons; className '' → .tw-pin on the inner element). --- */
+.tw-pin { display: block; line-height: 0; }
+.tw-pin svg { display: block; overflow: visible; filter: drop-shadow(var(--map-shadow-drop, 0 1px 1.5px rgba(0, 0, 0, 0.35))); }
+.tw-pin .f-accent { fill: var(--map-accent); }
+.tw-pin .f-ink { fill: var(--map-ink); }
+.tw-pin .f-neutral { fill: var(--map-neutral); }
+.tw-pin .f-casing { fill: var(--map-casing); }
+.tw-pin .f-white { fill: #FFFFFF; }
+.tw-pin .s-casing { stroke: var(--map-casing); }
+
+/* Numbered stop / route badge: small neutral circle, tabular numerals. */
+.tw-pin-num {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--map-surface);
+  color: var(--map-ink);
+  border: 1.5px solid var(--map-neutral);
+  box-shadow: 0 0 0 1.5px var(--map-casing), var(--map-shadow);
+  font: 600 10px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* Letter badge for the picker's return marker. */
+.tw-pin-letter {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--map-neutral);
+  color: var(--map-surface);
+  box-shadow: 0 0 0 2px var(--map-casing), var(--map-shadow);
+  font: 600 10px/1 var(--font-sans);
+  letter-spacing: 0;
+}
+
+/* Vehicle: ink dot with a truck glyph and an accent halo. */
+.tw-pin-vehicle {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--map-ink);
+  color: var(--map-surface);
+  box-shadow: 0 0 0 2px var(--map-casing), 0 0 0 7px var(--map-halo), var(--map-shadow);
+}
+.tw-pin-vehicle svg { width: 12px; height: 12px; display: block; }
+
+/* Temp pin while reverse-geocoding a double-click. */
+.tw-pin-temp {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--map-muted);
+  box-shadow: 0 0 0 2px var(--map-casing), 0 0 0 6px color-mix(in srgb, var(--map-muted) 25%, transparent);
+}
+
+/* --- Overlay buttons / chips (expand, close, traffic, hints). --- */
+.tw-map-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-primary, #0E1116);
+  background: var(--bg-surface, #FFFFFF);
+  border: 1px solid var(--border-default, #D8DBE0);
+  border-radius: var(--radius-control, 8px);
+  box-shadow: 0 1px 2px rgba(14, 17, 22, 0.16);
+  font-family: var(--font-sans);
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.tw-map-btn:hover { background: var(--bg-surface-hover, #F8F9FA); border-color: var(--border-strong, #C3C7CE); }
+
+.tw-map-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 16px;
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+  color: var(--text-secondary, #434A55);
+  background: var(--map-chip-bg, rgba(255, 255, 255, 0.82));
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border-subtle, #E4E6EA);
+  border-radius: var(--radius-chip, 6px);
+}
+.tw-map-chip strong { color: var(--text-primary, #0E1116); font-weight: 600; }
+
+button.tw-map-chip {
+  min-height: 32px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-primary, #0E1116);
+  background: var(--bg-surface, #FFFFFF);
+  border-color: var(--border-default, #D8DBE0);
+  box-shadow: 0 1px 2px rgba(14, 17, 22, 0.16);
+}
+button.tw-map-chip:hover { background: var(--bg-surface-hover, #F8F9FA); }
+.tw-map-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+
+/* Touch: 44px targets. */
+@media (pointer: coarse) {
+  .tw-map .leaflet-bar.leaflet-bar a,
+  .tw-map .leaflet-bar.leaflet-bar a:first-child,
+  .tw-map .leaflet-bar.leaflet-bar a:last-child { width: 44px; height: 44px; line-height: 42px; font-size: 20px; }
+  .tw-map-btn { width: 44px; height: 44px; }
+  button.tw-map-chip { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-map .leaflet-bar a, .tw-map-btn { transition: none; }
+}

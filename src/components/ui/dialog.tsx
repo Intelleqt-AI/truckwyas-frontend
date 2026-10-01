@@ -19,7 +19,7 @@ const DialogOverlay = React.forwardRef<
       // their whole content in a position:fixed, z-9999 shell to escape the
       // app root's overflow:hidden — a dialog at the default z-50 would
       // render behind that and just silently not be visible.
-      "fixed inset-0 z-[10000] bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-[10000] bg-[var(--modal-backdrop)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}
@@ -62,7 +62,7 @@ const DialogContent = React.forwardRef<
       >
         {children}
         {!hideClose && (
-          <DialogPrimitive.Close className="absolute right-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none">
+          <DialogPrimitive.Close className="absolute right-1 top-1 inline-flex h-11 w-11 items-center justify-center rounded-md text-[color:var(--text-secondary)] transition-colors hover:text-[color:var(--text-primary)] hover:bg-[var(--bg-surface-hover)] focus:outline-none focus-visible:[outline:2px_solid_var(--accent-primary)] focus-visible:[outline-offset:2px]">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>

@@ -1,16 +1,21 @@
+import './copilot-page.css';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { TriangleAlert, Check, Bot, Plus, ArrowUp, MessagesSquare, Trash2 } from 'lucide-react';
+import SectionHeader from '@/components/layout/SectionHeader';
+import OverflowMenu from '@/components/ui/OverflowMenu';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { CAPITAL_LAUNCHED } from '@/lib/features';
+import { toast } from '@/lib/toast';
+import { normaliseFigures, formatMoney, formatDate, formatDateTime, formatDays } from '@/lib/formatters';
+import { saDateISO, saDaysBetween } from '@/lib/dates';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { postData, fetchData, deleteData } from '@/lib/Api';
 import { useAuth } from '@/lib/AuthContext';
 import Markdown from '@/components/copilot/Markdown';
 import ProposalCard, { Proposal } from '@/components/copilot/ProposalCard';
-
-function relTime(iso: string): string {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (d < 1) return 'now'; if (d < 60) return `${d}m`;
-  const h = Math.floor(d / 60); if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
-}
+import ConversationList, { ConversationSummary, conversationTitle } from '@/components/copilot/ConversationList';
+import ConversationsSheet from '@/components/copilot/ConversationsSheet';
 
 interface Action { label: string; route: string; }
 interface ProposedAction {
@@ -26,6 +31,24 @@ interface Message {
   proposal?: Proposal | null;
   animate?: boolean;
   degraded?: boolean; // reply came from the rules engine (AI unavailable), not the LLM
+  /** When the reply was written (stored created_at, or when it arrived). */
+  createdAt?: string | null;
+}
+
+/**
+ * The day a stretch of the conversation was written (R8): said once, as a
+ * divider, when the conversation starts and whenever the day changes, so an
+ * old answer's figures never read as today's without repeating the age on
+ * every reply. "Today", "Yesterday", else "15 Jun 2026 · 104 days ago".
+ * The full date and time of the first message that day are the title.
+ */
+function dayDivider(iso: string): string {
+  const day = saDateISO(new Date(iso));
+  if (!day) return '';
+  const age = saDaysBetween(day) ?? 0;
+  if (age <= 0) return 'Today';
+  if (age === 1) return 'Yesterday';
+  return `${formatDate(day)} · ${formatDays(age)} ago`;
 }
 
 // The Typewriter streams raw text, which would flash unrendered markdown syntax.
@@ -33,33 +56,61 @@ interface Message {
 // inline code) skip the animation and render through <Markdown> immediately;
 // plain replies animate and then hand off to <Markdown> when done (onDone).
 function looksLikeMarkdown(s: string): boolean {
-  return s.includes('|') || s.includes('```') || s.includes('**') || s.includes('`')
+  return s.includes('|') || s.includes('```') || s.includes(' • ') || s.includes('**') || s.includes('`')
     || /\[[^\]]+\]\([^)]+\)/.test(s) || /^#{1,6}\s/m.test(s)
     || /^\s*[-*]\s/m.test(s) || /^\s*\d+\.\s/m.test(s);
 }
 
-const STARTERS: { title: string; prompt: string; hint: string }[] = [
-  { title: "What's overdue?", prompt: "What's overdue?", hint: 'Chase the right accounts first' },
-  { title: 'Fast-pay capacity', prompt: 'How much can I advance?', hint: 'Eligible invoices & net payout' },
-  { title: 'Quotes pipeline', prompt: "How's my pipeline?", hint: 'Win/loss & open quotes' },
-  { title: 'Fleet status', prompt: 'Fleet status', hint: 'Active, idle & maintenance' },
+/**
+ * House figures in replies (display only; the stored text is untouched).
+ * normaliseFigures skips an amount directly followed by a comma ("R28,443, 46
+ * days"), so those are rewritten here first.
+ */
+const houseFigures = (text: string) => normaliseFigures(
+  text.replace(/\bR\s?(\d{1,3}(?:,\d{3})+)(?=,(?:\s|$))/g, (_m, int: string) => formatMoney(Number(int.replace(/,/g, '')), 0)),
+);
+
+/** The one wording for the ask box (the top bar search uses it too). */
+const ASK = 'Ask Copilot about your business';
+
+type Starter = { title: string; prompt: string; hint: string };
+
+const STARTERS: Starter[] = [
+  { title: "What's overdue?", prompt: "What's overdue?", hint: 'Who to chase first' },
+  // Fast Pay is not live: no starter invites a capacity or payout answer until it is.
+  ...(CAPITAL_LAUNCHED ? [{ title: 'Fast Pay capacity', prompt: 'How much can I advance?', hint: 'Eligible invoices and net payout' }] : []),
+  { title: 'Quotes pipeline', prompt: "How's my pipeline?", hint: 'Won, lost and open quotes' },
+  { title: 'Fleet status', prompt: 'Fleet status', hint: 'Active, idle and in maintenance' },
 ];
 
 // Extra starters for roles that can write — the agent drafts the record, the
 // user confirms via the proposal card. Hidden for VIEWER/DRIVER.
-const WRITE_STARTERS: { title: string; prompt: string; hint: string }[] = [
-  { title: 'Add a customer', prompt: 'Add a new customer', hint: 'Draft a record — you confirm before it saves' },
-  { title: 'Draft a quote', prompt: 'Create a new quote', hint: 'Propose a quote for your confirmation' },
+const WRITE_STARTERS: Starter[] = [
+  { title: 'Add a customer', prompt: 'Add a new customer', hint: 'Drafts the record for you to check' },
+  { title: 'Draft a quote', prompt: 'Create a new quote', hint: 'Drafts a quote for you to check' },
 ];
 
-const GENERIC_INTRO_TEXT = "I'm your TruckWys copilot. Ask me about your cash position, overdue invoices, quotes pipeline, fleet status or fast-pay capacity — I answer from your live data.";
-
-function buildIntro(firstName?: string): Message {
-  return {
-    role: 'assistant',
-    content: firstName ? `Hi ${firstName} — ${GENERIC_INTRO_TEXT}` : GENERIC_INTRO_TEXT,
-  };
+/**
+ * Suggestion grid spans on a 6-column track, so no group leaves an orphan:
+ * 3 per row (span 2) or 2 per row (span 3); 4 = 2 + 2, 5 = 3 + 2, 1 = full.
+ */
+function groupSpans(n: number): number[] {
+  const rows: number[] = [];
+  let left = n;
+  while (left > 0) {
+    if (left === 4 || left === 2) { rows.push(2); left -= 2; }
+    else if (left === 1) { rows.push(1); left -= 1; }
+    else { rows.push(3); left -= 3; }
+  }
+  return rows.flatMap((size) => Array(size).fill(6 / size));
 }
+
+const TOPICS = CAPITAL_LAUNCHED
+  ? 'Ask about cash, overdue invoices, quotes, your fleet or Fast Pay.'
+  : 'Ask about cash, overdue invoices, quotes or your fleet.';
+
+// Kept as messages[0] (never rendered): the thread logic below counts on it.
+const INTRO: Message = { role: 'assistant', content: TOPICS };
 
 // Lightweight typewriter for the streaming feel (used on freshly-arrived replies).
 // Calls onDone when finished so the message can re-render through <Markdown>.
@@ -82,25 +133,23 @@ function Typewriter({ text, onDone }: { text: string; onDone?: () => void }) {
   return <>{text.slice(0, n)}</>;
 }
 
-const labelStyle: React.CSSProperties = {
-  fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4,
-};
-
 export default function Copilot() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const introMsg = useMemo(() => buildIntro((user?.name || '').split(' ')[0] || undefined), [user?.name]);
+  const firstName = (user?.name || '').split(' ')[0] || '';
+  const introMsg = INTRO;
   const [params, setParams] = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([introMsg]);
   const [conversationId, setConversationId] = useState<number | null>(null);
-  const [conversations, setConversations] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [conversationsLoaded, setConversationsLoaded] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ConversationSummary | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [proposalBusy, setProposalBusy] = useState(false);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   // The conversation the user is currently looking at. A reply must only be
   // applied if the user hasn't switched threads while it was in flight —
@@ -109,16 +158,27 @@ export default function Copilot() {
   useEffect(() => { activeConvRef.current = conversationId; }, [conversationId]);
 
   const canWrite = !['VIEWER', 'DRIVER'].includes(user?.role || '');
-  const starters = canWrite ? [...STARTERS, ...WRITE_STARTERS] : STARTERS;
+  const readSpans = useMemo(() => groupSpans(STARTERS.length), []);
+  const writeSpans = useMemo(() => groupSpans(WRITE_STARTERS.length), []);
+  const starters = canWrite
+    ? [...STARTERS.map((s, i) => ({ ...s, span: readSpans[i] })), ...WRITE_STARTERS.map((s, i) => ({ ...s, span: writeSpans[i] }))]
+    : STARTERS.map((s, i) => ({ ...s, span: readSpans[i] }));
   const isEmpty = messages.length <= 1;
+  const current = conversations.find((c) => c.id === conversationId) || null;
+  const threadTitle = conversationId ? (current ? conversationTitle(current) : 'Conversation') : 'New conversation';
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
+  // Keep the newest message in view (the thread scrolls inside its own column).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && !isEmpty) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [messages, loading, isEmpty]);
   useEffect(() => { document.title = 'Copilot - TruckWys'; }, []);
 
   const refreshConversations = useCallback(() => {
-    fetchData('api/v1/agent/conversations/')
+    return fetchData('api/v1/agent/conversations/')
       .then((d: any) => setConversations(d?.conversations || []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setConversationsLoaded(true));
   }, []);
 
   const openConversation = useCallback((id: number) => {
@@ -130,12 +190,12 @@ export default function Copilot() {
         // (pending/executed/dismissed/failed/expired) so history stays truthful.
         const hist = (d?.messages || []).map((m: any) => ({
           role: m.role, content: m.content, proposal: m.proposal || null,
-          actions: m.actions || [],
+          actions: m.actions || [], createdAt: m.created_at || null,
         }));
         setConversationId(id);
         setMessages(hist.length ? [introMsg, ...hist] : [introMsg]);
       })
-      .catch(() => {});
+      .catch(() => { toast.error("Couldn't open that conversation. Try again."); });
   }, [introMsg]);
 
   // On mount (e.g. clicking "Copilot" in the sidebar): always start a fresh
@@ -150,7 +210,7 @@ export default function Copilot() {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+    ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
   };
 
   const send = async (text?: string) => {
@@ -185,6 +245,7 @@ export default function Copilot() {
         actionState: res?.proposed_action ? 'pending' : undefined,
         proposal: res?.proposal || null, animate: true,
         degraded: res?.ai_available === false,
+        createdAt: new Date().toISOString(),
       }]);
       refreshConversations();
     } catch (e: any) {
@@ -205,6 +266,18 @@ export default function Copilot() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A suggestion fills the ask box and focuses it; the user presses Send.
+  const applySuggestion = (prompt: string) => {
+    setInput(prompt);
+    requestAnimationFrame(() => {
+      const ta = taRef.current;
+      if (!ta) return;
+      ta.focus();
+      ta.setSelectionRange(prompt.length, prompt.length);
+      autoGrow();
+    });
+  };
 
   const runAction = async (msgIndex: number, a: ProposedAction) => {
     setMessages(prev => prev.map((m, i) => i === msgIndex ? { ...m, actionState: 'pending' } : m));
@@ -282,7 +355,7 @@ export default function Copilot() {
       // on the server, so reopening the thread resurrects a confirmable card.
       patchProposal(msgIndex, { status: 'dismissed' });
     } catch (e: any) {
-      patchProposal(msgIndex, { result: { error: e?.message || 'Could not dismiss — please try again.' } });
+      patchProposal(msgIndex, { result: { error: e?.message || 'Could not dismiss. Try again.' } });
     } finally {
       setProposalBusy(false);
     }
@@ -293,219 +366,250 @@ export default function Copilot() {
   // unused "New chat" never gets saved to history. The previous thread is KEPT.
   const newChat = () => {
     setShowHistory(false); setInput(''); setAiAvailable(null);
+    if (taRef.current) taRef.current.style.height = 'auto';
     activeConvRef.current = null;  // any in-flight reply from the previous thread is dropped
     setMessages([introMsg]); setConversationId(null);
+    requestAnimationFrame(() => taRef.current?.focus());
   };
 
-  const deleteConversation = async (id: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm('Delete this conversation?')) return;
-    await deleteData({ url: `api/v1/agent/conversations/${id}/` }).catch(() => {});
-    if (id === conversationId) { setMessages([introMsg]); setConversationId(null); }
-    refreshConversations();
-  };
-
-  const avatar = (role: 'user' | 'assistant') => {
-    const userAvatar = (user?.avatar as string) || undefined;
-    if (role === 'user' && userAvatar) {
-      return (
-        <img
-          src={userAvatar}
-          alt="You"
-          style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 2, objectFit: 'cover' }}
-        />
-      );
+  // Delete asks first (accessible dialog), and a failure is reported, never swallowed.
+  const deleteConversation = async (c: ConversationSummary) => {
+    try {
+      await deleteData({ url: `api/v1/agent/conversations/${c.id}/` });
+    } catch (e: any) {
+      toast.error(e?.message ? `Couldn't delete the conversation. ${e.message}` : "Couldn't delete the conversation. Try again.");
+      return;
     }
-    return (
-      <div style={{
-        flexShrink: 0, width: 26, height: 26, borderRadius: 2, display: 'grid', placeItems: 'center',
-        background: role === 'user' ? 'var(--bg-surface)' : 'var(--accent-primary)',
-        border: role === 'user' ? '1px solid var(--border-subtle)' : 'none',
-        color: role === 'user' ? 'var(--text-secondary)' : 'var(--bg-deep)',
-        fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '0.05em',
-      }}>{role === 'user' ? 'YOU' : 'AI'}</div>
-    );
+    if (c.id === conversationId) { activeConvRef.current = null; setMessages([introMsg]); setConversationId(null); }
+    await refreshConversations();
+    toast.success('Conversation deleted');
+    requestAnimationFrame(() => taRef.current?.focus());
   };
+
+  const list = (
+    <ConversationList
+      conversations={conversations}
+      loaded={conversationsLoaded}
+      activeId={conversationId}
+      onOpen={openConversation}
+      onDelete={setPendingDelete}
+    />
+  );
+
+  const canSend = !!input.trim() && !loading;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      <style>{`
-        @keyframes cp-blink { 0%,80%,100% { opacity:.2 } 40% { opacity:1 } }
-        @keyframes cp-rise { from { opacity:0; transform: translateY(5px) } to { opacity:1; transform:none } }
-        .cp-msg { animation: cp-rise .16s ease both; }
-        .cp-dot { width:5px; height:5px; border-radius:50%; background:var(--text-tertiary); display:inline-block; animation: cp-blink 1.2s infinite both; }
-        .cp-card:hover { border-color: var(--accent-primary); }
-        .cp-chip:hover { background: var(--accent-primary); color: var(--bg-deep); }
-        .cp-conv:hover { background: var(--bg-surface-hover); }
-        .cp-conv:hover .cp-del { opacity: 1; }
-        .cp-del:hover { color: var(--status-danger) !important; }
-        .cp-md > :last-child { margin-bottom: 0 !important; }
-      `}</style>
+    <div className="copilot-page">
+      <SectionHeader
+        title="Copilot"
+        description="Answers from your data. You approve every change."
+        titleAdornment={aiAvailable === null ? undefined : (
+          <StatusChip tone={aiAvailable ? 'success' : 'warning'} label={aiAvailable ? 'AI available' : 'Rules engine only'} />
+        )}
+        actions={
+          <button type="button" className="tw-btn" onClick={newChat}>
+            <Plus size={16} aria-hidden="true" />
+            New chat
+          </button>
+        }
+      />
 
-      {/* Header — eyebrow + title + status pill */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-        <div>
-          <div style={labelStyle}>Intelligence</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Copilot</div>
-        </div>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 10,
-          padding: '4px 9px', borderRadius: 2, letterSpacing: '0.07em',
-          background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-          color: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-        }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)' }} />
-          {aiAvailable === null ? 'Ready' : aiAvailable ? 'AI · Live' : 'Rules engine'}
-        </span>
-      </div>
-
-      {/* Two-pane: conversation history sidebar (left) + active chat (right) */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 12 }}>
-        {/* Sidebar */}
-        <div style={{ width: 250, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, overflow: 'hidden' }}>
-          <div style={{ padding: 10, borderBottom: '1px solid var(--border-subtle)' }}>
-            <button onClick={newChat} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, padding: '9px 12px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em' }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              New chat
-            </button>
+      <div className="cp-layout">
+        {/* Desktop: the conversation rail (hidden on phones; they use the sheet). */}
+        <nav className="tw-card tw-card--flush cp-rail" aria-labelledby="cp-rail-title">
+          <div className="cp-rail__head">
+            <h2 id="cp-rail-title" className="tw-card__title">Conversations</h2>
+            {conversationsLoaded && conversations.length > 0 && (
+              <span className="cp-rail__count">{conversations.length}</span>
+            )}
           </div>
-          <div style={{ padding: '10px 12px 4px', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Conversations</div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            {conversations.length === 0 ? (
-              <div style={{ padding: 18, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 11 }}>No conversations yet</div>
-            ) : conversations.map((c: any) => (
-              <div
-                key={c.id}
-                onClick={() => openConversation(c.id)}
-                className="cp-conv"
-                style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, padding: '10px 10px 10px 12px', cursor: 'pointer', borderLeft: c.id === conversationId ? '2px solid var(--accent-primary)' : '2px solid transparent', background: c.id === conversationId ? 'var(--bg-surface-hover)' : 'transparent' }}
+          <div className="cp-rail__body">{list}</div>
+        </nav>
+
+        <section className="tw-card tw-card--flush cp-chat" aria-labelledby="cp-thread-title">
+          <div className="cp-chat__head">
+            <h2 id="cp-thread-title" className="cp-chat__title" title={threadTitle}>{threadTitle}</h2>
+            <div className="cp-chat__tools">
+              {conversationId && (
+                <OverflowMenu
+                  label="Conversation actions"
+                  items={() => [{
+                    label: 'Delete conversation', danger: true, icon: <Trash2 size={16} />,
+                    onSelect: () => setPendingDelete(current || { id: conversationId, title: threadTitle }),
+                  }]}
+                />
+              )}
+              <button
+                type="button"
+                className="tw-btn cp-chats-btn"
+                onClick={() => setShowHistory(true)}
+                aria-haspopup="dialog"
+                aria-expanded={showHistory}
               >
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'New conversation'}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{c.message_count} msgs · {relTime(c.updated_at)}</div>
-                </div>
-                <button onClick={(e) => deleteConversation(c.id, e)} className="cp-del" title="Delete" style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 13, padding: 2, opacity: 0.6 }}>✕</button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-      {/* Conversation card fills remaining height; input docked inside at the bottom */}
-      <div className="card" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 20 }}>
-          {isEmpty ? (
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>How can I help you run the business today?</div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 620, marginBottom: 22, lineHeight: 1.55 }}>{introMsg.content}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 10 }}>
-                {starters.map(s => (
-                  <button key={s.title} className="cp-card" onClick={() => send(s.prompt)}
-                    style={{ textAlign: 'left', cursor: 'pointer', padding: 14, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, transition: 'border-color .15s ease' }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>{s.title}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{s.hint}</div>
-                  </button>
-                ))}
-              </div>
+                <MessagesSquare size={16} aria-hidden="true" />
+                Conversations
+              </button>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              {messages.slice(1).map((m, i) => {
-                const realIndex = i + 1;
-                return (
-                  <div key={realIndex} className="cp-msg" style={{ display: 'flex', gap: 10, flexDirection: m.role === 'user' ? 'row-reverse' : 'row' }}>
-                    {avatar(m.role)}
-                    <div style={{ maxWidth: '80%', display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                      <div style={{
-                        padding: '11px 14px', borderRadius: 2, fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap',
-                        background: m.role === 'user' ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                        color: m.role === 'user' ? 'var(--bg-deep)' : 'var(--text-primary)',
-                        border: m.role === 'user' ? 'none' : '1px solid var(--border-subtle)',
-                      }}>
-                        {m.role === 'user'
-                          ? m.content
-                          : m.animate && !looksLikeMarkdown(m.content)
+          </div>
+
+          <div ref={scrollRef} className="cp-scroll">
+            {isEmpty ? (
+              <div className="cp-empty">
+                <h3 className="cp-empty__title">{firstName ? `Hi ${firstName}. What do you need to know?` : 'What do you need to know?'}</h3>
+                <p className="cp-empty__sub">{TOPICS}</p>
+                <ul className="cp-suggest" aria-label="Suggestions">
+                  {starters.map((s) => (
+                    <li key={s.title} style={{ gridColumn: `span ${s.span}` }}>
+                      <button
+                        type="button"
+                        className="cp-suggest__btn"
+                        onClick={() => applySuggestion(s.prompt)}
+                        aria-label={`${s.title}. ${s.hint}. Puts "${s.prompt}" in the ask box`}
+                      >
+                        <span className="cp-suggest__title">{s.title}</span>
+                        <span className="cp-suggest__hint">{s.hint}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="cp-thread" aria-live="polite" aria-relevant="additions">
+                {messages.slice(1).map((m, i) => {
+                  const realIndex = i + 1;
+                  // A day divider before the first message of each day (R8).
+                  const day = m.createdAt ? saDateISO(new Date(m.createdAt)) : null;
+                  const prevDay = (() => {
+                    for (let j = realIndex - 1; j >= 1; j--) {
+                      const c = messages[j].createdAt;
+                      if (c) return saDateISO(new Date(c));
+                    }
+                    return null;
+                  })();
+                  const divider = m.createdAt && day && day !== prevDay ? (
+                    <p className="cp-day" key={`d-${realIndex}`}>
+                      <time dateTime={m.createdAt} title={formatDateTime(m.createdAt)}>{dayDivider(m.createdAt)}</time>
+                    </p>
+                  ) : null;
+                  if (m.role === 'user') {
+                    return [divider,
+                      <div key={realIndex} className="cp-msg cp-msg--user">
+                        <span className="cp-sr">You said: </span>
+                        <div className="cp-bubble">{m.content}</div>
+                      </div>,
+                    ];
+                  }
+                  return [divider,
+                    <div key={realIndex} className="cp-msg cp-msg--assistant">
+                      <span className="cp-mark" aria-hidden="true"><Bot size={16} /></span>
+                      <div className="cp-msg__body">
+                        <span className="cp-sr">Copilot: </span>
+                        <div className="cp-answer">
+                          {m.animate && !looksLikeMarkdown(m.content)
                             ? <Typewriter
-                                text={m.content}
+                                text={houseFigures(m.content)}
                                 onDone={() => setMessages(prev => prev.map((mm, j) =>
                                   j === realIndex ? { ...mm, animate: false } : mm))}
                               />
-                            : <Markdown>{m.content}</Markdown>}
-                      </div>
-
-                      {m.role === 'assistant' && m.degraded && (
-                        <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>
-                          ⚠ Rules engine — AI is unavailable, so this answer is basic. Try again shortly.
+                            : <Markdown>{houseFigures(m.content)}</Markdown>}
                         </div>
-                      )}
 
-                      {m.proposal && (
-                        <ProposalCard
-                          proposal={m.proposal}
-                          onConfirm={() => executeProposal(realIndex, m.proposal!.id)}
-                          onDismiss={() => dismissProposal(realIndex, m.proposal!.id)}
-                          busy={proposalBusy || loading}
-                        />
-                      )}
+                        {m.degraded && (
+                          <p className="cp-note">
+                            <TriangleAlert size={14} aria-hidden="true" /> Answered by the rules engine because AI is unavailable, so it is basic. Try again shortly.
+                          </p>
+                        )}
 
-                      {m.proposedAction && m.actionState === 'pending' && (
-                        <div style={{ marginTop: 10, padding: 13, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', borderRadius: 2 }}>
-                          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 3 }}>{m.proposedAction.label}</div>
-                          {m.proposedAction.detail && <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginBottom: 11 }}>{m.proposedAction.detail}</div>}
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn-action" onClick={() => runAction(realIndex, m.proposedAction!)} disabled={loading}
-                              style={{ background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none' }}>
-                              {m.proposedAction.confirm_text || 'Confirm'}
-                            </button>
-                            <button className="btn-action" onClick={() => dismissAction(realIndex)} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>Dismiss</button>
+                        {m.proposal && (
+                          <ProposalCard
+                            proposal={m.proposal}
+                            onConfirm={() => executeProposal(realIndex, m.proposal!.id)}
+                            onDismiss={() => dismissProposal(realIndex, m.proposal!.id)}
+                            busy={proposalBusy || loading}
+                          />
+                        )}
+
+                        {m.proposedAction && m.actionState === 'pending' && (
+                          <div className="cp-proposed">
+                            <div className="cp-proposed__label">{m.proposedAction.label}</div>
+                            {m.proposedAction.detail && <div className="cp-proposed__detail">{m.proposedAction.detail}</div>}
+                            <div className="cp-proposed__actions">
+                              <button type="button" className="tw-btn tw-btn--primary" onClick={() => runAction(realIndex, m.proposedAction!)} disabled={loading}>
+                                {m.proposedAction.confirm_text || 'Confirm'}
+                              </button>
+                              <button type="button" className="tw-btn" onClick={() => dismissAction(realIndex)}>Dismiss</button>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      {m.proposedAction && m.actionState === 'done' && <div style={{ marginTop: 7, fontSize: 11, color: 'var(--status-success)', fontFamily: 'var(--font-mono)' }}>✓ Confirmed</div>}
-                      {m.proposedAction && m.actionState === 'dismissed' && <div style={{ marginTop: 7, fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>Dismissed</div>}
+                        )}
+                        {m.proposedAction && m.actionState === 'done' && <p className="cp-note cp-note--ok"><Check size={14} aria-hidden="true" /> Confirmed</p>}
+                        {m.proposedAction && m.actionState === 'dismissed' && <p className="cp-note">Dismissed</p>}
 
-                      {m.actions && m.actions.length > 0 && (
-                        <div style={{ display: 'flex', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
-                          {m.actions.map((a, j) => (
-                            <button key={j} className="cp-chip" onClick={() => navigate(a.route)}
-                              style={{ background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', padding: '6px 11px', fontFamily: 'var(--font-mono)', fontSize: 10.5, borderRadius: 2, cursor: 'pointer', letterSpacing: '0.04em', transition: 'all .12s ease', textTransform: 'uppercase' }}>
-                              {a.label} →
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                        {m.actions && m.actions.length > 0 && (
+                          <div className="cp-links">
+                            {m.actions.map((a, j) => (
+                              <button key={j} type="button" className="tw-btn tw-btn--sm" onClick={() => navigate(a.route)}>
+                                {a.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>,
+                  ];
+                })}
+                {loading && (
+                  <div className="cp-msg cp-msg--assistant">
+                    <span className="cp-mark" aria-hidden="true"><Bot size={16} /></span>
+                    <div className="cp-msg__body">
+                      <p role="status" className="cp-working">Working on an answer…</p>
                     </div>
                   </div>
-                );
-              })}
-              {loading && (
-                <div className="cp-msg" style={{ display: 'flex', gap: 10 }}>
-                  {avatar('assistant')}
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '13px 15px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2 }}>
-                    <span className="cp-dot" /><span className="cp-dot" style={{ animationDelay: '.2s' }} /><span className="cp-dot" style={{ animationDelay: '.4s' }} />
-                  </div>
-                </div>
-              )}
-              <div ref={endRef} />
-            </div>
-          )}
-        </div>
-
-        {/* Input dock */}
-        <div style={{ borderTop: '1px solid var(--border-subtle)', padding: 12, background: 'var(--bg-surface)' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-            <textarea ref={taRef} value={input} rows={1}
-              onChange={e => { setInput(e.target.value); autoGrow(); }}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder="Ask your copilot anything about your operations…"
-              style={{ flex: 1, resize: 'none', maxHeight: 140, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 2, color: 'var(--text-primary)', fontSize: 13.5, lineHeight: 1.5, outline: 'none', fontFamily: 'var(--font-sans)', padding: '10px 12px' }} />
-            <button className="btn-action" onClick={() => send()} disabled={loading || !input.trim()}
-              style={{ background: input.trim() && !loading ? 'var(--accent-primary)' : 'var(--bg-surface-hover)', color: input.trim() && !loading ? 'var(--bg-deep)' : 'var(--text-tertiary)', border: 'none', padding: '10px 18px' }}>
-              {loading ? '…' : 'Send'}
-            </button>
+                )}
+              </div>
+            )}
           </div>
-        </div>
+
+          <form
+            className="cp-compose"
+            onSubmit={(e) => { e.preventDefault(); send(); }}
+          >
+            <div className="cp-compose__box">
+              <label htmlFor="cp-ask" className="cp-sr">{ASK}</label>
+              <textarea
+                id="cp-ask"
+                ref={taRef}
+                value={input}
+                rows={1}
+                onChange={e => { setInput(e.target.value); autoGrow(); }}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder={ASK}
+                aria-describedby="cp-ask-hint"
+                className="cp-compose__input"
+              />
+              <button type="submit" className="tw-btn tw-btn--primary cp-send" disabled={!canSend}>
+                <ArrowUp size={16} aria-hidden="true" />
+                <span className="cp-send__label">{loading ? 'Sending' : 'Send'}</span>
+              </button>
+            </div>
+            <p id="cp-ask-hint" className="cp-compose__hint">Enter sends. Shift+Enter adds a line.</p>
+          </form>
+        </section>
       </div>
-      </div>
+
+      {showHistory && (
+        <ConversationsSheet onClose={() => setShowHistory(false)}>{list}</ConversationsSheet>
+      )}
+
+      {pendingDelete && (
+        <ConfirmModal
+          title="Delete this conversation?"
+          message={`"${conversationTitle(pendingDelete)}" and its messages will be removed. This can't be undone.`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { const c = pendingDelete; deleteConversation(c); }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import '@/pages/admin/admin-brand.css';
+import { formatDateTime } from '@/lib/formatters';
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, deleteData } from '@/lib/Api';
@@ -5,6 +7,7 @@ import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import PaginationControls from '@/pages/admin/PaginationControls';
+import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 
 // Per-user drawer opened from UsersTable — merges three separate data
 // sources (UserActivityLog, AuditLog auth rows, UserSession) into one place
@@ -25,38 +28,40 @@ const panelStyle: React.CSSProperties = {
   overflow: 'hidden',
 };
 const headerStyle: React.CSSProperties = {
-  padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)',
+  padding: '16px 24px', borderBottom: '1px solid var(--border-subtle)',
   display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12,
 };
 const closeBtnStyle: React.CSSProperties = {
   background: 'transparent', border: 'none', color: 'var(--text-tertiary)', fontSize: 20,
-  cursor: 'pointer', lineHeight: 1, padding: 4,
+  cursor: 'pointer', lineHeight: 1, padding: 0, width: 40, height: 40, borderRadius: 'var(--radius-control)',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
 };
 const tabsStyle: React.CSSProperties = {
-  display: 'flex', gap: 4, padding: '0 20px', borderBottom: '1px solid var(--border-subtle)',
+  display: 'flex', gap: 4, padding: '0 24px', borderBottom: '1px solid var(--border-subtle)',
 };
 const tabBtn = (active: boolean): React.CSSProperties => ({
-  padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer',
-  fontSize: 12, fontFamily: 'var(--font-mono)', letterSpacing: '0.03em',
+  padding: '10px 12px', minHeight: 40, background: 'transparent', border: 'none', cursor: 'pointer',
+  fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: active ? 500 : 400,
   color: active ? 'var(--text-primary)' : 'var(--text-tertiary)',
   borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
   marginBottom: -1,
 });
-const bodyStyle: React.CSSProperties = { flex: 1, overflowY: 'auto', padding: 20 };
+const bodyStyle: React.CSSProperties = { flex: 1, overflowY: 'auto', padding: 24 };
 const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '6px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-subtle)',
+  textAlign: 'left', padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)',
+  borderBottom: '1px solid var(--border-subtle)',
 };
 const tdStyle: React.CSSProperties = {
-  padding: '8px 10px', fontSize: 12, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 const secondaryBtnStyle: React.CSSProperties = {
-  padding: '5px 10px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--status-danger)',
-  borderRadius: 2, fontSize: 10.5, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', cursor: 'pointer',
+  padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--status-danger-text)',
+  borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer',
 };
 
 const fmt = (dateStr?: string | null) =>
-  dateStr ? new Date(dateStr).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  dateStr ? formatDateTime(dateStr) : 'Never';
 
 interface ActivityRow {
   id: number; method: string; path: string; status_code: number; duration_ms: number;
@@ -131,26 +136,26 @@ export default function UserActivityDrawer({
       <div style={panelStyle} onClick={e => e.stopPropagation()}>
         <div style={headerStyle}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Activity</div>
-            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>{userLabel}</div>
+            <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>Activity</div>
+            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>{userLabel}</div>
           </div>
-          <button style={closeBtnStyle} onClick={onClose} aria-label="Close">×</button>
+          <button className="admin-control admin-tint-hover" style={closeBtnStyle} onClick={onClose} aria-label="Close">×</button>
         </div>
 
         <div style={tabsStyle}>
-          <button style={tabBtn(tab === 'activity')} onClick={() => setTab('activity')}>Activity</button>
-          <button style={tabBtn(tab === 'sessions')} onClick={() => setTab('sessions')}>
+          <button className="admin-control" style={tabBtn(tab === 'activity')} onClick={() => setTab('activity')}>Activity</button>
+          <button className="admin-control" style={tabBtn(tab === 'sessions')} onClick={() => setTab('sessions')}>
             Sessions {sessionsQuery.data ? `(${sessions.length})` : ''}
           </button>
-          <button style={tabBtn(tab === 'auth')} onClick={() => setTab('auth')}>Sign-in history</button>
+          <button className="admin-control" style={tabBtn(tab === 'auth')} onClick={() => setTab('auth')}>Sign-in history</button>
         </div>
 
         <div style={bodyStyle}>
           {tab === 'activity' && (
             activityQuery.isLoading ? <Loader size={20} /> : (
               <>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="admin-scroll-region" role="region" aria-label="User activity" tabIndex={0} style={{ overflowX: 'auto' }}>
+                  <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
                         <th style={thStyle}>Time</th>
@@ -165,9 +170,9 @@ export default function UserActivityDrawer({
                         <tr key={r.id}>
                           <td style={tdStyle}>{fmt(r.created_at)}</td>
                           <td style={tdStyle}>{r.method}</td>
-                          <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 11 }}>{r.path}</td>
+                          <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 13 }}>{r.path}</td>
                           <td style={tdStyle}>
-                            <span style={{ color: r.status_code >= 400 ? 'var(--status-danger)' : 'var(--text-secondary)' }}>
+                            <span style={{ color: r.status_code >= 400 ? 'var(--status-danger-text)' : 'var(--text-secondary)' }}>
                               {r.status_code}
                             </span>
                           </td>
@@ -195,22 +200,23 @@ export default function UserActivityDrawer({
 
           {tab === 'sessions' && (
             sessionsQuery.isLoading ? <Loader size={20} /> : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {sessions.map(s => (
                   <div
                     key={s.id}
                     style={{
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
-                      padding: '10px 14px', border: '1px solid var(--border-subtle)', borderRadius: 2,
+                      padding: '4px 4px 4px 16px', minHeight: 48, border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)',
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{s.device}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                      <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{s.device}</div>
+                      <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
                         {s.ip_address || 'Unknown IP'} · last active {fmt(s.last_activity)}
                       </div>
                     </div>
                     <button
+                      className="admin-control"
                       style={secondaryBtnStyle}
                       disabled={revoking === s.id}
                       onClick={() => setRevokeTarget(s)}
@@ -220,7 +226,7 @@ export default function UserActivityDrawer({
                   </div>
                 ))}
                 {sessions.length === 0 && (
-                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>No active sessions.</div>
+                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>No active sessions.</div>
                 )}
               </div>
             )
@@ -229,8 +235,8 @@ export default function UserActivityDrawer({
           {tab === 'auth' && (
             authQuery.isLoading ? <Loader size={20} /> : (
               <>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="admin-scroll-region" role="region" aria-label="Sign-in history" tabIndex={0} style={{ overflowX: 'auto' }}>
+                  <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
                         <th style={thStyle}>Time</th>
@@ -244,7 +250,7 @@ export default function UserActivityDrawer({
                         <tr key={r.id}>
                           <td style={tdStyle}>{fmt(r.created_at)}</td>
                           <td style={tdStyle}>
-                            <span className={`status-badge ${r.action === 'LOGIN' ? 'active' : 'delayed'}`}>{r.event}</span>
+                            <StatusChip tone={r.action === 'LOGIN' ? 'success' : /FAIL/i.test(String(r.action)) ? 'danger' : 'neutral'} label={r.event} size="sm" />
                           </td>
                           <td style={tdStyle}>{r.device}</td>
                           <td style={tdStyle}>{r.ip}</td>
@@ -274,7 +280,7 @@ export default function UserActivityDrawer({
       {revokeTarget && (
         <ConfirmModal
           title="Force logout"
-          message={`Sign out of "${revokeTarget.device}"? That device will need to log in again — this doesn't affect any of their other active sessions.`}
+          message={`Sign out of "${revokeTarget.device}"? That device will need to log in again. This doesn't affect any of their other active sessions.`}
           confirmLabel="Force logout"
           danger
           onConfirm={() => handleRevoke(revokeTarget)}

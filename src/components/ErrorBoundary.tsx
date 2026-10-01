@@ -2,89 +2,106 @@ import React from 'react';
 
 interface Props {
   children: React.ReactNode;
+  /**
+   * 'app' (default) fills the viewport; 'page' sits inside the app shell so the
+   * navigation stays usable when one page fails to render.
+   */
+  variant?: 'app' | 'page';
+  /** Changing this clears the error (e.g. the route path), so navigating away recovers. */
+  resetKey?: unknown;
 }
 
 interface State {
   hasError: boolean;
-  error?: Error;
 }
 
+/**
+ * Last line of defence when a render throws. The user sees a plain, friendly
+ * message with Reload; the technical details (message, stack, component stack)
+ * go to the console only, never onto the screen.
+ */
 export class ErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+  static getDerivedStateFromError(): State {
+    return { hasError: true };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught:', error, errorInfo);
+    console.error('ErrorBoundary caught:', error, errorInfo?.componentStack);
+  }
+
+  componentDidUpdate(prev: Props) {
+    if (this.state.hasError && prev.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false });
+    }
   }
 
   render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{
+    if (!this.state.hasError) return this.props.children;
+
+    const page = this.props.variant === 'page';
+    return (
+      <div
+        role="alert"
+        style={{
           display: 'flex',
-          alignItems: 'center',
+          alignItems: page ? 'flex-start' : 'center',
           justifyContent: 'center',
-          minHeight: '100vh',
-          background: 'var(--bg-deep)',
-          padding: 24
+          minHeight: page ? 0 : '100vh',
+          background: page ? 'transparent' : 'var(--bg-deep)',
+          padding: page ? '48px 16px' : 24,
+        }}
+      >
+        <div style={{
+          background: 'var(--bg-surface)',
+          borderRadius: 'var(--radius-card)',
+          border: '1px solid var(--border-subtle)',
+          padding: 24,
+          maxWidth: 440,
+          width: '100%',
+          textAlign: 'center',
         }}>
-          <div style={{
-            background: 'var(--bg-surface)',
-            borderRadius: 12,
-            border: '1px solid var(--border-subtle)',
-            padding: 32,
-            maxWidth: 480,
-            textAlign: 'center'
+          <h2 style={{
+            fontSize: 16,
+            lineHeight: '24px',
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            margin: '0 0 4px',
           }}>
-            <div style={{
-              fontSize: 48,
-              marginBottom: 16
-            }}>⚠️</div>
-            <h2 style={{
-              fontSize: 20,
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-              marginBottom: 12
-            }}>
-              Something went wrong
-            </h2>
-            <p style={{
-              fontSize: 14,
-              color: 'var(--text-secondary)',
-              marginBottom: 24,
-              lineHeight: 1.5
-            }}>
-              {this.state.error?.message || 'An unexpected error occurred'}
-            </p>
+            {page ? 'This page didn’t load properly' : 'Something went wrong'}
+          </h2>
+          <p style={{
+            fontSize: 14,
+            color: 'var(--text-secondary)',
+            margin: '0 0 20px',
+            lineHeight: '20px',
+          }}>
+            Reload to try again. Anything you had already saved is safe.
+          </p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
-              onClick={() => {
-                this.setState({ hasError: false, error: undefined });
-                window.location.href = '/';
-              }}
-              style={{
-                background: 'var(--accent-primary)',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                padding: '12px 24px',
-                fontSize: 14,
-                fontWeight: 500,
-                cursor: 'pointer'
-              }}
+              type="button"
+              className="tw-btn tw-btn--primary"
+              onClick={() => window.location.reload()}
+              style={{ minHeight: 40 }}
             >
-              Return to Dashboard
+              Reload
+            </button>
+            <button
+              type="button"
+              className="tw-btn"
+              onClick={() => { window.location.href = '/'; }}
+              style={{ minHeight: 40 }}
+            >
+              Back to Home
             </button>
           </div>
         </div>
-      );
-    }
-
-    return this.props.children;
+      </div>
+    );
   }
 }

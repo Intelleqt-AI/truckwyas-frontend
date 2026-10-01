@@ -1,63 +1,21 @@
+import "./profile-form.css";
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData } from "@/lib/Api";
 import { useAuth } from "@/lib/AuthContext";
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsCardBodyStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from './settingsUi';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 'var(--card-radius)',
-  marginBottom: 16,
-};
-
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: '16px 20px 12px',
-  borderBottom: '1px solid var(--border-subtle)',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.08em',
-  color: 'var(--text-secondary)',
-  fontWeight: 600,
-};
-
-const sectionBodyStyle: React.CSSProperties = {
-  padding: '20px',
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontFamily: 'var(--font-mono)',
-  fontSize: 10,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.08em',
-  color: 'var(--text-tertiary)',
-  marginBottom: 6,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  background: 'var(--input-bg)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 2,
-  padding: '8px 12px',
-  color: 'var(--text-primary)',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 13,
-  outline: 'none',
-  transition: 'border-color 0.15s',
-};
-
+const sectionStyle = settingsCardStyle;
+const sectionHeaderStyle = settingsCardHeaderStyle;
+const sectionTitleStyle = settingsCardTitleStyle;
+const sectionBodyStyle = settingsCardBodyStyle;
+const labelStyle = settingsLabelStyle;
+// 40px / 14px on desktop like every other settings section; the shell's
+// <=640px rule lifts it to 48px / 16px for touch and iOS focus-zoom.
+const inputStyle = settingsInputStyle;
 
 const gridStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
   gap: 16,
 };
 
@@ -130,98 +88,84 @@ export function ProfileSettings() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
-          Profile Settings
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-          Manage your personal information and account preferences
-        </div>
-      </div>
+    <div className="tw-profile-settings" style={{ maxWidth: 'var(--form-max, 720px)' }}>
+      <SettingsPageHeader title="Profile" description="Your name, contact details and preferences" />
 
-      {/* Profile Picture */}
+      {/* Personal information, with the picture as its first row (R8: no one-line card). */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>Profile Picture</span>
-        </div>
-        <div style={{ ...sectionBodyStyle, display: 'flex', alignItems: 'center', gap: 16 }}>
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt="Profile"
-              style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-            />
-          ) : (
-            <div style={{
-              width: 52, height: 52, borderRadius: '50%',
-              background: 'var(--accent-dim)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 600,
-              color: 'var(--accent-primary)', flexShrink: 0,
-            }}>
-              {(form.first_name[0] || '') + (form.last_name[0] || '') || 'AU'}
-            </div>
-          )}
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/gif"
-              style={{ display: 'none' }}
-              onChange={handleAvatarChange}
-              disabled={isDemo}
-            />
-            <button
-              style={{
-                background: 'none', border: '1px solid var(--border-subtle)',
-                color: 'var(--text-secondary)', padding: '6px 12px',
-                fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
-                cursor: (uploadingAvatar || isDemo) ? 'not-allowed' : 'pointer',
-                letterSpacing: '0.05em',
-                opacity: (uploadingAvatar || isDemo) ? 0.6 : 1,
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingAvatar || isDemo}
-              title={isDemo ? 'Fixed in demo mode' : undefined}
-            >
-              {uploadingAvatar ? 'UPLOADING...' : 'CHANGE PICTURE'}
-            </button>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
-              JPG, GIF or PNG. Max size 2MB.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Personal Information */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>Personal Information</span>
+          <h2 style={sectionTitleStyle}>Personal information</h2>
         </div>
         <div style={sectionBodyStyle}>
-          <div style={{ ...gridStyle, marginBottom: 16 }}>
-            <div>
-              <label style={labelStyle}>First Name</label>
-              <input style={inputStyle} value={form.first_name} onChange={e => set('first_name', e.target.value)} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', paddingBottom: 20, marginBottom: 20, borderBottom: '1px solid var(--border-subtle)' }}>
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt="Profile"
+                style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+              />
+            ) : (
+              <div style={{
+                width: 52, height: 52, borderRadius: '50%',
+                background: 'var(--accent-dim)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 600,
+                color: 'var(--avatar-on-dim, var(--accent-primary))', flexShrink: 0,
+              }}>
+                {(form.first_name[0] || '') + (form.last_name[0] || '') || 'AU'}
+              </div>
+            )}
+            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+              <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>Picture</div>
+              <div style={{ ...settingsHelpStyle, marginTop: 0 }}>JPG, GIF or PNG, up to 2 MB.</div>
             </div>
             <div>
-              <label style={labelStyle}>Last Name</label>
-              <input style={inputStyle} value={form.last_name} onChange={e => set('last_name', e.target.value)} />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif"
+                style={{ display: 'none' }}
+                onChange={handleAvatarChange}
+                disabled={isDemo}
+              />
+              <button
+                type="button"
+                className="settings-control"
+                style={{
+                  ...settingsSecondaryButtonStyle,
+                  cursor: (uploadingAvatar || isDemo) ? 'not-allowed' : 'pointer',
+                  opacity: (uploadingAvatar || isDemo) ? 0.6 : 1,
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar || isDemo}
+                title={isDemo ? 'Fixed in demo mode' : undefined}
+              >
+                {uploadingAvatar ? 'Uploading…' : 'Change picture'}
+              </button>
+            </div>
+          </div>
+          <div className="tw-profile-fields" style={{ ...gridStyle, marginBottom: 16 }}>
+            <div>
+              <label htmlFor="profile-first_name" style={labelStyle}>First name</label>
+              <input id="profile-first_name" style={inputStyle} value={form.first_name} onChange={e => set('first_name', e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="profile-last_name" style={labelStyle}>Last name</label>
+              <input id="profile-last_name" style={inputStyle} value={form.last_name} onChange={e => set('last_name', e.target.value)} />
             </div>
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Email Address</label>
-            <input style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+            <label htmlFor="profile-email" style={labelStyle}>Email address</label>
+            <input id="profile-email" style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
           </div>
-          <div style={gridStyle}>
+          <div className="tw-profile-fields" style={gridStyle}>
             <div>
-              <label style={labelStyle}>Job Title</label>
-              <input style={inputStyle} value={form.job_title} onChange={e => set('job_title', e.target.value)} />
+              <label htmlFor="profile-job_title" style={labelStyle}>Job title</label>
+              <input id="profile-job_title" style={inputStyle} value={form.job_title} onChange={e => set('job_title', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Phone Number</label>
-              <input style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
+              <label htmlFor="profile-phone" style={labelStyle}>Phone number</label>
+              <input id="profile-phone" style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
             </div>
           </div>
         </div>
@@ -230,14 +174,14 @@ export function ProfileSettings() {
       {/* Preferences */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>Preferences</span>
+          <h2 style={sectionTitleStyle}>Preferences</h2>
         </div>
         <div style={sectionBodyStyle}>
-          <div style={{ ...gridStyle, marginBottom: 16 }}>
+          <div className="tw-profile-fields" style={{ ...gridStyle, marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>Timezone</label>
+              <label htmlFor="profile-timezone" style={labelStyle}>Timezone</label>
               <Select value={form.timezone} onValueChange={val => set('timezone', val)}>
-                <SelectTrigger>
+                <SelectTrigger id="profile-timezone" style={inputStyle}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -249,9 +193,9 @@ export function ProfileSettings() {
               </Select>
             </div>
             <div>
-              <label style={labelStyle}>Language</label>
+              <label htmlFor="profile-language" style={labelStyle}>Language</label>
               <Select value={form.language} onValueChange={val => set('language', val)}>
-                <SelectTrigger>
+                <SelectTrigger id="profile-language" style={inputStyle}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -262,11 +206,11 @@ export function ProfileSettings() {
               </Select>
             </div>
           </div>
-          <div style={{ ...gridStyle, marginBottom: 20 }}>
+          <div className="tw-profile-fields" style={gridStyle}>
             <div>
-              <label style={labelStyle}>Date Format</label>
+              <label htmlFor="profile-date_format" style={labelStyle}>Date format</label>
               <Select value={form.date_format} onValueChange={val => set('date_format', val)}>
-                <SelectTrigger>
+                <SelectTrigger id="profile-date_format" style={inputStyle}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -277,18 +221,21 @@ export function ProfileSettings() {
               </Select>
             </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              className="btn-action"
-              onClick={handleSave}
-              disabled={saving || isDemo}
-              title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
-            >
-              {saved ? 'SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
-            </button>
-          </div>
         </div>
+      </div>
+      {/* One save pattern across Settings (R9): the sticky save bar, as on
+          Company details. It saves every card on this page. */}
+      <div className="cs-savebar">
+        <span className="cs-savebar__note">{saved ? 'Saved.' : 'Applies to your account only.'}</span>
+        <button
+          className="btn-action settings-control"
+          onClick={handleSave}
+          disabled={saving || isDemo}
+          title={isDemo ? 'Fixed in demo mode' : undefined}
+          style={{ opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+        >
+          {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
+        </button>
       </div>
     </div>
   );

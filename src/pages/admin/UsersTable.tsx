@@ -1,3 +1,9 @@
+import '@/pages/table-heading-roles.css';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import { formatDate, formatDateTime } from '@/lib/formatters';
+import '@/pages/admin/admin-brand.css';
+import '@/pages/bookings-section.css';
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData } from '@/lib/Api';
@@ -6,6 +12,8 @@ import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import PaginationControls from '@/pages/admin/PaginationControls';
 import UserActivityDrawer from '@/pages/admin/UserActivityDrawer';
+import RowActions from '@/components/ui/RowActions';
+import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 
 const PAGE_SIZE = 20;
 
@@ -15,33 +23,47 @@ const PAGE_SIZE = 20;
 // query, so it can be dropped into AdminDashboard (or anywhere else) with no
 // required props.
 
-const cardStyle: React.CSSProperties = { padding: 20 };
-const sectionTitleStyle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 };
+const cardStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
+const sectionTitleStyle: React.CSSProperties = {
+  fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16,
+};
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', width: 240,
+  padding: '8px 12px', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  fontFamily: 'var(--font-sans)', height: 36, width: 240, maxWidth: '100%', boxSizing: 'border-box',
 };
 const selectStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 10px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', cursor: 'pointer',
+  padding: '8px 12px', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  fontFamily: 'var(--font-sans)', minHeight: 40, cursor: 'pointer',
 };
-const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '8px 12px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-subtle)',
-};
+const thStyle: React.CSSProperties = { textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
-  padding: '10px 12px', fontSize: 12.5, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
-const secondaryBtnStyle: React.CSSProperties = {
-  padding: '5px 10px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 2, fontSize: 10.5, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', cursor: 'pointer',
+// Cells holding 40px controls trim their vertical padding so the row stays 48px.
+const controlTdStyle: React.CSSProperties = { ...tdStyle, paddingTop: 4, paddingBottom: 4 };
+// The one row action (RowActions) stays pinned right, so wide tables never hide it.
+const actionTdStyle: React.CSSProperties = { ...controlTdStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' };
+const fieldLabelStyle: React.CSSProperties = {
+  display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6,
 };
 
 const ROLES = ['ADMIN', 'MANAGER', 'OPERATOR', 'DISPATCHER', 'VIEWER', 'DRIVER', 'CUSTOMER', 'PARTNER'] as const;
 type Role = typeof ROLES[number];
 
+// Presentation only — option *values* and the role payload stay the raw enum.
+const ROLE_LABELS: Record<Role, string> = {
+  ADMIN: 'Admin', MANAGER: 'Manager', OPERATOR: 'Operator', DISPATCHER: 'Dispatcher',
+  VIEWER: 'Viewer', DRIVER: 'Driver', CUSTOMER: 'Customer', PARTNER: 'Partner',
+};
+const roleLabel = (role: string) =>
+  Object.prototype.hasOwnProperty.call(ROLE_LABELS, role) ? ROLE_LABELS[role as Role] : role;
+
+// Date only in the cell (the time stays in its title), so the row keeps
+// one line at 1440.
 const fmt = (dateStr?: string | null) =>
-  dateStr ? new Date(dateStr).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  dateStr ? formatDate(dateStr) : 'Never';
 
 interface AdminUserRow {
   id: number | string;
@@ -70,6 +92,8 @@ export default function UsersTable() {
   // rather than freezing the whole table on any single click.
   const [pending, setPending] = useState<{ id: AdminUserRow['id']; kind: PendingAction } | null>(null);
   const [lockTarget, setLockTarget] = useState<AdminUserRow | null>(null);
+  // Role is plain text in the table; the row menu's "Change role" opens this.
+  const [roleTarget, setRoleTarget] = useState<{ user: AdminUserRow; role: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
   const [activityTarget, setActivityTarget] = useState<AdminUserRow | null>(null);
 
@@ -100,6 +124,10 @@ export default function UsersTable() {
   });
 
   const users: AdminUserRow[] = data?.results || [];
+  // Company earns a column only when at least 20% of the rows have one (R6:
+  // hidden when more than 80% would read "—"); the name's title still
+  // carries it, and Email gets the width.
+  const showCompanyCol = users.length > 0 && users.filter(u => (u.company_name || "").trim()).length >= users.length * 0.2;
   const refresh = () => qc.invalidateQueries({ queryKey: ['admin-users-table'] });
 
   const resetCreateForm = () => {
@@ -124,7 +152,7 @@ export default function UsersTable() {
           ...(newLastName.trim() ? { last_name: newLastName.trim() } : {}),
         },
       });
-      toast.success(`Account created — a setup email was sent to ${res?.email || email} so they can set a password and onboard their company.`);
+      toast.success(`Account created. A setup email was sent to ${res?.email || email} so they can set a password and onboard their company.`);
       resetCreateForm();
       setShowCreate(false);
       refresh();
@@ -183,22 +211,29 @@ export default function UsersTable() {
 
   return (
     <div className="card" style={cardStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
-        <div style={{ ...sectionTitleStyle, marginBottom: 0 }}>Users {data ? `(${data.count})` : ''}</div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="adm-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <h2 className="adm-toolbar__title" style={{ ...sectionTitleStyle, marginBottom: 0 }}>Users {data ? `(${data.count})` : ''}</h2>
+        <div className="adm-toolbar__controls" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
+            className="admin-control adm-toolbar__search"
             style={inputStyle}
+            aria-label="Search users"
             placeholder="Search name, email, company…"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          <select style={selectStyle} value={statusFilter} onChange={e => setStatusFilter(e.target.value as '' | 'active' | 'inactive')}>
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-          <button className="btn-action" style={{ fontSize: 11 }} onClick={() => setShowCreate(s => !s)}>
-            {showCreate ? 'Cancel' : '+ Create User'}
+          <Select value={statusFilter || 'all'} onValueChange={v => setStatusFilter((v === 'all' ? '' : v) as '' | 'active' | 'inactive')}>
+            <SelectTrigger aria-label="Filter by status" style={{ width: 'auto', minWidth: 150, height: 36, minHeight: 36 }}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+          <button className="btn-action admin-control adm-toolbar__new" style={{ height: 36, minHeight: 36, borderRadius: 'var(--radius-control)' }} onClick={() => setShowCreate(s => !s)}>
+            {showCreate ? 'Cancel' : 'New user'}
           </button>
         </div>
       </div>
@@ -208,50 +243,44 @@ export default function UsersTable() {
           style={{
             display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap',
             padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))',
-            border: '1px solid var(--border-subtle)', borderRadius: 2,
+            border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)',
           }}
         >
-          <div>
-            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-              Email *
-            </div>
-            <input style={{ ...inputStyle, width: 240 }} type="email" placeholder="user@company.com" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
-          </div>
-          <div>
-            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-              First name
-            </div>
-            <input style={{ ...inputStyle, width: 160 }} placeholder="Optional" value={newFirstName} onChange={e => setNewFirstName(e.target.value)} />
-          </div>
-          <div>
-            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-              Last name
-            </div>
-            <input style={{ ...inputStyle, width: 160 }} placeholder="Optional" value={newLastName} onChange={e => setNewLastName(e.target.value)} />
-          </div>
-          <button className="btn-action" style={{ fontSize: 11 }} disabled={creating} onClick={handleCreate}>
+          <label>
+            <span style={fieldLabelStyle}>Email *</span>
+            <input className="admin-control" style={{ ...inputStyle, width: 240 }} type="email" placeholder="user@company.com" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
+          </label>
+          <label>
+            <span style={fieldLabelStyle}>First name</span>
+            <input className="admin-control" style={{ ...inputStyle, width: 160 }} placeholder="Optional" value={newFirstName} onChange={e => setNewFirstName(e.target.value)} />
+          </label>
+          <label>
+            <span style={fieldLabelStyle}>Last name</span>
+            <input className="admin-control" style={{ ...inputStyle, width: 160 }} placeholder="Optional" value={newLastName} onChange={e => setNewLastName(e.target.value)} />
+          </label>
+          <button className="btn-action admin-control" style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }} disabled={creating} onClick={handleCreate}>
             {creating ? 'Creating…' : 'Create'}
           </button>
-          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', flexBasis: '100%' }}>
+          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', flexBasis: '100%' }}>
             Creates a bare account with no company. They'll get an email to set their password and can then onboard their own company.
           </div>
         </div>
       )}
 
       {isLoading ? (
-        <Loader size={24} />
+        <TableSkeleton rows={8} cols={6} label="Loading users" />
       ) : (
-        <div style={{ overflowX: 'auto', opacity: isFetching ? 0.7 : 1 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="admin-scroll-region" role="region" aria-label="Users" tabIndex={0} style={{ overflowX: 'auto', opacity: isFetching ? 0.7 : 1 }}>
+          <table className="table-heading-roles admin-table adm-users-table" style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
                 <th style={thStyle}>Name</th>
-                <th style={thStyle}>Email</th>
-                <th style={thStyle}>Company</th>
-                <th style={thStyle}>Role</th>
-                <th style={thStyle}>Status</th>
-                <th style={thStyle}>Last login</th>
-                <th style={thStyle}>Actions</th>
+                <th className="adm-col-phone" style={thStyle}>Email</th>
+                {showCompanyCol && <th className="adm-col-phone" style={thStyle}>Company</th>}
+                <th className="adm-col-phone" style={thStyle}>Role</th>
+                <th className="adm-col-status" style={thStyle}>Status</th>
+                <th className="adm-col-low" style={thStyle}>Last login</th>
+                <th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -259,77 +288,44 @@ export default function UsersTable() {
                 const rowPending = pending?.id === u.id ? pending.kind : null;
                 return (
                   <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.55 }}>
-                    <td style={tdStyle}>
+                    <td className="adm-user-name" style={tdStyle} title={[u.name, !showCompanyCol ? u.company_name : ''].filter(Boolean).join(' · ') || undefined}>
                       {u.name || '—'}
-                      {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--status-warning)' }}>SUPERUSER</span>}
+                      {/* Phones: role (and Inactive, since the Status column folds away) beside the name. */}
+                      {(u.role || !u.is_active) && <span className="adm-user-role-inline"> · {[u.role ? roleLabel(u.role) : '', u.is_active ? '' : 'Inactive'].filter(Boolean).join(' · ')}</span>}
+                      {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)' }}>Superuser</span>}
+
+                      {/* Phones: email and role ride under the name (their columns fold away). */}
+                      {/* One line (R7): the email alone, ending in an ellipsis only when
+                          it can't fit (full address in the title); the role
+                          rides on the name line instead. */}
+                      <div className="adm-status-sub adm-user-sub" title={u.email || undefined}>{u.email}</div>
                     </td>
-                    <td style={tdStyle}>{u.email}</td>
-                    <td style={tdStyle}>{u.company_name || '—'}</td>
-                    <td style={tdStyle}>
-                      <select
-                        style={{ ...selectStyle, padding: '4px 8px', fontSize: 11 }}
-                        value={u.role}
-                        disabled={rowPending === 'role'}
-                        onChange={e => handleRoleChange(u, e.target.value)}
-                      >
-                        {ROLES.map(r => (
-                          <option key={r} value={r}>{r}</option>
-                        ))}
-                        {!ROLES.includes(u.role as Role) && <option value={u.role}>{u.role}</option>}
-                      </select>
+                    <td className="adm-col-phone" style={{ ...tdStyle, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.email}>{u.email}</td>
+                    {showCompanyCol && <td className="adm-col-phone" style={{ ...tdStyle, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.company_name || undefined}>{u.company_name || '—'}</td>}
+                    <td className="adm-col-phone" style={tdStyle}>{roleLabel(u.role)}</td>
+                    <td className="adm-col-status" style={tdStyle}>
+                      <StatusChip status={u.is_active ? 'ACTIVE' : 'INACTIVE'} size="sm" />
                     </td>
-                    <td style={tdStyle}>
-                      <span className={`status-badge ${u.is_active ? 'active' : 'delayed'}`}>{u.is_active ? 'Active' : 'Inactive'}</span>
-                    </td>
-                    <td style={tdStyle}>{fmt(u.last_login)}</td>
-                    <td style={tdStyle}>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <button
-                          style={secondaryBtnStyle}
-                          onClick={() => setActivityTarget(u)}
-                        >
-                          Activity
-                        </button>
-                        {u.is_active ? (
-                          <button
-                            style={{ ...secondaryBtnStyle, color: 'var(--status-danger)' }}
-                            disabled={!!rowPending}
-                            onClick={() => setLockTarget(u)}
-                          >
-                            {rowPending === 'lock' ? 'Locking…' : 'Lock'}
-                          </button>
-                        ) : (
-                          <button
-                            style={secondaryBtnStyle}
-                            disabled={!!rowPending}
-                            onClick={() => runAction(u, 'unlock')}
-                          >
-                            {rowPending === 'unlock' ? 'Unlocking…' : 'Unlock'}
-                          </button>
-                        )}
-                        <button
-                          style={secondaryBtnStyle}
-                          disabled={!!rowPending}
-                          onClick={() => runAction(u, 'reset_password')}
-                        >
-                          {rowPending === 'reset_password' ? 'Sending…' : 'Reset password'}
-                        </button>
-                        {!u.is_superuser && (
-                          <button
-                            style={{ ...secondaryBtnStyle, color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
-                            disabled={!!rowPending}
-                            onClick={() => setDeleteTarget(u)}
-                          >
-                            {rowPending === 'delete' ? 'Deleting…' : 'Delete'}
-                          </button>
-                        )}
-                      </div>
+                    <td className="adm-col-low" style={{ ...tdStyle, whiteSpace: 'nowrap' }} title={u.last_login ? formatDateTime(u.last_login) : undefined}>{fmt(u.last_login)}</td>
+                    <td style={actionTdStyle}>
+                      <RowActions
+                        label={u.name || u.email}
+                        items={[
+                          { label: 'Activity', onSelect: () => setActivityTarget(u) },
+                          { label: rowPending === 'role' ? 'Saving role…' : 'Change role', onSelect: () => setRoleTarget({ user: u, role: u.role }), disabled: !!rowPending },
+                          { label: rowPending === 'reset_password' ? 'Sending…' : 'Reset password', onSelect: () => runAction(u, 'reset_password'), disabled: !!rowPending },
+                          u.is_active
+                            ? { label: rowPending === 'lock' ? 'Locking…' : 'Lock', danger: true, onSelect: () => setLockTarget(u), disabled: !!rowPending }
+                            : { label: rowPending === 'unlock' ? 'Unlocking…' : 'Unlock', onSelect: () => runAction(u, 'unlock'), disabled: !!rowPending },
+                          ...(!u.is_superuser ? [{ label: rowPending === 'delete' ? 'Deleting…' : 'Delete', danger: true, onSelect: () => setDeleteTarget(u), disabled: !!rowPending }] : []),
+                        ]}
+                      />
                     </td>
                   </tr>
                 );
               })}
               {users.length === 0 && (
-                <tr><td style={tdStyle} colSpan={7}>No users match.</td></tr>
+                <tr><td style={tdStyle} colSpan={showCompanyCol ? 7 : 6}>No users match.</td></tr>
               )}
             </tbody>
           </table>
@@ -346,10 +342,38 @@ export default function UsersTable() {
         />
       )}
 
+      {roleTarget && (
+        <div className="bk-dialog-backdrop" onClick={() => setRoleTarget(null)}>
+          <div className="bk-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-role-title" onClick={e => e.stopPropagation()}
+            onKeyDown={e => { if (e.key === 'Escape') setRoleTarget(null); }}>
+            <h2 className="bk-dialog__title" id="admin-role-title">Change role</h2>
+            <p className="bk-dialog__body">{roleTarget.user.name || roleTarget.user.email} is now {roleLabel(roleTarget.user.role).toLowerCase()}.</p>
+            <Select value={roleTarget.role} onValueChange={v => setRoleTarget({ ...roleTarget, role: v })}>
+              <SelectTrigger aria-label="New role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLES.map(r => <SelectItem key={r} value={r}>{roleLabel(r)}</SelectItem>)}
+                {!ROLES.includes(roleTarget.user.role as Role) && <SelectItem value={roleTarget.user.role}>{roleTarget.user.role}</SelectItem>}
+              </SelectContent>
+            </Select>
+            <div className="bk-dialog__footer">
+              <button type="button" className="bk-btn bk-btn--secondary" onClick={() => setRoleTarget(null)}>Cancel</button>
+              <button
+                type="button"
+                className="bk-btn bk-btn--primary"
+                disabled={roleTarget.role === roleTarget.user.role}
+                onClick={() => { const { user, role } = roleTarget; setRoleTarget(null); handleRoleChange(user, role); }}
+              >Save role</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {lockTarget && (
         <ConfirmModal
           title="Lock account"
-          message={`This deactivates ${lockTarget.name || lockTarget.email}'s account — they won't be able to log in until unlocked. This doesn't delete any of their data.`}
+          message={`This deactivates ${lockTarget.name || lockTarget.email}'s account. They won't be able to log in until unlocked. This doesn't delete any of their data.`}
           confirmLabel="Lock account"
           danger
           onConfirm={() => runAction(lockTarget, 'lock')}
@@ -360,7 +384,7 @@ export default function UsersTable() {
       {deleteTarget && (
         <ConfirmModal
           title="Delete user"
-          message={`Delete ${deleteTarget.name || deleteTarget.email}? Their account is deactivated and their email is freed up so it can be used to sign up again — this doesn't remove their existing loads, quotes or invoices, and can't be undone from here.`}
+          message={`Delete ${deleteTarget.name || deleteTarget.email}? Their account is deactivated and their email is freed up so it can be used to sign up again. This doesn't remove their existing loads, quotes or invoices, and can't be undone from here.`}
           confirmLabel="Delete"
           danger
           onConfirm={() => runAction(deleteTarget, 'delete')}

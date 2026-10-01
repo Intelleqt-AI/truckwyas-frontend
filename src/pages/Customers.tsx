@@ -1,14 +1,31 @@
+import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
+import './customers-typography.css';
+import './table-heading-roles.css';
+import './bookings-section.css';
+import './quote-invoice-roles.css';
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { Building2, Plus, X } from "lucide-react";
+import SectionHeader from "@/components/layout/SectionHeader";
 import { useQuery } from "@tanstack/react-query";
-import { fetchData, postData, patchData, deleteData } from "../lib/Api";
+import LoadError, { loadFailed } from "@/components/data/LoadError";
+import { rowLink } from "@/lib/rowLink";
+import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
+import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
+import { postData, patchData, deleteData } from "../lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { LiveBadge } from "@/components/LiveBadge";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader } from '@/components/Loader';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import { fetchAllPages } from '@/components/insights/findings';
+import { useLedger, isOpen, num, todayISO } from '@/components/reports/data';
+import { InfoTip } from '@/components/ui/InfoTip';
+import { formatCurrency, formatMoneyWhole } from '@/lib/formatters';
 import { useAuth } from '@/lib/AuthContext';
+import RowActions from '@/components/ui/RowActions';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
 interface Customer {
   id: number;
@@ -29,9 +46,9 @@ interface Customer {
 }
 
 const PAYMENT_TERMS = [
-  { value: "NET30", label: "Net 30 Days" },
-  { value: "NET60", label: "Net 60 Days" },
-  { value: "NET90", label: "Net 90 Days" },
+  { value: "NET30", label: "Net 30 days" },
+  { value: "NET60", label: "Net 60 days" },
+  { value: "NET90", label: "Net 90 days" },
 ];
 
 
@@ -41,22 +58,29 @@ const fieldStyle: React.CSSProperties = {
   border: "1px solid var(--border-subtle)",
   color: "var(--text-primary)",
   padding: "10px 12px",
-  borderRadius: 2,
-  fontSize: 12,
-  fontFamily: "var(--font-mono)",
-  outline: "none",
+  borderRadius: "var(--radius-control, 8px)",
+  fontSize: 14,
+  lineHeight: "20px",
+  fontFamily: "var(--font-sans)",
   boxSizing: "border-box",
 };
 
 const labelStyle: React.CSSProperties = {
   display: "block",
-  fontSize: 11,
-  fontFamily: "var(--font-mono)",
-  color: "var(--text-tertiary)",
-  letterSpacing: "0.06em",
+  fontSize: 13,
+  lineHeight: "20px",
+  fontWeight: 500,
+  fontFamily: "var(--font-sans)",
+  color: "var(--text-secondary)",
+  letterSpacing: "normal",
   marginBottom: 6,
-  textTransform: "uppercase",
+  textTransform: "none",
 };
+
+const PAYMENT_TERMS_LABEL: Record<string, string> = Object.fromEntries(PAYMENT_TERMS.map(t => [t.value, t.label]));
+// "NET45" → "Net 45 days" for terms outside the fixed list.
+const paymentTermsLabel = (v?: string) =>
+  !v ? "Net 30 days" : PAYMENT_TERMS_LABEL[v] || (/^NET(\d+)$/.test(v) ? `Net ${v.slice(3)} days` : v);
 
 const EMPTY_FORM = {
   name: "", company_name: "", email: "", phone: "",
@@ -80,10 +104,17 @@ export default function Customers() {
   const [sortBy, setSortBy] = useState("name_asc");
 
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
+  const toggleOne = (id: number, on: boolean) =>
+    setSelected(prev => (on ? [...prev, id] : prev.filter(x => x !== id)));
   const [addForm, setAddForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
 
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
+  // Slide-outs: focus moves in, Tab stays inside, focus returns on close.
+  useFocusTrap(latestModal, showAddForm);
+  useFocusTrap(latestModal, !!editCustomer);
   const [editForm, setEditForm] = useState<any>({});
 
   const [confirmOpts, setConfirmOpts] = useState<{
@@ -100,16 +131,79 @@ export default function Customers() {
     }
   }, [location.pathname]);
 
-  const { data, isLoading: loading, refetch } = useQuery({
+  const customersQuery = useQuery({
     queryKey: ["customers-page", debouncedSearch],
     queryFn: () => {
       const url = debouncedSearch
         ? `api/v1/customers/?search=${encodeURIComponent(debouncedSearch)}`
         : "api/v1/customers/";
-      return fetchData(url);
+      // Same list endpoint, every page followed, so the directory is complete.
+      return fetchAllPages<Customer>(url);
     },
   });
-  const customers: Customer[] = Array.isArray(data) ? data : data?.results || [];
+  const { data, refetch } = customersQuery;
+  // Failed (or failing and retrying) with nothing to show: say so, never "No customers yet".
+  const failed = loadFailed(customersQuery);
+  const loading = customersQuery.isLoading && !failed;
+  const customers: Customer[] = data?.rows ?? [];
+  // The endpoint is paginated; count is the true total (every page is followed).
+  const totalCustomers: number = data?.count ?? customers.length;
+
+  // Money owed per customer, from the same invoice ledger as Invoices and the
+  // Debtors report: issued, not paid, balance above zero (incl. VAT). Overdue
+  // is the part of that past its due date.
+  const ledger = useLedger(['invoices']);
+  const today = todayISO();
+  const owedBy = new Map<number, { owed: number; overdue: number; oldestDue?: string }>();
+  for (const inv of ledger.data?.invoices ?? []) {
+    if (inv.customer == null || !isOpen(inv)) continue;
+    const row = owedBy.get(inv.customer) ?? { owed: 0, overdue: 0 };
+    row.owed += num(inv.balance);
+    const due = inv.due_date?.slice(0, 10);
+    if (due && due < today) {
+      row.overdue += num(inv.balance);
+      if (!row.oldestDue || due < row.oldestDue) row.oldestDue = due;
+    }
+    owedBy.set(inv.customer, row);
+  }
+  // Material (R5): a customer's overdue part is at least a tenth of everything
+  // overdue and over 30 days late. Only those rows carry the small danger
+  // dot; every amount itself stays in ink, so the column never reads as an alarm.
+  const totalOverdue = [...owedBy.values()].reduce((n, r) => n + r.overdue, 0);
+  const daysLate = (iso?: string) => iso ? Math.floor((Date.parse(today) - Date.parse(iso)) / 86_400_000) : 0;
+  const isMaterial = (r?: { overdue: number; oldestDue?: string }) =>
+    !!r && r.overdue >= 0.005 && totalOverdue > 0 && r.overdue / totalOverdue >= 0.1 && daysLate(r.oldestDue) > 30;
+  // Some balance is partly late: every row then takes the two-line height.
+  const anyPartlyLate = [...owedBy.values()].some(r => r.overdue >= 0.005 && Math.abs(r.overdue - r.owed) >= 0.005);
+  // One money column: Owed, in ink. A partly late balance gets a quiet second
+  // line with the overdue part; a material overdue balance gets one small dot.
+  const owedCell = (row: { owed: number; overdue: number; oldestDue?: string } | undefined) => {
+    if (!ledger.data) return <span className="bk-muted">{ledger.error ? 'Not loaded' : '…'}</span>;
+    const owed = row?.owed ?? 0;
+    const overdue = row?.overdue ?? 0;
+    if (owed < 0.005) return <span className="bk-muted">—</span>;
+    const flag = isMaterial(row)
+      ? <span className="cu-owed__dot" title={`Overdue: ${formatCurrency(overdue)}, oldest ${daysLate(row!.oldestDue)} days late`}><span className="sr-only">Overdue, oldest {daysLate(row!.oldestDue)} days late: </span></span>
+      : null;
+    if (overdue >= 0.005 && Math.abs(overdue - owed) < 0.005) {
+      return <span title={flag ? formatCurrency(owed) : `${formatCurrency(owed)}, all overdue`}>{flag}{formatMoneyWhole(owed)}{!flag && <span className="sr-only">, all overdue</span>}</span>;
+    }
+    // Lists show whole rands (R7); the cents are in the title and on the
+    // statement.
+    return (
+      <span title={formatCurrency(owed)}>
+        {flag}{formatMoneyWhole(owed)}
+        {overdue >= 0.005 && <span className="cu-owed__sub">{formatMoneyWhole(overdue)} overdue</span>}
+      </span>
+    );
+  };
+
+  // Customer is the company; the contact name is shown only when it differs.
+  const displayName = (c: Customer) => (c.company_name || '').trim() || c.name;
+  const contactName = (c: Customer) => {
+    const n = (c.name || '').trim();
+    return n && n.toLowerCase() !== displayName(c).toLowerCase() ? n : '';
+  };
 
   useAutoRefresh(refetch);
 
@@ -122,11 +216,15 @@ export default function Customers() {
 
   const customerStatus = (c: Customer) =>
     c.is_active === false || c.status === "INACTIVE" ? "INACTIVE" : "ACTIVE";
+  // Status earns a column only when some customer is inactive.
+  const anyInactive = customers.some(c => customerStatus(c) !== 'ACTIVE');
 
   const filtered = [...customers].sort((a, b) => {
       switch (sortBy) {
-        case "name_asc":  return a.name.localeCompare(b.name);
-        case "name_desc": return b.name.localeCompare(a.name);
+        case "name_asc":  return displayName(a).localeCompare(displayName(b));
+        case "name_desc": return displayName(b).localeCompare(displayName(a));
+        case "owed":      return (owedBy.get(b.id)?.owed ?? 0) - (owedBy.get(a.id)?.owed ?? 0);
+        case "overdue":   return (owedBy.get(b.id)?.overdue ?? 0) - (owedBy.get(a.id)?.overdue ?? 0);
         case "city":      return (a.city || "").localeCompare(b.city || "");
         case "newest":    return (b.created_at || "").localeCompare(a.created_at || "");
         case "oldest":    return (a.created_at || "").localeCompare(b.created_at || "");
@@ -152,153 +250,208 @@ export default function Customers() {
     });
   }
 
-  if (loading) return <Loader fullScreen />;
+  const header = (
+    <SectionHeader
+      title="Customers"
+      description="Who you quote and invoice"
+      actions={
+        <>
+          <button
+            type="button"
+            className="bk-btn bk-btn--secondary"
+            onClick={() => setShowImport(true)}
+            disabled={isDemo}
+            title={isDemo ? 'Fixed in demo mode' : 'Paste a list from Excel'}
+          >Import from Excel</button>
+          <button
+            type="button"
+            className="bk-btn bk-btn--primary"
+            onClick={() => setShowAddForm(true)}
+            disabled={isDemo}
+            title={isDemo ? 'Fixed in demo mode' : undefined}
+          ><Plus size={16} aria-hidden="true" /> Add customer</button>
+        </>
+      }
+    />
+  );
+
+  if (failed) {
+    return (
+      <div className="customers-typography">
+        {header}
+        <LoadError
+          what="customers"
+          error={customersQuery.error ?? customersQuery.failureReason}
+          busy={customersQuery.isFetching}
+          onRetry={() => refetch()}
+        />
+      </div>
+    );
+  }
+  // The toolbar row is reserved while loading so the table does not jump.
+  if (loading) return <div className="customers-typography">{header}<div className="tw-toolbar" aria-hidden="true" /><TableSkeleton rows={8} cols={6} label="Loading customers" /></div>;
 
   return (
-    <div>
-      {/* Header */}
-      <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: "var(--text-primary)" }}>Customers</div>
-          <LiveBadge />
-        </div>
-        <button
-          className="btn-action"
-          onClick={() => setShowAddForm(true)}
-          disabled={isDemo}
-          title={isDemo ? 'Fixed in demo mode' : undefined}
-          style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-        >+ Add customer</button>
-      </div>
+    <div className="customers-typography bookings-typography">
+      {header}
 
-      {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-        {[
-          { label: "Total Customers", value: customers.length, color: "var(--text-primary)" },
-          { label: "With Credit Limit", value: customers.filter(c => c.credit_limit != null && Number(c.credit_limit) > 0).length, color: "var(--accent-primary)" },
-          { label: "Cities Covered", value: new Set(customers.map(c => c.city).filter(Boolean)).size, color: "var(--text-primary)" },
-          { label: "NET30 Clients", value: customers.filter(c => (c.payment_terms_default || "NET30") === "NET30").length, color: "var(--text-primary)" },
-        ].map(k => (
-          <div key={k.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{k.label}</span></div>
-            <div className="metric-value" style={{ fontSize: 28, color: k.color }}>{k.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Table */}
-      <div className="card" style={{ padding: 0, overflowX: "auto" }}>
-        {/* Table toolbar */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px 12px 32px", borderBottom: "1px solid var(--border-subtle)" }}>
-          <input
-            type="text"
-            placeholder="Search name, company, email, city..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ ...fieldStyle, width: 280 }}
-          />
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Sort</span>
+      {/* Table. No summary tiles: nothing on this directory drives a decision
+          except finding the customer, so the count sits in the toolbar. */}
+      {/* Toolbar sits above the card, as on every other list. */}
+      <Toolbar
+        className="cu-toolbar"
+        meta={data && !data.complete
+          ? `First ${customers.length} of ${totalCustomers} customers`
+          : `${totalCustomers} ${totalCustomers === 1 ? "customer" : "customers"}`}
+        end={
+          <>
+            <span id="customers-sort-label" className="cu-sort-label">Sort</span>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger>
+              <SelectTrigger aria-labelledby="customers-sort-label" style={{ width: 'auto', minWidth: 168 }}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="name_asc">Name A–Z</SelectItem>
                 <SelectItem value="name_desc">Name Z–A</SelectItem>
+                <SelectItem value="owed">Most owed</SelectItem>
+                <SelectItem value="overdue">Most overdue</SelectItem>
                 <SelectItem value="city">City A–Z</SelectItem>
-                <SelectItem value="newest">Newest First</SelectItem>
-                <SelectItem value="oldest">Oldest First</SelectItem>
+                <SelectItem value="newest">Newest first</SelectItem>
+                <SelectItem value="oldest">Oldest first</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </>
+        }
+      >
+        <SearchInput
+          aria-label="Search customers"
+          placeholder="Search name, company, email, city"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </Toolbar>
+
+      <div className="card" style={{ padding: 0, overflow: "hidden", borderRadius: "var(--radius-card, 12px)" }}>
+        {/* Sits above the table so it never covers the rows being chosen. */}
+        <div style={{ padding: selected.length ? "12px 16px 0" : 0 }}>
+          <BulkDeleteBar
+            entity="customers"
+            selected={selected}
+            onClear={() => setSelected([])}
+            onDeleted={() => { setSelected([]); refetch(); }}
+          />
         </div>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div className="bk-table-wrap bk-table-wrap--bare">
+        <table className={`table-heading-roles bk-table bk-table--pin-actions${anyPartlyLate ? ' cu-two-line' : ''}`}>
           <thead>
             <tr>
-              {["Name", "Company", "Email", "Phone", "City", "Payment Terms", ""].map(h => (
-                <th key={h} style={{
-                  padding: "12px 20px 12px 32px", textAlign: "left",
-                  fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase",
-                  letterSpacing: "0.08em", color: "var(--text-tertiary)",
-                  borderBottom: "1px solid var(--border-subtle)", fontWeight: 500, whiteSpace: "nowrap",
-                }}>{h}</th>
-              ))}
+              <th scope="col" className="bk-col-select" style={{ paddingRight: 0, width: 32 }}>
+                {filtered.length > 0 && (
+                  <RowCheckbox
+                    title="Select everything shown"
+                    checked={selected.length > 0 && filtered.every((c: any) => selected.includes(c.id))}
+                    onChange={on => setSelected(on ? filtered.map((c: any) => c.id) : [])}
+                  />
+                )}
+              </th>
+              <th scope="col">Customer</th>
+              <th scope="col" className="bk-col-opt">Email</th>
+              <th scope="col" className="bk-col-city">City</th>
+              <th scope="col" className="bk-col-terms bk-col-narrow">Terms</th>
+              <th scope="col" className="is-num bk-col-money"><span className="cu-owed__head">Owed<InfoTip align="end">Unpaid invoice balances, incl. VAT. A red dot marks a customer whose overdue part is at least a tenth of everything overdue and over 30 days late. A second line shows the overdue part when only some is late.</InfoTip></span></th>
+              {anyInactive && <th scope="col">Status</th>}
+              <th scope="col" className="is-num"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               customers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: 0 }}>
-                    <div style={{ padding: "60px 20px", textAlign: "center" }}>
-                      <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🏢</div>
-                      <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", marginBottom: 8 }}>No customers yet</div>
-                      <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
-                        Add your first customer to get started
+                  <td colSpan={anyInactive ? 8 : 7} style={{ padding: 0, whiteSpace: "normal" }}>
+                    <div className="bk-empty" style={{ padding: "48px 24px" }}>
+                      <div className="bk-empty__icon"><Building2 size={32} strokeWidth={1.5} aria-hidden="true" /></div>
+                      <h2 className="bk-empty__title">No customers yet</h2>
+                      <div className="bk-empty__text">
+                        Already have them in a spreadsheet? Paste the list straight in.
                       </div>
-                      <button
-                        onClick={() => setShowAddForm(true)}
-                        className="btn-action"
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-                      >Add customer</button>
+                      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowImport(true)}
+                          className="bk-btn bk-btn--primary"
+                          disabled={isDemo}
+                          title={isDemo ? 'Fixed in demo mode' : undefined}
+                        >Paste from Excel</button>
+                        <button
+                          type="button"
+                          className="bk-btn bk-btn--secondary"
+                          onClick={() => setShowAddForm(true)}
+                          disabled={isDemo}
+                          title={isDemo ? 'Fixed in demo mode' : undefined}
+                        >Add one at a time</button>
+                      </div>
                     </div>
                   </td>
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", color: "var(--text-tertiary)", padding: 40, fontSize: 13 }}>
-                    No customers match your filters
+                  <td colSpan={anyInactive ? 8 : 7} style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40, fontSize: 13 }}>
+                    No customers match your search.
                   </td>
                 </tr>
               )
             ) : filtered.map((c, idx) => {
               const status = customerStatus(c);
-              const dotColor = status === "ACTIVE" ? "var(--status-success)" : "var(--text-tertiary)";
               return (
                 <tr
                   key={c.id}
-                  style={{ cursor: "pointer", borderBottom: idx < filtered.length - 1 ? "1px solid var(--border-row)" : "none" }}
+                  className="is-clickable"
+                  {...rowLink(() => navigate(`/customers/${c.id}`))}
                   onClick={() => navigate(`/customers/${c.id}`)}
-                  onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-surface-hover)")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
-                  <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
-                      {c.name}
-                    </div>
+                  <td className="bk-col-select" style={{ paddingRight: 0, width: 32 }}>
+                    <RowCheckbox
+                      checked={selected.includes(c.id)}
+                      onChange={on => toggleOne(c.id, on)}
+                    />
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, color: "var(--text-secondary)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.company_name || ""}>
-                    {c.company_name || "—"}
+                  <td className="is-primary is-truncate bk-col-customer" style={{ fontWeight: 500 }} title={[displayName(c), contactName(c)].filter(Boolean).join(', contact ')}>
+                    {(() => {
+                      // Phones: the legal suffix ("(Pty) Ltd", "Ltd") steps
+                      // aside so the name stays on one line (R7); the full
+                      // name is in the title.
+                      const n = displayName(c);
+                      const m = n.match(/^(.*?\S)(\s+(?:\(Pty\)\s*)?(?:Ltd|Inc|CC)\.?)$/i);
+                      return m ? <>{m[1]}<span className="cu-suffix">{m[2]}</span></> : n;
+                    })()}
+                    {contactName(c) && <span className="bk-muted" style={{ fontWeight: 400 }}> · {contactName(c)}</span>}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-secondary)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.email}>
-                    {c.email}
+                  <td className="is-truncate bk-col-opt" title={c.email}>
+                    {c.email || <span className="bk-muted">—</span>}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                    {c.phone || "—"}
+                  <td className="is-truncate bk-col-city">
+                    {c.city || <span className="bk-muted">—</span>}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                    {c.city || "—"}
+                  <td className="bk-col-terms bk-col-narrow">
+                    {paymentTermsLabel(c.payment_terms_default).replace(/ days$/, '')}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                    {c.payment_terms_default || "NET30"}
-                  </td>
-                  <td style={{ padding: "12px 20px", textAlign: "right" }}>
-                    <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                      <button
-                        onClick={e => { e.stopPropagation(); openEdit(c); }}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", padding: "4px 10px", borderRadius: 2, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", opacity: isDemo ? 0.5 : 1 }}
-                      >Edit</button>
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          setConfirmOpts({
-                            title: "Delete Customer",
+                  <td className="is-money bk-col-money cu-owed">{owedCell(owedBy.get(c.id))}</td>
+                  {anyInactive && (
+                    <td>
+                      <StatusChip status={status === "ACTIVE" ? "ACTIVE" : "INACTIVE"} size="sm" />
+                    </td>
+                  )}
+                  <td className="is-num">
+                    <RowActions
+                      label={c.name}
+                      items={[
+                        { label: "Edit", onSelect: () => openEdit(c), disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined },
+                        {
+                          label: "Delete",
+                          danger: true,
+                          disabled: isDemo, title: isDemo ? 'Fixed in demo mode' : undefined,
+                          onSelect: () => setConfirmOpts({
+                            title: "Delete customer",
                             message: `Remove "${c.name}"? This cannot be undone.`,
                             confirmLabel: "Delete",
                             danger: true,
@@ -311,45 +464,52 @@ export default function Customers() {
                                 toast.error(err?.message || "Failed to delete");
                               }
                             },
-                          });
-                        }}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: "none", border: "1px solid var(--status-danger)", color: "var(--status-danger)", padding: "4px 10px", borderRadius: 2, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", opacity: isDemo ? 0.5 : 1 }}
-                      >Del</button>
-                    </div>
+                          }),
+                        },
+                      ]}
+                    />
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
-      {/* Add Customer slide-out */}
+      <PasteImportDrawer
+        entity="customers"
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={() => refetch()}
+      />
+
+      {/* Add customer slide-out */}
       {showAddForm && (
         <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ position: "absolute", inset: 0, background: "var(--modal-backdrop)" }} onClick={() => { setShowAddForm(false); if (location.pathname === "/customers/new") navigate("/customers", { replace: true }); }} />
-          <div style={{ position: "relative", width: 440, background: "var(--bg-deep)", borderLeft: "1px solid var(--border-subtle)", padding: 28, overflowY: "auto" }}>
+          <div style={{ position: "absolute", inset: 0, background: "var(--modal-backdrop, rgba(0,0,0,0.65))" }} onClick={() => { setShowAddForm(false); if (location.pathname === "/customers/new") navigate("/customers", { replace: true }); }} />
+          <div role="dialog" aria-modal="true" style={{ position: "relative", width: 440, maxWidth: "100%", background: "var(--bg-surface)", borderLeft: "1px solid var(--border-subtle)", padding: 24, overflowY: "auto", fontFamily: "var(--font-sans)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>Add Customer</div>
-              <button onClick={() => setShowAddForm(false)} style={{ background: "none", border: "none", color: "var(--text-tertiary)", cursor: "pointer", fontSize: 18 }}>✕</button>
+              <h2 className="bk-dialog__title" style={{ margin: 0 }}>Add customer</h2>
+              <button type="button" className="bk-icon-btn" aria-label="Close" onClick={() => setShowAddForm(false)}><X size={20} aria-hidden="true" /></button>
             </div>
 
             {[
-              { key: "name", label: "Full Name", placeholder: "e.g. John Doe", required: true },
-              { key: "company_name", label: "Company Name", placeholder: "e.g. Acme Logistics" },
+              { key: "name", label: "Full name", placeholder: "e.g. John Doe", required: true },
+              { key: "company_name", label: "Company name", placeholder: "e.g. Acme Logistics" },
               { key: "email", label: "Email", placeholder: "e.g. john@company.com", type: "email", required: true },
               { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000", required: true },
               { key: "city", label: "City", placeholder: "e.g. Johannesburg", required: true },
-              { key: "state", label: "Province / State", placeholder: "e.g. Gauteng" },
-              { key: "zip_code", label: "Zip Code", placeholder: "e.g. 2000" },
+              { key: "state", label: "Province", placeholder: "e.g. Gauteng" },
+              { key: "zip_code", label: "Postal code", placeholder: "e.g. 2000" },
               { key: "address", label: "Address", placeholder: "Street address" },
-              { key: "billing_address", label: "Billing Address", placeholder: "Leave blank if same as address" },
+              { key: "billing_address", label: "Billing address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>}</label>
+                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text)", marginLeft: 2 }}>*</span>}</label>
                 <input
+                  className="qi-input"
+                  aria-label={f.label}
                   type={f.type || "text"}
                   placeholder={f.placeholder}
                   value={(addForm as any)[f.key]}
@@ -360,19 +520,21 @@ export default function Customers() {
             ))}
 
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Payment Terms</label>
+              <label style={labelStyle}>Payment terms</label>
               <Select value={addForm.payment_terms_default} onValueChange={val => setAddForm(prev => ({ ...prev, payment_terms_default: val }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PAYMENT_TERMS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  {[...PAYMENT_TERMS, ...(addForm.payment_terms_default && !PAYMENT_TERMS.some(t => t.value === addForm.payment_terms_default)
+                    ? [{ value: addForm.payment_terms_default, label: paymentTermsLabel(addForm.payment_terms_default) }] : [])]
+                    .map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Credit Limit (R)</label>
+              <label style={labelStyle}>Credit limit (R)</label>
               <input
                 type="number"
                 placeholder="e.g. 50000"
@@ -405,13 +567,16 @@ export default function Customers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: "10px 0", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.06em", background: "var(--accent-primary)", color: "var(--bg-deep)", border: "none", borderRadius: 2, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
+                type="button"
+                className="bk-btn bk-btn--primary"
+                style={{ flex: 1 }}
               >
                 {saving ? "Saving…" : "Create customer"}
               </button>
               <button
                 onClick={() => setShowAddForm(false)}
-                style={{ padding: "10px 20px", fontFamily: "var(--font-mono)", fontSize: 11, background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 2, cursor: "pointer" }}
+                type="button"
+                className="bk-btn bk-btn--secondary"
               >
                 Cancel
               </button>
@@ -420,30 +585,32 @@ export default function Customers() {
         </div>
       )}
 
-      {/* Edit Customer slide-out */}
+      {/* Edit customer slide-out */}
       {editCustomer && (
         <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ position: "absolute", inset: 0, background: "var(--modal-backdrop)" }} onClick={() => setEditCustomer(null)} />
-          <div style={{ position: "relative", width: 440, background: "var(--bg-deep)", borderLeft: "1px solid var(--border-subtle)", padding: 28, overflowY: "auto" }}>
+          <div style={{ position: "absolute", inset: 0, background: "var(--modal-backdrop, rgba(0,0,0,0.65))" }} onClick={() => setEditCustomer(null)} />
+          <div role="dialog" aria-modal="true" style={{ position: "relative", width: 440, maxWidth: "100%", background: "var(--bg-surface)", borderLeft: "1px solid var(--border-subtle)", padding: 24, overflowY: "auto", fontFamily: "var(--font-sans)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>Edit Customer</div>
-              <button onClick={() => setEditCustomer(null)} style={{ background: "none", border: "none", color: "var(--text-tertiary)", cursor: "pointer", fontSize: 18 }}>✕</button>
+              <h2 className="bk-dialog__title" style={{ margin: 0 }}>Edit customer</h2>
+              <button type="button" className="bk-icon-btn" aria-label="Close" onClick={() => setEditCustomer(null)}><X size={20} aria-hidden="true" /></button>
             </div>
 
             {[
-              { key: "name", label: "Full Name", placeholder: "e.g. John Doe", required: true },
-              { key: "company_name", label: "Company Name", placeholder: "e.g. Acme Logistics" },
+              { key: "name", label: "Full name", placeholder: "e.g. John Doe", required: true },
+              { key: "company_name", label: "Company name", placeholder: "e.g. Acme Logistics" },
               { key: "email", label: "Email", placeholder: "e.g. john@company.com", type: "email", required: true },
               { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000", required: true },
               { key: "city", label: "City", placeholder: "e.g. Johannesburg", required: true },
-              { key: "state", label: "Province / State", placeholder: "e.g. Gauteng" },
-              { key: "zip_code", label: "Zip Code", placeholder: "e.g. 2000" },
+              { key: "state", label: "Province", placeholder: "e.g. Gauteng" },
+              { key: "zip_code", label: "Postal code", placeholder: "e.g. 2000" },
               { key: "address", label: "Address", placeholder: "Street address" },
-              { key: "billing_address", label: "Billing Address", placeholder: "Leave blank if same as address" },
+              { key: "billing_address", label: "Billing address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>}</label>
+                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text)", marginLeft: 2 }}>*</span>}</label>
                 <input
+                  className="qi-input"
+                  aria-label={f.label}
                   type={f.type || "text"}
                   placeholder={f.placeholder}
                   value={editForm[f.key] ?? ""}
@@ -454,19 +621,21 @@ export default function Customers() {
             ))}
 
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Payment Terms</label>
+              <label style={labelStyle}>Payment terms</label>
               <Select value={editForm.payment_terms_default ?? "NET30"} onValueChange={val => setEditForm((prev: any) => ({ ...prev, payment_terms_default: val }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PAYMENT_TERMS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  {[...PAYMENT_TERMS, ...(editForm.payment_terms_default && !PAYMENT_TERMS.some(t => t.value === editForm.payment_terms_default)
+                    ? [{ value: editForm.payment_terms_default, label: paymentTermsLabel(editForm.payment_terms_default) }] : [])]
+                    .map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Credit Limit (R)</label>
+              <label style={labelStyle}>Credit limit (R)</label>
               <input
                 type="number"
                 placeholder="e.g. 50000"
@@ -508,13 +677,16 @@ export default function Customers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: "10px 0", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.06em", background: "var(--accent-primary)", color: "var(--bg-deep)", border: "none", borderRadius: 2, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
+                type="button"
+                className="bk-btn bk-btn--primary"
+                style={{ flex: 1 }}
               >
-                {saving ? "Saving…" : "Update customer"}
+                {saving ? "Saving…" : "Save changes"}
               </button>
               <button
                 onClick={() => setEditCustomer(null)}
-                style={{ padding: "10px 20px", fontFamily: "var(--font-mono)", fontSize: 11, background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 2, cursor: "pointer" }}
+                type="button"
+                className="bk-btn bk-btn--secondary"
               >
                 Cancel
               </button>

@@ -1,0 +1,12 @@
+/* Quote and invoice form/body roles (desktop pages under src/pages only).
+   Typography and focus treatment; control behavior, values and calculations
+   are untouched. Replaces the old blanket outline:none on these inputs with
+   the brand 2px focus ring / 3px offset. */
+.qi-input:focus-visible,
+.qi-action:focus-visible,
+.qi-form input:focus-visible,
+.qi-form select:focus-visible,
+.qi-form textarea:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}

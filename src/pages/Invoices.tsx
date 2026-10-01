@@ -1,16 +1,34 @@
+import "./table-heading-roles.css";
+import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
+import "./finance-brand.css";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ellipsis } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatNumber, formatPercent } from "@/lib/formatters";
+import { fetchData, postData } from "@/lib/Api";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import SectionHeader, { FINANCE_TABS } from "@/components/layout/SectionHeader";
+import RowActions from "@/components/ui/RowActions";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { wholeRand } from "@/components/finance/FinTile";
+import { KpiRow, KpiTile } from "@/components/ui/KpiTile";
+import { Toolbar, SearchInput } from "@/components/ui/Toolbar";
+import { Segmented } from "@/components/ui/Segmented";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
+import LoadError, { loadFailed } from "@/components/data/LoadError";
+import InvoiceSendPreview, { type InvoiceMessageKind } from "@/components/finance/InvoiceSendPreview";
+import { canSendReminder, invoiceBalance, isInvoiceOverdue } from "@/lib/invoiceStatus";
+import { rowLink } from "@/lib/rowLink";
+import { daysBetween, isIssued, paidInvoiceTiming, todayISO, type Invoice as LedgerInvoice } from "@/components/reports/data";
 
-const MC_URL =
-  "https://getstarted.merchantcapital.co.za?actiontype=C_C&channel=Part_Trad&who=IA_SP";
-const MC_STORAGE_KEY = "mc_applied_invoice_ids";
+// External Fast Pay application link. The applied-state key is unchanged so
+// invoices already marked "Applied" stay marked.
+const FAST_PAY_STORAGE_KEY = "mc_applied_invoice_ids";
 
 function loadAppliedIds(): Set<string> {
   try {
-    return new Set(JSON.parse(localStorage.getItem(MC_STORAGE_KEY) || "[]"));
+    return new Set(JSON.parse(localStorage.getItem(FAST_PAY_STORAGE_KEY) || "[]"));
   } catch {
     return new Set();
   }
@@ -18,109 +36,111 @@ function loadAppliedIds(): Set<string> {
 
 function saveAppliedId(id: string, current: Set<string>): Set<string> {
   const next = new Set(current).add(id);
-  localStorage.setItem(MC_STORAGE_KEY, JSON.stringify([...next]));
+  localStorage.setItem(FAST_PAY_STORAGE_KEY, JSON.stringify([...next]));
   return next;
 }
-import { fetchData, postData, putData, deleteData } from "@/lib/Api";
-import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { LiveBadge } from "@/components/LiveBadge";
-import { Loader } from "@/components/Loader";
-import { DatePicker } from "@/components/ui/date-picker";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
-const TIER_COLOR: Record<string, string> = {
-  prime: "var(--status-success)",
-  standard: "var(--accent-primary)",
-  elevated: "var(--status-warning)",
-  high: "var(--status-danger)",
-};
-
-const STATUS_COLOR: Record<string, string> = {
-  PAID: "var(--status-success)",
-  SENT: "var(--status-warning)",
-  OVERDUE: "var(--status-danger)",
-  DRAFT: "var(--text-tertiary)",
-};
-
-const EXPENSE_STATUS_COLOR: Record<string, string> = {
-  PENDING: "var(--status-warning)",
-  APPROVED: "var(--status-success)",
-  REJECTED: "var(--status-danger)",
+// Invoice statuses use the product-wide StatusChip map (Sent is info
+// everywhere). Fast Pay risk tiers keep their own tone.
+const TIER_TONE: Record<string, StatusTone> = {
+  prime: "success",
+  standard: "info",
+  elevated: "warning",
+  high: "danger",
 };
 
 // Sentence-case a status/token for display: "PARTIALLY_PAID" → "Partially paid".
 const formatStatus = (s?: string) =>
   s ? s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()) : "—";
 
-const PAGE_SIZE = 10;
+const safeDate = (d?: string) => {
+  if (!d) return "—";
+  const t = new Date(d);
+  return isNaN(t.getTime()) ? d : formatDate(t);
+};
 
-type FinanceTab = "invoices" | "expenses";
+const PAGE_SIZE = 10;
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const STATUSES = ["All", "SENT", "OVERDUE", "PAID", "DRAFT"];
+
+/** Finance tabs; on the legacy /invoices path the Invoices tab points at it so it stays active. */
+function financeTabsFor(pathname: string) {
+  return pathname === "/invoices"
+    ? FINANCE_TABS.map((t) => (t.to === "/finance/invoices" ? { ...t, to: "/invoices" } : t))
+    : FINANCE_TABS;
+}
 
 // Fetches invoices + stats. Lives in the queryFn so the result is cached by
 // TanStack Query (keyed below) and survives navigation — revisiting the page
 // no longer refires these requests until the cache goes stale.
+// The list endpoint pages at 20. Filters and the Overdue tile must agree, so the
+// remaining pages are fetched too (same endpoint, `?page=n`, in parallel), up to
+// a bound that keeps request volume modest under the API's per-user rate limit.
+// A later page that fails leaves the list partial (and labelled so), never
+// failing the whole page.
+const MAX_INVOICE_PAGES = 10;
+
 async function loadInvoicesPage() {
   const [data, statsData] = await Promise.all([
     fetchData("/api/v1/invoices/"),
     fetchData("/api/v1/invoices/stats/").catch(() => null),
   ]);
   // API returns paginated {count, results} — extract results
+  const invoices = Array.isArray(data) ? [...data] : [...(data?.results || [])];
+  const pageSize = invoices.length;
+  if (!Array.isArray(data) && data?.next && typeof data?.count === "number" && pageSize > 0) {
+    const pages = Math.min(Math.ceil(data.count / pageSize), MAX_INVOICE_PAGES);
+    const rest = await Promise.all(
+      Array.from({ length: Math.max(0, pages - 1) }, (_, i) =>
+        fetchData(`/api/v1/invoices/?page=${i + 2}`).catch(() => null),
+      ),
+    );
+    for (const pageData of rest) {
+      if (!pageData) break; // keep pages in order; stop at the first gap
+      invoices.push(...(Array.isArray(pageData) ? pageData : pageData?.results || []));
+    }
+  }
   return {
-    invoices: Array.isArray(data) ? data : data?.results || [],
+    invoices,
+    // The list endpoint is paginated; `count` is the tenant's full total, so
+    // the page can say how much of it the table is based on.
+    total: typeof data?.count === "number" ? data.count : invoices.length,
     stats: statsData,
-  };
-}
-
-// Fetches expenses + vehicles together (mirrors the original Promise.all
-// grouping). Cached under its own key so the expenses tab survives navigation.
-async function loadFinanceExpenses() {
-  const [expensesData, vehiclesData] = await Promise.all([
-    fetchData("/api/v1/expenses/"),
-    fetchData("/api/v1/vehicles/").catch(() => []),
-  ]);
-  return {
-    expenses: Array.isArray(expensesData)
-      ? expensesData
-      : expensesData?.results || [],
-    vehicles: Array.isArray(vehiclesData)
-      ? vehiclesData
-      : vehiclesData?.results || [],
   };
 }
 
 export default function Invoices() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<FinanceTab>("invoices");
+  const initialStatus = (searchParams.get("status") || "").toUpperCase();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState(
+    STATUSES.includes(initialStatus) ? initialStatus : "All",
+  );
   const [page, setPage] = useState(1);
   const [sendingId, setSendingId] = useState<string | null>(null);
-  const [sendingReminderId, setSendingReminderId] = useState<string | null>(
-    null,
-  );
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  // Outgoing messages are previewed and confirmed before they are sent.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [preview, setPreview] = useState<{ kind: InvoiceMessageKind; invoice: any } | null>(null);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
-  const statuses = ["All", "SENT", "OVERDUE", "PAID", "DRAFT"];
 
   // Invoices + stats, cached across navigations.
-  const {
-    data: invoicesData,
-    isLoading: loading,
-    refetch: refetchInvoices,
-  } = useQuery({
+  const invoicesQuery = useQuery({
     queryKey: ["invoices-page"],
     queryFn: loadInvoicesPage,
   });
+  const { data: invoicesData, refetch: refetchInvoices } = invoicesQuery;
+  // Nothing to show because the request failed (or is failing and retrying):
+  // the page says so instead of spinning or showing an empty list.
+  const failed = loadFailed(invoicesQuery);
+  const loading = invoicesQuery.isLoading && !failed;
   const invoices: any[] = invoicesData?.invoices ?? [];
   const stats: any = invoicesData?.stats ?? null;
+  const totalInvoices: number = invoicesData?.total ?? invoices.length;
 
   // Capital-eligible invoices — fetched once, cached; silently ignored if no facility
   const { data: capitalData } = useQuery({
@@ -128,239 +148,44 @@ export default function Invoices() {
     queryFn: () => fetchData("api/v1/capital/eligible/").catch(() => null),
   });
   const eligibleInvoices: any[] = capitalData?.invoices || [];
-  const eligibleById = new Map(
-    eligibleInvoices.map((e: any) => [String(e.id), e]),
-  );
+  const eligibleById = new Map(eligibleInvoices.map((e: any) => [String(e.id), e]));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ineligibleInvoices: any[] = capitalData?.ineligible_invoices || [];
-  const ineligibleById = new Map(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ineligibleInvoices.map((e: any) => [String(e.id), e]),
-  );
-
-  // Expenses + vehicles, cached across navigations. Only fetched once the
-  // expenses tab is opened, mirroring the original lazy load.
-  const {
-    data: expensesData,
-    isLoading: expensesQueryLoading,
-    refetch: refetchExpenses,
-  } = useQuery({
-    queryKey: ["finance-expenses"],
-    queryFn: loadFinanceExpenses,
-    enabled: activeTab === "expenses",
-  });
-  const expenses: any[] = expensesData?.expenses ?? [];
-  const vehicles: any[] = expensesData?.vehicles ?? [];
-  // Show the skeleton only before the first expenses fetch resolves.
-  const expensesLoading = activeTab === "expenses" && expensesQueryLoading;
-
-  // Expenses state
-  const [categoryFilter, setCategoryFilter] = useState("All");
-  const [expenseStatusFilter, setExpenseStatusFilter] = useState("All");
-  const [expenseSearch, setExpenseSearch] = useState("");
-  const [expensePage, setExpensePage] = useState(1);
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const [editingExpense, setEditingExpense] = useState<any>(null);
-  const [expenseForm, setExpenseForm] = useState({
-    category: "FUEL",
-    description: "",
-    amount: "",
-    expense_date: new Date().toISOString().split("T")[0],
-    vehicle: "",
-    vendor: "",
-    receipt_number: "",
-    notes: "",
-    litres: "",
-    price_per_litre: "",
-  });
-
-  const expenseCategories = [
-    "All",
-    "FUEL",
-    "TOLLS",
-    "MAINTENANCE",
-    "DRIVER_COST",
-    "INSURANCE",
-    "OVERHEAD",
-    "OTHER",
-  ];
-  const expenseStatuses = ["All", "PENDING", "APPROVED", "REJECTED"];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ineligibleById = new Map(ineligibleInvoices.map((e: any) => [String(e.id), e]));
 
   useEffect(() => {
     document.title = "Invoices - TruckWys";
   }, []);
 
-  // Live-refresh both datasets on the auto-refresh tick / focus / live events.
-  // The expenses query is a no-op until its tab has been opened (enabled flag).
+  // Live-refresh on the auto-refresh tick / focus / live events.
   useAutoRefresh(() => {
     refetchInvoices();
-    if (activeTab === "expenses") refetchExpenses();
   });
 
-  // Expense handlers
-  const handleExpenseFormChange = (field: string, value: any) => {
-    setExpenseForm((prev) => {
-      const updated = { ...prev, [field]: value };
-      // Auto-calculate amount for fuel
-      if (field === "litres" || field === "price_per_litre") {
-        const litres =
-          parseFloat(field === "litres" ? value : updated.litres) || 0;
-        const pricePerLitre =
-          parseFloat(
-            field === "price_per_litre" ? value : updated.price_per_litre,
-          ) || 0;
-        if (litres > 0 && pricePerLitre > 0) {
-          updated.amount = (litres * pricePerLitre).toFixed(2);
-        }
-      }
-      return updated;
-    });
+  const flash = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
   };
 
-  const handleAddExpense = async () => {
-    try {
-      const payload: any = {
-        category: expenseForm.category,
-        description: expenseForm.description,
-        amount: parseFloat(expenseForm.amount),
-        expense_date: expenseForm.expense_date,
-        vehicle: expenseForm.vehicle || null,
-        vendor: expenseForm.vendor || null,
-        receipt_number: expenseForm.receipt_number || null,
-        notes: expenseForm.notes || "",
-      };
-
-      // Add fuel details to notes if category is FUEL
-      if (
-        expenseForm.category === "FUEL" &&
-        expenseForm.litres &&
-        expenseForm.price_per_litre
-      ) {
-        payload.notes = `Fuel: ${expenseForm.litres}L @ ${formatCurrency(parseFloat(expenseForm.price_per_litre))}/L${payload.notes ? "\n" + payload.notes : ""}`;
-      }
-
-      if (editingExpense) {
-        await putData({
-          url: `/api/v1/expenses/${editingExpense.id}/`,
-          data: payload,
-        });
-        setToast("Expense updated!");
-        refetchExpenses();
-      } else {
-        await postData({ url: "/api/v1/expenses/", data: payload });
-        setToast("Expense added!");
-        refetchExpenses();
-      }
-
-      setTimeout(() => setToast(null), 3000);
-      setShowExpenseForm(false);
-      setEditingExpense(null);
-      setExpenseForm({
-        category: "FUEL",
-        description: "",
-        amount: "",
-        expense_date: new Date().toISOString().split("T")[0],
-        vehicle: "",
-        vendor: "",
-        receipt_number: "",
-        notes: "",
-        litres: "",
-        price_per_litre: "",
-      });
-    } catch (error) {
-      console.error("Failed to save expense:", error);
-      setToast("Failed to save expense");
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  const handleApproveExpense = async (expenseId: string) => {
-    try {
-      await postData({ url: `/api/v1/expenses/${expenseId}/approve/` });
-      setToast("Expense approved!");
-      setTimeout(() => setToast(null), 3000);
-      refetchExpenses();
-    } catch (error) {
-      console.error("Failed to approve expense:", error);
-      setToast("Failed to approve expense");
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  const handleRejectExpense = async (expenseId: string) => {
-    try {
-      await postData({ url: `/api/v1/expenses/${expenseId}/reject/` });
-      setToast("Expense rejected!");
-      setTimeout(() => setToast(null), 3000);
-      refetchExpenses();
-    } catch (error) {
-      console.error("Failed to reject expense:", error);
-      setToast("Failed to reject expense");
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  const handleEditExpense = (expense: any) => {
-    setEditingExpense(expense);
-    // Parse fuel details from notes if present
-    let litres = "";
-    let pricePerLitre = "";
-    if (expense.category === "FUEL" && expense.notes) {
-      const fuelMatch = expense.notes.match(/Fuel: ([\d.]+)L @ R([\d.]+)\/L/);
-      if (fuelMatch) {
-        litres = fuelMatch[1];
-        pricePerLitre = fuelMatch[2];
-      }
-    }
-    setExpenseForm({
-      category: expense.category,
-      description: expense.description,
-      amount: expense.amount.toString(),
-      expense_date: expense.expense_date,
-      vehicle: expense.vehicle || "",
-      vendor: expense.vendor || "",
-      receipt_number: expense.receipt_number || "",
-      notes: expense.notes?.replace(/^Fuel: [\d.]+L @ R[\d.]+\/L\n?/, "") || "",
-      litres,
-      price_per_litre: pricePerLitre,
-    });
-    setShowExpenseForm(true);
-  };
-
-  const handleDeleteExpense = async (expenseId: string) => {
-    if (!confirm("Are you sure you want to delete this expense?")) return;
-    try {
-      await deleteData({ url: `/api/v1/expenses/${expenseId}/` });
-      setToast("Expense deleted!");
-      setTimeout(() => setToast(null), 3000);
-      refetchExpenses();
-    } catch (error) {
-      console.error("Failed to delete expense:", error);
-      setToast("Failed to delete expense");
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  const handleSendInvoice = async (e: React.MouseEvent, invoiceId: string) => {
-    e.stopPropagation();
+  const handleSendInvoice = async (e: React.MouseEvent | null, invoiceId: string) => {
+    e?.stopPropagation();
     setSendingId(invoiceId);
     try {
       await postData({ url: `/api/v1/invoices/${invoiceId}/send_invoice/` });
-      setToast("Invoice sent!");
-      setTimeout(() => setToast(null), 3000);
+      flash("Invoice sent");
       refetchInvoices();
-      queryClient.invalidateQueries({ queryKey: ['capital-eligible'] });
+      queryClient.invalidateQueries({ queryKey: ["capital-eligible"] });
     } catch (error) {
       console.error("Failed to send invoice:", error);
-      setToast("Failed to send invoice");
-      setTimeout(() => setToast(null), 3000);
+      flash("Could not send the invoice. Try again.");
     } finally {
       setSendingId(null);
     }
   };
 
-  const handleDownloadPDF = async (e: React.MouseEvent, invoiceId: string) => {
-    e.stopPropagation();
+  const handleDownloadPDF = async (e: React.MouseEvent | null, invoiceId: string) => {
+    e?.stopPropagation();
     // generate_pdf is POST-only and returns a pdf_url; window.open(GET) 405s.
     try {
       const result = await postData({
@@ -368,42 +193,50 @@ export default function Invoices() {
         data: {},
       });
       if (result?.pdf_url) window.open(result.pdf_url, "_blank");
-      setToast("PDF ready");
+      flash("PDF ready");
     } catch {
-      setToast("Could not generate PDF");
+      flash("Could not generate the PDF. Try again.");
     }
-    setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSendReminder = async (e: React.MouseEvent, invoiceId: string) => {
-    e.stopPropagation();
+  const handleSendReminder = async (e: React.MouseEvent | null, invoiceId: string) => {
+    e?.stopPropagation();
     setSendingReminderId(invoiceId);
     try {
       await postData({
         url: `/api/v1/invoices/${invoiceId}/send_reminder/`,
         data: {},
       });
-      setToast("Reminder sent successfully!");
-      setTimeout(() => setToast(null), 3000);
+      flash("Reminder sent");
+      refetchInvoices();
     } catch (error: any) {
       if (error?.response?.status === 404) {
-        setToast("Reminder recorded — customer will be contacted");
+        flash("Reminder recorded. The customer will be contacted.");
       } else {
-        setToast("Failed to send reminder");
+        flash("Could not send the reminder. Try again.");
       }
-      setTimeout(() => setToast(null), 3000);
     } finally {
       setSendingReminderId(null);
     }
   };
 
-
   // Never fall back to mock data — show empty state if API returns nothing
   const allInvoices = invoices;
 
-  const filtered = allInvoices.filter((inv) => {
-    const invStatus = inv.status?.toUpperCase();
-    const matchStatus = statusFilter === "All" || invStatus === statusFilter;
+  // "Overdue" uses the one shared definition (unpaid, sent, past due),
+  // whatever the status string says, so it matches the Overdue tile.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const statusMatches = (inv: any, status: string) =>
+    status === "All" ||
+    (status === "OVERDUE" ? isInvoiceOverdue(inv) : inv.status?.toUpperCase() === status);
+
+  // Newest first by issue date (the date the list shows), then by number.
+  const byIssued = [...allInvoices].sort((a, b) =>
+    String(b.issue_date || b.created_at || "").localeCompare(String(a.issue_date || a.created_at || "")) ||
+    Number(b.id) - Number(a.id));
+
+  const filtered = byIssued.filter((inv) => {
+    const matchStatus = statusMatches(inv, statusFilter);
     const invNumber = inv.invoice_number || inv.invoiceNumber || "";
     const custName = inv.customer_name || inv.customerName || "";
     const matchSearch =
@@ -416,1630 +249,449 @@ export default function Invoices() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const filteredExpenses = expenses.filter((e) => {
-    const matchCategory =
-      categoryFilter === "All" || e.category === categoryFilter;
-    const matchStatus =
-      expenseStatusFilter === "All" || e.status === expenseStatusFilter;
-    const matchSearch =
-      !expenseSearch ||
-      e.description?.toLowerCase().includes(expenseSearch.toLowerCase()) ||
-      e.vendor?.toLowerCase().includes(expenseSearch.toLowerCase()) ||
-      e.expense_number?.toLowerCase().includes(expenseSearch.toLowerCase());
-    return matchCategory && matchStatus && matchSearch;
-  });
+  // Headline figures are counted from the full invoice list with the Reports
+  // ledger rules (components/reports/data.ts), so they agree with the filter
+  // counts below and with Reports and Fast Pay. The stats endpoint is only a
+  // fallback when the list could not be loaded in full (it misses some paid
+  // invoices, e.g. INV-20260615-96400). Bases:
+  //   invoiced this month  issued invoices incl. VAT, by issue date since the 1st
+  //   collected this month paid amount of those invoices
+  //   overdue              unpaid balance incl. VAT, due date passed
+  //   time to get paid     issue date to paid date, all paid invoices
+  const now = new Date();
+  const monthName = MONTH_NAMES[now.getMonth()];
+  const byStatus = stats?.by_status ?? {};
+  const draftCount: number = byStatus.DRAFT ?? 0;
+  const truncatedList = totalInvoices > invoices.length;
+  const ymNowText = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const issuedThisMonth = invoices.filter(
+    (i) => isIssued(i as LedgerInvoice) && String(i.issue_date || "").slice(0, 7) === ymNowText,
+  );
+  const invoicedMtd: number = truncatedList
+    ? (stats?.total_invoiced_mtd ?? 0)
+    : issuedThisMonth.reduce((s, i) => s + (parseFloat(i.total_amount) || 0), 0);
+  const collectedMtd: number = truncatedList
+    ? (stats?.total_collected_mtd ?? 0)
+    : issuedThisMonth.reduce((s, i) => s + (parseFloat(i.paid_amount) || 0), 0);
+  const collectionRate = invoicedMtd > 0 ? collectedMtd / invoicedMtd : 0;
+  const monthActive = invoicedMtd > 0 || collectedMtd > 0;
+  // Overdue tile: when every invoice is loaded, count them with the same
+  // definition the filter uses so the two always agree. Only when the list is
+  // partial (the API pages at 20) does it fall back to the server's figure.
+  const overdueList = invoices.filter((i) => isInvoiceOverdue(i));
+  const overdueFromList = !truncatedList;
+  const overdueCount: number = overdueFromList ? overdueList.length : (stats?.overdue_count ?? 0);
+  const overdueAmount: number = overdueFromList
+    ? overdueList.reduce((sum, i) => sum + invoiceBalance(i), 0)
+    : (stats?.overdue_amount ?? 0);
+  // Time to get paid: the shared ledger definition (same count as "Paid").
+  const timing = paidInvoiceTiming(invoices);
+  const paidCount: number = truncatedList ? (byStatus.PAID ?? 0) : timing.count;
+  const avgDays: number | null = truncatedList
+    ? (paidCount > 0 && stats?.avg_days_to_pay ? stats.avg_days_to_pay : null)
+    : timing.avgDays;
+  const truncated = truncatedList;
+  // Drafts waiting to be sent: a decision (send them), counted from the list
+  // when it is complete, otherwise from the server's status counts.
+  const draftList = invoices.filter((i) => (i.status || "").toUpperCase() === "DRAFT");
+  const draftsCount: number = truncatedList ? draftCount : draftList.length;
+  // At most four tiles: the drafts tile only fills a row that has room.
+  const showDrafts = draftsCount > 0 && (monthActive ? 2 : 0) + (overdueCount > 0 ? 1 : 0) + (avgDays != null ? 1 : 0) < 4;
+  const draftAmount: number | null = truncatedList
+    ? null
+    : draftList.reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
 
-  const outstanding = allInvoices
-    .filter((i) => i.status === "SENT")
-    .reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
-  const overdue = allInvoices
-    .filter((i) => i.status === "OVERDUE")
-    .reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
-  const paid = allInvoices
-    .filter((i) => i.status === "PAID")
-    .reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
+  // Previous-month comparison only when every invoice is loaded; a partial
+  // page would understate last month.
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const invoicedLastMonth = truncated
+    ? null
+    : allInvoices
+        .filter((i) => {
+          const d = new Date(i.issue_date || i.created_at);
+          return d >= lastMonthStart && d < monthStart;
+        })
+        .reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
+  const lastMonthName = MONTH_NAMES[lastMonthStart.getMonth()];
+  const invoicedDelta = (() => {
+    if (invoicedLastMonth == null) return null;
+    if (invoicedLastMonth === 0) return `Nothing invoiced in ${lastMonthName}`;
+    const pct = ((invoicedMtd - invoicedLastMonth) / invoicedLastMonth) * 100;
+    return `${pct >= 0 ? "+" : "−"}${formatPercent(Math.abs(pct), 0)} vs ${lastMonthName}`;
+  })();
+
+  // Counts over the loaded list, with the same rules as the filter.
+  const statusOptions = STATUSES.map((st) => ({
+    value: st,
+    label: st === "All" ? "All" : formatStatus(st),
+    count: loading ? undefined : allInvoices.filter((inv) => statusMatches(inv, st)).length,
+  }));
+
+  const showStatus = (s: string) => {
+    setStatusFilter(s);
+    setPage(1);
+  };
 
   return (
-    <div>
+    <div className="fin-page">
       {toast && (
-        <div
-          style={{
-            position: "fixed",
-            top: 80,
-            right: 24,
-            zIndex: 1000,
-            background: "var(--accent-primary)",
-            color: "black",
-            padding: "12px 20px",
-            borderRadius: 2,
-            fontSize: 12,
-            fontFamily: "var(--font-mono)",
-            fontWeight: 500,
-          }}>
+        <div className="fin-toast" role="status" aria-live="polite">
           {toast}
         </div>
       )}
-      <div style={{ marginBottom: 24 }}>
-        <div
-          style={{
-            fontSize: 11,
-            fontFamily: "var(--font-mono)",
-            color: "var(--text-tertiary)",
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-            marginBottom: 4,
-          }}>
-          Finance
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                fontSize: 22,
-                fontWeight: 500,
-                color: "var(--text-primary)",
-              }}>
-              {activeTab === "invoices" ? "Invoices" : "Expenses"}
-            </div>
-            <LiveBadge />
-          </div>
-          {activeTab === "invoices" && (
-            <button
-              className="btn-action"
-              onClick={() => navigate("/finance/invoices/new")}>
-              + New invoice
-            </button>
-          )}
-          {activeTab === "expenses" && (
-            <button
-              className="btn-action"
-              onClick={() => {
-                setShowExpenseForm(true);
-                setEditingExpense(null);
-              }}>
-              + Add expense
-            </button>
-          )}
-        </div>
-      </div>
 
-      {/* Tab Navigation */}
-      <div
-        style={{
-          borderBottom: "1px solid var(--border-subtle)",
-          marginBottom: 20,
-          display: "flex",
-          gap: 24,
-        }}>
-        {(
-          [
-            { id: "invoices", label: "Invoices" },
-            { id: "expenses", label: "Expenses" },
-          ] as { id: FinanceTab; label: string }[]
-        ).map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              background: "transparent",
-              border: "none",
-              borderBottom:
-                activeTab === tab.id
-                  ? "2px solid var(--accent-primary)"
-                  : "2px solid transparent",
-              color:
-                activeTab === tab.id
-                  ? "var(--text-primary)"
-                  : "var(--text-secondary)",
-              padding: "12px 0",
-              marginBottom: -1,
-              fontSize: 13,
-              fontWeight: activeTab === tab.id ? 500 : 400,
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-              fontFamily: "var(--font-mono)",
-              letterSpacing: "0.05em",
-            }}
-            onMouseEnter={(e) => {
-              if (activeTab !== tab.id) {
-                e.currentTarget.style.color = "var(--text-primary)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== tab.id) {
-                e.currentTarget.style.color = "var(--text-secondary)";
-              }
-            }}>
-            {tab.label}
+      <SectionHeader
+        eyebrow="Finance"
+        title="Finance"
+        tabs={financeTabsFor(location.pathname)}
+        actions={
+          <button type="button" className="tw-btn tw-btn--primary" onClick={() => navigate("/finance/invoices/new")}>
+            New invoice
           </button>
-        ))}
-        <button
-          onClick={() => navigate("/finance/reports")}
-          style={{
-            background: "transparent",
-            border: "none",
-            borderBottom: "2px solid transparent",
-            color: "var(--text-secondary)",
-            padding: "12px 0",
-            marginBottom: -1,
-            fontSize: 13,
-            fontWeight: 400,
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-            fontFamily: "var(--font-mono)",
-            letterSpacing: "0.05em",
+        }
+      />
+
+      {preview && (
+        <InvoiceSendPreview
+          kind={preview.kind}
+          invoice={preview.invoice}
+          sending={preview.kind === "reminder" ? sendingReminderId === preview.invoice.id : sendingId === preview.invoice.id}
+          onCancel={() => setPreview(null)}
+          onConfirm={async () => {
+            const { kind, invoice } = preview;
+            if (kind === "reminder") await handleSendReminder(null, invoice.id);
+            else await handleSendInvoice(null, invoice.id);
+            setPreview(null);
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-secondary)"; }}>
-          Reports
-        </button>
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === "expenses" && (
-        <>
-          {/* Expense Form Modal */}
-          {showExpenseForm && (
-            <div
-              style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: "rgba(0, 0, 0, 0.7)",
-                zIndex: 1000,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 24,
-              }}>
-              <div
-                className="card"
-                style={{
-                  width: "100%",
-                  maxWidth: 600,
-                  maxHeight: "90vh",
-                  overflow: "auto",
-                  padding: 20,
-                }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 24,
-                  }}>
-                  <div
-                    style={{
-                      fontSize: 18,
-                      fontWeight: 500,
-                      color: "var(--text-primary)",
-                    }}>
-                    {editingExpense ? "Edit expense" : "Add expense"}
-                  </div>
-                  <button
-                    onClick={() => {
-                      setShowExpenseForm(false);
-                      setEditingExpense(null);
-                    }}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-tertiary)",
-                      fontSize: 24,
-                      cursor: "pointer",
-                      padding: 0,
-                      lineHeight: 1,
-                    }}>
-                    ×
-                  </button>
-                </div>
-
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-secondary)",
-                        marginBottom: 6,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}>
-                      Category *
-                    </label>
-                    <Select
-                      value={expenseForm.category}
-                      onValueChange={(val) =>
-                        handleExpenseFormChange("category", val)
-                      }>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="FUEL">Fuel</SelectItem>
-                        <SelectItem value="TOLLS">Tolls</SelectItem>
-                        <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-                        <SelectItem value="DRIVER_COST">Driver Cost</SelectItem>
-                        <SelectItem value="INSURANCE">Insurance</SelectItem>
-                        <SelectItem value="OVERHEAD">Overhead</SelectItem>
-                        <SelectItem value="OTHER">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-secondary)",
-                        marginBottom: 6,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}>
-                      Description *
-                    </label>
-                    <input
-                      type="text"
-                      value={expenseForm.description}
-                      onChange={(e) =>
-                        handleExpenseFormChange("description", e.target.value)
-                      }
-                      placeholder="e.g. Fuel refill at Shell"
-                      style={{
-                        width: "100%",
-                        background: "var(--bg-surface)",
-                        border: "1px solid var(--border-subtle)",
-                        padding: "10px 12px",
-                        color: "var(--text-primary)",
-                        borderRadius: 2,
-                        fontSize: 13,
-                        fontFamily: "var(--font-sans)",
-                      }}
-                    />
-                  </div>
-
-                  {expenseForm.category === "FUEL" && (
-                    <>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 1fr",
-                          gap: 12,
-                        }}>
-                        <div>
-                          <label
-                            style={{
-                              display: "block",
-                              fontSize: 11,
-                              fontFamily: "var(--font-mono)",
-                              color: "var(--text-secondary)",
-                              marginBottom: 6,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                            }}>
-                            Litres
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={expenseForm.litres}
-                            onChange={(e) =>
-                              handleExpenseFormChange("litres", e.target.value)
-                            }
-                            placeholder="0.00"
-                            style={{
-                              width: "100%",
-                              background: "var(--bg-surface)",
-                              border: "1px solid var(--border-subtle)",
-                              padding: "10px 12px",
-                              color: "var(--text-primary)",
-                              borderRadius: 2,
-                              fontSize: 13,
-                              fontFamily: "var(--font-mono)",
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label
-                            style={{
-                              display: "block",
-                              fontSize: 11,
-                              fontFamily: "var(--font-mono)",
-                              color: "var(--text-secondary)",
-                              marginBottom: 6,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                            }}>
-                            Price/Litre
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={expenseForm.price_per_litre}
-                            onChange={(e) =>
-                              handleExpenseFormChange(
-                                "price_per_litre",
-                                e.target.value,
-                              )
-                            }
-                            placeholder="0.00"
-                            style={{
-                              width: "100%",
-                              background: "var(--bg-surface)",
-                              border: "1px solid var(--border-subtle)",
-                              padding: "10px 12px",
-                              color: "var(--text-primary)",
-                              borderRadius: 2,
-                              fontSize: 13,
-                              fontFamily: "var(--font-mono)",
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <div>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-secondary)",
-                        marginBottom: 6,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}>
-                      Amount (ZAR) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={expenseForm.amount}
-                      onChange={(e) =>
-                        handleExpenseFormChange("amount", e.target.value)
-                      }
-                      placeholder="0.00"
-                      readOnly={Boolean(
-                        expenseForm.category === "FUEL" &&
-                        expenseForm.litres &&
-                        expenseForm.price_per_litre,
-                      )}
-                      style={{
-                        width: "100%",
-                        background: "var(--bg-surface)",
-                        border: "1px solid var(--border-subtle)",
-                        padding: "10px 12px",
-                        color: "var(--text-primary)",
-                        borderRadius: 2,
-                        fontSize: 13,
-                        fontFamily: "var(--font-mono)",
-                      }}
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 12,
-                    }}>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          fontSize: 11,
-                          fontFamily: "var(--font-mono)",
-                          color: "var(--text-secondary)",
-                          marginBottom: 6,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
-                        }}>
-                        Date *
-                      </label>
-                      <DatePicker
-                        value={expenseForm.expense_date}
-                        onChange={(val) =>
-                          handleExpenseFormChange("expense_date", val)
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          fontSize: 11,
-                          fontFamily: "var(--font-mono)",
-                          color: "var(--text-secondary)",
-                          marginBottom: 6,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
-                        }}>
-                        Vehicle
-                      </label>
-                      <Select
-                        value={expenseForm.vehicle}
-                        onValueChange={(val) =>
-                          handleExpenseFormChange("vehicle", val)
-                        }>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select vehicle..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {vehicles.map((v) => (
-                            <SelectItem key={v.id} value={String(v.id)}>
-                              {v.plate || v.registration || v.vehicle_number}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 12,
-                    }}>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          fontSize: 11,
-                          fontFamily: "var(--font-mono)",
-                          color: "var(--text-secondary)",
-                          marginBottom: 6,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
-                        }}>
-                        Vendor
-                      </label>
-                      <input
-                        type="text"
-                        value={expenseForm.vendor}
-                        onChange={(e) =>
-                          handleExpenseFormChange("vendor", e.target.value)
-                        }
-                        placeholder="e.g. Shell, BP"
-                        style={{
-                          width: "100%",
-                          background: "var(--bg-surface)",
-                          border: "1px solid var(--border-subtle)",
-                          padding: "10px 12px",
-                          color: "var(--text-primary)",
-                          borderRadius: 2,
-                          fontSize: 13,
-                          fontFamily: "var(--font-sans)",
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          fontSize: 11,
-                          fontFamily: "var(--font-mono)",
-                          color: "var(--text-secondary)",
-                          marginBottom: 6,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
-                        }}>
-                        Receipt #
-                      </label>
-                      <input
-                        type="text"
-                        value={expenseForm.receipt_number}
-                        onChange={(e) =>
-                          handleExpenseFormChange(
-                            "receipt_number",
-                            e.target.value,
-                          )
-                        }
-                        placeholder="Receipt number"
-                        style={{
-                          width: "100%",
-                          background: "var(--bg-surface)",
-                          border: "1px solid var(--border-subtle)",
-                          padding: "10px 12px",
-                          color: "var(--text-primary)",
-                          borderRadius: 2,
-                          fontSize: 13,
-                          fontFamily: "var(--font-mono)",
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-secondary)",
-                        marginBottom: 6,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}>
-                      Notes
-                    </label>
-                    <textarea
-                      value={expenseForm.notes}
-                      onChange={(e) =>
-                        handleExpenseFormChange("notes", e.target.value)
-                      }
-                      placeholder="Additional notes..."
-                      rows={3}
-                      style={{
-                        width: "100%",
-                        background: "var(--bg-surface)",
-                        border: "1px solid var(--border-subtle)",
-                        padding: "10px 12px",
-                        color: "var(--text-primary)",
-                        borderRadius: 2,
-                        fontSize: 13,
-                        fontFamily: "var(--font-sans)",
-                        resize: "vertical",
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                    <button
-                      className="btn-action"
-                      onClick={handleAddExpense}
-                      disabled={
-                        !expenseForm.category ||
-                        !expenseForm.description ||
-                        !expenseForm.amount ||
-                        !expenseForm.expense_date
-                      }
-                      style={{ flex: 1 }}>
-                      {editingExpense ? "Update expense" : "Add expense"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowExpenseForm(false);
-                        setEditingExpense(null);
-                      }}
-                      style={{
-                        flex: 1,
-                        background: "transparent",
-                        border: "1px solid var(--border-subtle)",
-                        color: "var(--text-secondary)",
-                        padding: "10px 16px",
-                        borderRadius: 2,
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
-                        cursor: "pointer",
-                        fontWeight: 500,
-                        letterSpacing: "0.05em",
-                      }}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Expenses KPIs */}
-          {expensesLoading ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0", marginBottom: 24 }}>
-              <Loader size={28} />
-            </div>
-          ) : (
-            <>
-              {(() => {
-                const now = new Date();
-                const currentMonth = now.getMonth();
-                const currentYear = now.getFullYear();
-
-                const thisMonthExpenses = expenses.filter((e) => {
-                  const expDate = new Date(e.expense_date);
-                  return (
-                    expDate.getMonth() === currentMonth &&
-                    expDate.getFullYear() === currentYear
-                  );
-                });
-
-                const totalMtd = thisMonthExpenses
-                  .filter((e) => e.status === "APPROVED")
-                  .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
-
-                const pendingExpenses = expenses.filter(
-                  (e) => e.status === "PENDING",
-                );
-                const pendingAmount = pendingExpenses.reduce(
-                  (sum, e) => sum + parseFloat(e.amount || 0),
-                  0,
-                );
-
-                const fuelCosts = thisMonthExpenses
-                  .filter((e) => e.category === "FUEL")
-                  .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
-
-                // Top category
-                const categoryTotals: Record<string, number> = {};
-                thisMonthExpenses.forEach((e) => {
-                  categoryTotals[e.category] =
-                    (categoryTotals[e.category] || 0) +
-                    parseFloat(e.amount || 0);
-                });
-                const topCategoryEntry = Object.entries(categoryTotals).sort(
-                  (a, b) => b[1] - a[1],
-                )[0];
-                const topCategory = topCategoryEntry
-                  ? topCategoryEntry[0].replace("_", " ")
-                  : "N/A";
-                const topCategoryAmount = topCategoryEntry
-                  ? topCategoryEntry[1]
-                  : 0;
-
-                return (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(4, 1fr)",
-                      gap: 16,
-                      marginBottom: 24,
-                    }}>
-                    {[
-                      {
-                        label: "Total Expenses MTD",
-                        value: formatCurrency(totalMtd),
-                        color: "var(--text-primary)",
-                      },
-                      {
-                        label: "Pending Approval",
-                        value: `${pendingExpenses.length} / ${formatCurrency(pendingAmount)}`,
-                        color: "var(--status-warning)",
-                      },
-                      {
-                        label: "Fuel Costs MTD",
-                        value: formatCurrency(fuelCosts),
-                        color: "var(--accent-primary)",
-                      },
-                      {
-                        label: "Top Category",
-                        value: `${topCategory}\n${formatCurrency(topCategoryAmount)}`,
-                        color: "var(--text-primary)",
-                      },
-                    ].map((m) => (
-                      <div key={m.label} className="card metric-card">
-                        <div className="card-header">
-                          <span className="card-title">{m.label}</span>
-                        </div>
-                        <div
-                          className="metric-value"
-                          style={{
-                            fontSize: 20,
-                            color: m.color,
-                            whiteSpace: "pre-line",
-                          }}>
-                          {m.value}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </>
-          )}
-
-          {/* Filters */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              gap: 8,
-              marginBottom: 20,
-              alignItems: "center",
-            }}>
-            <input
-              type="text"
-              placeholder="Search expenses..."
-              value={expenseSearch}
-              onChange={(e) => {
-                setExpenseSearch(e.target.value);
-                setExpensePage(1);
-              }}
-              style={{
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border-subtle)",
-                padding: "6px 10px",
-                color: "var(--text-primary)",
-                borderRadius: 2,
-                fontSize: 12,
-                outline: "none",
-                width: 220,
-                fontFamily: "var(--font-sans)",
-              }}
-            />
-            <select
-              value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value);
-                setExpensePage(1);
-              }}
-              style={{
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border-subtle)",
-                padding: "6px 10px",
-                color: "var(--text-primary)",
-                borderRadius: 2,
-                fontSize: 12,
-                width: 160,
-                cursor: "pointer",
-                fontFamily: "var(--font-sans)",
-              }}>
-              {expenseCategories.map((c) => (
-                <option key={c} value={c}>
-                  {c === "All" ? "All categories" : formatStatus(c)}
-                </option>
-              ))}
-            </select>
-            {expenseStatuses.map((s) => (
-              <button
-                key={s}
-                onClick={() => {
-                  setExpenseStatusFilter(s);
-                  setExpensePage(1);
-                }}
-                style={{
-                  background:
-                    expenseStatusFilter === s
-                      ? "var(--accent-primary)"
-                      : "var(--bg-surface)",
-                  border: "1px solid var(--border-subtle)",
-                  color:
-                    expenseStatusFilter === s
-                      ? "var(--bg-deep)"
-                      : "var(--text-secondary)",
-                  padding: "6px 12px",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
-                  borderRadius: 2,
-                  cursor: "pointer",
-                  letterSpacing: "0.06em",
-                  fontWeight: expenseStatusFilter === s ? 500 : 400,
-                  whiteSpace: "nowrap",
-                }}>
-                {s === "All" ? "All" : formatStatus(s)}
-              </button>
-            ))}
-            <span
-              style={{
-                marginLeft: "auto",
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                color: "var(--text-tertiary)",
-              }}>
-              {filteredExpenses.length} expenses
-            </span>
-          </div>
-
-          {/* Expenses Table */}
-          {(() => {
-            const totalPages = Math.max(
-              1,
-              Math.ceil(filteredExpenses.length / PAGE_SIZE),
-            );
-            const expenseRows = filteredExpenses.slice(
-              (expensePage - 1) * PAGE_SIZE,
-              expensePage * PAGE_SIZE,
-            );
-
-            return (
-              <>
-                <div className="card table-card">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>Category</th>
-                        <th>Description</th>
-                        <th>Vehicle</th>
-                        <th>Amount</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {expenseRows.length === 0 ? (
-                        expenses.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} style={{ padding: 0 }}>
-                              <div
-                                style={{
-                                  padding: "60px 20px",
-                                  textAlign: "center",
-                                }}>
-                                <div
-                                  style={{
-                                    fontSize: 48,
-                                    marginBottom: 16,
-                                    opacity: 0.3,
-                                  }}>
-                                  💰
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: 16,
-                                    fontWeight: 500,
-                                    color: "var(--text-primary)",
-                                    marginBottom: 8,
-                                  }}>
-                                  No expenses yet
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: 13,
-                                    color: "var(--text-secondary)",
-                                    marginBottom: 20,
-                                  }}>
-                                  Add your first expense to track costs and
-                                  manage budgets
-                                </div>
-                                <button
-                                  onClick={() => setShowExpenseForm(true)}
-                                  className="btn-action">
-                                  Add expense
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : (
-                          <tr>
-                            <td
-                              colSpan={7}
-                              style={{
-                                textAlign: "center",
-                                padding: "32px 0",
-                                color: "var(--text-tertiary)",
-                                fontSize: 13,
-                              }}>
-                              No expenses match your filters
-                            </td>
-                          </tr>
-                        )
-                      ) : (
-                        expenseRows.map((exp) => {
-                          const veh = vehicles.find(
-                            (v) => v.id === exp.vehicle,
-                          );
-                          const vehicleName =
-                            veh?.plate ||
-                            veh?.registration ||
-                            veh?.vehicle_number ||
-                            "N/A";
-
-                          return (
-                            <tr key={exp.id}>
-                              <td className="mono" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
-                                {formatDate(exp.expense_date)}
-                              </td>
-                              <td style={{ fontSize: 12, whiteSpace: "nowrap" }}>
-                                <span
-                                  style={{ fontFamily: "var(--font-sans)" }}>
-                                  {formatStatus(exp.category)}
-                                </span>
-                              </td>
-                              <td style={{ fontSize: 12, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={exp.description}>
-                                {exp.description}
-                              </td>
-                              <td
-                                className="mono"
-                                style={{
-                                  fontSize: 12,
-                                  color: "var(--text-secondary)",
-                                }}>
-                                {vehicleName}
-                              </td>
-                              <td
-                                className="mono"
-                                style={{ fontSize: 13, fontWeight: 500, whiteSpace: "nowrap" }}>
-                                {formatCurrency(exp.amount)}
-                              </td>
-                              <td>
-                                <span
-                                  style={{
-                                    fontFamily: "var(--font-mono)",
-                                    fontSize: 10,
-                                    color:
-                                      EXPENSE_STATUS_COLOR[exp.status] ||
-                                      "var(--text-secondary)",
-                                    padding: "2px 6px",
-                                    background: "var(--bg-surface-hover)",
-                                    borderRadius: 4,
-                                    display: "inline-block",
-                                    whiteSpace: "nowrap",
-                                  }}>
-                                  {formatStatus(exp.status)}
-                                </span>
-                              </td>
-                              <td>
-                                <div style={{ display: "flex", gap: 8 }}>
-                                  {exp.status === "PENDING" && (
-                                    <>
-                                      <button
-                                        className="btn-action"
-                                        style={{
-                                          fontSize: 10,
-                                          padding: "4px 12px",
-                                          background: "var(--status-success)",
-                                          border: "none",
-                                        }}
-                                        onClick={() =>
-                                          handleApproveExpense(exp.id)
-                                        }>
-                                        Approve
-                                      </button>
-                                      <button
-                                        className="btn-action"
-                                        style={{
-                                          fontSize: 10,
-                                          padding: "4px 12px",
-                                          background: "var(--status-danger)",
-                                          border: "none",
-                                        }}
-                                        onClick={() =>
-                                          handleRejectExpense(exp.id)
-                                        }>
-                                        Reject
-                                      </button>
-                                    </>
-                                  )}
-                                  <button
-                                    className="btn-action"
-                                    style={{
-                                      fontSize: 10,
-                                      padding: "4px 10px",
-                                      background: "transparent",
-                                      border: "1px solid var(--border-subtle)",
-                                      color: "var(--text-secondary)",
-                                    }}
-                                    onClick={() => handleEditExpense(exp)}>
-                                    Edit
-                                  </button>
-                                  <button
-                                    className="btn-action"
-                                    style={{
-                                      fontSize: 10,
-                                      padding: "4px 10px",
-                                      background: "transparent",
-                                      border: "1px solid var(--status-danger)",
-                                      color: "var(--status-danger)",
-                                    }}
-                                    onClick={() => handleDeleteExpense(exp.id)}>
-                                    Del
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        padding: "12px 20px",
-                        borderTop: "1px solid var(--border-subtle)",
-                      }}>
-                      <span
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 11,
-                          color: "var(--text-tertiary)",
-                        }}>
-                        Page {expensePage} of {totalPages} · showing{" "}
-                        {expenseRows.length} of {filteredExpenses.length}
-                      </span>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                          className="btn-action"
-                          onClick={() =>
-                            setExpensePage((p) => Math.max(1, p - 1))
-                          }
-                          disabled={expensePage === 1}>
-                          ← Prev
-                        </button>
-                        <button
-                          className="btn-action"
-                          onClick={() =>
-                            setExpensePage((p) => Math.min(totalPages, p + 1))
-                          }
-                          disabled={expensePage === totalPages}>
-                          Next →
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            );
-          })()}
-        </>
+        />
       )}
 
-      {activeTab === "invoices" && (
-        <>
-          {/* KPIs */}
-          {loading ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0", marginBottom: 24 }}>
-              <Loader size={28} />
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: 16,
-                marginBottom: 24,
-              }}>
-              {[
-                {
-                  label: "Total Invoiced MTD",
-                  value: formatCurrency(
-                    stats?.total_invoiced_mtd ?? outstanding,
-                  ),
-                  color: "var(--text-primary)",
-                },
-                {
-                  label: "Collected",
-                  value: formatCurrency(stats?.total_collected_mtd ?? paid),
-                  color: "var(--status-success)",
-                },
-                {
-                  label: "Overdue",
-                  value: `${stats?.overdue_count ?? 0} / ${formatCurrency(stats?.overdue_amount ?? overdue)}`,
-                  color: "var(--status-danger)",
-                },
-                {
-                  label: "Collection Rate",
-                  value: `${Math.round((stats?.collection_rate ?? 0) * 100)}%`,
-                  color: "var(--accent-primary)",
-                },
-              ].map((m) => (
-                <div key={m.label} className="card metric-card">
-                  <div className="card-header">
-                    <span className="card-title">{m.label}</span>
-                  </div>
-                  <div
-                    className="metric-value"
-                    style={{ fontSize: 20, color: m.color }}>
-                    {m.value}
-                  </div>
-                </div>
-              ))}
-            </div>
+      {failed ? (
+        <LoadError
+          what="invoices"
+          error={invoicesQuery.error ?? invoicesQuery.failureReason}
+          busy={invoicesQuery.isFetching}
+          onRetry={() => refetchInvoices()}
+        />
+      ) : (
+      <>
+      {/* Headline: tiles only where the number drives a decision */}
+      {loading ? (
+        <div className="tw-kpi-row fin-kpi-row" aria-busy="true" aria-label="Loading totals">
+          {[0, 1, 2].map((i) => <div key={i} className="tw-kpi fin-skel-tile" aria-hidden="true" />)}
+        </div>
+      ) : !stats && truncatedList ? (
+        <div className="card fin-summary">
+          <div className="fin-summary__text">
+            <p className="fin-summary__title">Invoice totals are unavailable</p>
+            <p className="fin-summary__body">The summary didn’t load. The invoice list below is unaffected.</p>
+          </div>
+          <div className="fin-summary__actions">
+            <button className="btn-action fin-btn-secondary" onClick={() => refetchInvoices()}>
+              Retry loading
+            </button>
+          </div>
+        </div>
+      ) : (
+        // The standard tile: only figures that drive a decision, never a dash.
+        (monthActive || overdueCount > 0 || avgDays != null || showDrafts) && (
+        <KpiRow className="fin-kpi-row">
+          {/* Separate children (not a fragment) so KpiRow counts the tiles. */}
+          {monthActive && (
+              <KpiTile
+                label={`Invoiced in ${monthName}`}
+                aside={<InfoTip>{`Invoice totals incl. VAT, by issue date since the 1st. Covers all invoices.${invoicedLastMonth == null ? "" : ` Change compares ${lastMonthName}.`}`}</InfoTip>}
+                figure={<span title={formatCurrency(invoicedMtd)}>{wholeRand(invoicedMtd)}</span>}
+                note={invoicedDelta ?? "By issue date"}
+              />
+          )}
+          {monthActive && (
+              <KpiTile
+                label="Collected"
+                aside={<InfoTip>{`Paid amount of invoices issued in ${monthName}. Covers all invoices.`}</InfoTip>}
+                figure={<span title={formatCurrency(collectedMtd)}>{wholeRand(collectedMtd)}</span>}
+                note={invoicedMtd > 0 ? `${Math.round((truncatedList ? (stats?.collection_rate ?? 0) : collectionRate) * 100)}% of ${monthName} invoiced` : `On ${monthName} invoices`}
+              />
           )}
 
-          {/* Filters */}
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              marginBottom: 20,
-              alignItems: "center",
-            }}>
-            <input
-              type="text"
-              placeholder="Search invoices..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              style={{
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border-subtle)",
-                padding: "6px 10px",
-                color: "var(--text-primary)",
-                borderRadius: 2,
-                fontSize: 12,
-                outline: "none",
-                width: 220,
-                fontFamily: "var(--font-sans)",
-              }}
+          {overdueCount > 0 && (
+            <KpiTile
+              label="Overdue"
+              aside={
+                <InfoTip>
+                  {overdueFromList
+                    ? "Unpaid balance incl. VAT on sent invoices past their due date, including part-paid ones. Covers all invoices. Select to show them."
+                    : "Unpaid balance incl. VAT on invoices past their due date, from the server's count of all invoices. Select to show them."}
+                </InfoTip>
+              }
+              figure={<span title={formatCurrency(overdueAmount)}>{wholeRand(overdueAmount)}</span>}
+              note={`${overdueCount} ${overdueCount === 1 ? "invoice" : "invoices"} late`}
+              tone="danger"
+              onClick={statusFilter !== "OVERDUE" ? () => showStatus("OVERDUE") : undefined}
+              aria-label={`Overdue: ${formatCurrency(overdueAmount)}, ${overdueCount} late. Show overdue invoices`}
             />
-            <div style={{ display: "flex", gap: 8 }}>
-              {statuses.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => {
-                    setStatusFilter(s);
-                    setPage(1);
-                  }}
-                  style={{
-                    background:
-                      statusFilter === s
-                        ? "var(--accent-primary)"
-                        : "var(--bg-surface)",
-                    border: "1px solid var(--border-subtle)",
-                    color:
-                      statusFilter === s
-                        ? "var(--bg-deep)"
-                        : "var(--text-secondary)",
-                    padding: "6px 12px",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11,
-                    borderRadius: 2,
-                    cursor: "pointer",
-                    letterSpacing: "0.06em",
-                    fontWeight: statusFilter === s ? 500 : 400,
-                    transition: "all 0.2s ease",
-                  }}>
-                  {s === "All" ? "All" : formatStatus(s)}
-                </button>
-              ))}
-            </div>
-            <span
-              style={{
-                marginLeft: "auto",
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                color: "var(--text-tertiary)",
-              }}>
-              {filtered.length} invoices
-            </span>
-          </div>
+          )}
+          {avgDays != null && (
+            <KpiTile
+              label="Time to get paid"
+              aside={<InfoTip>Average days from issue date to the date the invoice was paid in full, across every paid invoice (the Paid filter below).</InfoTip>}
+              figure={<>{formatNumber(avgDays, { maximumFractionDigits: 1 })}<span className="fin-tile__unit">days</span></>}
+              note={`${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}`}
+            />
+          )}
+          {showDrafts && (
+            <KpiTile
+              label="Not sent yet"
+              aside={<InfoTip>Draft invoices, incl. VAT. They are not owed until you send them. Select to show them.</InfoTip>}
+              figure={draftAmount != null
+                ? <span title={formatCurrency(draftAmount)}>{wholeRand(draftAmount)}</span>
+                : <>{draftsCount}<span className="fin-tile__unit">{draftsCount === 1 ? "draft" : "drafts"}</span></>}
+              note={draftAmount != null ? `${draftsCount} ${draftsCount === 1 ? "draft" : "drafts"} to send` : "Drafts to send"}
+              onClick={statusFilter !== "DRAFT" ? () => showStatus("DRAFT") : undefined}
+              aria-label={`Not sent yet: ${draftsCount} ${draftsCount === 1 ? "draft" : "drafts"}. Show drafts`}
+            />
+          )}
+        </KpiRow>
+        )
+      )}
 
-          {/* Table — 10 per page, clickable */}
-          <div className="card table-card">
-            <table className="data-table">
-              <colgroup>
-                <col style={{ width: "160px" }} />
-                <col />
-                <col style={{ width: "130px" }} />
-                <col style={{ width: "160px" }} />
-                <col style={{ width: "180px" }} />
-                <col style={{ width: "80px" }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Invoice #</th>
-                  <th>Customer</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Due Date</th>
-                  <th style={{ textAlign: "right" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
-                  allInvoices.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} style={{ padding: 0 }}>
-                        <div
-                          style={{ padding: "60px 20px", textAlign: "center" }}>
-                          <div
-                            style={{
-                              fontSize: 48,
-                              marginBottom: 16,
-                              opacity: 0.3,
-                            }}>
-                            📄
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 16,
-                              fontWeight: 500,
-                              color: "var(--text-primary)",
-                              marginBottom: 8,
-                            }}>
-                            No invoices yet
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 13,
-                              color: "var(--text-secondary)",
-                              marginBottom: 20,
-                            }}>
-                            Invoices will be generated from completed bookings
-                          </div>
-                          <button
-                            onClick={() => navigate("/bookings")}
-                            className="btn-action">
-                            Go to bookings
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        style={{
-                          textAlign: "center",
-                          padding: "32px 0",
-                          color: "var(--text-tertiary)",
-                          fontSize: 13,
-                        }}>
-                        No invoices match your filters
-                      </td>
-                    </tr>
-                  )
-                ) : (
-                  rows.map((inv) => {
-                    const invStatus = inv.status?.toUpperCase();
-                    const amount =
-                      parseFloat(inv.total_amount || inv.amount) || 0;
-                    const invNumber = inv.invoice_number || inv.invoiceNumber;
-                    const custName = inv.customer_name || inv.customerName;
-                    const dueDate = inv.due_date || inv.dueDate;
-                    // Aging indicator
-                    const ageDays = dueDate
-                      ? Math.floor(
-                          (Date.now() - new Date(dueDate).getTime()) / 86400000,
-                        )
-                      : 0;
-                    const agingColor =
-                      ageDays <= 0
-                        ? "var(--status-success)"
-                        : ageDays <= 30
-                          ? "var(--status-warning)"
-                          : ageDays <= 60
-                            ? "var(--accent-primary)"
-                            : "var(--status-danger)";
-                    const agingLabel =
-                      ageDays <= 0
-                        ? `Due in ${Math.abs(ageDays)}d`
-                        : `${ageDays}d overdue`;
-
-                    const capitalEntry = eligibleById.get(String(inv.id));
-                    const ineligibleEntry = !capitalEntry ? ineligibleById.get(String(inv.id)) : null;
-                    const tier = capitalEntry
-                      ? String(
-                          capitalEntry.risk_tier ||
-                            capitalEntry.tier ||
-                            "standard",
-                        ).toLowerCase()
-                      : null;
-
-                    return (
-                      <tr
-                        key={inv.id}
-                        style={{ cursor: "pointer" }}
-                        onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
-                        <td className="mono" style={{ whiteSpace: "nowrap" }}>{invNumber}</td>
-                        <td style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={custName}>{custName}</td>
-                        <td className="mono" style={{ whiteSpace: "nowrap" }}>{formatCurrency(amount)}</td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}>
-                            <span
-                              style={{
-                                fontFamily: "var(--font-mono)",
-                                fontSize: 10,
-                                color:
-                                  STATUS_COLOR[invStatus] ||
-                                  "var(--text-secondary)",
-                                padding: "2px 6px",
-                                background: "var(--bg-surface-hover)",
-                                borderRadius: 4,
-                                display: "inline-block",
-                                whiteSpace: "nowrap",
-                              }}>
-                              {formatStatus(invStatus)}
-                            </span>
-                            {capitalEntry && tier && (
-                              <span
-                                style={{
-                                  fontFamily: "var(--font-mono)",
-                                  fontSize: 9,
-                                  color:
-                                    TIER_COLOR[tier] || "var(--text-tertiary)",
-                                  padding: "1px 5px",
-                                  border: `1px solid ${TIER_COLOR[tier] || "var(--border-subtle)"}`,
-                                  borderRadius: 4,
-                                  display: "inline-block",
-                                  whiteSpace: "nowrap",
-                                }}>
-                                {formatStatus(tier)}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}>
-                            <span
-                              style={{
-                                color:
-                                  invStatus === "OVERDUE"
-                                    ? "var(--status-danger)"
-                                    : "var(--text-secondary)",
-                                fontFamily: "var(--font-mono)",
-                                fontSize: 11,
-                              }}>
-                              {dueDate}
-                            </span>
-                            {invStatus !== "PAID" && dueDate && (
-                              <span
-                                style={{
-                                  fontSize: 9,
-                                  fontFamily: "var(--font-mono)",
-                                  color: agingColor,
-                                  padding: "1px 5px",
-                                  border: `1px solid ${agingColor}`,
-                                  borderRadius: 2,
-                                  whiteSpace: "nowrap",
-                                }}>
-                                {agingLabel}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ position: "relative", textAlign: "right" }}>
-                          {/* 3-dot menu button */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenDropdownId(
-                                openDropdownId === inv.id ? null : inv.id,
-                              );
-                            }}
-                            style={{
-                              background: "transparent",
-                              border: "1px solid var(--border-subtle)",
-                              color: "var(--text-secondary)",
-                              borderRadius: 2,
-                              cursor: "pointer",
-                              padding: "3px 8px",
-                              lineHeight: 0,
-                              display: "inline-flex",
-                              alignItems: "center",
-                            }}>
-                            <Ellipsis size={14} />
-                          </button>
-
-                          {/* Dropdown */}
-                          {openDropdownId === inv.id && (
-                            <>
-                              {/* click-away overlay */}
-                              <div
-                                style={{
-                                  position: "fixed",
-                                  inset: 0,
-                                  zIndex: 99,
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenDropdownId(null);
-                                }}
-                              />
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  right: 0,
-                                  top: "calc(100% + 4px)",
-                                  zIndex: 100,
-                                  background: "#ffffff",
-                                  border: "1px solid var(--border-subtle)",
-                                  borderRadius: 4,
-                                  minWidth: 200,
-                                  boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
-                                  overflow: "hidden",
-                                }}>
-                                {invStatus === "DRAFT" && (
-                                  <button
-                                    style={{
-                                      display: "block",
-                                      width: "100%",
-                                      textAlign: "left",
-                                      background: "transparent",
-                                      border: "none",
-                                      borderBottom:
-                                        "1px solid var(--border-subtle)",
-                                      color: "var(--accent-primary)",
-                                      fontFamily: "var(--font-mono)",
-                                      fontSize: 11,
-                                      letterSpacing: "0.05em",
-                                      padding: "10px 14px",
-                                      cursor: "pointer",
-                                      transition: "background 0.15s",
-                                    }}
-                                    disabled={sendingId === inv.id}
-                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                                    onClick={(e) => {
-                                      setOpenDropdownId(null);
-                                      handleSendInvoice(e, inv.id);
-                                    }}>
-                                    {sendingId === inv.id
-                                      ? "Sending..."
-                                      : "Send to customer"}
-                                  </button>
-                                )}
-                                {invStatus === "OVERDUE" && (
-                                  <button
-                                    style={{
-                                      display: "block",
-                                      width: "100%",
-                                      textAlign: "left",
-                                      background: "transparent",
-                                      border: "none",
-                                      borderBottom:
-                                        "1px solid var(--border-subtle)",
-                                      color: "var(--status-warning)",
-                                      fontFamily: "var(--font-mono)",
-                                      fontSize: 11,
-                                      letterSpacing: "0.05em",
-                                      padding: "10px 14px",
-                                      cursor: "pointer",
-                                      transition: "background 0.15s",
-                                    }}
-                                    disabled={sendingReminderId === inv.id}
-                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                                    onClick={(e) => {
-                                      setOpenDropdownId(null);
-                                      handleSendReminder(e, inv.id);
-                                    }}>
-                                    {sendingReminderId === inv.id
-                                      ? "Sending..."
-                                      : "Send reminder"}
-                                  </button>
-                                )}
-                                {invStatus !== "DRAFT" && (
-                                  <button
-                                    style={{
-                                      display: "block",
-                                      width: "100%",
-                                      textAlign: "left",
-                                      background: "transparent",
-                                      border: "none",
-                                      borderBottom:
-                                        "1px solid var(--border-subtle)",
-                                      color: "var(--text-secondary)",
-                                      fontFamily: "var(--font-mono)",
-                                      fontSize: 11,
-                                      letterSpacing: "0.05em",
-                                      padding: "10px 14px",
-                                      cursor: "pointer",
-                                      transition: "background 0.15s",
-                                    }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                                    onClick={(e) => {
-                                      setOpenDropdownId(null);
-                                      handleDownloadPDF(e, inv.id);
-                                    }}>
-                                    Download PDF
-                                  </button>
-                                )}
-                                {capitalEntry && (
-                                  <a
-                                    href={MC_URL}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={() => {
-                                      setOpenDropdownId(null);
-                                      setAppliedIds((prev) => saveAppliedId(String(inv.id), prev));
-                                    }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                                    style={{
-                                      display: "block",
-                                      width: "100%",
-                                      textAlign: "left",
-                                      background: "transparent",
-                                      borderBottom: "1px solid var(--border-subtle)",
-                                      color: appliedIds.has(String(inv.id))
-                                        ? "var(--status-success)"
-                                        : TIER_COLOR[tier || ""] || "var(--accent-primary)",
-                                      fontFamily: "var(--font-mono)",
-                                      fontSize: 11,
-                                      letterSpacing: "0.05em",
-                                      padding: "10px 14px",
-                                      cursor: "pointer",
-                                      textDecoration: "none",
-                                      boxSizing: "border-box",
-                                      transition: "background 0.15s",
-                                    }}>
-                                    {appliedIds.has(String(inv.id)) ? "Applied ✓" : "Request capital →"}
-                                  </a>
-                                )}
-                                {ineligibleEntry && (
-                                  <div
-                                    style={{
-                                      padding: "10px 14px",
-                                      fontFamily: "var(--font-mono)",
-                                      fontSize: 10,
-                                      color: "var(--text-tertiary)",
-                                      lineHeight: 1.4,
-                                    }}>
-                                    <div
-                                      style={{
-                                        color: "var(--status-danger)",
-                                        fontWeight: 500,
-                                        marginBottom: 2,
-                                        fontSize: 9,
-                                        letterSpacing: "0.05em",
-                                      }}>
-                                      Not eligible for capital
-                                    </div>
-                                    {ineligibleEntry.reason}
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "12px 20px",
-                  borderTop: "1px solid var(--border-subtle)",
-                }}>
-                <span
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11,
-                    color: "var(--text-tertiary)",
-                  }}>
-                  Page {page} of {totalPages} · showing {rows.length} of{" "}
-                  {filtered.length}
-                </span>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    className="btn-action"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}>
-                    ← Prev
-                  </button>
-                  <button
-                    className="btn-action"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}>
-                    Next →
-                  </button>
-                </div>
-              </div>
+      {/* Filters: the shared toolbar (36px controls), as on every list. */}
+      <Toolbar
+        className="fin-toolbar"
+        aria-label="Filter invoices"
+        meta={
+          <>
+            {filtered.length} {filtered.length === 1 ? "invoice" : "invoices"}
+            {!loading && truncated && (
+              <>
+                {` · latest ${allInvoices.length} of ${totalInvoices}`}
+                <InfoTip align="end">
+                  This list holds the {allInvoices.length} most recent of {totalInvoices} invoices; search and filters apply to
+                  these. The figures above cover all {totalInvoices}.
+                </InfoTip>
+              </>
             )}
+          </>
+        }
+      >
+        <SearchInput
+          wrapClassName="inv-search"
+          placeholder="Search invoices"
+          aria-label="Search invoices by number or customer"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+        />
+        {/* Five statuses: the segmented control on wide screens, a compact
+            menu beside the search on phones (no 5-option strip). */}
+        <span className="inv-status-seg">
+          <Segmented
+            label="Filter by status"
+            className="fin-seg"
+            value={statusFilter}
+            onChange={showStatus}
+            options={statusOptions}
+          />
+        </span>
+        <span className="inv-status-menu">
+          <Select value={statusFilter} onValueChange={showStatus}>
+            <SelectTrigger aria-label="Filter by status" className="inv-status-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
+              {statusOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}{o.count != null ? ` (${o.count})` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </span>
+      </Toolbar>
+
+      {/* Table: 10 per page, clickable */}
+      <div className="card fin-table-card fin-table-card--fit">
+        <div className="fin-table-scroll">
+          <table className="fin-table fin-table--stack table-heading-roles">
+            <thead>
+              <tr>
+                <th className="fin-cell-fill">Customer</th>
+                <th>Issued</th>
+                <th>Due</th>
+                <th>Status</th>
+                <th className="num">Amount incl. VAT</th>
+                <th className="actions">
+                  <span className="sr-only" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
+                    Actions
+                  </span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr className="is-empty">
+                  <td colSpan={6} style={{ padding: 0 }}>
+                    {loading ? (
+                      <div className="fin-empty fin-empty--compact">Loading invoices…</div>
+                    ) : allInvoices.length === 0 ? (
+                      <div className="fin-empty">
+                        <p className="fin-empty__title">No invoices yet</p>
+                        <p className="fin-empty__body">Invoices are generated from completed bookings.</p>
+                        <button onClick={() => navigate("/bookings")} className="btn-action">
+                          Go to bookings
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="fin-empty fin-empty--compact">No invoices match your filters</div>
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                rows.map((inv) => {
+                  const today = todayISO();
+                  const invStatus = inv.status?.toUpperCase();
+                  const amount = parseFloat(inv.total_amount || inv.amount) || 0;
+                  const invNumber = inv.invoice_number || inv.invoiceNumber;
+                  const custName = inv.customer_name || inv.customerName;
+                  const dueDate = inv.due_date || inv.dueDate;
+                  // Days relative to the due date, stated in words next to it:
+                  // whole SA calendar days, the Debtors report's count.
+                  const ageDays = dueDate ? daysBetween(String(dueDate), today) : 0;
+                  const open = invStatus !== "PAID" && invStatus !== "DRAFT" && !!dueDate;
+                  const agingLabel = !open
+                    ? null
+                    : ageDays > 0
+                      ? `${ageDays} ${ageDays === 1 ? "day" : "days"} late`
+                      : ageDays === 0
+                        ? "due today"
+                        : `in ${Math.abs(ageDays)} ${Math.abs(ageDays) === 1 ? "day" : "days"}`;
+
+                  const capitalEntry = eligibleById.get(String(inv.id));
+                  const ineligibleEntry = !capitalEntry ? ineligibleById.get(String(inv.id)) : null;
+                  const tier = capitalEntry
+                    ? String(capitalEntry.risk_tier || capitalEntry.tier || "standard").toLowerCase()
+                    : null;
+                  const applied = appliedIds.has(String(inv.id));
+
+                  return (
+                    <tr
+                      key={inv.id}
+                      className="is-clickable"
+                      {...rowLink(() => navigate(`/finance/invoices/${inv.id}`))}
+                      onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
+                      <td className="fin-strong m-party m-span2 fin-cell-2 fin-cell-fill">
+                        <div className="fin-truncate fin-truncate--fill" title={custName}>
+                          {custName}
+                        </div>
+                        <span className="fin-cell-sub">
+                          <span className="fin-id">{invNumber}</span>
+                        </span>
+                      </td>
+                      <td className="fin-date m-hide">{safeDate(inv.issue_date)}</td>
+                      <td className={`fin-date m-due${agingLabel ? "" : " m-hide"}`}>
+                        <span className="fin-mobile-only">Due </span>
+                        {safeDate(dueDate)}
+                        {agingLabel && (
+                          <span className={ageDays > 0 ? "fin-text-danger" : "fin-text-muted"}> · {agingLabel}</span>
+                        )}
+                      </td>
+                      <td className="m-status">
+                        <span className="fin-inline-list" style={{ flexWrap: "nowrap" }}>
+                          <StatusChip status={invStatus} size="sm" />
+                          {capitalEntry && tier && (
+                            <StatusChip
+                              tone={TIER_TONE[tier] ?? "neutral"}
+                              label={formatStatus(tier)}
+                              size="sm"
+                              title="Fast Pay risk tier"
+                            />
+                          )}
+                        </span>
+                      </td>
+                      <td className={`num m-amount${invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005 ? " fin-cell-2" : ""}`}>
+                        {/* Lists show whole rands; cents stay on the invoice and in the title (R8). */}
+                        <span title={formatCurrency(amount)}>{wholeRand(amount)}</span>
+                        {/* Part-paid: what is still owed, under the invoice total. */}
+                        {invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005 && (
+                          <span className="fin-cell-sub" title={`${formatCurrency(invoiceBalance(inv))} due`}>{wholeRand(invoiceBalance(inv))} due</span>
+                        )}
+                      </td>
+                      <td className="actions" onClick={(e) => e.stopPropagation()}>
+                        <RowActions
+                          label={`Invoice ${invNumber}`}
+                          items={[
+                            { label: "Open invoice", onSelect: () => navigate(`/finance/invoices/${inv.id}`) },
+                            ...(invStatus === "DRAFT"
+                              ? [{
+                                  label: sendingId === inv.id ? "Sending…" : "Send to customer",
+                                  onSelect: () => setPreview({ kind: "invoice", invoice: inv }),
+                                  disabled: sendingId === inv.id,
+                                }]
+                              : []),
+                            ...(canSendReminder(inv)
+                              ? [{
+                                  label: sendingReminderId === inv.id ? "Sending…" : "Send reminder",
+                                  onSelect: () => setPreview({ kind: "reminder", invoice: inv }),
+                                  disabled: sendingReminderId === inv.id,
+                                }]
+                              : []),
+                            ...(invStatus !== "DRAFT"
+                              ? [{ label: "Download PDF", onSelect: () => handleDownloadPDF(null, inv.id) }]
+                              : []),
+                            ...(capitalEntry
+                              ? applied
+                                ? [{ label: "Applied for Fast Pay", hint: "Your earlier application is on record.", onSelect: () => {}, disabled: true }]
+                                : [{
+                                    // No handler until Fast Pay launches (unchanged behaviour).
+                                    label: CAPITAL_LAUNCHED ? "Request Fast Pay" : "Request Fast Pay (coming soon)",
+                                    hint: CAPITAL_LAUNCHED ? undefined : CAPITAL_COMING_SOON,
+                                    onSelect: () => {},
+                                    disabled: !CAPITAL_LAUNCHED,
+                                  }]
+                              : []),
+                            ...(ineligibleEntry
+                              ? [{ label: "Not eligible for Fast Pay", hint: String(ineligibleEntry.reason ?? ""), onSelect: () => {}, disabled: true }]
+                              : []),
+                          ]}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="fin-table-foot">
+            <span>
+              {(page - 1) * PAGE_SIZE + 1} to {(page - 1) * PAGE_SIZE + rows.length} of {filtered.length}
+            </span>
+            <div className="fin-table-foot__nav">
+              <button
+                type="button"
+                className="tw-btn"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}>
+                Previous
+              </button>
+              <button
+                type="button"
+                className="tw-btn"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}>
+                Next
+              </button>
+            </div>
           </div>
-        </>
+        )}
+      </div>
+      </>
       )}
     </div>
   );

@@ -144,7 +144,7 @@ export const OpenInApp = () => {
         }}
       >
         <div style={{ marginBottom: 32 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>TRUCKWYS</div>
+          <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>TRUCKWYS</div>
           <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>ROAD FREIGHT INTELLIGENCE</div>
         </div>
 
@@ -169,7 +169,7 @@ export const OpenInApp = () => {
           <>
             <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>You're all set</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
-              Continue in the Truckwys app — you'll already be signed in.
+              Continue in the TruckWys app. You'll already be signed in.
             </div>
 
             {showLink ? (

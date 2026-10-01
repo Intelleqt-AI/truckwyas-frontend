@@ -1,59 +1,80 @@
-import { useState } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import './fleet-detail.css';
+import { useCallback, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, patchData } from '@/lib/Api';
-import { formatCurrency } from '@/lib/formatters';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader } from '@/components/Loader';
+import {
+  DetailSkeleton, RecordState, randCents, InfoTip, Panel, RecordHeader, StatusChip, StatusControl,
+  capacityTonnes, dateText, formatStatus, isNotFound, kmText, num, plural, randWhole,
+} from '@/components/fleet-detail/parts';
+import {
+  ComplianceCard, ConditionCard, FactsCard, LinkCard, LoadLink, NowLine, PerformanceCard,
+  daysSince, fleetPerKm, isDelivered, isOpenLoad, latest, perfFigures, perfLine, performance, dateToDo, staleWork, staleSentence, StaleOrderButton, type ToDo,
+} from '@/components/fleet-detail/record';
+import { useBalancedColumns } from '@/components/fleet-detail/useBalancedColumns';
+import { formatNumber, formatPercent, formatWeight, sentenceCaseLabel } from '@/lib/formatters';
+import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
+import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
+import { useLedger } from '@/components/reports/data';
+import { loadFailed } from '@/components/data/LoadError';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import { Link } from 'react-router-dom';
 
 const VEHICLE_STATUSES = ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'OUT_OF_SERVICE'] as const;
 
-// Sentence-case a status token for display: "IN_USE" → "In use".
-const formatStatus = (s?: string) =>
-  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+/** The model default for `fuel_consumption_per_km` (core/models/vehicle.py). */
+const DEFAULT_L_PER_KM = 0.35;
+/** Warn this many km before a service falls due. */
+const SERVICE_SOON_KM = 1000;
 
-const ScoreBar = ({ label, value, max = 100, color = 'var(--accent-primary)' }: any) => (
-  <div style={{ marginBottom: 14 }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{label}</span>
-      <span style={{ fontSize: 13, color, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{value ?? '—'}</span>
-    </div>
-    <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
-      <div style={{ height: 4, width: `${Math.min(100, ((value ?? 0) / max) * 100)}%`, background: color, borderRadius: 2, transition: 'width 0.5s ease' }} />
-    </div>
-  </div>
-);
-
-const STATUS_COLOR: Record<string, string> = {
-  AVAILABLE: 'var(--status-success)',
-  IN_USE: 'var(--status-warning)',
-  MAINTENANCE: 'var(--status-danger)',
-  OUT_OF_SERVICE: 'var(--text-tertiary)',
-};
-
+/* One page per truck (owner redesign, round 4). The head says what it is
+   (plate, make and model, type, year, payload) and what it is doing now;
+   the main column says what it earns (Performance, then its loads with
+   money); the rail holds what the owner acts on (Compliance to-dos), its
+   condition, and the facts. /fleet/vehicles/:id and /:id/financial both
+   land here. Figures come from this truck's loads and the Reports expense
+   ledger only. */
 export default function VehicleFinancialProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const queryClient = useQueryClient();
-  const isFinancial = location.pathname.endsWith('/financial');
   const [updating, setUpdating] = useState(false);
+  const railRef = useStickyRail<HTMLElement>();
   const [showEditForm, setShowEditForm] = useState(false);
+  useFocusTrap(latestModal, showEditForm);
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: vehicle, isLoading } = useQuery({
+  const vehicleQuery = useQuery({
     queryKey: ['vehicle', id],
     queryFn: () => fetchData(`api/v1/vehicles/${id}/`),
     enabled: !!id,
+    // A missing record is final; only retry transient failures.
+    retry: (count: number, err: unknown) => !isNotFound(err) && count < 2,
   });
+  const { data: vehicle, isLoading, error: queryError, refetch } = vehicleQuery;
+  const loadError = queryError ?? vehicleQuery.failureReason;
+  // Failing (even while retrying) with nothing to show: say so straight away.
+  const isError = loadFailed(vehicleQuery);
 
-  const { data: loadsData } = useQuery({
+  const { data: loadsData, isLoading: loadsLoading } = useQuery({
     queryKey: ['vehicle-loads', id],
     queryFn: () => fetchData(`api/v1/loads/?vehicle=${id}&page_size=50`),
     enabled: !!id,
   });
+
+  // Costs logged on this truck, from the same expense ledger as the P&L; every
+  // load, for the fleet's revenue per km (the comparison).
+  const ledger = useLedger(['expenses', 'loads']);
+
+  // The facts card may drop into the main column, and the driver card may
+  // fold into it as a row, so the two columns end within 48px of each other
+  // (R5) without a stretched one-line card (R8). Condition always stays in the rail, so it
+  // has one layout on every truck (R7).
+  const bal = useBalancedColumns({ toMain: ['driver', 'facts'] }, `${id}-${isLoading}-${loadsLoading}-${ledger.loading}`);
+  const sideRef = useCallback((n: HTMLElement | null) => { railRef(n); bal.sideRef.current = n; }, [railRef, bal.sideRef]);
 
   const { data: vtData } = useQuery({
     queryKey: ['vehicle-types'],
@@ -73,22 +94,29 @@ export default function VehicleFinancialProfile() {
     return { id: d.id, name: fn && ln ? `${fn} ${ln}` : fn || ln || `Driver ${d.id}` };
   });
 
-  if (isLoading) return <Loader fullScreen />;
-  if (!vehicle) return (
-    <div style={{ padding: 40 }}>
-      <div style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>Vehicle not found.</div>
-      <button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/fleet')}>← Back to fleet</button>
-    </div>
+  // Error states keep the head ("Vehicle") and the breadcrumb (R7): a 404 says
+  // the truck is not there; anything else is a load error with Retry.
+  const stateProps = { type: 'Vehicle', crumb: 'Vehicles', crumbTo: '/fleet/vehicles', what: 'this vehicle',
+    missingTitle: 'There is no vehicle at this link', missingHint: 'It may have been deleted, or the link is wrong.', backLabel: 'All vehicles' };
+  if (isError && !isNotFound(loadError)) return (
+    <RecordState kind="error" {...stateProps} error={loadError} busy={vehicleQuery.isFetching} onRetry={() => refetch()} />
   );
+  // Loads and the cost ledger decide the cards: wait for them so nothing jumps.
+  // A failed ledger does not block the page; the margin figure is left out.
+  if ((isLoading || loadsLoading || ledger.loading) && !isError) return <DetailSkeleton crumb="Vehicles" crumbTo="/fleet/vehicles" />;
+  if (!vehicle) return <RecordState kind="missing" {...stateProps} />;
 
-  const loads = Array.isArray(loadsData) ? loadsData : (loadsData?.results || []);
-  const delivered = loads.filter((l: any) => l.status === 'DELIVERED');
-  const totalRevenue = delivered.reduce((s: number, l: any) => s + parseFloat(l.total_amount || '0'), 0);
-  const avgRevPerTrip = delivered.length > 0 ? totalRevenue / delivered.length : 0;
-  const totalDistance = delivered.reduce((s: number, l: any) => s + parseFloat(l.distance || '0'), 0);
-  const revPerKm = totalDistance > 0 ? totalRevenue / totalDistance : 0;
+  const loads: any[] = Array.isArray(loadsData) ? loadsData : (loadsData?.results || []);
+  const loadsTotal: number = loadsData?.count ?? loads.length;
+  const partial = loadsTotal > loads.length;
+  const vid = Number(id);
+  const expenses = ledger.data ? ledger.data.expenses.filter((e: any) => e.vehicle === vid) : null;
+  const perf = performance(loads, expenses);
+  const deliveredCount = perf.delivered.length;
+  const thin = deliveredCount > 0 && deliveredCount < 3;
 
-  const healthScore = vehicle.ai_health_score ?? 0;
+  const lPerKm = num(vehicle.fuel_consumption_per_km);
+  const defaultFuel = Math.abs(lPerKm - DEFAULT_L_PER_KM) < 0.001;
 
   const nextServiceKm = (vehicle.service_interval_km && vehicle.last_service_mileage)
     ? parseFloat(vehicle.last_service_mileage) + Number(vehicle.service_interval_km)
@@ -97,350 +125,328 @@ export default function VehicleFinancialProfile() {
     ? nextServiceKm - parseFloat(vehicle.mileage)
     : null;
 
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    background: 'transparent', border: 'none',
-    borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
-    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-    fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
-    fontWeight: active ? 500 : 400,
-    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
-    transition: 'all 0.2s ease',
-  });
+  const openEdit = () => {
+    setShowEditForm(true);
+    setEditForm({
+      vin: vehicle.vin || '',
+      plate: vehicle.plate || '',
+      make: vehicle.make || '',
+      model: vehicle.model || '',
+      year: vehicle.year || '',
+      capacity: vehicle.capacity ? String(Number(vehicle.capacity) / 1000) : '',
+      mileage: vehicle.mileage || '',
+      type: vehicle.vehicle_type_name || '',
+      fuel_type: vehicle.fuel_type || 'Diesel',
+      status: vehicle.status || 'AVAILABLE',
+      registration_expiry: vehicle.registration_expiry?.slice(0, 10) || '',
+      last_maintenance_date: vehicle.last_maintenance_date?.slice(0, 10) || '',
+      service_interval_km: vehicle.service_interval_km || '',
+      last_service_mileage: vehicle.last_service_mileage || '',
+      driver: vehicle.driver ?? '',
+    });
+  };
+
+  const setStatus = async (s: string) => {
+    setUpdating(true);
+    try {
+      await patchData({ url: `api/v1/vehicles/${id}/`, data: { status: s } });
+      queryClient.invalidateQueries({ queryKey: ['vehicle', id] });
+    } catch (e) { console.error(e); }
+    setUpdating(false);
+  };
+
+  const makeModel = [vehicle.make, vehicle.model].filter(Boolean).join(' ');
+  const tonnes = capacityTonnes(vehicle);
+  // Year steps aside on phones so the subtitle keeps one line (content at 146).
+  const metaParts = [
+    makeModel && { k: 'mm', v: makeModel },
+    vehicle.vehicle_type_name && { k: 'type', v: sentenceCaseLabel(vehicle.vehicle_type_name) },
+    vehicle.year && { k: 'year', v: String(vehicle.year), phoneHide: true },
+    tonnes && { k: 't', v: formatWeight(tonnes) },
+  ].filter(Boolean) as { k: string; v: string; phoneHide?: boolean }[];
+  const meta = metaParts.length ? <>{metaParts.map((m, i) => (
+    <span key={m.k} className={m.phoneHide ? 'fd-hide-phone' : undefined}>{i > 0 ? ' · ' : ''}{m.v}</span>
+  ))}</> : null;
+  const title = vehicle.plate || vehicle.registration || `Vehicle ${id}`;
+  const status = String(vehicle.status || '').toUpperCase();
+
+  // ---- Now: from the open order that names this truck, else its status.
+  const openLoad = loads.filter(isOpenLoad).sort((a, b) => String(b.pickup_date || '').localeCompare(String(a.pickup_date || '')))[0];
+  const lastDelivered = latest(loads.filter(isDelivered));
+  const lastWhen = lastDelivered ? dateText(lastDelivered.delivery_date || lastDelivered.pickup_date) : null;
+  const idleDays = lastDelivered ? daysSince(lastDelivered.delivery_date || lastDelivered.pickup_date) : null;
+  const openOrders = <button type="button" className="fd-ghost" onClick={() => navigate('/bookings/orders')}>Open orders</button>;
+  let now: JSX.Element;
+  const stale = staleWork(openLoad);
+  if (openLoad && stale) {
+    // Stale work (R5/R7): an order left open is not current work. One short
+    // fact line (neutral, one amber dot) and one action; the load number is in
+    // the Loads card and the driver in the Driver card, so neither repeats here.
+    now = (
+      <NowLine dot action={<StaleOrderButton load={openLoad} />}>
+        {staleSentence(openLoad, stale)}
+      </NowLine>
+    );
+  } else if (openLoad) {
+    const to = openLoad.delivery_city || openLoad.delivery_location;
+    const driverName = vehicle.driver_name || openLoad.driver_name;
+    const flag = status === 'AVAILABLE' ? 'Marked available' : status === 'MAINTENANCE' || status === 'OUT_OF_SERVICE' ? `Marked ${formatStatus(status).toLowerCase()}` : undefined;
+    now = (
+      <NowLine flag={flag}>
+        <strong>{({ IN_TRANSIT: 'In transit', LOADING: 'Loading', ASSIGNED: 'Assigned' } as Record<string, string>)[String(openLoad.status).toUpperCase()] ?? 'On an order'}</strong>{': '}
+        {driverName ? driverName : <span className="fd-now__warn">no driver on the order</span>}
+        {to ? <> to {to}</> : null}
+        {openLoad.customer_name ? <> for {openLoad.customer_name}</> : null}
+        {' · '}<LoadLink load={openLoad} />
+      </NowLine>
+    );
+  } else if (status === 'IN_USE') {
+    now = (
+      <NowLine flag="No current order" action={openOrders}>
+        {/* The head chip already says "In use"; the flag says what contradicts it. */}
+        {lastWhen ? <>Last delivery <span className="fd-nowrap">{lastWhen}</span></> : 'No loads yet'}
+      </NowLine>
+    );
+  } else if (status === 'MAINTENANCE') {
+    now = <NowLine>In maintenance{vehicle.last_maintenance_date ? ` since ${dateText(vehicle.last_maintenance_date)}` : ''}</NowLine>;
+  } else if (status === 'OUT_OF_SERVICE' || status === 'INACTIVE') {
+    now = <NowLine>{formatStatus(status)}</NowLine>;
+  } else if (lastDelivered && idleDays !== null) {
+    now = (
+      <NowLine action={openOrders}>
+        <strong>Idle {plural(Math.max(0, idleDays), 'day')}</strong>, last delivery <span className="fd-nowrap">{lastWhen}</span>
+        {lastDelivered.delivery_city ? <> in <span className="fd-nowrap">{lastDelivered.delivery_city}</span></> : null}
+      </NowLine>
+    );
+  } else {
+    now = <NowLine>{status === 'IN_USE' ? 'Marked in use, no loads yet' : 'Available, no loads yet'}</NowLine>;
+  }
+
+  // ---- Compliance: what the owner acts on.
+  const addEdit = (what: string) => ({ label: 'Add', onClick: openEdit, aria: `Add ${what}` });
+  const todos: ToDo[] = [];
+  if (kmUntilService !== null) {
+    todos.push(kmUntilService <= 0
+      ? { key: 'service', tone: 'danger', title: 'Service overdue', detail: `${kmText(-kmUntilService)} over · due at ${kmText(nextServiceKm!)}` }
+      : { key: 'service', tone: kmUntilService <= SERVICE_SOON_KM ? 'warning' : 'ok', title: `Service due in ${kmText(kmUntilService)}`, detail: `At ${kmText(nextServiceKm!)}` });
+  } else {
+    todos.push({ key: 'service', tone: 'missing', title: 'Service interval', detail: vehicle.service_interval_km ? 'Last service odometer not recorded' : 'Not recorded', action: addEdit('service interval') });
+  }
+  [
+    dateToDo('reg', 'Licence disc', vehicle.registration_expiry, 30, addEdit('licence disc expiry')),
+    dateToDo('ins', 'Insurance', vehicle.insurance_expiry, 30),
+  ].forEach(t => { if (t) todos.push(t); });
+  const maintDays = vehicle.next_maintenance_due ? daysSince(vehicle.next_maintenance_due) : null;
+  if (maintDays !== null) {
+    todos.push(maintDays > 0
+      ? { key: 'maint', tone: 'danger', title: 'Maintenance overdue', detail: `${plural(maintDays, 'day')} · ${dateText(vehicle.next_maintenance_due)}` }
+      : { key: 'maint', tone: -maintDays <= 14 ? 'warning' : 'ok', title: maintDays === 0 ? 'Maintenance due today' : `Maintenance due in ${plural(-maintDays, 'day')}`, detail: dateText(vehicle.next_maintenance_due) });
+  }
+
+  // ---- Performance
+  const fleetKm = fleetPerKm(ledger.data?.loads);
+  const basis = <>
+    Delivered and invoiced loads on this truck, counted in the month of delivery, over the last 12 months (the Reports definition).
+    {' '}Margin after truck costs: revenue less approved expenses logged on this truck (fuel, tolls, maintenance, insurance) in the same months; expenses waiting for approval are not deducted, as in the P&L, and the line under the margin shows what it becomes if they are approved.
+    {perf.costCount > 0 ? ` Approved costs in these months: ${randWhole(perf.costs)}${perf.pending > 0 ? `; ${randWhole(perf.pending)} more is waiting for approval` : ''}.` : ''}
+    {' '}Revenue per km uses loads with a distance{perf.km > 0 ? ` (${kmText(perf.km)} here)` : ''}; the fleet figure{fleetKm ? ` (${randCents(fleetKm.perKm)} per km)` : ''} is every delivered load with a distance over the same 12 months, the basis Insights uses. Days on a job count calendar days from pickup to delivery.
+    {partial ? ` Based on the latest ${loads.length} of ${loadsTotal} loads.` : ''}
+    {perf.older > 0 ? ` ${plural(perf.older, 'older delivered load')} fall outside the 12 months.` : ''}
+  </>;
+  const figures = perfFigures(perf, { revenueLabel: 'Revenue', thin, costs: true, costsKnown: expenses !== null, fleetKm });
+
+  // ---- Condition
+  const overall = Number(vehicle.ai_health_score) || null;
+  const uptimePct = Number(vehicle.uptime_percentage) ? formatPercent(parseFloat(vehicle.uptime_percentage), 1) : null;
+
+  // ---- Driver
+  const driverId = vehicle.driver ?? null;
+  const driverName = vehicle.driver_name || null;
+  const noLoads = loads.length === 0;
+  // The driver on the vehicle record, else the driver on its open order
+  // (named as the Now line does: "On LOAD-… with Riaan Venter"), else none.
+  const openDriver = openLoad && !(driverId && driverName) ? (openLoad.driver_name || null) : null;
+  // Said once, here (R7): the driver on the open order is marked inactive.
+  const openDriverInactive = !!openLoad?.driver && String(((Array.isArray(driversData) ? driversData : driversData?.results) || [])
+    .find((d: any) => d.id === openLoad.driver)?.status || '').toUpperCase() === 'INACTIVE';
+  // The driver: a small card in the rail; where the columns need it out of
+  // the rail it folds into the Vehicle card as a row (R8), never a one-line
+  // card stretched across the main column.
+  const driverFolded = bal.inMain('driver');
+  const driverParts: { primary: JSX.Element; secondary?: string; action?: JSX.Element } | null = noLoads ? null : driverId && driverName ? {
+    primary: <Link className="fd-inline-link" to={`/fleet/drivers/${driverId}`}>{driverName}</Link>,
+    secondary: 'Assigned to this truck',
+  } : openLoad && openDriver ? {
+    primary: openLoad.driver ? <Link className="fd-inline-link" to={`/fleet/drivers/${openLoad.driver}`}>{openDriver}</Link> : <>{openDriver}</>,
+    secondary: openDriverInactive ? 'Marked inactive · no regular driver' : 'On the open order · no regular driver',
+  } : {
+    primary: <span className="fd-muted">{driverFolded ? 'None assigned' : 'No driver assigned'}</span>,
+    action: <button type="button" className={driverFolded ? 'fd-ghost fd-ghost--row' : 'fd-ghost'} onClick={openEdit} aria-label="Assign a driver">Assign</button>,
+  };
+  const driverCard = driverParts && !driverFolded ? (
+    <LinkCard title="Driver" className="fd-o-driver" primary={driverParts.primary} secondary={driverParts.secondary} action={driverParts.action} />
+  ) : null;
+  // Folded: the card's first line, across the full card width (label, then
+  // the name with its qualifier under it), not one cell of the facts grid.
+  const driverLead = driverParts && driverFolded ? (
+    <div className="fd-factlead">
+      <span className="fd-factlead__label">Driver</span>
+      <span className="fd-linkfact">
+        <span className="fd-linkfact__main">{driverParts.primary}{driverParts.action}</span>
+        {driverParts.secondary && driverParts.secondary !== 'Assigned to this truck' ? <span className="fd-linkfact__note">{driverParts.secondary}</span> : null}
+      </span>
+    </div>
+  ) : null;
+
+  // A truck with no loads: one "Getting started" card (its first load, its
+  // driver, then the compliance to-dos) in place of three empty cards. The
+  // rail and the facts stay where they are on every other truck.
+  const firstSteps: ToDo[] = noLoads ? [
+    { key: 'first-load', tone: 'missing', title: 'First load', detail: 'Performance fills in once it delivers', action: { label: 'Open orders', onClick: () => navigate('/bookings/orders') } },
+    ...(!(driverId && driverName) ? [{ key: 'driver', tone: 'missing' as const, title: 'Driver', detail: 'Not assigned', action: { label: 'Assign', onClick: openEdit, aria: 'Assign a driver' } }] : []),
+  ] : [];
+
+  // Head subtitle already says make and model, type, year and payload: the
+  // facts card lists only what the head does not (year returns on phones,
+  // where the subtitle drops it).
+  const factsCard = (
+    <FactsCard className="fd-o-facts" wide={bal.inMain('facts')} title="Vehicle" lead={driverLead} facts={[
+                { label: 'VIN', value: vehicle.vin, mono: true, add: openEdit },
+                { label: 'Year', value: vehicle.year, phoneOnly: true },
+                { label: 'Fuel', value: vehicle.fuel_type ? formatStatus(vehicle.fuel_type) : null },
+                {
+                  label: 'Fuel use',
+                  value: lPerKm ? <>{formatNumber(lPerKm, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L/km{defaultFuel ? <span className="fd-row__note fd-muted">default</span> : null}</> : null,
+                },
+                { label: 'Odometer', value: Number(vehicle.mileage) ? kmText(parseFloat(vehicle.mileage)) : null, add: openEdit },
+                { label: 'Last maintenance', value: dateText(vehicle.last_maintenance_date), add: openEdit },
+                ...(!makeModel ? [{ label: 'Make and model', value: null, add: openEdit }] : []),
+                ...(!tonnes ? [{ label: 'Payload', value: null, add: openEdit }] : []),
+              ]} />
+  );
+
+  const conditionCard = (overall || !noLoads) ? (
+    <ConditionCard
+      className="fd-o-condition"
+      overall={overall}
+      info={<>Rule-based, not a prediction: maintenance 35%, uptime 25%, fuel use 25% and age 15%, each out of 100. A factor with no data scores a neutral value. 80 or more is good, 60 to 79 fair, 40 to 59 low; below 40 needs action.</>}
+      parts={[
+        { label: 'Maintenance', score: Number(vehicle.maintenance_score) || null },
+        { label: 'Fuel efficiency', score: Number(vehicle.fuel_efficiency_score) || null },
+        { label: 'Uptime', score: Number(vehicle.uptime_score) || null, note: uptimePct ? `${uptimePct} of the time` : undefined },
+      ]}
+    />
+  ) : null;
 
   return (
-    <div>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <button
-          onClick={() => navigate('/fleet')}
-          style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}
-        >← Back to fleet</button>
+    <div className="fleet-detail">
+      <RecordHeader
+        crumb="Vehicles"
+        crumbTo="/fleet/vehicles"
+        title={title}
+        chip={<StatusChip status={vehicle.status} />}
+        meta={meta || undefined}
+        actions={<>
+          <button type="button" className="fd-button fd-head-secondary" onClick={openEdit}>Edit vehicle</button>
+          <StatusControl label="Set vehicle status" subject={title} options={VEHICLE_STATUSES} current={vehicle.status} busy={updating} onPick={setStatus} />
+        </>}
+      />
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>VEHICLE</div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-              {vehicle.plate}
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, fontFamily: 'var(--font-sans)' }}>
-              {vehicle.make} {vehicle.model} · {vehicle.vehicle_type_name} · {vehicle.year} · {vehicle.fuel_type}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <button
-              onClick={() => {
-                setShowEditForm(true);
-                setEditForm({
-                  vin: vehicle.vin || '',
-                  plate: vehicle.plate || '',
-                  make: vehicle.make || '',
-                  model: vehicle.model || '',
-                  year: vehicle.year || '',
-                  capacity: vehicle.capacity ? String(Number(vehicle.capacity) / 1000) : '',
-                  mileage: vehicle.mileage || '',
-                  type: vehicle.vehicle_type_name || '',
-                  fuel_type: vehicle.fuel_type || 'Diesel',
-                  status: vehicle.status || 'AVAILABLE',
-                  registration_expiry: vehicle.registration_expiry?.slice(0, 10) || '',
-                  last_maintenance_date: vehicle.last_maintenance_date?.slice(0, 10) || '',
-                  service_interval_km: vehicle.service_interval_km || '',
-                  last_service_mileage: vehicle.last_service_mileage || '',
-                  driver: vehicle.driver ?? '',
-                });
-              }}
-              style={{
-                fontFamily: 'var(--font-mono)', fontSize: 11,
-                color: 'var(--text-secondary)',
-                background: 'transparent',
-                padding: '6px 12px',
-                border: `1px solid var(--border-subtle)`, borderRadius: 2,
-                cursor: 'pointer',
-                letterSpacing: '0.08em',
-                transition: 'all 0.15s ease',
-              }}
+      {now}
+
+      <div className="fd-record">
+        <div className="fd-main" ref={bal.mainRef}>
+          {noLoads ? (
+            <ComplianceCard
+              className="fd-o-todo"
+              title="Getting started"
+              lead={firstSteps}
+              items={todos}
+            />
+          ) : (
+            // With loads but none delivered in the window, Performance has one
+            // sentence: it becomes the Loads card's sub line (R6).
+            deliveredCount > 0 ? (
+              <PerformanceCard
+                className="fd-o-perf"
+                perf={perf}
+                figures={figures}
+                basis={basis}
+                thinLine={perfLine(perf)}
+              />
+            ) : null
+          )}
+
+          {!noLoads && (
+            <Panel
+              title="Loads"
+              sub={deliveredCount > 0
+                ? (loadsTotal > 1 ? plural(loadsTotal, 'load') : undefined)
+                : `${plural(loadsTotal, 'load')} · none delivered in the last 12 months${perf.older > 0 ? ` (${perf.older} earlier)` : ''}`}
+              flush
+              className="fd-o-loads"
             >
-              Edit
-            </button>
-            <div style={{ display: 'flex', gap: 6 }}>
-            {VEHICLE_STATUSES.map(s => {
-              const isCurrentStatus = vehicle.status === s;
-              const btnColor = STATUS_COLOR[s] || 'var(--text-tertiary)';
-              return (
-                <button
-                  key={s}
-                  disabled={isCurrentStatus || updating}
-                  onClick={async () => {
-                    setUpdating(true);
-                    try {
-                      await patchData({ url: `api/v1/vehicles/${id}/`, data: { status: s } });
-                      queryClient.invalidateQueries({ queryKey: ['vehicle', id] });
-                    } catch (e) { console.error(e); }
-                    setUpdating(false);
-                  }}
-                  style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 11,
-                    color: isCurrentStatus ? 'var(--bg-deep)' : btnColor,
-                    background: isCurrentStatus ? btnColor : 'transparent',
-                    padding: '6px 12px',
-                    border: `1px solid ${btnColor}`, borderRadius: 2,
-                    cursor: isCurrentStatus || updating ? 'default' : 'pointer',
-                    opacity: updating && !isCurrentStatus ? 0.5 : 1,
-                    letterSpacing: '0.08em',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {formatStatus(s)}
-                </button>
-              );
-            })}
-            </div>
-          </div>
+              <LoadsTable loads={loads} />
+            </Panel>
+          )}
+
+          {bal.inMain('facts') && factsCard}
         </div>
+
+        <aside ref={sideRef} className="fd-side">
+          {!noLoads && <ComplianceCard className="fd-o-todo" items={todos} />}
+          {driverCard}
+          {!bal.inMain('facts') && factsCard}
+          {conditionCard}
+        </aside>
       </div>
-
-      {/* Tabs */}
-      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 24, display: 'flex' }}>
-        <button style={tabStyle(!isFinancial)} onClick={() => navigate(`/fleet/vehicles/${id}`)}>Overview</button>
-        <button style={tabStyle(isFinancial)} onClick={() => navigate(`/fleet/vehicles/${id}/financial`)}>Financial Profile</button>
-      </div>
-
-      {/* ── OVERVIEW TAB ── */}
-      {!isFinancial && (
-        <>
-          {/* KPI strip */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-            {[
-              { label: 'AI Health Score', value: vehicle.ai_health_score ?? 0, suffix: '/100', color: healthScore >= 80 ? 'var(--status-success)' : healthScore >= 60 ? 'var(--status-warning)' : 'var(--status-danger)' },
-              { label: 'Fuel Efficiency', value: vehicle.fuel_efficiency_score ?? 0, suffix: '/100' },
-              { label: 'Uptime', value: parseFloat(vehicle.uptime_percentage || '0').toFixed(1), suffix: '%' },
-              { label: 'Mileage', value: parseFloat(vehicle.mileage || '0').toLocaleString('en-ZA'), suffix: ' km' },
-            ].map(m => (
-              <div key={m.label} className="card metric-card">
-                <div className="card-header"><span className="card-title">{m.label}</span></div>
-                <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: m.color || 'var(--text-primary)' }}>
-                  {m.value}<span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{m.suffix}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-            {/* Specs */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>SPECIFICATIONS</div>
-              {[
-                { label: 'VIN', value: vehicle.vin },
-                { label: 'PLATE', value: vehicle.plate },
-                { label: 'TYPE', value: vehicle.vehicle_type_name || '—' },
-                { label: 'CAPACITY', value: vehicle.capacity ? `${(parseFloat(vehicle.capacity) / 1000).toFixed(1)} ton` : '—' },
-                { label: 'FUEL TYPE', value: vehicle.fuel_type },
-                { label: 'YEAR', value: vehicle.year },
-                { label: 'DRIVER', value: vehicle.driver_name || '—' },
-              ].map(r => (
-                <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value ?? '—'}</span>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Economics */}
-              <div className="card" style={{ padding: 20 }}>
-                <div className="card-title" style={{ marginBottom: 16 }}>ECONOMICS</div>
-                {[
-                  { label: 'COST PER KM', value: `R ${parseFloat(vehicle.cost_per_km || '0').toFixed(2)}` },
-                  { label: 'MARGIN PER TRIP', value: formatCurrency(parseFloat(vehicle.margin_per_trip || '0')) },
-                  { label: 'FUEL CONSUMPTION', value: `${parseFloat(vehicle.fuel_consumption_per_km || '0').toFixed(2)} L/km` },
-                ].map(r => (
-                  <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
-                    <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Maintenance */}
-              <div className="card" style={{ padding: 20 }}>
-                <div className="card-title" style={{ marginBottom: 16 }}>MAINTENANCE</div>
-                {[
-                  { label: 'LAST MAINTENANCE', value: vehicle.last_maintenance_date?.slice(0, 10) || '—' },
-                  { label: 'SERVICE INTERVAL', value: vehicle.service_interval_km ? `${Number(vehicle.service_interval_km).toLocaleString('en-ZA')} km` : '—' },
-                  { label: 'NEXT SERVICE AT', value: nextServiceKm ? `${nextServiceKm.toLocaleString('en-ZA')} km` : '—' },
-                  { label: 'KM UNTIL SERVICE', value: kmUntilService !== null ? (kmUntilService > 0 ? `${Math.round(kmUntilService).toLocaleString('en-ZA')} km` : 'Overdue') : '—' },
-                  { label: 'REGISTRATION EXPIRY', value: vehicle.registration_expiry?.slice(0, 10) || '—' },
-                ].map(r => (
-                  <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
-                    <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── FINANCIAL TAB ── */}
-      {isFinancial && (
-        <>
-          {/* KPI strip */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Revenue Generated</span></div>
-              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>
-                {formatCurrency(totalRevenue)}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{delivered.length} completed trips</div>
-            </div>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Avg Revenue / Trip</span></div>
-              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)' }}>
-                {formatCurrency(avgRevPerTrip)}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>Delivered loads</div>
-            </div>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Revenue / km</span></div>
-              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)' }}>
-                R {(revPerKm || 0).toFixed(2)}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{(totalDistance || 0).toFixed(0)} km total</div>
-            </div>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">AI Health Score</span></div>
-              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: healthScore >= 80 ? 'var(--status-success)' : healthScore >= 60 ? 'var(--status-warning)' : 'var(--status-danger)' }}>
-                {healthScore}/100
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>Fleet intelligence</div>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-            {/* Performance Scores */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 20 }}>PERFORMANCE SCORES</div>
-              <ScoreBar label="AI HEALTH SCORE" value={healthScore} color={healthScore >= 80 ? 'var(--status-success)' : 'var(--status-warning)'} />
-              <ScoreBar label="UPTIME SCORE" value={vehicle.uptime_score ?? 0} color="var(--accent-primary)" />
-              <ScoreBar label="FUEL EFFICIENCY" value={vehicle.fuel_efficiency_score ?? 0} />
-              <ScoreBar label="MAINTENANCE SCORE" value={vehicle.maintenance_score ?? 0} color="var(--status-success)" />
-              <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>UPTIME</span>
-                <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                  {parseFloat(vehicle.uptime_percentage || '0').toFixed(1)}%
-                </span>
-              </div>
-            </div>
-
-            {/* Cost Analysis */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>COST ANALYSIS</div>
-              {[
-                { label: 'COST PER KM', value: vehicle.cost_per_km ? `R ${parseFloat(vehicle.cost_per_km).toFixed(2)}` : '—' },
-                { label: 'MARGIN PER TRIP', value: vehicle.margin_per_trip ? formatCurrency(parseFloat(vehicle.margin_per_trip)) : '—' },
-                { label: 'FUEL CONSUMPTION', value: vehicle.fuel_consumption_per_km ? `${vehicle.fuel_consumption_per_km} L/km` : '—' },
-                { label: 'CAPACITY', value: vehicle.capacity ? `${(parseFloat(vehicle.capacity) / 1000).toFixed(1)} ton` : '—' },
-                { label: 'FUEL TYPE', value: vehicle.fuel_type || '—' },
-                { label: 'MILEAGE', value: vehicle.mileage ? `${parseFloat(vehicle.mileage).toLocaleString('en-ZA')} km` : '—' },
-              ].map(r => (
-                <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Compliance */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>COMPLIANCE & MAINTENANCE</div>
-              {[
-                { label: 'LAST MAINTENANCE', value: vehicle.last_maintenance_date?.slice(0, 10) || '—', alert: false },
-                { label: 'SERVICE INTERVAL', value: vehicle.service_interval_km ? `${Number(vehicle.service_interval_km).toLocaleString('en-ZA')} km` : '—', alert: false },
-                { label: 'NEXT SERVICE AT', value: nextServiceKm ? `${nextServiceKm.toLocaleString('en-ZA')} km` : '—', alert: false },
-                { label: 'KM UNTIL SERVICE', value: kmUntilService !== null ? (kmUntilService > 0 ? `${Math.round(kmUntilService).toLocaleString('en-ZA')} km` : 'Overdue') : '—', alert: kmUntilService !== null && kmUntilService <= 0 },
-                { label: 'REGISTRATION EXPIRY', value: vehicle.registration_expiry?.slice(0, 10) || '—', alert: !!(vehicle.registration_expiry && new Date(vehicle.registration_expiry) < new Date()) },
-                { label: 'VIN', value: vehicle.vin || '—', alert: false },
-              ].map(r => (
-                <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
-                  <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: r.alert ? 'var(--status-danger)' : 'var(--text-primary)' }}>{r.value}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Recent Loads */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>RECENT LOADS ({loads.length})</div>
-              {loads.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '20px 0', textAlign: 'center' }}>No loads recorded</div>
-              ) : loads.slice(0, 8).map((load: any) => (
-                <div
-                  key={load.id}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-row)', cursor: 'pointer' }}
-                  onClick={() => navigate(`/bookings/${load.id}`)}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                >
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{load.load_number}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{load.pickup_city} → {load.delivery_city}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>{formatCurrency(parseFloat(load.total_amount || '0'))}</div>
-                    <div style={{ fontSize: 10, color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{formatStatus(load.status)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
 
       {/* Edit Vehicle Slide-out */}
       {showEditForm && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setShowEditForm(false)} />
-          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Vehicle</div>
-              <button onClick={() => setShowEditForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+        <div className="fd-drawer" role="dialog" aria-modal="true" aria-labelledby="fd-edit-vehicle-title" onKeyDown={e => { if (e.key === 'Escape') setShowEditForm(false); }}>
+          <div className="fd-drawer__backdrop" onClick={() => setShowEditForm(false)} />
+          <div className="fd-drawer__panel">
+            <div className="fd-drawer__head">
+              <h2 id="fd-edit-vehicle-title" className="fd-card__title" style={{ margin: 0 }}>Edit vehicle</h2>
+              <button className="fd-icon-button" aria-label="Close" onClick={() => setShowEditForm(false)}>✕</button>
             </div>
             {error && (
-              <div style={{ padding: 12, background: 'var(--status-danger)', color: 'var(--bg-deep)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
+              <div className="fd-error" role="alert">
                 {error}
               </div>
             )}
             {[
-              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. WDB9634031L123456' },
+              { key: 'vin', label: 'VIN', placeholder: 'e.g. WDB9634031L123456' },
               { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz' },
               { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
               { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
-              { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
+              { key: 'plate', label: 'Registration plate', placeholder: 'e.g. GP 567 ZAB' },
               { key: 'capacity', label: 'Capacity (ton)', placeholder: 'e.g. 30', type: 'number' },
               { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
-              { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
-              { key: 'last_maintenance_date', label: 'Last Maintenance Date', type: 'date' },
-              { key: 'service_interval_km', label: 'Service Interval (km)', placeholder: 'e.g. 10000', type: 'number' },
-              { key: 'last_service_mileage', label: 'Last Service Odometer (km)', placeholder: 'e.g. 145000', type: 'number' },
+              { key: 'registration_expiry', label: 'Registration expiry', type: 'date' },
+              { key: 'last_maintenance_date', label: 'Last maintenance date', type: 'date' },
+              { key: 'service_interval_km', label: 'Service interval (km)', placeholder: 'e.g. 10000', type: 'number' },
+              { key: 'last_service_mileage', label: 'Last service odometer (km)', placeholder: 'e.g. 145000', type: 'number' },
             ].map(f => (
-              <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+              <div key={f.key} className="fd-field">
+                <label className="fd-label" htmlFor={`fd-edit-${f.key}`}>{f.label}</label>
                 <input
+                  id={`fd-edit-${f.key}`}
+                  className="fd-input"
                   type={f.type || 'text'}
                   placeholder={f.placeholder}
                   value={editForm[f.key] ?? ''}
                   onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
                 />
               </div>
             ))}
             {[
-              { key: 'type', label: 'Vehicle Type', options: vehicleTypeNames.length > 0 ? vehicleTypeNames : ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck', 'Tautliner', 'Box Truck'] },
-              { key: 'fuel_type', label: 'Fuel Type', options: ['Diesel', 'Petrol', 'Electric', 'Hybrid'] },
+              { key: 'type', label: 'Vehicle type', options: vehicleTypeNames.length > 0 ? vehicleTypeNames : ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck', 'Tautliner', 'Box Truck'] },
+              { key: 'fuel_type', label: 'Fuel type', options: ['Diesel', 'Petrol', 'Electric', 'Hybrid'] },
               { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE', 'OUT_OF_SERVICE'] },
             ].map(f => (
-              <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+              <div key={f.key} className="fd-field">
+                <label className="fd-label">{f.label}</label>
                 <Select
                   value={editForm[f.key] ?? ''}
                   onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}
@@ -449,26 +455,26 @@ export default function VehicleFinancialProfile() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {f.options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                    {f.options.map(o => <SelectItem key={o} value={o}>{f.key === 'status' ? formatStatus(o) : o}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             ))}
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Driver</label>
+            <div className="fd-field">
+              <label className="fd-label">Assigned driver</label>
               <Select
                 value={String(editForm.driver ?? '')}
                 onValueChange={val => setEditForm((prev: any) => ({ ...prev, driver: val }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="— No driver assigned —" />
+                  <SelectValue placeholder="No driver assigned" />
                 </SelectTrigger>
                 <SelectContent>
                   {driversList.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+            <div className="fd-drawer__actions">
               <button
                 disabled={saving}
                 onClick={async () => {
@@ -496,13 +502,14 @@ export default function VehicleFinancialProfile() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
+                className="btn-action"
+                style={{ flex: 1, cursor: saving ? 'wait' : 'pointer' }}
               >
                 {saving ? 'Saving…' : 'Update vehicle'}
               </button>
               <button
                 onClick={() => setShowEditForm(false)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+                className="fd-button"
               >
                 Cancel
               </button>

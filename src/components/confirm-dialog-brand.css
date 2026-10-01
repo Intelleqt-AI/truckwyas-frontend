@@ -1,0 +1,29 @@
+/* Shared confirmation presentation (design principles v2: 16px dialog radius,
+   24px padding, one border and no shadow, 40px sans controls). Geometry lives
+   inline in ConfirmModal.tsx; this file holds the theme-dependent danger
+   colours, hover tints and focus rings. Action handlers are unchanged. */
+.dashboard-confirm-dialog {
+  --confirm-danger-surface: #321919;
+  --confirm-danger-text: #FCA5A5;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  font: 400 14px/20px var(--font-sans);
+}
+[data-theme="light"] .dashboard-confirm-dialog {
+  --confirm-danger-surface: #FEF2F2;
+  --confirm-danger-text: #B91C1C;
+}
+.dashboard-confirm-message { overflow-wrap: anywhere; }
+.dashboard-confirm-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  text-transform: none; letter-spacing: normal;
+  transition: background-color 0.15s, opacity 0.15s;
+}
+.dashboard-confirm-button:not(.dashboard-confirm-primary):hover { background: var(--surface-tint-hover) !important; }
+.dashboard-confirm-primary:hover { opacity: 0.9; }
+.dashboard-confirm-button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+/* Touch and phones (R7): both actions are 44px targets. The height is a
+   variable because the geometry is inline in ConfirmModal.tsx. */
+@media (max-width: 767px), (pointer: coarse) {
+  .dashboard-confirm-dialog { --confirm-btn-h: 44px; }
+}

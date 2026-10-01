@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import { fetchData } from '@/lib/Api';
+import { invalidateAllTopics, invalidateTopics, setLiveConnected } from '@/lib/liveData';
 
 /**
  * Global real-time event client. Mounted once (in OSLayout) for authenticated
@@ -35,6 +37,8 @@ function currentUserId(): string | null {
   }
 }
 
+const BURST_WINDOW_MS = 8000;
+
 const EVENT_TITLES: Record<string, string> = {
   // Bookings / Loads
   'booking.created':    'New booking',
@@ -66,8 +70,14 @@ const EVENT_TITLES: Record<string, string> = {
 };
 
 export function LiveEvents() {
+  const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
+  // data.changed topics collected over a short window: a burst of saves (an
+  // import, a batch) refreshes each affected cache once, not once per row.
+  const pendingTopicsRef = useRef<Set<string>>(new Set());
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryRef = useRef(0);
+  const burstRef = useRef<Record<string, { id: string; count: number; at: number }>>({});
   // The user's push preferences: toasts for a category the user disabled are
   // suppressed (the event still refreshes screens via tw:live-event, and the
   // bell keeps the full history). Null until loaded — show everything.
@@ -111,6 +121,9 @@ export function LiveEvents() {
         // right after a real gap, not on a fixed schedule.
         if (retryRef.current > 0) {
           window.dispatchEvent(new CustomEvent('tw:live-reconnected'));
+          // Changes pushed while the socket was down were missed: refresh
+          // everything once, then live updates take over again.
+          invalidateAllTopics(queryClient);
         }
         retryRef.current = 0;
       };
@@ -118,7 +131,25 @@ export function LiveEvents() {
       ws.onmessage = (e) => {
         let msg: any;
         try { msg = JSON.parse(e.data); } catch { return; }
-        if (!msg || msg.type === 'connected' || msg.type === 'pong') return;
+        if (!msg || msg.type === 'pong') return;
+        // The server joined us to the company group: live updates are on, so
+        // screens stop polling (useAutoRefresh).
+        if (msg.type === 'connected') { setLiveConnected(true); return; }
+        // A record changed (any save or delete, by anyone in the company):
+        // refresh only the data it feeds. No toast, and not a tw:live-event,
+        // so the bell and other notification listeners aren't woken by it.
+        if (msg.type === 'event' && msg.event === 'data.changed') {
+          (msg.data?.topics || []).forEach((t: string) => pendingTopicsRef.current.add(t));
+          if (!flushTimerRef.current) {
+            flushTimerRef.current = setTimeout(() => {
+              flushTimerRef.current = null;
+              const topics = pendingTopicsRef.current;
+              pendingTopicsRef.current = new Set();
+              invalidateTopics(queryClient, topics);
+            }, 250);
+          }
+          return;
+        }
         if (msg.type === 'event') {
           window.dispatchEvent(new CustomEvent('tw:live-event', { detail: msg }));
           // The push goes to every connected browser in the company, including
@@ -134,19 +165,30 @@ export function LiveEvents() {
           const mutedByPrefs = !!category && !!prefs && prefs[category] === false;
           if (msg.message && !isOwnAction && !mutedByPrefs) {
             const label = EVENT_TITLES[msg.event] || 'Update';
-            const text = label === msg.message ? label : `${label} — ${msg.message}`;
+            // The message already says what happened; the label is only a fallback.
+            const single = String(msg.message || label);
             const ntype = (msg.data?.type || '').toLowerCase();
-            // event_id (uuid per event) as toastId dedupes replayed frames.
-            const opts = msg.data?.event_id ? { toastId: msg.data.event_id } : undefined;
-            if (ntype === 'success') toast.success(text, opts);
-            else if (ntype === 'alert') toast.error(text, opts);
-            else toast.info(text, opts);
+            // Bursts of the same event collapse into one counted toast instead of a stack.
+            const now = Date.now();
+            const burst = burstRef.current[msg.event];
+            if (burst && now - burst.at < BURST_WINDOW_MS && toast.isActive(burst.id)) {
+              burst.count += 1;
+              burst.at = now;
+              toast.update(burst.id, { render: `${label} (${burst.count})` });
+            } else {
+              const id = String(msg.data?.event_id || `${msg.event}-${now}`);
+              burstRef.current[msg.event] = { id, count: 1, at: now };
+              if (ntype === 'success') toast.success(single, { toastId: id });
+              else if (ntype === 'alert') toast.error(single, { toastId: id });
+              else toast.info(single, { toastId: id });
+            }
           }
         }
       };
 
       ws.onclose = () => {
         wsRef.current = null;
+        setLiveConnected(false);
         if (stopped) return;
         const delay = Math.min(30000, 1000 * 2 ** retryRef.current);
         retryRef.current += 1;
@@ -162,8 +204,10 @@ export function LiveEvents() {
       stopped = true;
       try { wsRef.current?.close(); } catch { /* noop */ }
       wsRef.current = null;
+      setLiveConnected(false);
+      if (flushTimerRef.current) { clearTimeout(flushTimerRef.current); flushTimerRef.current = null; }
     };
-  }, []);
+  }, [queryClient]);
 
   return null;
 }

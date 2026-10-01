@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { fetchData, patchData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -37,31 +38,34 @@ interface Props {
 // forms must stay in lockstep, so this mirrors it deliberately rather than
 // each page keeping its own copy that can quietly drift.
 const TEXT_FIELDS = [
-  { key: 'vin', label: 'VIN Number', placeholder: 'e.g. WDB9634031L123456', required: true },
+  { key: 'vin', label: 'VIN number', placeholder: 'e.g. WDB9634031L123456', required: true },
   { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz', required: true },
   { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645', required: true },
   { key: 'year', label: 'Year', placeholder: '2024', type: 'number', required: true },
-  { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB', required: true },
+  { key: 'plate', label: 'Registration plate', placeholder: 'e.g. GP 567 ZAB', required: true },
   { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
-  { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
-  { key: 'last_maintenance_date', label: 'Last Maintenance Date', type: 'date' },
-  { key: 'service_interval_km', label: 'Service Interval (km)', placeholder: 'e.g. 10000', type: 'number' },
-  { key: 'last_service_mileage', label: 'Last Service Odometer (km)', placeholder: 'e.g. 145000', type: 'number' },
+  { key: 'registration_expiry', label: 'Registration expiry', type: 'date' },
+  { key: 'last_maintenance_date', label: 'Last maintenance date', type: 'date' },
+  { key: 'service_interval_km', label: 'Service interval (km)', placeholder: 'e.g. 10000', type: 'number' },
+  { key: 'last_service_mileage', label: 'Last service odometer (km)', placeholder: 'e.g. 145000', type: 'number' },
 ];
 
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)',
-  color: 'var(--text-tertiary)', letterSpacing: '0.06em',
-  marginBottom: 6, textTransform: 'uppercase',
+  display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)',
+  letterSpacing: 'normal', marginBottom: 6,
 };
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2,
-  fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box',
+  color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 'var(--radius-control)',
+  fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box',
 };
 
 export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) {
+  // Modal drawer: focus moves in, Tab stays inside, focus returns to the trigger on close.
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef, open);
   const [form, setForm] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -161,17 +165,20 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
 
   if (!open || !vehicle) return null;
 
+  // Kept as {name, capacity} rather than collapsed to plain name strings —
+  // the dropdown shows capacity alongside the name (matches AddVehicleDrawer)
+  // while the SELECT VALUE stays the bare name for handleTypeChange's lookup.
   const typeOptions = vehicleTypes.length > 0
-    ? vehicleTypes.map(vt => vt.name)
-    : ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck', 'Tautliner', 'Box Truck'];
+    ? vehicleTypes
+    : ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck', 'Tautliner', 'Box Truck'].map(name => ({ id: 0, name, capacity: undefined as number | string | undefined }));
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={onClose} />
-      <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Edit vehicle" style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 24, overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Vehicle</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+          <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit vehicle</h2>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-control)', margin: '-13px -13px 0 0' }}>✕</button>
         </div>
 
         {submitError && (
@@ -179,14 +186,14 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
             marginBottom: 20, padding: '12px 14px',
             background: 'var(--status-danger-bg, #fef2f2)',
             border: '1px solid var(--status-danger, #dc2626)',
-            borderRadius: 4, display: 'flex', alignItems: 'flex-start', gap: 10,
+            borderRadius: 'var(--radius-nested)', display: 'flex', alignItems: 'flex-start', gap: 10,
           }}>
-            <span style={{ color: 'var(--status-danger, #dc2626)', fontWeight: 700, fontSize: 15, lineHeight: 1 }}>!</span>
+            <span style={{ color: 'var(--status-danger, #dc2626)', fontWeight: 600, fontSize: 15, lineHeight: 1 }}>!</span>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-danger, #dc2626)', marginBottom: 2 }}>
+              <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 2 }}>
                 Failed to update vehicle
               </div>
-              <div style={{ fontSize: 12, color: 'var(--status-danger, #dc2626)', opacity: 0.85 }}>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
                 {submitError}
               </div>
             </div>
@@ -199,7 +206,7 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
         {TEXT_FIELDS.filter(f => f.required).map(f => (
           <div key={f.key} style={{ marginBottom: 16 }}>
             <label style={labelStyle}>
-              {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+              {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
             </label>
             <input
               type={f.type || 'text'}
@@ -213,19 +220,24 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
 
         <div style={{ marginBottom: 16 }}>
           <label style={labelStyle}>
-            Vehicle Type<span style={{ color: 'var(--status-danger)' }}> *</span>
+            Vehicle type<span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>
           </label>
           <Select value={form.type ?? ''} onValueChange={handleTypeChange}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {typeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              {typeOptions.map(o => (
+                <SelectItem key={o.name} value={o.name}>
+                  {o.name}
+                  {o.capacity != null && <span style={{ color: 'var(--text-tertiary)' }}> · {o.capacity}t</span>}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
         <div style={{ marginBottom: 16 }}>
           <label style={labelStyle}>
-            Capacity (ton)<span style={{ color: 'var(--status-danger)' }}> *</span>
+            Capacity (ton)<span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>
           </label>
           <input
             type="number"
@@ -240,7 +252,7 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
           <div key={f.key} style={{ marginBottom: 16 }}>
             <label style={labelStyle}>{f.label}</label>
             {f.type === 'date' ? (
-              <DatePicker
+              <DatePicker dashboard
                 value={form[f.key] ?? ''}
                 onChange={val => set(f.key, val)}
               />
@@ -264,44 +276,44 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
             <Select value={form[f.key] ?? ''} onValueChange={val => set(f.key, val)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {f.options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                {f.options.map(o => <SelectItem key={o} value={o}>{o.charAt(0) + o.slice(1).toLowerCase().replace(/_/g, ' ')}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
         ))}
 
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Assigned Driver</label>
+          <label style={labelStyle}>Assigned driver</label>
           <Select value={form.driver ?? ''} onValueChange={val => set('driver', val)}>
-            <SelectTrigger><SelectValue placeholder="— No driver assigned —" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="No driver assigned" /></SelectTrigger>
             <SelectContent>
               {drivers.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
             </SelectContent>
           </Select>
           {vehicle.cartrack_current_driver_ref && (
-            <div style={{ marginTop: 6, fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-              Cartrack reports: {vehicle.cartrack_current_driver_ref} (informational only — doesn't change the assignment above)
+            <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)' }}>
+              Cartrack reports: {vehicle.cartrack_current_driver_ref} (for information only, it doesn't change the assignment above)
             </div>
           )}
         </div>
 
-        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
           * Required.
         </div>
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+        <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
           <button
             disabled={saving || !canSave}
             onClick={handleSave}
-            style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : canSave ? 'pointer' : 'not-allowed', fontWeight: 600, opacity: canSave ? 1 : 0.5 }}
+            style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control)', cursor: saving ? 'wait' : canSave ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canSave ? 1 : 0.5 }}
           >
-            {saving ? 'SAVING...' : 'UPDATE VEHICLE'}
+            {saving ? 'Saving…' : 'Update vehicle'}
           </button>
           <button
             onClick={onClose}
-            style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+            style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-control)', cursor: 'pointer' }}
           >
-            CANCEL
+            Cancel
           </button>
         </div>
       </div>

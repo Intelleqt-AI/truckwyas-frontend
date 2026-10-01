@@ -1,9 +1,17 @@
+import './customers-directory-controls.css';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import '@/pages/settings/settings-brand.css';
 import { useState, useEffect } from "react";
 import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
+import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
+import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
+import RowActions from "@/components/ui/RowActions";
+import { settingsCardStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, SettingsPageHeader } from "./settingsUi";
+import { StatusChip } from '@/components/ui/StatusChip';
 
 interface Customer {
   id: number;
@@ -18,29 +26,18 @@ interface Customer {
   status: string;
 }
 
+const STATUS_LABEL: Record<string, string> = { ACTIVE: 'Active', INACTIVE: 'Inactive', PENDING: 'Pending' };
+
 const STATUS_COLOR: Record<string, string> = {
   ACTIVE: 'var(--accent-primary)',
-  INACTIVE: 'var(--status-danger)',
-  PENDING: 'var(--status-warning)',
+  INACTIVE: 'var(--status-danger-text)',
+  PENDING: 'var(--status-warning-text)',
 };
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 'var(--card-radius)',
-};
+const sectionStyle: React.CSSProperties = { ...settingsCardStyle, marginBottom: 0 };
 
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)',
-  color: 'var(--text-tertiary)', letterSpacing: '0.06em',
-  marginBottom: 6, textTransform: 'uppercase',
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2,
-  fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box',
-};
+const labelStyle = settingsLabelStyle;
+const inputStyle = settingsInputStyle;
 
 export function CustomersDirectory() {
   const { user: authUser } = useAuth();
@@ -51,6 +48,10 @@ export function CustomersDirectory() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
+  const toggleOne = (id: number, on: boolean) =>
+    setSelected(prev => (on ? [...prev, id] : prev.filter(x => x !== id)));
   const [saving, setSaving] = useState(false);
   const [addErr, setAddErr] = useState('');
   const [form, setForm] = useState({ name: '', email: '', phone: '', city: '' });
@@ -142,47 +143,48 @@ export function CustomersDirectory() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Customers</div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Your customer directory</div>
-      </div>
+    <div className="customer-directory-controls settings-wide" style={{ minWidth: 0 }}>
+      <SettingsPageHeader title="Customers" description="Your customer directory" />
 
       <div style={sectionStyle}>
         <div style={{
-          padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '12px var(--card-pad, 20px)', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)',
+          display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-secondary)', fontWeight: 600 }}>
-            Customers ({customers.length})
-          </span>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <h2 style={settingsCardTitleStyle}>
+            Customers <span style={{ fontWeight: 400, color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>({customers.length})</span>
+          </h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', minWidth: 0, gap: 12 }}>
             <input
+              className="settings-control"
+              aria-label="Search customers"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search..."
-              style={{
-                background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                borderRadius: 2, padding: '6px 10px', color: 'var(--text-primary)',
-                fontSize: 12, outline: 'none', width: 180,
-              }}
+              placeholder="Search…"
+              style={{ ...settingsInputStyle, width: 180, maxWidth: '100%' }}
             />
+            <button
+              onClick={() => setShowImport(true)}
+              disabled={isDemo}
+              title={isDemo ? 'Not available in the demo' : 'Paste or upload a list'}
+              style={{ ...secondaryButtonStyle, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', textTransform: 'none', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+            >Import</button>
             <button
               className="btn-action"
               onClick={() => { setShowAdd(s => !s); setAddErr(''); }}
               disabled={isDemo && !showAdd}
               title={isDemo && !showAdd ? 'Not available in the demo' : undefined}
-              style={isDemo && !showAdd ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              style={{ fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', ...(isDemo && !showAdd ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
             >
-              {showAdd ? 'CLOSE' : '+ ADD CUSTOMER'}
+              {showAdd ? 'Close' : '+ Add customer'}
             </button>
           </div>
         </div>
 
         {/* Add form */}
         {showAdd && (
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-deep)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 12 }}>
+          <div style={{ padding: '16px var(--card-pad, 20px)', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-deep)' }}>
+            <div className="customer-directory-add-grid" style={{ display: 'grid', gap: 12, marginBottom: 12 }}>
               {([
                 { k: 'name', ph: 'Name *' },
                 { k: 'email', ph: 'Email *' },
@@ -191,109 +193,102 @@ export function CustomersDirectory() {
               ] as const).map(f => (
                 <input
                   key={f.k}
+                  className="settings-control"
+                  aria-label={f.ph.replace(' *', ' (required)')}
                   value={(form as any)[f.k]}
                   onChange={e => setForm(prev => ({ ...prev, [f.k]: e.target.value }))}
                   placeholder={f.ph}
-                  style={{
-                    background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                    borderRadius: 2, padding: '8px 10px', color: 'var(--text-primary)',
-                    fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box',
-                  }}
+                  style={settingsInputStyle}
                 />
               ))}
             </div>
-            {addErr && <div style={{ color: 'var(--status-danger)', fontSize: 12, marginBottom: 10 }}>{addErr}</div>}
+            {addErr && <div role="alert" style={{ color: 'var(--status-danger-text)', fontSize: 13, lineHeight: '20px', marginBottom: 12 }}>{addErr}</div>}
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button
-                className="btn-action"
+                className="btn-action settings-control"
                 onClick={handleAdd}
                 disabled={saving || isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
-                style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                style={{ fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
               >
-                {saving ? 'SAVING...' : 'SAVE CUSTOMER'}
+                {saving ? 'Saving…' : 'Save customer'}
               </button>
             </div>
           </div>
         )}
 
+        <BulkDeleteBar
+          entity="customers"
+          selected={selected}
+          onClear={() => setSelected([])}
+          onDeleted={() => { setSelected([]); load(); }}
+        />
+
         {/* Table */}
         {loading ? (
-          <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
+          <TableSkeleton rows={6} cols={4} label="Loading customers" />
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+          <div className="settings-scroll-region" role="region" aria-label="Customer directory table" tabIndex={0} style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'auto' }}>
+          <table className="table-heading-roles settings-table settings-table--pin-actions" style={{ minWidth: 830, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
             <thead>
               <tr>
-                {['Customer', 'Contact', 'City', 'Payment Terms', 'Status', ''].map(h => (
-                  <th key={h} style={{
-                    padding: '10px 20px', textAlign: 'left' as const,
-                    fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                    letterSpacing: '0.08em', color: 'var(--text-tertiary)',
-                    borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
-                  }}>{h}</th>
+                <th style={{ width: 32, fontSize: 13, lineHeight: '20px', fontWeight: 500, }}>
+                  {filtered.length > 0 && (
+                    <RowCheckbox
+                      title="Select everything shown"
+                      checked={selected.length > 0 && filtered.every((c: any) => selected.includes(c.id))}
+                      onChange={on => setSelected(on ? filtered.map((c: any) => c.id) : [])}
+                    />
+                  )}
+                </th>
+                {['Customer', 'Contact', 'City', 'Payment terms', 'Status', 'Actions'].map(h => (
+                  <th key={h || 'actions'} scope="col" style={{ textAlign: (h === 'Actions') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center' as const, padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No customers found</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center' as const, padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No customers found</td></tr>
               ) : filtered.map((c, i) => (
                 <tr key={c.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                  <td style={{ padding: '12px 20px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 1 }}>{c.name}</div>
-                    {c.company_name && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{c.company_name}</div>}
+                  <td style={{ width: 32 }}>
+                    <RowCheckbox checked={selected.includes(c.id)} onChange={on => toggleOne(c.id, on)} />
                   </td>
-                  <td style={{ padding: '12px 20px' }}>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 1 }}>{c.email}</div>
-                    {c.phone && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{c.phone}</div>}
+                  <td>
+                    <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>{c.name}</div>
+                    {c.company_name && <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{c.company_name}</div>}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>{c.city || '—'}</td>
-                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
+                  <td>
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 1 }}>{c.email}</div>
+                    {c.phone && <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{c.phone}</div>}
+                  </td>
+                  <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{c.city || '—'}</td>
+                  <td style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-secondary)' }}>
                     {c.payment_terms || '30 days'}
                   </td>
-                  <td style={{ padding: '12px 20px' }}>
-                    <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 10,
-                      color: STATUS_COLOR[c.status] || 'var(--text-tertiary)',
-                      textTransform: 'uppercase' as const,
-                    }}>{c.status}</span>
+                  <td>
+                    <StatusChip status={c.status} label={Object.prototype.hasOwnProperty.call(STATUS_LABEL, c.status) ? STATUS_LABEL[c.status] : undefined} size="sm" />
                   </td>
-                  <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button
-                        onClick={() => openEdit(c)}
-                        disabled={isDemo}
-                        title={isDemo ? 'Not available in the demo' : undefined}
-                        style={{
-                          background: 'none', border: '1px solid var(--border-subtle)',
-                          color: 'var(--text-secondary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
-                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
-                        }}
-                      >EDIT</button>
-                      <button
-                        onClick={() => setDeleteTarget({ id: c.id, name: c.name })}
-                        disabled={isDemo}
-                        title={isDemo ? 'Not available in the demo' : undefined}
-                        style={{
-                          background: 'none', border: '1px solid var(--status-danger)',
-                          color: 'var(--status-danger)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
-                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
-                        }}
-                      >DELETE</button>
-                    </div>
+                  <td style={{ textAlign: 'right' as const }}>
+                    <RowActions
+                      label={c.name}
+                      items={[
+                        { label: 'Edit', onSelect: () => openEdit(c), disabled: isDemo },
+                        { label: 'Delete', danger: true, onSelect: () => setDeleteTarget({ id: c.id, name: c.name }), disabled: isDemo },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
       {deleteTarget && (
         <ConfirmModal
-          title="Delete Customer"
+          title="Delete customer"
           message={`Are you sure you want to delete "${deleteTarget.name}"? This cannot be undone.`}
           confirmLabel="Delete"
           danger
@@ -306,13 +301,13 @@ export function CustomersDirectory() {
       {editCustomer && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditCustomer(null)} />
-          <div style={{ position: 'relative', width: 420, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+          <div style={{ position: 'relative', width: 'min(420px, 100vw)', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 'var(--card-pad, 20px)', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Customer</div>
-              <button onClick={() => setEditCustomer(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+              <h2 style={{ ...settingsCardTitleStyle }}>Edit customer</h2>
+              <button type="button" className="settings-control" aria-label="Close" onClick={() => setEditCustomer(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 18, lineHeight: 1, width: 40, height: 40, borderRadius: 'var(--radius-control)' }}>✕</button>
             </div>
             {editErr && (
-              <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
+              <div role="alert" style={{ padding: '8px 12px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
                 {editErr}
               </div>
             )}
@@ -323,8 +318,10 @@ export function CustomersDirectory() {
               { key: 'city', label: 'City' },
             ] as const).map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>{f.label}</label>
+                <label htmlFor={`customer-edit-${f.key}`} style={labelStyle}>{f.label}</label>
                 <input
+                  id={`customer-edit-${f.key}`}
+                  className="settings-control"
                   value={editForm[f.key]}
                   onChange={e => setEditForm(prev => ({ ...prev, [f.key]: e.target.value }))}
                   style={inputStyle}
@@ -332,33 +329,42 @@ export function CustomersDirectory() {
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Status</label>
+              <label htmlFor="customer-edit-status" style={labelStyle}>Status</label>
               <Select value={editForm.status} onValueChange={val => setEditForm(prev => ({ ...prev, status: val }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="customer-edit-status" style={inputStyle}><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {['ACTIVE', 'INACTIVE', 'PENDING'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {['ACTIVE', 'INACTIVE', 'PENDING'].map(s => <SelectItem key={s} value={s}>{STATUS_LABEL[s] || s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 24 }}>
               <button
                 disabled={editSaving || isDemo}
                 onClick={handleEditSave}
                 title={isDemo ? 'Not available in the demo' : undefined}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: isDemo ? 'not-allowed' : editSaving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase', opacity: isDemo ? 0.5 : 1 }}
+                className="settings-control"
+                style={{ flex: '1 1 140px', minHeight: 40, padding: '8px 16px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: 'var(--radius-control)', cursor: isDemo ? 'not-allowed' : editSaving ? 'wait' : 'pointer', fontWeight: 500, textTransform: 'none', opacity: isDemo ? 0.5 : 1 }}
               >
-                {editSaving ? 'SAVING...' : 'SAVE CHANGES'}
+                {editSaving ? 'Saving…' : 'Save changes'}
               </button>
               <button
+                className="settings-control"
                 onClick={() => setEditCustomer(null)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase' }}
+                style={{ minHeight: 40, padding: '8px 16px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-control)', cursor: 'pointer', textTransform: 'none' }}
               >
-                CANCEL
+                Cancel
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <PasteImportDrawer
+        entity="customers"
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={() => load()}
+      />
     </div>
   );
 }

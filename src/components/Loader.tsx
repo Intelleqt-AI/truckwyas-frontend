@@ -31,7 +31,7 @@ export function Loader({ size = 40, color = 'var(--accent-primary)', label, full
         />
       </svg>
       {label && (
-        <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{label}</div>
+        <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)' }}>{label}</div>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
 interface Props {
   quoteNumber?: string;
@@ -24,7 +25,7 @@ interface VehicleOption {
 
 const overlayStyle: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 2000,
-  background: 'rgba(0,0,0,0.65)',
+  background: 'var(--modal-backdrop, rgba(0,0,0,0.65))',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   padding: 24,
 };
@@ -32,40 +33,44 @@ const overlayStyle: React.CSSProperties = {
 const boxStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
   border: '1px solid var(--border-subtle)',
-  borderRadius: 4,
-  padding: 28,
+  borderRadius: 'var(--radius-dialog)',
+  padding: 24,
   maxWidth: 420,
+  fontFamily: 'var(--font-sans)',
   width: '100%',
-  boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
 };
 
-const titleStyle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 };
-const messageStyle: React.CSSProperties = { fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 };
+const titleStyle: React.CSSProperties = { margin: 0, fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 };
+const messageStyle: React.CSSProperties = { fontSize: 14, color: 'var(--text-secondary)', lineHeight: '20px', marginBottom: 16 };
 
 const cancelBtnStyle: React.CSSProperties = {
-  padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-secondary)', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)',
-  letterSpacing: '0.06em', cursor: 'pointer',
+  padding: '8px 16px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)',
+  color: 'var(--text-secondary)', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
+  fontWeight: 500, letterSpacing: 'normal', cursor: 'pointer',
 };
 
 const selectStyle: React.CSSProperties = {
   width: '100%',
   background: 'var(--input-bg, var(--bg-surface))',
   border: '1px solid var(--border-subtle)',
-  borderRadius: 4,
-  padding: '9px 11px',
+  borderRadius: 'var(--radius-control)',
+  padding: '8px 12px',
+  minHeight: 40,
   color: 'var(--text-primary)',
-  fontSize: 13,
+  fontSize: 14,
+  lineHeight: '20px',
+  fontFamily: 'var(--font-sans)',
   outline: 'none',
 };
 
 const fieldLabelStyle: React.CSSProperties = {
-  fontSize: 11,
-  fontFamily: 'var(--font-mono)',
-  color: 'var(--text-tertiary)',
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
-  marginBottom: 5,
+  display: 'block',
+  fontSize: 13,
+  lineHeight: '20px',
+  fontWeight: 500,
+  fontFamily: 'var(--font-sans)',
+  color: 'var(--text-secondary)',
+  marginBottom: 6,
 };
 
 // One confirmation modal. The driver/vehicle fields stay collapsed behind a
@@ -74,6 +79,7 @@ const fieldLabelStyle: React.CSSProperties = {
 // and leaves the booking unassigned (pick it up later from Bookings); a
 // vehicle picked (driver optional) converts pre-assigned.
 export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfirm, onCancel }: Props) {
+  useFocusTrap(latestModal, true);
   const [showAssign, setShowAssign] = useState(false);
   const [driverId, setDriverId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
@@ -107,8 +113,8 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
 
   return (
     <div style={overlayStyle} onClick={onCancel}>
-      <div style={boxStyle} onClick={e => e.stopPropagation()}>
-        <div style={titleStyle}>Convert to Booking</div>
+      <div style={boxStyle} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="convert-booking-title">
+        <h2 id="convert-booking-title" style={titleStyle}>Convert to booking</h2>
         <div style={messageStyle}>
           Convert {quoteNumber ? <b>{quoteNumber}</b> : 'this quote'} to an active booking?
         </div>
@@ -117,15 +123,15 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
           <button
             type="button"
             onClick={() => setShowAssign(true)}
-            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent-primary)', fontSize: 12, fontFamily: 'var(--font-mono)', letterSpacing: '0.03em', cursor: 'pointer', marginBottom: 20 }}
+            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent-primary)', fontSize: 14, lineHeight: '20px', minHeight: 40, fontFamily: 'var(--font-sans)', letterSpacing: 'normal', cursor: 'pointer', marginBottom: 12 }}
           >
             + Assign driver and vehicle
           </button>
         ) : (
           <div style={{ marginBottom: 8 }}>
             <div style={{ marginBottom: 14 }}>
-              <div style={fieldLabelStyle}>Vehicle{vehicleType ? ` (${vehicleType})` : ''}</div>
-              <select value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={selectStyle}>
+              <label htmlFor="convert-vehicle" style={fieldLabelStyle}>Vehicle{vehicleType ? ` (${vehicleType})` : ''}</label>
+              <select id="convert-vehicle" value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={selectStyle}>
                 <option value="">Select vehicle…</option>
                 {vehicles.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -134,17 +140,17 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
                 ))}
               </select>
               {vehicles.length === 0 && (
-                <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 5 }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning-text, var(--status-warning))', marginTop: 6 }}>
                   {vehicleType
-                    ? `No available ${vehicleType} vehicles — check the Fleet page.`
-                    : 'No available vehicles — check the Fleet page.'}
+                    ? `No available ${vehicleType} vehicles. Check the Fleet page.`
+                    : 'No available vehicles. Check the Fleet page.'}
                 </div>
               )}
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <div style={fieldLabelStyle}>Driver (optional)</div>
-              <select value={driverId} onChange={e => setDriverId(e.target.value)} style={selectStyle}>
+              <label htmlFor="convert-driver" style={fieldLabelStyle}>Driver (optional)</label>
+              <select id="convert-driver" value={driverId} onChange={e => setDriverId(e.target.value)} style={selectStyle}>
                 <option value="">Select driver…</option>
                 {drivers.map((d) => (
                   <option key={d.id} value={d.id}>
@@ -153,40 +159,42 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
                 ))}
               </select>
               {drivers.length === 0 && (
-                <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 5 }}>
-                  No available drivers — check the Fleet page.
+                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning-text, var(--status-warning))', marginTop: 6 }}>
+                  No available drivers. Check the Fleet page.
                 </div>
               )}
             </div>
 
             {driverWithoutVehicle && (
-              <div style={{ fontSize: 11, color: 'var(--status-warning)', marginBottom: 12 }}>
-                A driver needs a vehicle — select a vehicle too, or clear the driver.
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning-text, var(--status-warning))', marginBottom: 12 }}>
+                A driver needs a vehicle. Select a vehicle too, or clear the driver.
               </div>
             )}
           </div>
         )}
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
-          <button onClick={onCancel} style={cancelBtnStyle}>CANCEL</button>
+          <button onClick={onCancel} style={cancelBtnStyle}>Cancel</button>
           <button
             onClick={() => canProceed && onConfirm(driverId, vehicleId)}
             disabled={!canProceed}
             style={{
-              padding: '8px 18px',
+              padding: '8px 16px',
+              minHeight: 40,
               background: 'var(--accent-primary)',
               border: 'none',
-              color: '#fff',
-              borderRadius: 2,
-              fontSize: 11,
-              fontFamily: 'var(--font-mono)',
-              fontWeight: 600,
-              letterSpacing: '0.06em',
+              color: 'var(--btn-action-color, #fff)',
+              borderRadius: 'var(--radius-control)',
+              fontSize: 14,
+              lineHeight: '20px',
+              fontFamily: 'var(--font-sans)',
+              fontWeight: 500,
+              letterSpacing: 'normal',
               cursor: canProceed ? 'pointer' : 'not-allowed',
               opacity: canProceed ? 1 : 0.5,
             }}
           >
-            {busy ? 'CONVERTING…' : vehicleId ? 'ASSIGN & CONFIRM' : 'CONFIRM — ASSIGN LATER'}
+            {busy ? 'Converting…' : vehicleId ? 'Assign and confirm' : 'Confirm, assign later'}
           </button>
         </div>
       </div>

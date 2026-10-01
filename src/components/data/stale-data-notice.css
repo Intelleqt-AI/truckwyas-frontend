@@ -1,0 +1,35 @@
+.stale-data-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--status-warning);
+  background: var(--status-warning-bg, var(--bg-surface));
+  color: var(--status-warning-text, var(--status-warning));
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+}
+.stale-data-notice__retry {
+  min-height: 32px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.stale-data-notice__retry:disabled { cursor: progress; opacity: 0.7; text-decoration: none; }
+.stale-data-notice__retry:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* When shown under a section header, keep the standard gap before content. */
+.section-header + .stale-data-notice { margin-bottom: 24px; }

@@ -1,0 +1,55 @@
+/* Local Customers type roles. Existing grid, table scroll and actions retained. */
+.customers-typography .card-title {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.customers-typography .metric-value {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  line-height: 36px;
+}
+.customers-typography .btn-action {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* R3: one money column. The overdue part is a quiet second line only when it says something. */
+.customers-typography .cu-owed__sub { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; }
+.customers-typography .cu-owed { vertical-align: middle; }
+.customers-typography .cu-owed__dot { display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--status-danger-dot); vertical-align: 2px; }
+.customers-typography .cu-owed__head { display: inline-flex; align-items: center; gap: 4px; }
+/* Even rows: every row takes the two-line height, so a partly overdue
+   balance never makes its row taller than the rest. */
+.customers-typography .bk-table.cu-two-line tbody td { height: 52px; }
+.customers-typography .cu-sort-label { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); letter-spacing: 0; }
+/* With Overdue folded into Owed, names get the room back. */
+.customers-typography .bk-table .bk-col-customer { max-width: 34ch; }
+@container (max-width: 520px) { .customers-typography .bk-table .bk-col-customer { max-width: 20ch; } }
+/* Phone: Add customer stays on the title row; Import moves into the head's "⋯" menu (SectionHeader). */
+
+/* R5, phones: the customer name wraps to two lines instead of truncating
+   (it has the room Owed does not need). */
+/* R7, phones: one line per name. The legal suffix folds away (full name in
+   the title); anything still too long ends in an ellipsis, never a wrap
+   mid-name. */
+@container (max-width: 520px) {
+  .customers-typography .bk-table .bk-col-customer.is-truncate { max-width: none; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .customers-typography .bk-table .cu-suffix { display: none; }
+  .customers-typography .bk-table .cu-owed { padding-left: 8px; }
+}
+
+/* R7 touch: the Owed header tip's 44px target fits inside the 44px head row
+   (the table card clips anything taller) and sits above the pinned actions
+   column, which overlaps its right edge. */
+@media (pointer: coarse) {
+  .customers-typography .cu-owed__head .tw-info::after { inset: -12px; }
+  .customers-typography .cu-owed__head .tw-info { position: relative; z-index: 2; }
+}

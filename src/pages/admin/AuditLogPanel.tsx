@@ -1,3 +1,7 @@
+import '@/pages/table-heading-roles.css';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import { formatDateTime } from '@/lib/formatters';
+import '@/pages/admin/admin-brand.css';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
@@ -10,22 +14,22 @@ import PaginationControls from '@/pages/admin/PaginationControls';
 
 const PAGE_SIZE = 20;
 
-const cardStyle: React.CSSProperties = { padding: 20 };
-const sectionTitleStyle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 };
+const cardStyle: React.CSSProperties = { padding: 'var(--card-pad, 20px)' };
+const sectionTitleStyle: React.CSSProperties = {
+  fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16,
+};
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', width: 260,
+  padding: '8px 12px', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  fontFamily: 'var(--font-sans)', minHeight: 40, width: 260,
 };
-const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '8px 12px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-subtle)',
-};
+const thStyle: React.CSSProperties = { textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
-  padding: '10px 12px', fontSize: 12.5, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 
 const fmt = (dateStr?: string | null) =>
-  dateStr ? new Date(dateStr).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  dateStr ? formatDateTime(dateStr) : 'Never';
 
 interface AuditLogRow {
   id: string | number;
@@ -79,20 +83,22 @@ export default function AuditLogPanel() {
 
   return (
     <div className="card" style={cardStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ ...sectionTitleStyle, marginBottom: 0 }}>Audit Log {data ? `(${data.count})` : ''}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Audit log {data ? `(${data.count})` : ''}</h2>
         <input
+          className="admin-control"
           style={inputStyle}
+          aria-label="Search audit log"
           placeholder="Search actor, action, resource…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
       </div>
       {isLoading ? (
-        <Loader size={24} />
+        <TableSkeleton rows={8} cols={4} label="Loading audit log" />
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="admin-scroll-region" role="region" aria-label="Audit log" tabIndex={0} style={{ overflowX: 'auto' }}>
+          <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thStyle}>When</th>
@@ -107,12 +113,12 @@ export default function AuditLogPanel() {
                 <tr key={row.id}>
                   <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmt(row.created_at)}</td>
                   <td style={tdStyle}>{row.actor || <span style={{ color: 'var(--text-tertiary)' }}>system</span>}</td>
-                  <td style={tdStyle}>{row.action}</td>
-                  <td style={tdStyle}>
+                  <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>{row.action}</td>
+                  <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-mono)' }}>
                     {row.resource_type}
                     {row.resource_id != null && <span style={{ color: 'var(--text-tertiary)' }}> #{row.resource_id}</span>}
                   </td>
-                  <td style={{ ...tdStyle, fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', maxWidth: 360 }}>
+                  <td style={{ ...tdStyle, fontSize: 13, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', maxWidth: 360 }}>
                     {formatDetails(row.details)}
                   </td>
                 </tr>

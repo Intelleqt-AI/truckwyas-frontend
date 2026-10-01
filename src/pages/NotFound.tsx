@@ -17,7 +17,7 @@ const NotFound = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-dashboard">
       <div className="text-center max-w-md mx-auto p-6">
         <div className="mb-8">
-          <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
+          <h1 className="text-6xl font-semibold text-primary mb-4">404</h1>
           <h2 className="text-2xl font-semibold text-foreground mb-2">Page Not Found</h2>
           <p className="text-muted-foreground">
             Sorry, the page you're looking for doesn't exist in the Truckwys platform.

@@ -1,0 +1,27 @@
+/* Explicit detail-page header roles; desktop dashboard only. */
+@media (min-width: 768px) {
+  .os-app-shell .dashboard-detail-heading {
+    --detail-heading-size: 22px;
+    --detail-heading-weight: 600;
+    --detail-heading-font: var(--font-sans);
+    --detail-heading-line: 28px;
+    --detail-heading-tracking: normal;
+    --detail-heading-case: none;
+    font: 600 22px/28px var(--font-sans);
+    letter-spacing: normal;
+    text-transform: none;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .os-app-shell .dashboard-detail-eyebrow {
+    --detail-eyebrow-size: 13px;
+    --detail-eyebrow-weight: 400;
+    --detail-eyebrow-font: var(--font-sans);
+    --detail-eyebrow-line: 20px;
+    --detail-eyebrow-tracking: normal;
+    --detail-eyebrow-case: none;
+    font: 400 13px/20px var(--font-sans);
+    letter-spacing: normal;
+    text-transform: none;
+  }
+}

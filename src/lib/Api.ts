@@ -80,9 +80,15 @@ api.interceptors.response.use(
 
 const handleError = (error: any) => { throw error; };
 
+// Page data never waits forever: a hung GET used to leave a screen "loading"
+// with no error and every later refresh queued behind it. 45s still covers a
+// server cold start (~20-30s); the request then fails and the page's normal
+// retry / "Couldn't refresh" handling takes over.
+const GET_TIMEOUT_MS = 45_000;
+
 export const fetchData = async (url: string) => {
   if (!url) throw new Error('No URL provided');
-  const response = await api.get(url);
+  const response = await api.get(url, { timeout: GET_TIMEOUT_MS });
   return response.data;
 };
 

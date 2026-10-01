@@ -5,24 +5,25 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:[outline:2px_solid_var(--accent-primary)] focus-visible:[outline-offset:3px] disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        // Theme tokens only (the shadcn HSL variables are not defined in this app).
+        default: "border-0 bg-[var(--btn-primary-bg)] text-[color:var(--btn-primary-fg)] hover:bg-[var(--btn-primary-hover)] active:bg-[var(--btn-primary-pressed)] disabled:bg-[var(--btn-disabled-bg)] disabled:text-[color:var(--btn-disabled-fg)]",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+          "border-0 bg-[var(--btn-danger-bg)] text-[color:var(--btn-danger-fg)] hover:bg-[var(--btn-danger-hover)] disabled:bg-[var(--btn-disabled-bg)] disabled:text-[color:var(--btn-disabled-fg)]",
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          "border border-[color:var(--border-default)] bg-transparent text-[color:var(--text-primary)] hover:bg-[var(--surface-tint-hover)] hover:border-[color:var(--border-strong)] disabled:text-[color:var(--text-disabled)]",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+          "border border-[color:var(--border-default)] bg-transparent text-[color:var(--text-secondary)] hover:bg-[var(--surface-tint-hover)] hover:text-[color:var(--text-primary)] disabled:text-[color:var(--text-disabled)]",
+        ghost: "border-0 bg-transparent text-[color:var(--text-secondary)] disabled:text-[color:var(--text-disabled)] hover:bg-[var(--surface-tint-hover)] hover:text-[color:var(--text-primary)]",
+        link: "border-0 bg-transparent text-[color:var(--link)] underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-4 py-2",
         sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
+        lg: "h-12 rounded-md px-6",
         icon: "h-10 w-10",
       },
     },

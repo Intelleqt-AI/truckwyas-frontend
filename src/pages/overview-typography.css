@@ -1,0 +1,282 @@
+/* Today (Overview), v3. Page-scoped: every rule sits under .overview-typography
+   or uses the td- prefix. Shared primitives (tw-card, tw-btn, tw-seg, tw-chip,
+   tw-delta, tw-info) live in src/styles/theme.css. */
+.overview-typography {
+  font: 400 14px/20px var(--font-sans);
+  color: var(--text-primary);
+  letter-spacing: normal;
+  min-width: 0;
+}
+.overview-typography h1,
+.overview-typography h2,
+.overview-typography h3,
+.overview-typography p { margin: 0; }
+
+/* ---- Notices under the header ---- */
+.ov-notices { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 var(--card-gap); }
+.ov-notices:empty { display: none; }
+
+/* ---- KPI tiles ---- */
+.td-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--card-gap);
+  margin-bottom: var(--section-gap);
+}
+/* Standard KPI tile (DESIGN-PRINCIPLES §11.6): label, figure, one line, --kpi-height, --card-pad. */
+.td-kpi {
+  position: relative;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 0;
+  box-sizing: border-box;
+  min-width: 0; height: var(--kpi-height, 106px);
+  padding: var(--card-pad);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+}
+.td-kpi > * { flex-shrink: 0; }
+.td-kpi__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 16px; }
+.overview-typography .td-kpi__label {
+  display: inline-flex; align-items: center; gap: 4px; min-width: 0;
+  font: 500 12px/16px var(--font-sans);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.td-kpi__head .tw-info { width: 16px; height: 16px; }
+.td-kpi__body { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; min-width: 0; }
+.td-kpi__value {
+  font: 600 28px/34px var(--font-sans);
+  letter-spacing: var(--tracking-figure);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.td-kpi__body .td-micro { margin-bottom: 4px; }
+.td-kpi__meta { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.td-kpi__meta .tw-delta { max-width: 100%; }
+/* R6: pending costs on the margin tile. The figure it becomes sits where the
+   other tiles carry a micro chart; the note under it names the pending amount.
+   One line each at desktop, so the row keeps --kpi-height (no shift on load). */
+.td-kpi__alt { margin-bottom: 4px; font: 600 13px/16px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-secondary); white-space: nowrap; }
+.td-kpi__alt.is-loss, .td-kpi__if .is-loss { color: var(--status-danger-text); }
+.td-kpi__go {
+  display: inline-grid; place-items: center;
+  width: 28px; height: 28px; margin: -6px -8px -6px 0;
+  border-radius: 8px; color: var(--text-tertiary);
+}
+.td-kpi__go:hover { background: var(--nav-hover-bg); color: var(--text-primary); }
+.td-kpi__go:focus-visible { outline: 2px solid var(--focus-outline); outline-offset: 1px; }
+
+/* Micro bar sparkline */
+.td-micro { flex-shrink: 0; display: block; }
+.td-micro rect { fill: var(--chart-muted); }
+.td-micro rect.is-current { fill: var(--chart-series-1); }
+.td-micro rect.is-negative { fill: var(--status-danger-dot); }
+
+/* Emphasis tile: inverted, the one figure on the page that needs action. */
+.td-kpi--emphasis { background: var(--emphasis-bg); border-color: var(--emphasis-border); color: var(--emphasis-fg); }
+.overview-typography .td-kpi--emphasis .td-kpi__label { color: var(--emphasis-fg-muted); }
+.td-kpi--emphasis .td-kpi__value { color: var(--emphasis-fg); }
+.td-kpi--emphasis .td-kpi__meta { color: var(--emphasis-fg-muted); }
+/* Focus inside the emphasis tile uses --emphasis-focus. */
+.td-kpi--emphasis :focus-visible { outline-color: var(--emphasis-focus) !important; }
+.td-kpi--emphasis .tw-info { color: var(--emphasis-fg-muted); }
+.td-kpi--emphasis .tw-info:hover, .td-kpi--emphasis .tw-info[aria-expanded="true"] { color: var(--emphasis-fg); }
+.overview-typography .td-kpi--emphasis .overview-kpi-menu-trigger { color: var(--emphasis-fg-muted); }
+.overview-typography .td-kpi--emphasis .overview-kpi-menu-trigger:hover { background: var(--surface-tint-hover); color: var(--emphasis-fg); }
+.td-kpi--emphasis .tw-info:focus-visible { outline: 2px solid var(--emphasis-focus); }
+.td-kpi--emphasis .ov-skel { background: var(--emphasis-track); }
+.td-kpi__strip { position: relative; flex-shrink: 0; width: 84px; height: 6px; margin-bottom: 12px; border-radius: 3px; background: var(--emphasis-track); overflow: hidden; }
+.td-kpi__strip > span { position: absolute; right: 0; top: 0; bottom: 0; background: var(--emphasis-fill); border-radius: 3px; }
+
+/* KPI "more" menu: named trigger, themed menu. */
+.overview-typography .overview-kpi-menu-trigger {
+  width: 28px; height: 28px; margin: -6px -8px -6px 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; border-radius: 8px;
+  color: var(--text-tertiary); cursor: pointer;
+}
+.overview-typography .overview-kpi-menu-trigger:hover { background: var(--nav-hover-bg); color: var(--text-primary); }
+.overview-typography .overview-kpi-menu {
+  position: absolute; top: 28px; right: -8px; z-index: 1000;
+  display: flex; flex-direction: column; padding: 6px;
+  background: var(--bg-overlay); border: 1px solid var(--border-overlay);
+  border-radius: 12px; box-shadow: var(--shadow-pop);
+}
+.overview-typography .overview-kpi-menu-item {
+  min-height: 36px; padding: 8px 10px; text-align: left;
+  background: transparent; border: 0; border-radius: 8px; cursor: pointer;
+  font: 500 13px/20px var(--font-sans); color: var(--text-secondary); white-space: nowrap;
+}
+.overview-typography .overview-kpi-menu-item:hover { background: var(--surface-tint-active); color: var(--text-primary); }
+.overview-typography .overview-kpi-menu-trigger:focus-visible,
+.overview-typography .overview-kpi-menu-item:focus-visible,
+.overview-typography .ov-id:focus-visible { outline: 2px solid var(--focus-outline); outline-offset: 2px; }
+@media (pointer: coarse) {
+  .overview-typography .overview-kpi-menu-trigger, .td-kpi__go { width: 28px; height: 28px; position: relative; }
+  .overview-typography .overview-kpi-menu-trigger::after, .td-kpi__go::after { content: ''; position: absolute; inset: -8px; }
+}
+
+/* ---- Panels grid: generous between, compact inside ---- */
+.td-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  gap: var(--card-gap);
+  align-items: stretch;
+}
+/* Two independent columns: cards stack at their own height (§11.7). */
+.td-col { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; }
+/* Both columns end on the same line: the last card in each takes up the slack. */
+.td-col > :last-child { flex: 1 1 auto; }
+
+/* Chart */
+.td-legend { display: flex; gap: 14px; font: 500 12px/16px var(--font-sans); color: var(--text-secondary); white-space: nowrap; padding-top: 3px; }
+.td-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.td-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.td-legend__rev { background: var(--chart-series-1); }
+.td-legend__cost { background: repeating-linear-gradient(45deg, var(--chart-hatch) 0 2px, var(--chart-bar) 2px 4px); box-shadow: inset 0 0 0 1px var(--chart-hatch); }
+.td-chart svg { display: block; overflow: visible; }
+.td-grid-line, .td-chart .td-grid { stroke: var(--chart-grid); stroke-dasharray: 2 4; }
+.td-chart .td-axis { stroke: var(--chart-axis); }
+.td-chart .td-tick { fill: var(--text-tertiary); font: 500 11px var(--font-sans); font-variant-numeric: tabular-nums; }
+.td-chart .td-tick.is-current { fill: var(--text-primary); font-weight: 600; }
+.td-chart .td-bar-rev { fill: var(--chart-series-1); }
+.td-chart .td-hatch-bg { fill: var(--chart-bar); }
+.td-chart .td-hatch-line { stroke: var(--chart-hatch); }
+.td-chart .td-bar-cost { stroke: var(--chart-hatch); stroke-width: 1; }
+.td-chart .td-hover-band { fill: var(--chart-hover-band); }
+
+/* Needs you */
+.td-needs__list { list-style: none; margin: 0 -8px; padding: 0; display: flex; flex-direction: column; }
+.td-needs__row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 8px; border-radius: 10px; }
+.td-needs__row + .td-needs__row { border-top: 1px solid var(--border-row); border-radius: 0; }
+.td-needs__row { align-items: center; }
+/* Plain line icon: no tinted square, no severity colour (the row order and the action carry priority). */
+.td-needs__icon { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-tertiary); align-self: flex-start; margin-top: 1px; }
+.td-needs__action { flex-shrink: 0; }
+.td-needs__amount { flex-shrink: 0; font: 500 13px/18px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; }
+.td-needs__text { min-width: 0; flex: 1; }
+.td-needs__line { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+.td-needs__line .td-needs__title { min-width: 0; }
+.td-needs__title { font: 500 13px/18px var(--font-sans); color: var(--text-primary); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* Two lines, not an ellipsis: the detail is the point of the row. */
+.td-needs__body { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); margin-top: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+/* Latest work */
+.td-recent__head { padding: var(--card-pad) var(--card-pad) 0; margin-bottom: 8px; }
+.td-recent__tools { display: flex; align-items: center; gap: 4px; }
+.td-recent__skel { margin: 0 var(--card-pad) var(--card-pad); }
+/* Loading placeholders hold the loaded height (R5: no layout shift when data lands):
+   Latest work = header row + 5 rows; chart = the 300px plot; Needs you = 5 rows;
+   pipeline = 5 stage bars + the stats line. */
+.td-recent .td-recent__skel { height: calc(33px + 5 * 48px - var(--card-pad) + 8px); }
+.td-chart-card > .ov-skel-block { height: 300px; }
+.td-needs > .ov-skel-block { height: 300px; }
+.td-pipe-card > .ov-skel-block { height: 195px; }
+.td-recent__empty { padding: 0 var(--card-pad) var(--card-pad); }
+.ov-table-wrap { overflow-x: auto; }
+.ov-table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 20px; font-variant-numeric: tabular-nums; }
+.ov-table th {
+  text-align: left; padding: 8px 12px 8px 0;
+  font: 500 12px/16px var(--font-sans); color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-row); white-space: nowrap;
+}
+.ov-table td { height: 48px; padding: 0 12px 0 0; border-bottom: 1px solid var(--border-row); color: var(--text-primary); white-space: nowrap; }
+.ov-table th:first-child, .ov-table td:first-child { padding-left: var(--card-pad); }
+.ov-table th:last-child, .ov-table td:last-child { padding-right: var(--card-pad); }
+.ov-table tr:last-child td { border-bottom: 0; }
+.ov-table tbody tr { cursor: pointer; }
+.ov-table tbody tr:hover td { background: var(--bg-surface-hover); }
+.ov-table .num { text-align: right; }
+.ov-table td.ov-muted { color: var(--text-tertiary); }
+.td-show-sm { display: none; }
+.td-ellipsis { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.td-sub { display: none; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.ov-id { font: 500 12px/20px var(--font-mono); color: var(--text-primary); text-decoration: none; }
+.ov-id:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Pipeline */
+.td-pipe { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.td-pipe__row { display: grid; grid-template-columns: 84px minmax(0, 1fr) 28px; align-items: center; gap: 12px; }
+.td-pipe__label { font: 500 12px/16px var(--font-sans); color: var(--text-secondary); white-space: nowrap; }
+.td-pipe__track { height: 6px; border-radius: 3px; background: var(--bg-raised); overflow: hidden; }
+.td-pipe__track > span { display: block; height: 100%; border-radius: 3px; background: var(--chart-muted); min-width: 2px; }
+.td-pipe__row.is-key .td-pipe__track > span { background: var(--chart-series-1); }
+.td-pipe__row.is-key .td-pipe__label { color: var(--text-primary); }
+.td-pipe__count { font: 600 13px/16px var(--font-sans); font-variant-numeric: tabular-nums; text-align: right; }
+.td-pipe__rate { font: 500 12px/16px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-tertiary); text-align: right; }
+
+/* R7: the stale split under "On the road" ("+4 past delivery date, left open"). */
+.td-pipe__note { grid-column: 2 / -1; margin-top: -8px; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+/* The pipeline card is the side column's last card, so it takes the slack
+   that balances the two columns. It never shows that slack as an empty tail:
+   the stage rows spread over the card (capped, so a very tall card keeps
+   readable rows) and Win rate sits on the card foot. */
+.td-grid .td-pipe-card { display: flex; flex-direction: column; }
+.td-grid .td-pipe-card .td-pipe { flex: 1 1 auto; justify-content: space-around; max-height: 300px; margin-bottom: 16px; }
+.td-grid .td-pipe-card .td-stats { margin-top: auto; }
+@media (max-width: 1100px) { .td-grid .td-pipe-card .td-pipe { flex: 0 0 auto; margin-bottom: 0; } .td-grid .td-pipe-card .td-stats { margin-top: 16px; } }
+.td-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 16px 0 0; padding-top: 16px; border-top: 1px solid var(--border-row); }
+.td-stats--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.td-stats--one { grid-template-columns: minmax(0, 1fr); }
+.td-stats > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.td-stats dt { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; }
+.td-stats dd { margin: 0; font: 600 18px/24px var(--font-sans); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+
+/* Fleet now */
+.td-fleet { display: flex; align-items: baseline; gap: 8px; }
+.td-fleet__value { font: 600 var(--text-figure)/38px var(--font-sans); letter-spacing: var(--tracking-figure); font-variant-numeric: tabular-nums; }
+.td-fleet__of { font: 500 13px/20px var(--font-sans); color: var(--text-tertiary); }
+.td-meter { height: 6px; border-radius: 3px; background: var(--bg-raised); margin-top: 12px; overflow: hidden; }
+.td-meter > span { display: block; height: 100%; border-radius: 3px; background: var(--text-primary); }
+
+/* Empty and loading */
+.td-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
+.ov-skel { display: inline-block; width: 60%; height: 30px; border-radius: 8px; background: var(--bg-raised); vertical-align: middle; }
+.ov-skel-block { height: 220px; border-radius: 12px; background: var(--bg-raised); }
+.ov-skel-block--short { height: 132px; }
+.ov-muted { color: var(--text-tertiary); }
+.ov-sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---- Narrow ---- */
+@media (max-width: 1280px) {
+  .td-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 1100px) {
+  /* One column, interleaved: chart, needs you, latest work, pipeline. */
+  .td-grid { grid-template-columns: minmax(0, 1fr); }
+  .td-col { display: contents; }
+  .td-chart-card { order: 1; }
+  .td-needs { order: 2; }
+  .td-recent { order: 3; }
+  .td-pipe-card { order: 4; }
+}
+@media (max-width: 640px) {
+  /* Phone head: SectionHeader keeps New quote on the title row and moves the
+     other actions into its "⋯" menu. */
+  /* Four tiles, two columns, same --kpi-height; micro charts stay on desktop. */
+  .td-kpis { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--card-gap); }
+  .overview-typography .td-kpi .overview-kpi-menu-trigger { display: none; }
+  .td-kpi__value { font-size: 22px; line-height: 34px; letter-spacing: -0.02em; }
+  /* A note that still does not fit wraps to a second line (never "…"); the tile grows rather than clipping it. */
+  .td-kpi { height: auto; min-height: var(--kpi-height, 106px); }
+  .td-kpi__meta { height: auto; min-height: 16px; white-space: normal; overflow: visible; }
+  /* The label's text truncates, not the label: the tip's 44px touch target
+     (::after) must not be clipped by the label box. */
+  .overview-typography .td-kpi__label { overflow: visible; }
+  .overview-typography .td-kpi__label > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .td-kpi__body .td-micro, .td-kpi__strip { display: none; }
+  .td-hide-sm { display: none; }
+  .td-show-sm { display: inline; }
+  .td-legend { display: none; }
+  .td-recent__head { flex-direction: column; align-items: stretch; }
+  .td-recent__tools { justify-content: space-between; }
+  .td-sub { display: block; }
+  .td-table td { height: 56px; }
+  .td-recent .td-recent__skel { height: calc(33px + 5 * 56px - var(--card-pad) + 8px); }
+}

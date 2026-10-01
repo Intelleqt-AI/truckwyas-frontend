@@ -1,0 +1,47 @@
+/* Quote-form assistant: launcher and panel placement (presentation only).
+   Neutral launcher (surface + hairline + pop shadow), never an accent disc.
+   Placement reads two custom properties the host page sets on an ancestor:
+     --ai-fab-right / --ai-fab-bottom  (defaults: 16px / 16px)
+     --ai-fab-z  (default 60; a page with its own sticky bar raises it)
+   and always adds the device safe area. */
+.ai-launcher {
+  position: fixed;
+  right: var(--ai-fab-right, 16px);
+  bottom: calc(var(--ai-fab-bottom, 16px) + env(safe-area-inset-bottom, 0px));
+  z-index: var(--ai-fab-z, 60);
+  width: 44px; height: 44px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-overlay, var(--border-default));
+  background: var(--bg-overlay, var(--bg-surface));
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-pop);
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s;
+}
+/* A few px of extra hit area around the 44px disc. */
+.ai-launcher::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; }
+.ai-launcher:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.ai-launcher[aria-expanded="true"] { color: var(--text-primary); }
+.ai-launcher:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
+/* In-flow variant: the host places the launcher in a slot of its own layout
+   (an icon button in a toolbar), so it never floats over other controls. */
+.ai-launcher--inline {
+  position: relative; right: auto; bottom: auto; z-index: auto;
+  flex-shrink: 0; box-shadow: none;
+  border-color: var(--border-default); background: var(--bg-surface);
+}
+.ai-launcher--inline::after { inset: -2px; }
+
+.ai-chat-panel {
+  position: fixed;
+  right: var(--ai-fab-right, 16px);
+  bottom: calc(var(--ai-fab-bottom, 16px) + 56px + env(safe-area-inset-bottom, 0px));
+  z-index: var(--ai-fab-z, 60);
+  width: 360px;
+  max-height: min(70vh, calc(100dvh - var(--ai-fab-bottom, 16px) - 140px));
+  box-shadow: var(--shadow-pop);
+}
+@media (max-width: 768px) {
+  .ai-chat-panel { left: 16px; right: 16px; width: auto; }
+}

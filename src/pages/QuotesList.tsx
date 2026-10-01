@@ -1,11 +1,19 @@
-import { useState, useEffect, useMemo } from "react";
+import './bookings-typography.css';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import './table-heading-roles.css';
+import './bookings-section.css';
+import { useState, useEffect, useMemo, useRef } from "react";
+import { BoardScrollbar } from "@/components/BoardScrollbar";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { fetchData, patchData, postData } from "@/lib/Api";
-import { formatCurrency } from "@/lib/formatters";
-import { LiveBadge } from "@/components/LiveBadge";
+import { formatCurrency, formatDate, formatDateShort, formatMoneyWhole } from "@/lib/formatters";
 import { Loader } from "@/components/Loader";
 import { toast } from "@/lib/toast";
+import { Fuel, Columns3, List as ListIcon } from "lucide-react";
+import { boardStage } from "@/components/overview/today";
+import { useAllQuotes } from "@/components/overview/ledger";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { ConvertToBookingModal } from "@/components/ConvertToBookingModal";
 import { useAuth } from "@/lib/AuthContext";
@@ -27,27 +35,22 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import QuoteSendPreview from '@/components/QuoteSendPreview';
+import { rowLink } from '@/lib/rowLink';
+import { StatusChip, statusTone } from '@/components/ui/StatusChip';
+import { Segmented } from '@/components/ui/Segmented';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-// Distinct hue per pipeline stage so the board reads as progression
-// (the design system's --status-success and --accent-primary are the same blue,
-// which made Accepted / Declined indistinguishable from neutral).
-// IT/COMPLETED aren't pipeline columns anymore (that's the Order's delivery
-// status now — see convert_to_load) but the colors stay so any pre-existing
-// quote still carrying one of those statuses renders sensibly in the list view.
-const STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'var(--text-tertiary)',   // neutral grey
-  SENT: '#F59E0B',                 // amber — awaiting reply
-  ACCEPTED: '#22C55E',             // green — won
-  DECLINED: 'var(--status-danger)',
-  IT: 'var(--accent-primary)',     // blue — in motion (legacy)
-  COMPLETED: '#14B8A6',            // teal — done (legacy)
+
+// Pipeline stage -> dot/chip tone. Colour only ever sits next to its text label.
+const COLUMN_TONE: Record<string, 'neutral' | 'warning' | 'success' | 'danger'> = {
+  DRAFT: 'neutral',
+  SENT: 'warning',
+  ACCEPTED: 'success',
+  BOOKED: 'success',
+  DECLINED: 'danger',
 };
-
-const WON_GREEN = '#22C55E';
-const WON_GREEN_BG = 'rgba(34,197,94,0.12)';
-
-const confidenceColor = (c?: string) =>
-  c === 'HIGH' ? WON_GREEN : c === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)';
 
 // Full route chain, stops included — same data the quote and its map show
 // elsewhere, not just the pickup/delivery pair. Shared by every place this
@@ -70,16 +73,66 @@ const sentenceCase = (s?: string) =>
 // used to double as quote-pipeline columns too, which let a quote be
 // dragged straight to "Completed" with no Order behind it at all.
 const COLUMNS = ['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED'];
+// Booked: quotes converted into a load (server filter status=BOOKED, the
+// load is the source of truth). Fetched like a status column but nothing is
+// dropped on it or dragged out: only "Convert to booking" puts a quote there.
+const QUERY_COLUMNS = ['DRAFT', 'SENT', 'ACCEPTED', 'BOOKED', 'DECLINED'];
+// The board shows one more column, Expired: derived from the date rule, not
+// a status, so nothing can be dropped on it either.
+const BOARD_COLUMNS = [...QUERY_COLUMNS, 'EXPIRED'];
 const COLUMN_LABELS: Record<string, string> = {
   DRAFT: 'Draft',
   SENT: 'Sent',
   ACCEPTED: 'Accepted',
+  BOOKED: 'Booked',
   DECLINED: 'Declined',
+  // Draft or Sent past its valid-until date (boardStage, R8): not live work.
+  EXPIRED: 'Expired',
   // Not board columns — kept only so a quote from before this change still
   // renders a readable label in the list view instead of the raw code.
-  IT: 'In-Transit',
+  IT: 'In transit',
   COMPLETED: 'Completed',
 };
+
+const QUOTE_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
+  DRAFT: 'neutral',
+  SENT: 'warning',
+  ACCEPTED: 'success',
+  DECLINED: 'danger',
+  IT: 'info',
+  COMPLETED: 'success',
+};
+
+// Card body shared by the board card and its drag overlay.
+function QuoteCardBody({ quote }: { quote: any }) {
+  return (
+    <>
+      <div className="bk-qcard__top">
+        <span className="bk-qcard__id">{quote.quote_number}</span>
+        <span className="bk-qcard__flags">
+          {quote.fuel_alert && (
+            <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', color: 'var(--status-warning-text)' }}><Fuel size={16} aria-hidden="true" /></span>
+          )}
+          {/* The recorded answer, when the column does not already say it.
+              Neutral text: the column is the status. */}
+          {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && <span className="bk-qcard__meta">Marked won</span>}
+          {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <span className="bk-qcard__meta">Marked lost</span>}
+        </span>
+      </div>
+      <div className="bk-qcard__customer" title={quote.customer_name || ''}>{quote.customer_name || '—'}</div>
+      <div className="bk-qcard__route" title={routeOf(quote)}>{routeOf(quote)}</div>
+      <div className="bk-qcard__foot">
+        <span className="bk-qcard__amount" title={formatCurrency(parseFloat(quote.total_amount || '0'))}>{formatMoneyWhole(parseFloat(quote.total_amount || '0'))}</span>
+        {/* Only a low price confidence is worth a word on the card; otherwise the date it was made. */}
+        {boardStage(quote) === 'EXPIRED' && quote.valid_until
+          ? <span className="bk-qcard__meta" title={`${String(quote.status).toUpperCase() === 'SENT' ? 'Sent' : 'Draft'}, valid until ${formatDate(quote.valid_until)}`}>Expired {formatDateShort(quote.valid_until)}</span>
+          : String(quote.confidence).toUpperCase() === 'LOW'
+          ? <span className="bk-qcard__meta">Low confidence</span>
+          : quote.created_at ? <span className="bk-qcard__meta">{formatDateShort(quote.created_at)}</span> : null}
+      </div>
+    </>
+  );
+}
 
 // Draggable Quote Card Component
 function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, convertedLoad, dragDisabled }: { quote: any; onClick: () => void; onConvertToLoad?: (e: React.MouseEvent, quote: any) => void; onViewBooking?: (e: React.MouseEvent, load: any) => void; convertedLoad?: any; dragDisabled?: boolean }) {
@@ -92,76 +145,66 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
     isDragging,
   } = useSortable({ id: String(quote.id), disabled: dragDisabled });
 
-  const accent = STATUS_COLOR[quote.status] || 'var(--border-subtle)';
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.4 : 1,
     cursor: dragDisabled ? 'pointer' : (isDragging ? 'grabbing' : 'grab'),
-    background: 'var(--bg-surface)',
-    border: '1px solid var(--border-subtle)',
-    borderRadius: 2,
-    boxShadow: isDragging ? '0 8px 16px rgba(0,0,0,0.25)' : 'none',
   };
 
   return (
     <div
       ref={setNodeRef}
+      className="bk-qcard"
       style={style}
       {...attributes}
       {...(dragDisabled ? {} : listeners)}
       onClick={onClick}
-      onMouseEnter={(e) => { if (!isDragging) e.currentTarget.style.background = 'var(--bg-surface-hover)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-surface)'; }}
     >
-      <div style={{ padding: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: 6, background: accent, flexShrink: 0 }} />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>{quote.quote_number}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {quote.fuel_alert && (
-              <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 11 }}>⛽</span>
-            )}
-            {quote.outcome === 'accepted' && (
-              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, fontFamily: 'var(--font-mono)', fontWeight: 500 }}>✓ Won</span>
-            )}
-            {quote.outcome === 'rejected' && (
-              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>✗ Lost</span>
-            )}
-          </div>
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{quote.customer_name || '—'}</div>
-        <div style={{
-          fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10,
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden',
-        }} title={routeOf(quote)}>
-          {routeOf(quote)}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: quote.status === 'ACCEPTED' ? 10 : 0 }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
-          {quote.confidence && (
-            <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', color: confidenceColor(quote.confidence), border: `1px solid ${confidenceColor(quote.confidence)}` }}>{sentenceCase(quote.confidence)}</span>
-          )}
-        </div>
-        {quote.status === 'ACCEPTED' && convertedLoad && (
-          <button
-            onClick={(e) => onViewBooking?.(e, convertedLoad)}
-            style={{ width: '100%', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, letterSpacing: '0.05em', padding: '7px 8px', background: WON_GREEN_BG, border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
-          >
-            ✓ Converted — View booking →
-          </button>
-        )}
-        {quote.status === 'ACCEPTED' && !convertedLoad && onConvertToLoad && (
-          <button
-            onClick={(e) => onConvertToLoad(e, quote)}
-            style={{ width: '100%', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, letterSpacing: '0.05em', padding: '7px 8px', background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
-          >
-            → Convert to booking
-          </button>
-        )}
+      <QuoteCardBody quote={quote} />
+      {/* Any quote with a linked booking offers it, whatever its own status
+          (legacy In-transit quotes sit in the Accepted column too). */}
+      {convertedLoad && (
+        <button
+          type="button"
+          className="bk-btn bk-btn--secondary bk-btn--block bk-qcard__action"
+          onClick={(e) => onViewBooking?.(e, convertedLoad)}
+          style={{ pointerEvents: 'auto' }}
+        >
+          View booking
+        </button>
+      )}
+      {quote.status === 'ACCEPTED' && !convertedLoad && onConvertToLoad && (
+        <button
+          type="button"
+          className="bk-btn bk-btn--secondary bk-btn--block bk-qcard__action"
+          onClick={(e) => onConvertToLoad(e, quote)}
+          style={{ pointerEvents: 'auto' }}
+        >
+          Convert to booking
+        </button>
+      )}
+    </div>
+  );
+}
+
+// An expired quote's card: opens the quote (where "Edit quote" is the next
+// step); it is not dragged, since its column is a date rule, not a status.
+function StaticQuoteCard({ quote, onClick, stage = 'expired', footer }: { quote: any; onClick: () => void; stage?: string; footer?: React.ReactNode }) {
+  return (
+    <div className="bk-qcard">
+      {/* The footer (e.g. "View booking") sits beside, not inside, the clickable body. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Quote ${quote.quote_number}, ${stage}`}
+        style={{ cursor: 'pointer' }}
+        onClick={onClick}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
+      >
+        <QuoteCardBody quote={quote} />
       </div>
+      {footer}
     </div>
   );
 }
@@ -180,8 +223,8 @@ function DroppableColumn({ columnId, items, children, isOver }: { columnId: stri
   return (
     <div ref={setNodeRef} style={{
       display: 'flex', flexDirection: 'column', gap: 8,
-      minHeight: 80, padding: 2, borderRadius: 4,
-      background: isOver ? 'var(--bg-surface)' : 'transparent',
+      minHeight: 80, padding: 2, borderRadius: 'var(--radius-nested, 8px)',
+      background: isOver ? 'var(--bg-surface-hover)' : 'transparent',
       outline: isOver ? '1px dashed var(--accent-primary)' : '1px solid transparent',
       transition: 'background 0.15s ease',
     }}>
@@ -190,6 +233,26 @@ function DroppableColumn({ columnId, items, children, isOver }: { columnId: stri
       </SortableContext>
     </div>
   );
+}
+
+// The loads list behind "View booking". Quote detail reads the same cached
+// query, so the board card and the detail page always agree.
+export const loadsQuery = {
+  queryKey: ['loads'],
+  queryFn: () => fetchData('api/v1/loads/'),
+  retry: 1,
+};
+
+// A quote converts to at most one load (convert_to_load blocks a second
+// conversion) — map quote id -> its load so the "Convert to booking"
+// button can be swapped for a "View booking" link once that's happened.
+export function mapLoadsByQuoteId(loadsData: any): Map<string, any> {
+  const loads: any[] = loadsData?.results || loadsData || [];
+  const byQuote = new Map<string, any>();
+  loads.forEach(l => {
+    if (l.quote != null) byQuote.set(String(l.quote), l);
+  });
+  return byQuote;
 }
 
 const QUOTE_PAGE_SIZE = 10;
@@ -253,13 +316,48 @@ interface QuotesListProps {
   onViewChange?: (value: 'board' | 'list') => void;
 }
 
+/**
+ * A status filter: the segmented control on wider screens; on phones, when
+ * there are more than four options, a compact select (R4 phone rule). Both
+ * stay mounted and CSS picks one, so nothing shifts when the width changes.
+ */
+export { idTail, RecordNo, RecordId } from './recordNo';
+import { RecordNo } from './recordNo';
+
+export function StatusFilter<V extends string>({ label, value, onChange, options, className, compactOnPhone }: {
+  label: string; value: V; onChange: (v: V) => void;
+  options: { value: V; label: string; count?: number }[]; className?: string;
+  /** Use the phone select even with four options, so the count fits beside it. */
+  compactOnPhone?: boolean;
+}) {
+  const compact = compactOnPhone || options.length > 4;
+  const current = options.find(o => o.value === value) ?? options[0];
+  const text = (o: { label: string; count?: number }) => (o.count != null ? `${o.label} (${o.count})` : o.label);
+  return (
+    <div className={`bk-filter${compact ? ' bk-filter--compact' : ''}${className ? ` ${className}` : ''}`}>
+      <Segmented<V> label={label} value={value} onChange={onChange} options={options} className="bk-filter__seg" />
+      {compact && (
+        <Select value={value} onValueChange={v => onChange(v as V)}>
+          <SelectTrigger aria-label={label} className="bk-filter__select">
+            <SelectValue>{current ? text(current) : ''}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {options.map(o => <SelectItem key={o.value} value={o.value}>{text(o)}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      )}
+    </div>
+  );
+}
+
 export function QuotesList({ embedded = false, search: searchProp, onSearchChange, view: viewProp, onViewChange }: QuotesListProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
   const [internalSearch, setInternalSearch] = useState('');
-  const [internalView, setInternalView] = useState<'board' | 'list'>('board');
+  const [internalView, setInternalView] = useState<'board' | 'list'>(() =>
+    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches ? 'list' : 'board');
   const search = searchProp ?? internalSearch;
   const setSearch = onSearchChange ?? setInternalSearch;
   const view = viewProp ?? internalView;
@@ -272,6 +370,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [confirmOpts, setConfirmOpts] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void } | null>(null);
   const [pendingConvertQuote, setPendingConvertQuote] = useState<any>(null);
+  // Dragging a card into Sent emails the customer (the server sends on the
+  // status change), so it is previewed and confirmed first.
+  const [pendingSend, setPendingSend] = useState<{ quote: any; oldColumn: string } | null>(null);
 
   // Search is sent to the backend (it searches across every quote, not just
   // whatever's already loaded on screen) — debounced so typing doesn't fire
@@ -290,20 +391,14 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     })
   );
 
-  const { data: loadsData } = useQuery({
-    queryKey: ['loads'],
-    queryFn: () => fetchData('api/v1/loads/'),
-    retry: 1,
-  });
-  const loads: any[] = loadsData?.results || loadsData || [];
-
-  // A quote converts to at most one load (convert_to_load blocks a second
-  // conversion) — map quote id -> its load so the "Convert to booking"
-  // button can be swapped for a "View booking" link once that's happened.
-  const loadByQuoteId = new Map<string, any>();
-  loads.forEach(l => {
-    if (l.quote != null) loadByQuoteId.set(String(l.quote), l);
-  });
+  const kanbanRef = useRef<HTMLDivElement>(null);
+  const { data: loadsData } = useQuery(loadsQuery);
+  const loadByQuoteId = mapLoadsByQuoteId(loadsData);
+  // The quote API names its load (booked_load); the loads list is only page
+  // 1, so it is the fallback, never the source.
+  type BookedLoad = { id: number | string; load_number?: string; status?: string };
+  const bookedLoadOf = (q: { id?: number | string; booked_load?: BookedLoad | null } | null | undefined): BookedLoad | undefined =>
+    q?.booked_load ?? loadByQuoteId.get(String(q?.id));
 
   // Each pipeline column is its own backend-paginated query (10 at a time,
   // "load more" — see useQuoteColumn) rather than one big "fetch every
@@ -315,13 +410,72 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   const draftQ = useQuoteColumn('DRAFT', debouncedSearch);
   const sentQ = useQuoteColumn('SENT', debouncedSearch);
   const acceptedQ = useQuoteColumn('ACCEPTED', debouncedSearch);
+  const bookedQ = useQuoteColumn('BOOKED', debouncedSearch);
   const declinedQ = useQuoteColumn('DECLINED', debouncedSearch);
   const allQ = useQuoteColumn(null, debouncedSearch, view === 'list' && statusFilter === 'ALL');
   const columnQueries = useMemo(
-    () => ({ DRAFT: draftQ, SENT: sentQ, ACCEPTED: acceptedQ, DECLINED: declinedQ }),
-    [draftQ, sentQ, acceptedQ, declinedQ]
+    () => ({ DRAFT: draftQ, SENT: sentQ, ACCEPTED: acceptedQ, BOOKED: bookedQ, DECLINED: declinedQ }),
+    [draftQ, sentQ, acceptedQ, bookedQ, declinedQ]
   );
-  const totalQuotesCount = COLUMNS.reduce((sum, col) => sum + flattenColumn(columnQueries[col]).count, 0);
+  const totalQuotesCountRaw = QUERY_COLUMNS.reduce((sum, col) => sum + flattenColumn(columnQueries[col as keyof typeof columnQueries]).count, 0);
+  // A sent quote whose answer was recorded as lost belongs with the declined
+  // ones: the board shows it there (with "Marked lost"), and both column
+  // counts and totals move with it, so the board never says "Declined 0"
+  // while a lost quote sits under Sent. Only loaded cards can move.
+  // One stage definition everywhere (R5): the board's, shared with Home.
+  const isMarkedLost = (q: any) => String(q.status).toUpperCase() === 'SENT' && boardStage(q) === 'DECLINED';
+  const movedLost = flattenColumn(sentQ).items.filter(isMarkedLost);
+  const amountOf = (q: any) => parseFloat(q.total_amount || '0') || 0;
+  const movedLostTotal = movedLost.reduce((n: number, q: any) => n + amountOf(q), 0);
+  // R8: a Draft or Sent quote past its valid-until date is Expired (the same
+  // boardStage rule as Home's pipeline). Without a search the exact set comes
+  // from the full quotes list Home already fetches (same cache); with a search
+  // only the loaded cards can be placed.
+  const allQuotesQ = useAllQuotes();
+  const allRows: any[] | null = !debouncedSearch && allQuotesQ.data?.complete ? allQuotesQ.data.rows : null;
+  // Until that list arrives, Draft, Sent and Expired wait together, so cards
+  // don't jump between columns as it lands.
+  const expiryPending = !debouncedSearch && allQuotesQ.isLoading;
+  const isExpired = (q: any) => boardStage(q) === 'EXPIRED';
+  const expiredRows: any[] = allRows
+    ? allRows.filter(isExpired)
+    : [...flattenColumn(draftQ).items, ...flattenColumn(sentQ).items].filter(isExpired);
+  const expiredIn = (st: string) => expiredRows.filter((q: any) => String(q.status).toUpperCase() === st);
+  // Quotes whose backend status is already EXPIRED are on no status query.
+  const extraExpired = expiredIn('EXPIRED').length;
+  const boardColumn = (col: string) => {
+    if (col === 'EXPIRED') {
+      const failed = loadFailed(draftQ) || loadFailed(sentQ);
+      return {
+        items: expiredRows, count: expiredRows.length,
+        totalAmount: expiredRows.reduce((n: number, q: any) => n + amountOf(q), 0),
+        hasNextPage: false, isLoading: (expiryPending || (!allRows && (draftQ.isLoading || sentQ.isLoading))) && !failed,
+        isFetchingNextPage: false, fetchNextPage: () => undefined,
+      };
+    }
+    const f = flattenColumn(columnQueries[col as keyof typeof columnQueries]);
+    const lapsed = col === 'DRAFT' || col === 'SENT' ? expiredIn(col) : [];
+    const lapsedTotal = lapsed.reduce((n: number, q: any) => n + amountOf(q), 0);
+    const live = (items: any[]) => items.filter((q: any) => !isExpired(q) && !(col === 'SENT' && isMarkedLost(q)));
+    if (col === 'DRAFT' || col === 'SENT') {
+      const lost = col === 'SENT' ? movedLost : [];
+      const items = live(f.items);
+      const count = Math.max(0, f.count - lapsed.length - lost.length);
+      return {
+        ...f, items, count, isLoading: f.isLoading || expiryPending,
+        totalAmount: f.totalAmount - lapsedTotal - (col === 'SENT' ? movedLostTotal : 0),
+        // Every live card may already be loaded even though the backend has
+        // more rows in this status (the rest are expired).
+        hasNextPage: f.hasNextPage && items.length < count,
+      };
+    }
+    if (col === 'DECLINED' && movedLost.length) return { ...f, items: [...f.items, ...movedLost], count: f.count + movedLost.length, totalAmount: f.totalAmount + movedLostTotal };
+    return f;
+  };
+  // A failed column must never read as "No quotes" (and its 0 must not be counted).
+  const failedColumns = QUERY_COLUMNS.filter(col => loadFailed(columnQueries[col as keyof typeof columnQueries]));
+  const totalQuotesCount = totalQuotesCountRaw + extraExpired;
+  const retryFailedColumns = () => failedColumns.forEach(col => columnQueries[col as keyof typeof columnQueries].refetch());
 
   // Live update: refetch every column when the backend pushes any quote
   // event over WebSocket — prefix match invalidates all of them (and the
@@ -331,6 +485,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       const { detail } = (e as CustomEvent);
       if (typeof detail?.event === 'string' && detail.event.startsWith('quote.')) {
         queryClient.invalidateQueries({ queryKey: ['quotes-column'] });
+        queryClient.invalidateQueries({ queryKey: ['insights-source', 'quotes'] });
       }
     };
     window.addEventListener('tw:live-event', handler);
@@ -379,7 +534,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   // that card's column, not just a bare column id.
   const columnOfQuoteId: Record<string, string> = {};
   COLUMNS.forEach(col => {
-    flattenColumn(columnQueries[col]).items.forEach((q: any) => { columnOfQuoteId[String(q.id)] = col; });
+    boardColumn(col).items.forEach((q: any) => { columnOfQuoteId[String(q.id)] = col; });
   });
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -420,36 +575,60 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     // new column (and disappears from the old) once these refetch, which
     // the live WebSocket event above also triggers the moment the backend
     // confirms the change.
+    if (newStatus === 'SENT') {
+      const quote = allLoadedBoardItems.find((q: any) => String(q.id) === quoteId);
+      if (quote) { setPendingSend({ quote, oldColumn }); return; }
+    }
+    moveQuote(quoteId, oldColumn, newStatus);
+  };
+
+  const moveQuote = (quoteId: string, oldColumn: string, newStatus: string, onDone?: () => void) => {
     statusMutation.mutate({ id: quoteId, status: newStatus }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['quotes-column', oldColumn] });
         queryClient.invalidateQueries({ queryKey: ['quotes-column', newStatus] });
         queryClient.invalidateQueries({ queryKey: ['quotes-column', null] });
+        queryClient.invalidateQueries({ queryKey: ['insights-source', 'quotes'] });
       },
+      onSettled: () => onDone?.(),
     });
   };
 
-  const allLoadedBoardItems = COLUMNS.flatMap(col => flattenColumn(columnQueries[col]).items);
+  const allLoadedBoardItems = COLUMNS.flatMap(col => flattenColumn(columnQueries[col as keyof typeof columnQueries]).items);
   const activeQuote = activeQuoteId ? allLoadedBoardItems.find((q: any) => String(q.id) === activeQuoteId) : null;
 
   // List view reuses a board column's query directly for a specific status,
   // or the separate "All" query (no status filter) for the All tab.
-  const activeListQuery = statusFilter === 'ALL' ? allQ : columnQueries[statusFilter];
+  const activeListQuery = statusFilter === 'ALL' ? allQ : statusFilter === 'EXPIRED' ? draftQ : columnQueries[statusFilter as keyof typeof columnQueries];
   const {
-    items: listItems, hasNextPage: listHasNextPage, isLoading: listIsLoading,
+    hasNextPage: listHasNextPage, isLoading: listIsLoading,
     isFetchingNextPage: listIsFetchingNextPage, fetchNextPage: listFetchNextPage,
-  } = flattenColumn(activeListQuery);
+  } = statusFilter === 'ALL' ? flattenColumn(allQ) : boardColumn(statusFilter);
+  // The list's per-status rows and counts are the board's columns, so a
+  // quote marked lost is under Declined in both views (R5: "Sent 2" twice).
+  const listItems = statusFilter === 'ALL' ? flattenColumn(allQ).items : boardColumn(statusFilter).items;
+  const statusOptions = ['ALL', ...BOARD_COLUMNS].map(status => ({
+    value: status,
+    label: status === 'ALL' ? 'All' : COLUMN_LABELS[status],
+    count: (status === 'ALL' ? failedColumns.length === 0 : status === 'EXPIRED' ? !failedColumns.includes('DRAFT') && !failedColumns.includes('SENT') : !failedColumns.includes(status))
+      ? (status === 'ALL' ? totalQuotesCount : boardColumn(status).count)
+      : undefined,
+  }));
+  // Phones: one toolbar row (search, status select, view toggle) so the
+  // first quote starts high on the screen.
+  const isPhone = useIsMobile(767);
+  const statusText = (o: { label: string; count?: number }) => (o.count != null ? `${o.label} (${o.count})` : o.label);
+  const currentStatus = statusOptions.find(o => o.value === statusFilter) ?? statusOptions[0];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+    <div className="bookings-typography bk-qlist-fill" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* Header — hidden when embedded in Bookings tabs */}
       {!embedded && (
         <div style={{ marginBottom: 24, flexShrink: 0 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Operations</div>
+          <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', marginBottom: 4 }}>Operations</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Loads & Quotes</div>
-              <LiveBadge />
+              <div style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)' }}>Loads & quotes</div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-action" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={() => navigate('/bookings/quotes/new')}>
@@ -461,58 +640,84 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
         </div>
       )}
 
-      {/* Controls — hidden when embedded; the parent (Bookings tab nav) renders
-          the search box and Board/List toggle inline with its tabs instead. */}
-      {!embedded && (
-        <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center', flexShrink: 0 }}>
-          <input
-            type="text"
-            placeholder="Search loads, customers, routes..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '6px 10px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 12, outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
+      {/* Toolbar — search, Board/List toggle and count sit on their own row
+          under the shared Bookings header, so the tab row keeps one geometry. */}
+      <div className="bk-toolbar">
+        <input
+          type="search"
+          className="bk-search"
+          aria-label="Search quotes"
+          placeholder={isPhone ? 'Search quotes' : 'Search quotes, customers, routes'}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {isPhone ? (
+          <>
+            {view === 'list' && (
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger aria-label="Filter quotes by status" className="bk-toolbar__status">
+                  <SelectValue>{statusText(currentStatus)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{statusText(o)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            <button
+              type="button"
+              className="bk-view-toggle"
+              aria-label={view === 'list' ? 'Show as board' : 'Show as list'}
+              title={view === 'list' ? 'Show as board' : 'Show as list'}
+              onClick={() => setView(view === 'list' ? 'board' : 'list')}
+            >
+              {view === 'list' ? <Columns3 size={18} aria-hidden="true" /> : <ListIcon size={18} aria-hidden="true" />}
+            </button>
+          </>
+        ) : (
+          <Segmented
+            label="Quote view"
+            value={view}
+            onChange={setView}
+            options={[{ value: 'board', label: 'Board' }, { value: 'list', label: 'List' }]}
           />
-          <div style={{ display: 'flex', gap: 4 }}>
-            {(['board', 'list'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)} style={{
-                background: view === v ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                color: view === v ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                padding: '6px 12px',
-                borderRadius: 2,
-                fontSize: 11,
-                fontFamily: 'var(--font-mono)',
-                cursor: 'pointer',
-                letterSpacing: '0.06em',
-                fontWeight: view === v ? 500 : 400,
-                transition: 'all 0.2s ease',
-              }}>{v === 'board' ? 'Board' : 'List'}</button>
-            ))}
-          </div>
-          <div style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
-            <span>{totalQuotesCount} quotes</span>
-          </div>
-        </div>
-      )}
+        )}
+        <span className="bk-toolbar__end">
+          {view === 'board' && !billingBlocked ? 'Drag a card to change its status' : ''}
+          {failedColumns.length === 0 && <>{view === 'board' && !billingBlocked ? ' · ' : ''}{totalQuotesCount} {totalQuotesCount === 1 ? 'quote' : 'quotes'}</>}
+        </span>
+        {/* List view (R6): the status filter shares the search row, as on
+            Orders and History, so the table starts at the same height. */}
+        {!isPhone && view === 'list' && (
+          <StatusFilter
+            label="Filter quotes by status"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={statusOptions}
+          />
+        )}
+      </div>
 
       {billingBlocked && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, padding: 14,
-          borderRadius: 6, background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)',
-          flexShrink: 0,
-        }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--status-danger)', marginBottom: 2 }}>Quoting is blocked</div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{subscriptionStatusDetail(authUser?.subscription_status)} Drag-and-drop status changes are disabled until then.</div>
+        <div className="bk-notice bk-notice--danger" role="status" style={{ flexShrink: 0, marginBottom: 16 }}>
+          <div>
+            <p className="bk-notice__text">Quoting is blocked</p>
+            <p className="bk-notice__sub">{subscriptionStatusDetail(authUser?.subscription_status)} Drag-and-drop status changes are disabled until then.</p>
           </div>
-          <button onClick={() => navigate('/settings/billing')} className="btn-action" style={{ fontSize: 11, flexShrink: 0 }}>
-            GO TO BILLING
+          <button type="button" onClick={() => navigate('/settings/billing')} className="bk-btn bk-btn--primary">
+            Go to billing
           </button>
         </div>
       )}
 
       {/* Tabs */}
-      {view === 'board' ? (
+      {view === 'board' && failedColumns.length === QUERY_COLUMNS.length ? (
+        <LoadError
+          what="quotes"
+          error={columnQueries.DRAFT.error ?? columnQueries.DRAFT.failureReason}
+          busy={QUERY_COLUMNS.some(col => columnQueries[col as keyof typeof columnQueries].isFetching)}
+          onRetry={retryFailedColumns}
+        />
+      ) : view === 'board' ? (
         <DndContext
           sensors={sensors}
           onDragStart={handleDragStart}
@@ -522,27 +727,68 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           {/* Quotes Kanban — fills whatever height is left below the controls; each
               column scrolls its own card list instead of the whole page growing. */}
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexShrink: 0 }}>
-              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}>QUOTES PIPELINE — DRAG TO UPDATE STATUS</span>
-              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{totalQuotesCount} quotes</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: '1fr', gap: 16, flex: 1, minHeight: 0 }}>
-              {COLUMNS.map(col => {
-                const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading, isFetchingNextPage, fetchNextPage } = flattenColumn(columnQueries[col]);
+            <div className="bk-kanban" ref={kanbanRef}>
+              {BOARD_COLUMNS.map(col => {
+                const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading: colLoading, isFetchingNextPage, fetchNextPage } = boardColumn(col);
+                const isExpiredCol = col === 'EXPIRED';
+                const colFailed = isExpiredCol ? failedColumns.includes('DRAFT') && failedColumns.includes('SENT') : failedColumns.includes(col);
+                const isLoading = colLoading && !colFailed;
+                const colQuery = isExpiredCol ? draftQ : columnQueries[col as keyof typeof columnQueries];
                 return (
-                <div key={col} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0, background: 'var(--bg-panel)', borderRadius: 6, padding: '8px 4px 8px 8px' }}>
-                  <div style={{ borderTop: `2px solid ${STATUS_COLOR[col] || 'var(--border-subtle)'}`, paddingTop: 8, marginBottom: 10, marginRight: 4, flexShrink: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[col] || 'var(--text-secondary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{COLUMN_LABELS[col]}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-secondary)', background: 'var(--bg-surface-hover)', padding: '2px 7px', borderRadius: 10 }}>{colCount}</span>
-                    </div>
-                    {colTotal > 0 && (
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', padding: '4px 2px 0' }}>{formatCurrency(colTotal)}</div>
-                    )}
+                <section key={col} className="bk-col" aria-label={`${COLUMN_LABELS[col]} quotes`}>
+                  <div className="bk-col__head">
+                    <span className="bk-col__title">
+                      <span className={`bk-dot bk-dot--${statusTone(col)}`} aria-hidden="true" />
+                      {COLUMN_LABELS[col]}
+                      {!colFailed && <span className="bk-col__count">{colCount}</span>}
+                    </span>
+                    {colTotal > 0 && <span className="bk-col__total" title={formatCurrency(colTotal)}>{formatMoneyWhole(colTotal)}</span>}
                   </div>
                   <div className="kanban-col-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
-                    {isLoading ? (
-                      <div style={{ padding: '28px 0', display: 'flex', justifyContent: 'center' }}><Loader size={22} /></div>
+                    {colFailed ? (
+                      <LoadError
+                        compact
+                        what={`${COLUMN_LABELS[col].toLowerCase()} quotes`}
+                        error={colQuery.error ?? colQuery.failureReason}
+                        busy={colQuery.isFetching}
+                        onRetry={() => colQuery.refetch()}
+                      />
+                    ) : isLoading ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{[0, 1, 2].map(i => <div key={i} className="ops-skel" style={{ height: 84, borderRadius: 8 }} />)}</div>
+                    ) : col === 'BOOKED' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 2 }}>
+                        {colItems.map((q: { id: number | string; booked_load?: { id: number | string; load_number?: string; status?: string } | null }) => {
+                          const load = bookedLoadOf(q);
+                          return (
+                            <StaticQuoteCard
+                              key={q.id}
+                              quote={q}
+                              stage="booked"
+                              onClick={() => navigate(`/bookings/quotes/${q.id}`)}
+                              footer={load ? (
+                                <button type="button" className="bk-btn bk-btn--secondary bk-btn--block bk-qcard__action"
+                                  title={load.load_number ? `Open booking ${load.load_number}` : 'Open booking'}
+                                  onClick={() => navigate(`/bookings/${load.id}`)}>
+                                  View booking
+                                </button>
+                              ) : null}
+                            />
+                          );
+                        })}
+                        {colItems.length === 0 && <div className="bk-col__empty">No booked quotes. Accepted quotes land here once converted to a booking.</div>}
+                        {hasNextPage && (
+                          <button type="button" className="bk-btn bk-btn--quiet bk-btn--block" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+                            {isFetchingNextPage ? 'Loading…' : `Load 10 more (${colCount - colItems.length} left)`}
+                          </button>
+                        )}
+                      </div>
+                    ) : isExpiredCol ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 2 }}>
+                        {colItems.map((q: any) => (
+                          <StaticQuoteCard key={q.id} quote={q} onClick={() => navigate(`/bookings/quotes/${q.id}`)} />
+                        ))}
+                        {colItems.length === 0 && <div className="bk-col__empty">No expired quotes</div>}
+                      </div>
                     ) : (
                       <DroppableColumn columnId={col} items={colItems} isOver={overColumnId === col}>
                         {colItems.map((q: any) => (
@@ -552,54 +798,38 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                             onClick={() => navigate(`/bookings/quotes/${q.id}`)}
                             onConvertToLoad={handleConvertToLoad}
                             onViewBooking={(e, load) => { e.stopPropagation(); navigate(`/bookings/${load.id}`); }}
-                            convertedLoad={loadByQuoteId.get(String(q.id))}
+                            convertedLoad={bookedLoadOf(q)}
                             dragDisabled={billingBlocked}
                           />
                         ))}
                         {colItems.length === 0 && (
-                          <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 11, border: '1px dashed var(--border-subtle)', borderRadius: 2 }}>Drop here</div>
+                          <div className="bk-col__empty">{billingBlocked ? 'No quotes' : 'No quotes. Drag a card here to move it.'}</div>
                         )}
                         {hasNextPage && (
                           <button
+                            type="button"
+                            className="bk-btn bk-btn--quiet bk-btn--block"
                             onClick={() => fetchNextPage()}
                             disabled={isFetchingNextPage}
-                            style={{
-                              width: '100%', padding: '8px', marginTop: 2, fontSize: 10, fontFamily: 'var(--font-mono)',
-                              letterSpacing: '0.05em', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                              color: 'var(--text-secondary)', borderRadius: 2, cursor: isFetchingNextPage ? 'default' : 'pointer',
-                              opacity: isFetchingNextPage ? 0.6 : 1,
-                            }}
                           >
-                            {isFetchingNextPage ? 'LOADING…' : `LOAD 10 MORE (${colCount - colItems.length} LEFT)`}
+                            {isFetchingNextPage ? 'Loading…' : `Load 10 more (${colCount - colItems.length} left)`}
                           </button>
                         )}
                       </DroppableColumn>
                     )}
                   </div>
-                </div>
+                </section>
                 );
               })}
             </div>
+            <BoardScrollbar target={kanbanRef} label="Scroll the quote board" />
           </div>
 
           {/* Drag Overlay */}
           <DragOverlay>
             {activeQuote ? (
-              <div style={{ padding: 12, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, boxShadow: '0 8px 16px rgba(0,0,0,0.25)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 6, background: STATUS_COLOR[activeQuote.status] || 'var(--border-subtle)', flexShrink: 0 }} />
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>{activeQuote.quote_number}</span>
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{activeQuote.customer_name || '—'}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                  {routeOf(activeQuote)}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(parseFloat(activeQuote.total_amount || '0'))}</span>
-                  {activeQuote.confidence && (
-                    <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', color: confidenceColor(activeQuote.confidence), border: `1px solid ${confidenceColor(activeQuote.confidence)}` }}>{sentenceCase(activeQuote.confidence)}</span>
-                  )}
-                </div>
+              <div className="bk-qcard" style={{ borderColor: 'var(--border-active)', cursor: 'grabbing' }}>
+                <QuoteCardBody quote={activeQuote} />
               </div>
             ) : null}
           </DragOverlay>
@@ -608,140 +838,138 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
         /* List view — quotes table, backed by the same per-status paginated
            queries as the board (plus a 5th "All" query with no status
            filter) — switching tabs reuses whatever's already loaded. */
-        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          {/* Status filter tabs */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexShrink: 0 }}>
-            {['ALL', ...COLUMNS].map(status => (
-              <button
-                key={status}
-                onClick={() => setStatusFilter(status)}
-                style={{
-                  background: statusFilter === status ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
-                  color: statusFilter === status ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                  padding: '6px 12px',
-                  borderRadius: 2,
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
-                  cursor: 'pointer',
-                  letterSpacing: '0.06em',
-                  fontWeight: statusFilter === status ? 500 : 400,
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                {status === 'ALL' ? 'All' : COLUMN_LABELS[status]} ({status === 'ALL' ? totalQuotesCount : flattenColumn(columnQueries[status]).count})
-              </button>
-            ))}
-          </div>
+        <div className="bk-qlist-fill" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-          <div className="card" style={{ padding: 0, overflow: 'auto', flex: 1, minHeight: 0 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          {loadFailed(activeListQuery) ? (
+            <LoadError
+              what="quotes"
+              error={activeListQuery.error ?? activeListQuery.failureReason}
+              busy={activeListQuery.isFetching}
+              onRetry={() => activeListQuery.refetch()}
+            />
+          ) : (
+          (() => {
+          // Columns with nothing in them on any row step aside (R9).
+          const anyOutcome = listItems.some((q: any) => q.outcome === 'accepted' || q.outcome === 'rejected');
+          const anyAction = listItems.some((q: any) => q.status === 'ACCEPTED' || !!bookedLoadOf(q));
+          return (
+          <div className="bk-table-wrap bk-qlist-fill" style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+            <table className="table-heading-roles bk-table">
               <thead>
-                <tr style={{ background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)', position: 'sticky', top: 0, zIndex: 1 }}>
-                  {['QUOTE #', 'CUSTOMER', 'ROUTE', 'STATUS', 'OUTCOME', 'CREATED', 'AMOUNT', 'ACTION'].map(h => (
-                    <th key={h} style={{
-                      padding: '12px 16px',
-                      textAlign: h === 'AMOUNT' ? 'right' : h === 'ACTION' ? 'center' : 'left',
-                      fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-                      fontWeight: 500, letterSpacing: '0.08em', whiteSpace: 'nowrap',
-                    }}>{h}</th>
-                  ))}
+                <tr style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                  <th scope="col" className="bk-col-load">Quote #</th>
+                  <th scope="col">Customer</th>
+                  <th scope="col" className="bk-col-route">Route</th>
+                  <th scope="col">Status</th>
+                  {anyOutcome && <th scope="col" className="bk-col-phone">Outcome</th>}
+                  <th scope="col" className="bk-col-phone">Created</th>
+                  <th scope="col" className="is-num">Amount</th>
+                  {anyAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Action</span></th>}
                 </tr>
               </thead>
               <tbody>
-                {listItems.map((quote: any, idx: number) => (
+                {listItems.map((quote: any) => (
                   <tr
                     key={quote.id}
+                    className="is-clickable"
+                    {...rowLink(() => navigate(`/bookings/quotes/${quote.id}`))}
                     onClick={() => navigate(`/bookings/quotes/${quote.id}`)}
-                    style={{
-                      borderBottom: idx < listItems.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-                      cursor: 'pointer', transition: 'background 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-surface)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
-                    <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                    <td className="is-id bk-col-load">
                       {quote.quote_number}
                       {quote.fuel_alert && (
-                        <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 11, marginLeft: 6 }}>⛽</span>
+                        <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: 6, color: 'var(--status-warning-text)' }}><Fuel size={16} aria-hidden="true" /></span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{quote.customer_name || '—'}</td>
-                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }} title={routeOf(quote)}>{routeOf(quote)}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{
-                        display: 'inline-block', whiteSpace: 'nowrap',
-                        fontFamily: 'var(--font-mono)', fontSize: 10,
-                        color: STATUS_COLOR[quote.status] || 'var(--text-secondary)',
-                        padding: '4px 8px',
-                        border: `1px solid ${STATUS_COLOR[quote.status] || 'var(--border-subtle)'}`,
-                        borderRadius: 4,
-                      }}>
-                        {COLUMN_LABELS[quote.status] || quote.status}
-                      </span>
+                    <td className="is-primary bk-col-customer" title={quote.customer_name || ''}>
+                      {quote.customer_name || '—'}
+                      {/* Phones: the quote number rides under the customer (its column folds away). */}
+                      <RecordNo value={quote.quote_number} />
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      {quote.outcome === 'accepted' && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', fontWeight: 500 }}>✓ Won</span>
-                      )}
-                      {quote.outcome === 'rejected' && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', fontWeight: 500 }}>✗ Lost</span>
-                      )}
-                      {(!quote.outcome || quote.outcome === 'pending') && (
-                        <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>—</span>
-                      )}
+                    <td className="is-truncate bk-col-route" title={routeOf(quote)}>{routeOf(quote)}</td>
+                    <td>
+                      {/* The board's stage: a sent quote marked lost reads Declined here too. */}
+                      {(() => {
+                        // Converted into a load: "Booked", as on the quote page (its tone follows the load).
+                        const booked = bookedLoadOf(quote);
+                        if (booked || quote.converted) return <StatusChip status={booked?.status || 'BOOKED'} label="Booked" size="sm" />;
+                        const stage = boardStage(quote);
+                        return stage
+                          ? <StatusChip status={stage} label={COLUMN_LABELS[stage]} size="sm" />
+                          : <StatusChip status={quote.status === 'IT' ? 'IN_TRANSIT' : quote.status} label={COLUMN_LABELS[quote.status]} size="sm" />;
+                      })()}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-                      {quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '—'}
+                    {anyOutcome && <td className="bk-col-phone">
+                      {quote.outcome === 'accepted' && <StatusChip status="WON" size="sm" />}
+                      {quote.outcome === 'rejected' && <StatusChip status="LOST" size="sm" />}
+                      {(!quote.outcome || quote.outcome === 'pending') && <span>—</span>}
+                    </td>}
+                    <td className="is-date bk-col-phone">
+                      {quote.created_at ? formatDate(quote.created_at) : '—'}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      {formatCurrency(parseFloat(quote.total_amount || '0'))}
+                    <td className="is-money" title={formatCurrency(parseFloat(quote.total_amount || '0'))}>
+                      {/* Lists show whole rands; the quote itself carries the cents (R7). */}
+                      {formatMoneyWhole(parseFloat(quote.total_amount || '0'))}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                      {quote.status === 'ACCEPTED' && loadByQuoteId.has(String(quote.id)) && (
+                    {anyAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
+                      {!!bookedLoadOf(quote) && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); navigate(`/bookings/${loadByQuoteId.get(String(quote.id)).id}`); }}
-                          style={{ background: WON_GREEN_BG, border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          type="button"
+                          className="bk-btn bk-btn--secondary bk-btn--sm"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/bookings/${bookedLoadOf(quote)!.id}`); }}
                         >
-                          ✓ View booking
+                          View booking
                         </button>
                       )}
-                      {quote.status === 'ACCEPTED' && !loadByQuoteId.has(String(quote.id)) && (
+                      {quote.status === 'ACCEPTED' && !bookedLoadOf(quote) && (
                         <button
+                          type="button"
+                          className="bk-btn bk-btn--secondary bk-btn--sm"
                           onClick={(e) => handleConvertToLoad(e, quote)}
-                          style={{ background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
-                          → Booking
+                          Convert to booking
                         </button>
                       )}
-                    </td>
+                    </td>}
                   </tr>
                 ))}
               </tbody>
             </table>
-            {listIsLoading && (
-              <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={24} /></div>
+            {listIsLoading && !loadFailed(activeListQuery) && (
+              <TableSkeleton rows={6} cols={5} label="Loading quotes" />
             )}
             {!listIsLoading && listItems.length === 0 && (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No quotes found</div>
+              <div className="bk-empty"><p className="bk-empty__text">{search ? 'No quotes match your search.' : statusFilter === 'ALL' ? 'No quotes yet.' : `No ${COLUMN_LABELS[statusFilter].toLowerCase()} quotes.`}</p></div>
             )}
             {listHasNextPage && (
               <div style={{ padding: 12, display: 'flex', justifyContent: 'center' }}>
                 <button
+                  type="button"
+                  className="bk-btn bk-btn--secondary"
                   onClick={() => listFetchNextPage()}
                   disabled={listIsFetchingNextPage}
-                  style={{
-                    padding: '8px 20px', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em',
-                    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-                    borderRadius: 2, cursor: listIsFetchingNextPage ? 'default' : 'pointer', opacity: listIsFetchingNextPage ? 0.6 : 1,
-                  }}
                 >
-                  {listIsFetchingNextPage ? 'LOADING…' : 'LOAD 10 MORE'}
+                  {listIsFetchingNextPage ? 'Loading…' : 'Load 10 more'}
                 </button>
               </div>
             )}
           </div>
+          );
+          })()
+          )}
         </div>
+      )}
+
+      {pendingSend && (
+        <QuoteSendPreview
+          quote={pendingSend.quote}
+          sending={statusMutation.isPending}
+          onCancel={() => setPendingSend(null)}
+          onConfirm={() => {
+            const { quote, oldColumn } = pendingSend;
+            moveQuote(String(quote.id), oldColumn, 'SENT', () => setPendingSend(null));
+          }}
+        />
       )}
 
       {confirmOpts && (

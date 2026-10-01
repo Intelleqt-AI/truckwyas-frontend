@@ -1,0 +1,25 @@
+/* Explicit section headings and form labels in desktop detail pages. */
+@media (min-width: 768px) {
+  .os-app-shell .dashboard-detail-section {
+    --detail-section-size: 16px;
+    --detail-section-line: 24px;
+    --detail-section-weight: 600;
+    --detail-section-font: var(--font-sans);
+    --detail-section-tracking: normal;
+    --detail-section-case: none;
+    font: 600 16px/24px var(--font-sans);
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .os-app-shell .dashboard-detail-field-label {
+    --detail-field-label-size: 13px;
+    --detail-field-label-line: 20px;
+    --detail-field-label-weight: 500;
+    --detail-field-label-font: var(--font-sans);
+    --detail-field-label-tracking: normal;
+    --detail-field-label-case: none;
+    font: 500 13px/20px var(--font-sans);
+    letter-spacing: normal;
+    text-transform: none;
+  }
+}

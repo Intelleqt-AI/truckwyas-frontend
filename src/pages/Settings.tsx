@@ -1,5 +1,6 @@
-import { useParams, NavLink, Navigate } from "react-router-dom";
+import { useParams, Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
+import { SettingsShell, SETTINGS_NAV } from "./settings/SettingsShell";
 
 // Import individual setting pages
 import { ProfileSettings } from "./settings/ProfileSettings";
@@ -14,44 +15,23 @@ import { VehiclesDirectory } from "./settings/VehiclesDirectory";
 import { VehicleTypesDirectory } from "./settings/VehicleTypesDirectory";
 import { DeveloperApi } from "./settings/DeveloperApi";
 
-type SectionItem = { id: string; label: string; component: () => JSX.Element; adminOnly?: boolean };
-type Section = { group: string; items: SectionItem[] };
+// Section id -> component. Labels, grouping and the admin-only flag live in
+// SETTINGS_NAV (SettingsShell.tsx) so the sub-page routes share the same nav.
+const COMPONENTS: Record<string, () => JSX.Element> = {
+  profile: ProfileSettings,
+  notifications: NotificationSettings,
+  security: SecuritySettings,
+  company: CompanySettings,
+  users: UsersPermissions,
+  billing: BillingSettings,
+  integrations: IntegrationsSettings,
+  customers: CustomersDirectory,
+  vehicles: VehiclesDirectory,
+  'vehicle-types': VehicleTypesDirectory,
+  'risk-api': DeveloperApi,
+};
 
-const SECTIONS: Section[] = [
-  {
-    group: 'My Account',
-    items: [
-      { id: 'profile', label: 'Profile', component: ProfileSettings },
-      { id: 'notifications', label: 'Notifications', component: NotificationSettings },
-      { id: 'security', label: 'Security', component: SecuritySettings },
-    ],
-  },
-  {
-    group: 'Workspace',
-    items: [
-      { id: 'company', label: 'Company Details', component: CompanySettings, adminOnly: true },
-      { id: 'users', label: 'Users & Permissions', component: UsersPermissions, adminOnly: true },
-      { id: 'billing', label: 'Billing', component: BillingSettings, adminOnly: true },
-      { id: 'integrations', label: 'Integrations', component: IntegrationsSettings, adminOnly: true },
-    ],
-  },
-  {
-    group: 'Directory',
-    items: [
-      { id: 'customers', label: 'Customers', component: CustomersDirectory },
-      { id: 'vehicles', label: 'Vehicles', component: VehiclesDirectory },
-      { id: 'vehicle-types', label: 'Vehicle Types', component: VehicleTypesDirectory },
-    ],
-  },
-  {
-    group: 'Developers',
-    items: [
-      { id: 'risk-api', label: 'Risk-Scoring API', component: DeveloperApi, adminOnly: true },
-    ],
-  },
-];
-
-const ALL_ITEMS = SECTIONS.flatMap(s => s.items);
+const ALL_ITEMS = SETTINGS_NAV.flatMap(s => s.items);
 
 export default function Settings() {
   const { section } = useParams();
@@ -63,107 +43,15 @@ export default function Settings() {
   const current = ALL_ITEMS.find(i => i.id === section);
 
   // Redirect non-admins away from admin-only sections
-  if ((current as any)?.adminOnly && !isAdmin) {
+  if (current?.adminOnly && !isAdmin) {
     return <Navigate to="/settings/profile" replace />;
   }
 
-  const CurrentComponent = current?.component || ProfileSettings;
-
-  const visibleSections = SECTIONS.map(s => ({
-    ...s,
-    items: s.items.filter(item => !(item as any).adminOnly || isAdmin),
-  })).filter(s => s.items.length > 0);
+  const CurrentComponent = (current && COMPONENTS[current.id]) || ProfileSettings;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100%', gap: 0 }}>
-      {/* Sidebar — this outer column stays full height so its right border
-          runs top to bottom alongside the (taller) settings panel; only the
-          nav content inside is sticky, via the inner wrapper below. */}
-      <div style={{
-        width: 220,
-        flexShrink: 0,
-        borderRight: '1px solid var(--border-subtle)',
-      }}>
-      <div style={{
-        position: 'sticky',
-        top: 0,
-        maxHeight: '100vh',
-        overflowY: 'auto',
-        paddingTop: 8,
-        paddingBottom: 24,
-      }}>
-        {visibleSections.map((s, idx) => (
-          <div key={s.group} style={{ marginBottom: idx < visibleSections.length - 1 ? 20 : 0 }}>
-            <div style={{
-              fontSize: 10,
-              fontFamily: 'var(--font-mono)',
-              color: 'var(--text-tertiary)',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              padding: '12px 20px 6px',
-            }}>
-              {s.group}
-            </div>
-            {s.items.map(item => {
-              const active = section === item.id;
-              return (
-                <NavLink
-                  key={item.id}
-                  to={`/settings/${item.id}`}
-                  style={{
-                    display: 'block',
-                    padding: '8px 20px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    textDecoration: 'none',
-                    color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                    background: active ? 'rgba(var(--accent-primary-rgb, 37,99,235), 0.08)' : 'transparent',
-                    borderLeft: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
-                    transition: 'color 0.15s, background 0.15s',
-                  }}
-                >
-                  {item.label}
-                </NavLink>
-              );
-            })}
-          </div>
-        ))}
-        {/* Platform-level, not a company setting — jumps to its own full
-            page rather than rendering inline like the sections above. */}
-        {user?.is_superuser && (
-          <div style={{ marginTop: 20, paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
-            <div style={{
-              fontSize: 10,
-              fontFamily: 'var(--font-mono)',
-              color: 'var(--text-tertiary)',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              padding: '0 20px 6px',
-            }}>
-              Platform
-            </div>
-            <NavLink
-              to="/admin"
-              style={{
-                display: 'block',
-                padding: '8px 20px',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12,
-                textDecoration: 'none',
-                color: 'var(--status-warning)',
-              }}
-            >
-              Admin Dashboard
-            </NavLink>
-          </div>
-        )}
-      </div>
-      </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, padding: '0 0 0 32px', minWidth: 0 }}>
-        <CurrentComponent />
-      </div>
-    </div>
+    <SettingsShell activeId={section}>
+      <CurrentComponent />
+    </SettingsShell>
   );
 }

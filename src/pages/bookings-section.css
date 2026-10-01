@@ -1,0 +1,798 @@
+/* Bookings section (quotes, orders, history, booking/quote/customer detail).
+   Page-scoped primitives so every Bookings view shares one toolbar, filter,
+   table and status-chip treatment. Presentation only. */
+
+.bk-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: var(--control-h, 36px);
+  margin-bottom: var(--card-gap, 16px);
+  flex-shrink: 0;
+}
+.bk-toolbar__end {
+  margin-left: auto;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bk-search {
+  box-sizing: border-box;
+  height: var(--control-h, 36px);
+  min-height: var(--control-h, 36px);
+  width: 280px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control, 8px);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+}
+.bk-search::placeholder { color: var(--text-tertiary); }
+.bk-search:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
+/* Filter chips and segmented toggles share one control geometry. */
+.bk-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.bk-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--control-h, 36px);
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control, 8px);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.bk-chip:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+.bk-chip.is-active {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-active);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.bk-chip:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.bk-chip__count { font-variant-numeric: tabular-nums; color: var(--text-tertiary); }
+.bk-chip.is-active .bk-chip__count { color: var(--text-secondary); }
+
+/* Buttons */
+.bk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--control-h, 36px);
+  padding: 0 14px;
+  border-radius: var(--radius-control, 8px);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+.bk-btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.bk-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.bk-btn--primary { background: var(--btn-primary-bg); color: var(--btn-primary-fg); }
+.bk-btn--primary:hover:not(:disabled) { background: var(--btn-primary-hover); }
+.bk-btn--primary:active:not(:disabled) { background: var(--btn-primary-pressed); }
+.bk-btn--secondary { background: var(--bg-surface); border-color: var(--border-subtle); color: var(--text-primary); }
+.bk-btn--secondary:hover:not(:disabled) { background: var(--bg-surface-hover); }
+.bk-btn--quiet { background: transparent; border-color: transparent; color: var(--text-secondary); font-weight: 400; }
+.bk-btn--quiet:hover:not(:disabled) { background: var(--bg-surface-hover); color: var(--text-primary); }
+.bk-btn--quiet-danger { background: transparent; border-color: transparent; color: var(--text-secondary); font-weight: 400; }
+.bk-btn--quiet-danger:hover:not(:disabled) { background: var(--status-danger-bg); color: var(--status-danger-text); }
+.bk-btn--sm { min-height: 32px; padding: 4px 10px; }
+.bk-btn--outline { background: transparent; border-color: var(--accent-primary); color: var(--accent-primary); }
+.bk-btn--success { background: var(--status-success-bg); border-color: var(--status-success-text); color: var(--status-success-text); }
+.bk-btn--success-outline { background: transparent; border-color: var(--status-success-text); color: var(--status-success-text); }
+.bk-btn--block { width: 100%; }
+
+/* Tables */
+.bk-table-wrap {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card, 12px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Column priority is decided by the card's own width, not the viewport,
+     so a collapsed or expanded sidebar gives the same result. */
+  container-type: inline-size;
+}
+.bk-table { width: 100%; border-collapse: collapse; }
+.bk-table thead tr { background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); }
+.bk-table th { height: 44px; padding: 12px 16px; text-align: left; white-space: nowrap; vertical-align: middle; box-sizing: border-box; }
+.bk-table th:first-child, .bk-table td:first-child { padding-left: var(--card-pad, 20px); }
+.bk-table th:last-child, .bk-table td:last-child { padding-right: var(--card-pad, 20px); }
+.bk-table td {
+  padding: 7px 16px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  height: 48px; /* 48px rows; 7px padding leaves room for 32px row controls */
+  box-sizing: border-box;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+.bk-table tbody tr { border-bottom: 1px solid var(--border-row); transition: background 0.15s ease; }
+.bk-table tbody tr:last-child { border-bottom: none; }
+.bk-table tbody tr.is-clickable { cursor: pointer; }
+.bk-table tbody tr.is-clickable:hover { background: var(--bg-surface-hover); }
+.bk-table .is-num, .bk-table th.is-num { text-align: right; font-variant-numeric: tabular-nums; }
+.bk-table .is-center, .bk-table th.is-center { text-align: center; }
+.bk-table .is-primary { color: var(--text-primary); }
+.bk-table .is-money { color: var(--text-primary); font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
+.bk-table .is-id { font-family: var(--font-sans); font-size: 14px; color: var(--text-primary); font-weight: 400; font-variant-numeric: tabular-nums; }
+.bk-table .is-date { color: var(--text-secondary); }
+.bk-table .is-truncate { max-width: 40ch; overflow: hidden; text-overflow: ellipsis; }
+.bk-table .bk-col-customer { max-width: 22ch; }
+.bk-table .bk-col-route { max-width: 30ch; }
+.bk-table .bk-col-opt { max-width: 24ch; }
+.bk-muted { color: var(--text-tertiary); }
+/* Money columns hold their width while figures load, so nothing reflows. */
+.bk-table .bk-col-money { width: 128px; min-width: 112px; }
+.bk-table .bk-overdue { color: var(--status-danger-text); }
+.bk-table .bk-col-terms { white-space: nowrap; }
+/* A table wrap inside an existing card: no second border or radius. */
+.bk-table-wrap--bare { border: 0; border-radius: 0; background: transparent; }
+/* Column priority (§11.14): Status and Amount never leave the card. Free
+   text truncates first, then the lowest-value column drops out. */
+@container (max-width: 1040px) {
+  .bk-table .bk-col-customer { max-width: 17ch; }
+  .bk-table .bk-col-route { max-width: 20ch; }
+  .bk-table .bk-col-opt { max-width: 18ch; }
+  .bk-table .bk-col-city { display: none; }
+}
+@container (max-width: 900px) {
+  .bk-table .bk-col-opt { display: none; }
+}
+/* History carries a row action as well, so the assignment column (least
+   useful once a load is finished) gives way earlier. */
+@container (max-width: 1280px) {
+  .bk-table--history .bk-col-opt { display: none; }
+}
+@container (max-width: 700px) {
+  .bk-table .bk-col-route, .bk-table .bk-col-narrow { display: none; }
+}
+/* Phones: the row keeps who, status and money; paddings tighten first. */
+@container (max-width: 520px) {
+  .bk-table .bk-col-load, .bk-table .bk-col-overdue, .bk-table .bk-col-phone, .bk-table .bk-col-select { display: none; }
+  .bk-table .bk-col-customer { max-width: 14ch; }
+  .bk-table td { font-size: 13px; }
+  /* R4: cells keep at least 12px; the outer edge matches the 16px card pad,
+     also when the hidden select column was the first one. */
+  .bk-table th, .bk-table td { padding-left: 12px; padding-right: 12px; }
+  .bk-table th:first-child, .bk-table td:first-child,
+  .bk-table .bk-col-select + th, .bk-table .bk-col-select + td { padding-left: 16px; }
+  .bk-table th:last-child, .bk-table td:last-child { padding-right: 16px; }
+}
+/* Columns size to their content; the card scrolls sideways before any cell is cut. */
+.bk-table .is-nowrap { white-space: nowrap; }
+/* One row action (RowActions) pinned to the right edge, so it is reachable
+   without scrolling a wide table sideways. */
+.bk-table--pin-actions th:last-child:not([colspan]),
+.bk-table--pin-actions td:last-child:not([colspan]) { position: sticky; right: 0; z-index: 1; width: 1%; background: var(--bg-surface); }
+.bk-table--pin-actions tbody tr.is-clickable:hover td:last-child:not([colspan]) { background: var(--bg-surface-hover); }
+
+/* Status chips: sentence case label + AA text role on a tinted surface. */
+.bk-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-chip, 6px);
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.bk-status--neutral { color: var(--text-secondary); background: var(--status-neutral-bg); }
+.bk-status--info { color: var(--status-info-text); background: var(--accent-glow); border-color: transparent; }
+.bk-status--warning { color: var(--status-warning-text); background: var(--status-warning-bg); }
+.bk-status--success { color: var(--status-success-text); background: var(--status-success-bg); }
+.bk-status--danger { color: var(--status-danger-text); background: var(--status-danger-bg); }
+
+/* Empty / error states */
+.bk-empty {
+  padding: 40px 24px;
+  text-align: center;
+  font-family: var(--font-sans);
+}
+.bk-empty__icon { color: var(--text-tertiary); margin-bottom: 12px; display: inline-flex; }
+.bk-empty__title { font-size: 16px; line-height: 24px; font-weight: 600; color: var(--text-primary); margin: 0 0 4px; }
+.bk-empty__text { font-size: 13px; line-height: 20px; color: var(--text-secondary); margin: 0 0 16px; }
+.bk-empty__text:last-child { margin-bottom: 0; }
+
+/* Metric row */
+.bk-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--card-gap, 16px);
+  margin-bottom: var(--section-gap, 24px);
+}
+@media (max-width: 900px) {
+  .bk-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .bk-metrics { gap: 12px; }
+  .bk-search { width: 100%; }
+}
+
+/* ---- Detail pages (booking, quote, customer) ---- */
+.bk-detail { font-family: var(--font-sans); }
+.bk-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  margin: 0 0 8px -4px;
+  padding: 4px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-control, 8px);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.bk-back:hover { color: var(--text-primary); }
+.bk-back:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.bk-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: var(--section-gap, 24px);
+}
+.bk-detail-header__titles { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.bk-detail-header__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bk-eyebrow { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--text-tertiary); }
+.bk-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.bk-title { margin: 0; font-size: var(--text-display, 28px); line-height: 34px; font-weight: 600; letter-spacing: var(--tracking-display, -0.025em); color: var(--text-primary); overflow-wrap: anywhere; }
+@media (max-width: 768px) { .bk-title { font-size: 24px; line-height: 30px; } }
+.bk-subtitle { margin: 0; font-size: 14px; line-height: 20px; color: var(--text-secondary); }
+
+.bk-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card, 12px);
+  padding: var(--card-pad, 20px);
+  min-width: 0;
+}
+.bk-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 24px;
+  margin-bottom: 16px;
+}
+.bk-card__title { margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: var(--text-primary); letter-spacing: normal; text-transform: none; }
+
+.bk-kv { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border-row); }
+.bk-kv:last-child { border-bottom: none; }
+.bk-kv__label { font-size: 13px; line-height: 20px; color: var(--text-secondary); flex-shrink: 0; }
+.bk-kv__value { font-size: 14px; line-height: 20px; color: var(--text-primary); text-align: right; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
+.bk-kv--total { border-bottom: none; padding-top: 12px; }
+/* Fuel cost: estimated vs actual, under the order total. */
+.bk-fuel { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-row); }
+.bk-fuel__title { display: flex; align-items: center; gap: 6px; font: 500 13px/20px var(--font-sans); color: var(--text-primary); }
+.bk-fuel__over { color: var(--status-danger-text); }
+/* A rate shown under its line (Base rate → R x/km): not a summand (R10). */
+.bk-kv__note { display: block; font-size: 12px; line-height: 16px; color: var(--text-secondary); }
+.bk-kv--total .bk-kv__label { font-weight: 500; color: var(--text-primary); }
+.bk-kv--total .bk-kv__value { font-weight: 600; }
+
+.bk-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.bk-field__label { font-size: 13px; line-height: 20px; font-weight: 500; color: var(--text-secondary); }
+.bk-help { font-size: 13px; line-height: 20px; color: var(--text-secondary); margin: 0; }
+.bk-help--warning { color: var(--status-warning-text); }
+.bk-help--danger { color: var(--status-danger-text); }
+.bk-link { background: none; border: none; padding: 0; color: var(--link, var(--accent-primary)); font: inherit; font-weight: 500; text-decoration: none; cursor: pointer; }
+/* One link style app-wide (R4): accent text, underline on hover. */
+.bk-link:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.bk-link:disabled { color: var(--text-tertiary); cursor: default; }
+.bk-link:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
+.bk-link--sm { font-size: 13px; line-height: 20px; }
+.bk-mono { font-family: var(--font-sans); font-size: 14px; line-height: 20px; font-variant-numeric: tabular-nums; }
+
+.bk-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--card-gap, 16px); align-items: start; }
+.bk-stack { display: flex; flex-direction: column; gap: var(--card-gap, 16px); min-width: 0; }
+/* Main column plus a 360px rail that stays in view, so the two columns never
+   read as a dead gap when their heights differ. */
+.bk-detail-grid--rail { grid-template-columns: minmax(0, 1fr) 360px; }
+.bk-detail-grid--rail > :last-child { position: sticky; top: 24px; }
+@media (max-width: 1000px) {
+  .bk-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .bk-detail-grid--rail > :last-child { position: static; }
+}
+
+/* Dialogs */
+.bk-dialog-backdrop {
+  position: fixed; inset: 0; z-index: 2000;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.bk-dialog {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-dialog, 16px);
+  padding: 24px;
+  width: 100%;
+  max-width: 440px;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  font-family: var(--font-sans);
+}
+.bk-dialog__title { margin: 0 0 8px; font-size: 16px; line-height: 24px; font-weight: 600; color: var(--text-primary); }
+.bk-dialog__body { margin: 0 0 16px; font-size: 14px; line-height: 20px; color: var(--text-secondary); }
+.bk-dialog__footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.bk-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; flex-shrink: 0;
+  background: none; border: 1px solid transparent; border-radius: var(--radius-control, 8px);
+  color: var(--text-secondary); cursor: pointer;
+}
+.bk-icon-btn:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+.bk-icon-btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
+@media (max-width: 767px) {
+  .bk-card { padding: var(--card-pad, 16px); }
+}
+
+.bk-btn--danger-outline { background: transparent; border-color: var(--status-danger-text); color: var(--status-danger-text); }
+.bk-btn--danger-outline:hover:not(:disabled) { background: var(--status-danger-bg); }
+.bk-btn--danger { background: var(--status-danger-text); color: var(--bg-surface); }
+.bk-btn--danger:hover:not(:disabled) { opacity: 0.9; }
+.bk-btn--success-outline:hover:not(:disabled), .bk-btn--outline:hover:not(:disabled) { background: var(--bg-surface-hover); }
+.bk-btn--whatsapp { background: #067A32; color: #fff; }
+.bk-btn--whatsapp:hover { background: #056A2B; }
+.bk-divider { height: 1px; background: var(--border-subtle); margin: 4px 0; border: 0; }
+
+/* Headline amount block in a detail header */
+.bk-amount { display: flex; flex-direction: column; align-items: flex-end; gap: 0; text-align: right; }
+.bk-amount__label { font-size: 13px; line-height: 20px; font-weight: 500; color: var(--text-secondary); }
+.bk-amount__value { font-size: 28px; line-height: 36px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .bk-amount { align-items: flex-start; text-align: left; }
+}
+
+/* Label / value pairs in a two-column card */
+.bk-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
+.bk-facts--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 16px 0 0; padding-top: 16px; border-top: 1px solid var(--border-row); }
+.bk-facts dd { margin: 0; }
+.bk-facts--auto { grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); }
+@media (max-width: 520px) {
+  .bk-facts--3 { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+}
+.bk-fact__label { font-size: 13px; line-height: 20px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
+.bk-fact__value { font-size: 14px; line-height: 20px; color: var(--text-primary); overflow-wrap: anywhere; }
+@media (max-width: 520px) {
+  .bk-facts { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Quote pipeline board: one row of equal columns, however many there are
+   (Draft, Sent, Accepted, Booked, Declined, Expired). Each column keeps a
+   readable 280px minimum; when they don't fit, the board scrolls sideways
+   inside itself (each column still scrolls its own cards up and down)
+   instead of wrapping a column onto a second row or crushing cards. */
+.bk-kanban {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(280px, 1fr);
+  grid-template-rows: minmax(0, 1fr); gap: 16px; flex: 1; min-height: 0;
+  overflow-x: auto; overscroll-behavior-x: contain;
+  /* Its own scrollbar is replaced by .bk-hscroll (arrows at both ends). */
+  scrollbar-width: none;
+}
+.bk-kanban::-webkit-scrollbar { display: none; }
+/* Board scrollbar: a small arrow at each end (one column per click) around
+   a thin, draggable track. */
+.bk-hscroll { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-shrink: 0; }
+.bk-hscroll__btn {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative;
+  width: 20px; height: 20px; padding: 0; border: 1px solid var(--border-default); border-radius: var(--radius-chip, 6px);
+  background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;
+}
+.bk-hscroll__btn:hover:not(:disabled) { background: var(--bg-surface-hover); border-color: var(--border-strong); color: var(--text-primary); }
+.bk-hscroll__btn:disabled { color: var(--text-disabled); cursor: default; }
+.bk-hscroll__btn:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
+/* Track and thumb share one height and one fully rounded shape. The track
+   has an invisible 8px grab margin above and below so it is easy to hit. */
+.bk-hscroll__track {
+  position: relative; flex: 1; min-width: 0; height: 6px;
+  border-radius: 999px; background: var(--bg-raised); cursor: pointer;
+}
+.bk-hscroll__track::before { content: ''; position: absolute; inset: -8px 0; }
+.bk-hscroll__thumb {
+  position: absolute; top: 0; bottom: 0;
+  border-radius: 999px; background: var(--border-strong); cursor: grab; touch-action: none;
+}
+.bk-hscroll__thumb:hover { background: var(--text-tertiary); }
+.bk-hscroll__thumb:active { cursor: grabbing; background: var(--text-tertiary); }
+@media (pointer: coarse) { .bk-hscroll__btn::after { content: ''; position: absolute; inset: -12px; } }
+@media (max-width: 900px) {
+  .bk-kanban { grid-auto-columns: minmax(260px, 85vw); }
+}
+
+/* Order progress: scrolls locally on phones rather than overlapping labels. */
+.bk-stepper { overflow-x: auto; }
+.bk-stepper > ol { min-width: 520px; }
+
+/* Rows that carry a full rand amount stack on phones so the value never
+   breaks mid-number; count-only rows stay two-up. */
+@media (max-width: 560px) {
+  .bk-metrics--money { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- Design principles v2 (docs/brand/DESIGN-PRINCIPLES.md) ---- */
+
+/* Summary figures now use separate tiles: see ops-tiles.css. */
+
+/* Plain-language notice (zero states, blockers). No rail, no glow. */
+.bk-notice {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 16px 24px;
+  margin-bottom: var(--section-gap, 24px);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card, 12px);
+  font-family: var(--font-sans);
+}
+.bk-notice__text { margin: 0; font-size: 14px; line-height: 20px; color: var(--text-primary); }
+.bk-notice__sub { margin: 2px 0 0; font-size: 13px; line-height: 20px; color: var(--text-secondary); }
+.bk-notice--danger { background: var(--status-danger-bg); border-color: transparent; }
+.bk-notice--danger .bk-notice__text { color: var(--status-danger-text); font-weight: 500; }
+.bk-notice--warning { background: var(--status-warning-bg); border-color: transparent; }
+.bk-notice--warning .bk-notice__text { color: var(--status-warning-text); font-weight: 500; }
+
+/* Quote board */
+.bk-col {
+  display: flex; flex-direction: column; min-height: 0; min-width: 0;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card, 12px);
+  padding: 12px 4px 12px 12px;
+}
+.bk-col__head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0 8px 12px 0; flex-shrink: 0; }
+.bk-col__title { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--text-primary); }
+.bk-col__count { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.bk-col__total { font-size: 13px; line-height: 20px; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bk-col__empty { padding: 24px 12px; text-align: center; color: var(--text-secondary); font-size: 13px; line-height: 20px; border: 1px dashed var(--border-subtle); border-radius: var(--radius-nested, 8px); }
+.bk-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.bk-dot--neutral { background: var(--status-neutral-dot); }
+.bk-dot--warning { background: var(--status-warning-dot); }
+.bk-dot--success { background: var(--status-success-dot); }
+.bk-dot--danger { background: var(--status-danger-dot); }
+.bk-dot--info { background: var(--status-info-dot); }
+
+.bk-qcard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-nested, 8px);
+  padding: 12px 16px;
+  font-family: var(--font-sans);
+  transition: background 0.15s ease;
+}
+.bk-qcard:hover { background: var(--bg-surface-hover); }
+.bk-qcard:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.bk-qcard__top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+.bk-qcard__id { font-family: var(--font-sans); font-size: 13px; line-height: 20px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.bk-qcard__flags { display: inline-flex; align-items: center; gap: 6px; }
+.bk-qcard__customer { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bk-qcard__route {
+  font-size: 13px; line-height: 20px; color: var(--text-secondary); margin-top: 2px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.bk-qcard__foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; }
+.bk-qcard__amount { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.bk-qcard__meta { font-size: 13px; line-height: 20px; color: var(--text-secondary); white-space: nowrap; }
+.bk-qcard__action { margin-top: 12px; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Cards never push a column sideways: only the board scrolls horizontally. */
+.bk-kanban .kanban-col-scroll { overflow-x: hidden; }
+
+/* Detail pages: shared shells use the principles radius and no hover lift. */
+.bk-detail .card.card { border-radius: var(--radius-card, 12px); box-shadow: none; }
+.bk-detail .card.card:hover { border-color: var(--border-subtle); box-shadow: none; }
+.bk-detail-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bk-route { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bk-route__stop { display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 12px; }
+.bk-route__stop > :last-child { padding-bottom: 16px; min-width: 0; }
+.bk-route__stop:last-child > :last-child { padding-bottom: 0; }
+.bk-route__marker { display: flex; flex-direction: column; align-items: center; padding-top: 6px; }
+.bk-route__pin { width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--text-secondary); background: var(--bg-surface); box-sizing: content-box; }
+.bk-route__stop:first-child .bk-route__pin, .bk-route__stop:last-child .bk-route__pin { background: var(--text-primary); border-color: var(--text-primary); }
+.bk-route__line { flex: 1; width: 1px; background: var(--border-subtle); margin: 4px 0 -6px; min-height: 12px; }
+.bk-route__stop:last-child .bk-route__line { display: none; }
+.bk-route__label { font-size: 13px; line-height: 20px; font-weight: 500; color: var(--text-secondary); }
+.bk-route__place { font-size: 14px; line-height: 20px; color: var(--text-primary); overflow-wrap: anywhere; }
+.bk-route__meta { font-size: 13px; line-height: 20px; color: var(--text-secondary); }
+
+/* ---- Round 3: customer detail ---- */
+.bk-kv__label { display: inline-flex; align-items: center; gap: 4px; }
+.cd-status { display: inline-flex; align-items: baseline; gap: 12px; }
+.cd-status .bk-link { font-size: 13px; }
+.cd-more { display: flex; justify-content: center; padding: 8px var(--card-pad, 20px) 12px; border-top: 1px solid var(--border-row); }
+
+/* ---- Round 3: orders and history ---- */
+/* Routes are city to city now; give them the room the customer column does not need. */
+@container (min-width: 1041px) { .bk-table .bk-col-route { max-width: 36ch; } }
+.bk-table .bk-col-assign .tw-status { max-width: 100%; }
+
+/* ---- Round 3: booking detail ---- */
+.bk-progress { margin-bottom: var(--section-gap, 24px); padding: 16px var(--card-pad, 20px); display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.bk-progress__note { text-align: right; max-width: 260px; }
+.bk-steps { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); list-style: none; margin: 0; padding: 0; }
+.bk-step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; text-align: center; }
+/* Connector from the previous dot's centre to this dot's centre, at dot height. */
+.bk-step + .bk-step::before { content: ''; position: absolute; top: 5px; right: 50%; width: 100%; height: 2px; background: var(--border-subtle); }
+.bk-step.is-done + .bk-step.is-done::before { background: var(--accent-primary); }
+.bk-step__dot { position: relative; z-index: 1; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; background: var(--bg-surface); border: 2px solid var(--border-active); }
+.bk-step.is-done .bk-step__dot { background: var(--accent-primary); border-color: var(--accent-primary); }
+.bk-step.is-current .bk-step__dot { box-shadow: 0 0 0 3px var(--bg-surface), 0 0 0 4px var(--accent-primary); }
+.bk-step__label { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.bk-step.is-current .bk-step__label { color: var(--text-primary); font-weight: 600; }
+@media (max-width: 520px) {
+  .bk-progress { padding: 12px 8px; }
+  .bk-step__label { font-size: 11px; line-height: 16px; white-space: normal; }
+}
+/* Assignment card also carries the order's documents (no one-button Actions card). */
+.bk-assign__flag { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border-row); }
+.bk-assign__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.bk-kv__value.bk-muted { color: var(--text-tertiary); }
+/* Long record IDs (LOAD-20260616-9737) stay on one line at desktop widths.
+   Phones leave the title to the shared head fit (24px, then wrap), which
+   needs the row to overflow to notice, so no ellipsis there. */
+@media (min-width: 769px) {
+  .bk-detail .section-header__title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+}
+@container (max-width: 520px) { .bk-table .bk-col-action { display: none; } }
+
+/* ---- Round 4: orders flag and history row action ---- */
+/* A contradiction (on the move, no vehicle) is one short amber line under the
+   status chip: the only amber element in the row, never a truncated chip. */
+.bk-table .bk-status-flag { display: block; margin-top: 2px; font: 500 12px/16px var(--font-sans); color: var(--status-warning-text); white-space: nowrap; }
+/* The quotes toolbar's Board/List seg matches every other 36px toolbar control. */
+.bk-toolbar .tw-seg { padding: 3px; }
+.bk-toolbar .tw-seg__opt { height: calc(var(--control-h, 36px) - 6px); }
+
+/* Status filters (StatusFilter in QuotesList.tsx): the seg on wider screens;
+   a compact select on phones when there are more than four options. */
+.bk-filter { display: inline-flex; max-width: 100%; min-width: 0; }
+.bk-filter .bk-filter__select { display: none; }
+@media (max-width: 767px) {
+  .bk-filter.bk-filter--compact .bk-filter__seg { display: none; }
+  .bk-filter.bk-filter--compact { display: flex; width: 100%; }
+  .bk-filter.bk-filter--compact .bk-filter__select { display: flex; flex: 1 1 auto; width: auto; min-width: 180px; height: var(--control-h, 44px); }
+}
+/* Phone rows: the record number rides under the customer when its own column folds away. */
+.bk-table .bk-phone-sub { display: none; }
+@container (max-width: 520px) {
+  .bk-table .bk-phone-sub { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; }
+}
+/* Booking detail head on phones: the status chip repeats the stepper, so it
+   gives the title row back to the load number. */
+.bk-head-chip { display: inline-flex; }
+@media (max-width: 768px) { .bk-head-chip--stepper { display: none; } }
+/* Loads on phones: customer and load number get the room Status does not need. */
+@container (max-width: 520px) { .bk-table--loads .bk-col-customer { max-width: 17ch; } }
+/* Customer contact on phones: short facts pair up two per row; email and
+   addresses take the full width, so the card is not one long column. */
+@media (max-width: 520px) {
+  .bk-facts.cd-contact { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+  .bk-facts.cd-contact .bk-fact--wide { grid-column: 1 / -1; }
+}
+.cd-tiles-skel .ops-kpis { margin-bottom: 0; }
+/* History toolbar on phones: the four-option seg always takes its own line,
+   so the count arriving ("0" to "17 records") never re-wraps the row. */
+/* R7: History uses the Orders pattern on phones (count + status select on
+   one row under the search), so the toolbar is two rows, not three. */
+@media (max-width: 767px) { .bk-hist-toolbar .tw-toolbar__end { flex: 1 1 0; min-width: 0; } .bk-hist-toolbar .bk-filter--compact .bk-filter__select { min-width: 0; } }
+
+/* ---- Round 5: stale work and honest progress ---- */
+/* Stale work (an open order past its delivery date or older than 30 days):
+   neutral text plus one amber dot, never a second amber line. */
+.bk-table .bk-status-flag--stale { color: var(--text-secondary); font-weight: 400; display: flex; align-items: center; gap: 6px; }
+.bk-table .bk-status-flag--stale::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--status-warning-dot); flex-shrink: 0; }
+.bk-stale { flex-basis: 100%; display: flex; align-items: flex-start; gap: 8px; margin: 0; padding-top: 12px; border-top: 1px solid var(--border-row); font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.bk-stale .bk-dot { margin-top: 6px; }
+.bk-stale b { font-weight: 500; color: var(--text-primary); }
+/* A step the order passed without doing it (Assigned with no vehicle): hollow,
+   dashed dot and quiet label; the line through it stays drawn. */
+.bk-step.is-skipped .bk-step__dot { background: var(--bg-surface); border: 2px dashed var(--text-tertiary); }
+.bk-step.is-skipped .bk-step__label { color: var(--text-tertiary); }
+/* Quotes on phones (R5): search, status select and a view toggle share one
+   toolbar row; the count lives in the select ("All (25)"). */
+.bk-view-toggle { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: var(--control-h, 44px); height: var(--control-h, 44px); padding: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-control, 8px); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; }
+.bk-view-toggle:hover { color: var(--text-primary); border-color: var(--border-active); }
+.bk-view-toggle:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+@media (max-width: 767px) {
+  .bk-toolbar:has(.bk-view-toggle) { flex-wrap: nowrap; gap: 8px; margin-bottom: 12px; }
+  .bk-toolbar:has(.bk-view-toggle) .bk-search { flex: 1 1 0; width: auto; min-width: 0; }
+  .bk-toolbar:has(.bk-view-toggle) .bk-toolbar__end { display: none; }
+  .bk-toolbar .bk-toolbar__status { flex: 0 1 136px; width: 136px; min-width: 0; height: var(--control-h, 44px); }
+}
+/* Customer detail (R5): a value's source in one quiet line under it. */
+.bk-kv.cd-kv--noted { align-items: flex-start; }
+.bk-kv .cd-kv__note { display: block; margin-top: 2px; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: normal; text-align: right; }
+/* R5: the stale line under Status needs ~130px; the route gives it up, so
+   Amount stays in view at 1440 without a side scroll. */
+@container (min-width: 1041px) { .bk-table--loads .bk-col-route { max-width: 30ch; } }
+.bk-table .bk-status-flag--stale { white-space: nowrap; }
+@container (max-width: 520px) { .bk-table .bk-status-flag--stale { white-space: normal; align-items: baseline; } .bk-table .bk-status-flag--stale::before { transform: translateY(-1px); } }
+
+/* ---- Round 6: booking detail and orders ---- */
+/* Job figures under the route: distance is short, cargo takes the room. */
+.bk-facts.bk-facts--job { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); margin: 16px 0 0; padding-top: 16px; border-top: 1px solid var(--border-row); }
+@media (max-width: 520px) { .bk-facts.bk-facts--job { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px 16px; } }
+/* A plate is one token: "MP 567 MNO" never breaks across lines. */
+.bk-plate { white-space: nowrap; }
+.bk-kv__value .bk-vehicle-model { color: var(--text-secondary); }
+/* Orders rows (R6): every row is two lines tall, so heights are even; the
+   route stacks from / to instead of truncating; Status is the chip plus at
+   most one stale line. */
+.bk-table--loads:not(.bk-table--history) tbody td { height: 60px; }
+.bk-table .bk-route-cell { max-width: none; }
+.bk-table .bk-route-cell__from,
+.bk-table .bk-route-cell__to { display: block; max-width: 28ch; overflow: hidden; text-overflow: ellipsis; }
+.bk-table .bk-route-cell__to { color: var(--text-secondary); }
+.bk-table .bk-route-cell__from { color: var(--text-primary); }
+.bk-table .bk-col-status .bk-status-flag--stale { margin-top: 4px; }
+.bk-table .bk-col-date { width: 1%; }
+@container (max-width: 1040px) { .bk-table .bk-route-cell__from, .bk-table .bk-route-cell__to { max-width: 20ch; } }
+.bk-table .bk-stale-short { display: none; }
+@container (max-width: 520px) {
+  .bk-table .bk-stale-long { display: none; }
+  .bk-table .bk-stale-short { display: inline; }
+  .bk-table .bk-status-flag--stale { white-space: nowrap; align-items: center; }
+  .bk-table .bk-status-flag--stale::before { transform: none; }
+  .bk-table--loads:not(.bk-table--history) tbody td { height: 60px; }
+}
+/* Orders: the load number rides under the customer at every width (rows are
+   two lines anyway), which gives Route and Status their room. */
+.bk-table--loads:not(.bk-table--history) .bk-col-load { display: none; }
+.bk-table--loads:not(.bk-table--history) .bk-phone-sub { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; }
+.bk-table--loads:not(.bk-table--history) .bk-col-customer { padding-left: var(--card-pad, 20px); }
+@container (max-width: 700px) { .bk-table .bk-col-date { display: none; } }
+.bk-table .bk-amt-short { display: none; }
+@container (max-width: 520px) {
+  .bk-table--loads:not(.bk-table--history) .bk-amt-long { display: none; }
+  .bk-table--loads:not(.bk-table--history) .bk-amt-short { display: inline; }
+  .bk-table--loads:not(.bk-table--history) .bk-col-customer { max-width: 12ch; }
+  .bk-table--loads:not(.bk-table--history) td.bk-col-status { padding-left: 8px; padding-right: 8px; }
+}
+@container (max-width: 1040px) { .bk-table .bk-route-cell__from, .bk-table .bk-route-cell__to { max-width: 26ch; } }
+.bk-table .bk-assign-cell { max-width: none; }
+.bk-table .bk-assign-cell__driver { display: block; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
+.bk-table .bk-assign-cell__plate { display: block; white-space: nowrap; }
+.bk-table--loads:not(.bk-table--history) .bk-col-customer-head { padding-left: var(--card-pad, 20px); }
+@container (max-width: 520px) { .bk-table--loads:not(.bk-table--history) .bk-col-customer-head { padding-left: 16px; } }
+/* R6 touch targets: "Mark inactive" keeps its 20px line but gets a 44px hit
+   area on coarse pointers (padding cancelled by a negative margin). */
+@media (pointer: coarse) {
+  .cd-status .bk-link { padding: 12px 0; margin: -12px 0; }
+}
+/* Customer detail open orders (R6): phones keep one line per cell. */
+@container (max-width: 520px) {
+  .bk-table.cd-orders .bk-amt-long { display: none; }
+  .bk-table.cd-orders .bk-amt-short { display: inline; }
+  .bk-table.cd-orders .cd-orders__load { max-width: none; overflow: visible; text-overflow: clip; white-space: nowrap; }
+  .bk-table.cd-orders td.bk-col-status { padding-left: 8px; padding-right: 8px; }
+  /* R9: Amount ends at the card padding like every other right edge. */
+  .bk-table.cd-orders tr > :first-child { padding-right: 8px; }
+  .bk-table.cd-orders tr > :last-child { padding-left: 8px; }
+}
+/* Customer detail tables on phones: long record IDs truncate (their title
+   holds the full number) so Status and Balance stay in the card. */
+@container (max-width: 520px) { .bk-table .cd-col-id { max-width: none; overflow: visible; text-overflow: clip; white-space: nowrap; } }
+.bk-missing .load-error__icon { color: var(--text-tertiary); }
+
+/* ---- Round 7 ---- */
+/* Record numbers: the full number where it fits; the distinguishing tail
+   ("…0310-1004") on narrow rows, never a cut-off prefix. */
+.bk-table .bk-id-short { display: none; }
+@container (max-width: 520px) {
+  .bk-table .bk-id-long { display: none; }
+  .bk-table .bk-id-short { display: inline; }
+}
+@container (max-width: 520px) {
+  .bk-table .bk-id-short { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .bk-table--loads .bk-col-customer { max-width: 19ch; }
+}
+/* Booking detail: "in the ⋯ menu" only where Change status sits in ⋯. */
+.bk-phone-note { display: none; }
+@media (max-width: 768px) { .bk-phone-note { display: inline; } }
+/* Customer detail (R7): Invoices, Quotes and Open orders share one column
+   grid, so Date, Status and Amount line up down the page. Phones keep the
+   auto layout (columns fold away there). */
+@container (min-width: 701px) {
+  .bk-table.cd-grid { table-layout: fixed; width: 100%; }
+  .bk-table.cd-grid col.cd-c-id { width: 20%; }
+  .bk-table.cd-grid col.cd-c-2 { width: 15%; }
+  .bk-table.cd-grid col.cd-c-3 { width: 13%; }
+  .bk-table.cd-grid col.cd-c-date { width: 20%; }
+  .bk-table.cd-grid col.cd-c-status { width: 17%; }
+  .bk-table.cd-grid col.cd-c-amt { width: 15%; }
+  .bk-table.cd-grid td, .bk-table.cd-grid th { overflow: hidden; text-overflow: ellipsis; }
+  .bk-table.cd-grid .cd-due { white-space: nowrap; }
+}
+/* Customer detail on phones (R7): while the figures load, the cards below
+   wait behind one placeholder, so the tiles landing (one or two rows) never
+   push content that is already on screen. */
+.cd-wait-skel { display: none; }
+@media (max-width: 767px) {
+  .cd-waiting .cd-after { display: none; }
+  .cd-waiting .cd-wait-skel { display: block; }
+}
+
+/* ---- Round 8 ---- */
+/* Orders on phones: the stale line rides under the customer (as History),
+   so Status is the chip only and the customer and ID tail get the room.
+   The ID tail is never cut ("…0616-9737"). */
+.bk-table .bk-stale-in-customer { display: none; }
+.bk-table--loads:not(.bk-table--history) .bk-phone-sub .bk-id-short { overflow: visible; text-overflow: clip; }
+@container (max-width: 520px) {
+  .bk-table--loads:not(.bk-table--history) .bk-stale-in-status { display: none; }
+  .bk-table--loads:not(.bk-table--history) .bk-stale-in-customer { display: flex; margin-top: 2px; font: 400 12px/16px var(--font-sans); white-space: nowrap; }
+  .bk-table--loads:not(.bk-table--history) .bk-col-customer { max-width: none; white-space: normal; }
+  .bk-table--loads:not(.bk-table--history) .bk-col-customer.is-truncate { overflow: visible; text-overflow: clip; }
+  .bk-table--loads:not(.bk-table--history) .bk-phone-sub { overflow: visible; text-overflow: clip; white-space: nowrap; }
+  .bk-table--loads:not(.bk-table--history) td.bk-col-status { width: 1%; white-space: nowrap; }
+  .bk-table--loads:not(.bk-table--history) tbody td { height: auto; }
+}
+/* Quote cards in the five-column board (R8): the number never wraps; a
+   "Marked lost" note drops under it when the column is narrow. */
+.bk-qcard__top { flex-wrap: wrap; row-gap: 0; }
+.bk-qcard__id { white-space: nowrap; }
+.bk-qcard__foot { flex-wrap: wrap; row-gap: 0; }
+
+/* Orders and History tabs: like the Quotes list, the tiles and toolbar stay
+   put and the table scrolls inside its own card with its header row pinned,
+   instead of the whole page scrolling. A short table keeps its own height
+   (no empty card below it); a long one shrinks to fit and scrolls. */
+.bk-tab-fill { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.bk-tab-fill > * { flex-shrink: 0; }
+.bk-tab-fill > .bk-table-wrap { flex: 0 1 auto; min-height: 0; overflow: auto; }
+.bk-tab-fill .bk-table thead th { position: sticky; top: 0; z-index: 2; background: var(--bg-surface); }
+
+/* Quotes list on phones (R9): the list flows with the page instead of
+   scrolling inside a card, so "Load 10 more" is reached by scrolling the
+   page. The board keeps its own column scrolls. */
+@media (max-width: 767px) {
+  .bk-qlist-page,
+  .bk-qlist-page .bk-qlist-fill {
+    height: auto !important;
+    flex: none !important;
+    overflow: visible !important;
+  }
+  .bk-qlist-page .bk-table-wrap.bk-qlist-fill { overflow-x: auto !important; overflow-y: visible !important; }
+  /* Same for Orders and History: on phones the table flows with the page. */
+  .bk-tab-fill { flex: none; }
+  .bk-tab-fill > .bk-table-wrap { overflow-x: auto; overflow-y: visible; }
+  .bk-tab-fill .bk-table thead th { position: static; }
+}

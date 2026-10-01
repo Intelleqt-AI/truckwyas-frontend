@@ -2,7 +2,8 @@ import './bookings-typography.css';
 import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import './table-heading-roles.css';
 import './bookings-section.css';
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { BoardScrollbar } from "@/components/BoardScrollbar";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { fetchData, patchData, postData } from "@/lib/Api";
@@ -47,6 +48,7 @@ const COLUMN_TONE: Record<string, 'neutral' | 'warning' | 'success' | 'danger'> 
   DRAFT: 'neutral',
   SENT: 'warning',
   ACCEPTED: 'success',
+  BOOKED: 'success',
   DECLINED: 'danger',
 };
 
@@ -71,13 +73,18 @@ const sentenceCase = (s?: string) =>
 // used to double as quote-pipeline columns too, which let a quote be
 // dragged straight to "Completed" with no Order behind it at all.
 const COLUMNS = ['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED'];
+// Booked: quotes converted into a load (server filter status=BOOKED, the
+// load is the source of truth). Fetched like a status column but nothing is
+// dropped on it or dragged out: only "Convert to booking" puts a quote there.
+const QUERY_COLUMNS = ['DRAFT', 'SENT', 'ACCEPTED', 'BOOKED', 'DECLINED'];
 // The board shows one more column, Expired: derived from the date rule, not
-// a status, so nothing can be dropped on it.
-const BOARD_COLUMNS = [...COLUMNS, 'EXPIRED'];
+// a status, so nothing can be dropped on it either.
+const BOARD_COLUMNS = [...QUERY_COLUMNS, 'EXPIRED'];
 const COLUMN_LABELS: Record<string, string> = {
   DRAFT: 'Draft',
   SENT: 'Sent',
   ACCEPTED: 'Accepted',
+  BOOKED: 'Booked',
   DECLINED: 'Declined',
   // Draft or Sent past its valid-until date (boardStage, R8): not live work.
   EXPIRED: 'Expired',
@@ -183,18 +190,21 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
 
 // An expired quote's card: opens the quote (where "Edit quote" is the next
 // step); it is not dragged, since its column is a date rule, not a status.
-function StaticQuoteCard({ quote, onClick }: { quote: any; onClick: () => void }) {
+function StaticQuoteCard({ quote, onClick, stage = 'expired', footer }: { quote: any; onClick: () => void; stage?: string; footer?: React.ReactNode }) {
   return (
-    <div
-      className="bk-qcard"
-      role="button"
-      tabIndex={0}
-      aria-label={`Quote ${quote.quote_number}, expired`}
-      style={{ cursor: 'pointer' }}
-      onClick={onClick}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
-    >
-      <QuoteCardBody quote={quote} />
+    <div className="bk-qcard">
+      {/* The footer (e.g. "View booking") sits beside, not inside, the clickable body. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Quote ${quote.quote_number}, ${stage}`}
+        style={{ cursor: 'pointer' }}
+        onClick={onClick}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
+      >
+        <QuoteCardBody quote={quote} />
+      </div>
+      {footer}
     </div>
   );
 }
@@ -381,8 +391,14 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     })
   );
 
+  const kanbanRef = useRef<HTMLDivElement>(null);
   const { data: loadsData } = useQuery(loadsQuery);
   const loadByQuoteId = mapLoadsByQuoteId(loadsData);
+  // The quote API names its load (booked_load); the loads list is only page
+  // 1, so it is the fallback, never the source.
+  type BookedLoad = { id: number | string; load_number?: string; status?: string };
+  const bookedLoadOf = (q: { id?: number | string; booked_load?: BookedLoad | null } | null | undefined): BookedLoad | undefined =>
+    q?.booked_load ?? loadByQuoteId.get(String(q?.id));
 
   // Each pipeline column is its own backend-paginated query (10 at a time,
   // "load more" — see useQuoteColumn) rather than one big "fetch every
@@ -394,13 +410,14 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   const draftQ = useQuoteColumn('DRAFT', debouncedSearch);
   const sentQ = useQuoteColumn('SENT', debouncedSearch);
   const acceptedQ = useQuoteColumn('ACCEPTED', debouncedSearch);
+  const bookedQ = useQuoteColumn('BOOKED', debouncedSearch);
   const declinedQ = useQuoteColumn('DECLINED', debouncedSearch);
   const allQ = useQuoteColumn(null, debouncedSearch, view === 'list' && statusFilter === 'ALL');
   const columnQueries = useMemo(
-    () => ({ DRAFT: draftQ, SENT: sentQ, ACCEPTED: acceptedQ, DECLINED: declinedQ }),
-    [draftQ, sentQ, acceptedQ, declinedQ]
+    () => ({ DRAFT: draftQ, SENT: sentQ, ACCEPTED: acceptedQ, BOOKED: bookedQ, DECLINED: declinedQ }),
+    [draftQ, sentQ, acceptedQ, bookedQ, declinedQ]
   );
-  const totalQuotesCountRaw = COLUMNS.reduce((sum, col) => sum + flattenColumn(columnQueries[col]).count, 0);
+  const totalQuotesCountRaw = QUERY_COLUMNS.reduce((sum, col) => sum + flattenColumn(columnQueries[col as keyof typeof columnQueries]).count, 0);
   // A sent quote whose answer was recorded as lost belongs with the declined
   // ones: the board shows it there (with "Marked lost"), and both column
   // counts and totals move with it, so the board never says "Declined 0"
@@ -456,9 +473,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     return f;
   };
   // A failed column must never read as "No quotes" (and its 0 must not be counted).
-  const failedColumns = COLUMNS.filter(col => loadFailed(columnQueries[col]));
+  const failedColumns = QUERY_COLUMNS.filter(col => loadFailed(columnQueries[col as keyof typeof columnQueries]));
   const totalQuotesCount = totalQuotesCountRaw + extraExpired;
-  const retryFailedColumns = () => failedColumns.forEach(col => columnQueries[col].refetch());
+  const retryFailedColumns = () => failedColumns.forEach(col => columnQueries[col as keyof typeof columnQueries].refetch());
 
   // Live update: refetch every column when the backend pushes any quote
   // event over WebSocket — prefix match invalidates all of them (and the
@@ -577,7 +594,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     });
   };
 
-  const allLoadedBoardItems = COLUMNS.flatMap(col => flattenColumn(columnQueries[col]).items);
+  const allLoadedBoardItems = COLUMNS.flatMap(col => flattenColumn(columnQueries[col as keyof typeof columnQueries]).items);
   const activeQuote = activeQuoteId ? allLoadedBoardItems.find((q: any) => String(q.id) === activeQuoteId) : null;
 
   // List view reuses a board column's query directly for a specific status,
@@ -693,11 +710,11 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       )}
 
       {/* Tabs */}
-      {view === 'board' && failedColumns.length === COLUMNS.length ? (
+      {view === 'board' && failedColumns.length === QUERY_COLUMNS.length ? (
         <LoadError
           what="quotes"
           error={columnQueries.DRAFT.error ?? columnQueries.DRAFT.failureReason}
-          busy={COLUMNS.some(col => columnQueries[col].isFetching)}
+          busy={QUERY_COLUMNS.some(col => columnQueries[col as keyof typeof columnQueries].isFetching)}
           onRetry={retryFailedColumns}
         />
       ) : view === 'board' ? (
@@ -710,7 +727,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           {/* Quotes Kanban — fills whatever height is left below the controls; each
               column scrolls its own card list instead of the whole page growing. */}
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-            <div className="bk-kanban">
+            <div className="bk-kanban" ref={kanbanRef}>
               {BOARD_COLUMNS.map(col => {
                 const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading: colLoading, isFetchingNextPage, fetchNextPage } = boardColumn(col);
                 const isExpiredCol = col === 'EXPIRED';
@@ -738,6 +755,33 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       />
                     ) : isLoading ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{[0, 1, 2].map(i => <div key={i} className="ops-skel" style={{ height: 84, borderRadius: 8 }} />)}</div>
+                    ) : col === 'BOOKED' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 2 }}>
+                        {colItems.map((q: { id: number | string; booked_load?: { id: number | string; load_number?: string; status?: string } | null }) => {
+                          const load = bookedLoadOf(q);
+                          return (
+                            <StaticQuoteCard
+                              key={q.id}
+                              quote={q}
+                              stage="booked"
+                              onClick={() => navigate(`/bookings/quotes/${q.id}`)}
+                              footer={load ? (
+                                <button type="button" className="bk-btn bk-btn--secondary bk-btn--block bk-qcard__action"
+                                  title={load.load_number ? `Open booking ${load.load_number}` : 'Open booking'}
+                                  onClick={() => navigate(`/bookings/${load.id}`)}>
+                                  View booking
+                                </button>
+                              ) : null}
+                            />
+                          );
+                        })}
+                        {colItems.length === 0 && <div className="bk-col__empty">No booked quotes. Accepted quotes land here once converted to a booking.</div>}
+                        {hasNextPage && (
+                          <button type="button" className="bk-btn bk-btn--quiet bk-btn--block" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+                            {isFetchingNextPage ? 'Loading…' : `Load 10 more (${colCount - colItems.length} left)`}
+                          </button>
+                        )}
+                      </div>
                     ) : isExpiredCol ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 2 }}>
                         {colItems.map((q: any) => (
@@ -754,7 +798,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                             onClick={() => navigate(`/bookings/quotes/${q.id}`)}
                             onConvertToLoad={handleConvertToLoad}
                             onViewBooking={(e, load) => { e.stopPropagation(); navigate(`/bookings/${load.id}`); }}
-                            convertedLoad={loadByQuoteId.get(String(q.id))}
+                            convertedLoad={bookedLoadOf(q)}
                             dragDisabled={billingBlocked}
                           />
                         ))}
@@ -778,6 +822,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                 );
               })}
             </div>
+            <BoardScrollbar target={kanbanRef} label="Scroll the quote board" />
           </div>
 
           {/* Drag Overlay */}
@@ -806,7 +851,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           (() => {
           // Columns with nothing in them on any row step aside (R9).
           const anyOutcome = listItems.some((q: any) => q.outcome === 'accepted' || q.outcome === 'rejected');
-          const anyAction = listItems.some((q: any) => q.status === 'ACCEPTED' || loadByQuoteId.has(String(q.id)));
+          const anyAction = listItems.some((q: any) => q.status === 'ACCEPTED' || !!bookedLoadOf(q));
           return (
           <div className="bk-table-wrap bk-qlist-fill" style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
             <table className="table-heading-roles bk-table">
@@ -845,6 +890,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                     <td>
                       {/* The board's stage: a sent quote marked lost reads Declined here too. */}
                       {(() => {
+                        // Converted into a load: "Booked", as on the quote page (its tone follows the load).
+                        const booked = bookedLoadOf(quote);
+                        if (booked || quote.converted) return <StatusChip status={booked?.status || 'BOOKED'} label="Booked" size="sm" />;
                         const stage = boardStage(quote);
                         return stage
                           ? <StatusChip status={stage} label={COLUMN_LABELS[stage]} size="sm" />
@@ -864,16 +912,16 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       {formatMoneyWhole(parseFloat(quote.total_amount || '0'))}
                     </td>
                     {anyAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
-                      {loadByQuoteId.has(String(quote.id)) && (
+                      {!!bookedLoadOf(quote) && (
                         <button
                           type="button"
                           className="bk-btn bk-btn--secondary bk-btn--sm"
-                          onClick={(e) => { e.stopPropagation(); navigate(`/bookings/${loadByQuoteId.get(String(quote.id)).id}`); }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/bookings/${bookedLoadOf(quote)!.id}`); }}
                         >
                           View booking
                         </button>
                       )}
-                      {quote.status === 'ACCEPTED' && !loadByQuoteId.has(String(quote.id)) && (
+                      {quote.status === 'ACCEPTED' && !bookedLoadOf(quote) && (
                         <button
                           type="button"
                           className="bk-btn bk-btn--secondary bk-btn--sm"

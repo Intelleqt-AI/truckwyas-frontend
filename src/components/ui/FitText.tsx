@@ -12,7 +12,7 @@ import { useLayoutEffect, useRef, type ElementType, type ReactNode } from 'react
  *   <FitText as="div" className="td-kpi__value">{wholeRand(owed)}</FitText>
  */
 export function FitText({
-  as: Tag = 'span', className, title, children, min = 14,
+  as: Tag = 'span', className, title, children, min = 14, id,
 }: {
   as?: ElementType;
   className?: string;
@@ -20,6 +20,8 @@ export function FitText({
   children?: ReactNode;
   /** Smallest font size in px the figure may shrink to. */
   min?: number;
+  /** Forwarded to the element, e.g. so aria-labelledby can reference it. */
+  id?: string;
 }) {
   const ref = useRef<HTMLElement>(null);
 
@@ -65,7 +67,7 @@ export function FitText({
     };
   }, [min]);
 
-  return <Tag ref={ref} className={className} title={title}>{children}</Tag>;
+  return <Tag ref={ref} id={id} className={className} title={title}>{children}</Tag>;
 }
 
 export default FitText;

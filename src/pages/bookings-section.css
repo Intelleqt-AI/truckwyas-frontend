@@ -299,6 +299,10 @@
 .bk-kv__label { font-size: 13px; line-height: 20px; color: var(--text-secondary); flex-shrink: 0; }
 .bk-kv__value { font-size: 14px; line-height: 20px; color: var(--text-primary); text-align: right; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
 .bk-kv--total { border-bottom: none; padding-top: 12px; }
+/* Fuel cost: estimated vs actual, under the order total. */
+.bk-fuel { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-row); }
+.bk-fuel__title { display: flex; align-items: center; gap: 6px; font: 500 13px/20px var(--font-sans); color: var(--text-primary); }
+.bk-fuel__over { color: var(--status-danger-text); }
 /* A rate shown under its line (Base rate → R x/km): not a summand (R10). */
 .bk-kv__note { display: block; font-size: 12px; line-height: 16px; color: var(--text-secondary); }
 .bk-kv--total .bk-kv__label { font-weight: 500; color: var(--text-primary); }
@@ -393,11 +397,46 @@
   .bk-facts { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Quote pipeline board: four equal columns on desktop; on narrow screens the
-   board scrolls sideways instead of crushing the cards. */
-.bk-kanban { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: 1fr; gap: 16px; flex: 1; min-height: 0; }
+/* Quote pipeline board: one row of equal columns, however many there are
+   (Draft, Sent, Accepted, Booked, Declined, Expired). Each column keeps a
+   readable 280px minimum; when they don't fit, the board scrolls sideways
+   inside itself (each column still scrolls its own cards up and down)
+   instead of wrapping a column onto a second row or crushing cards. */
+.bk-kanban {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(280px, 1fr);
+  grid-template-rows: minmax(0, 1fr); gap: 16px; flex: 1; min-height: 0;
+  overflow-x: auto; overscroll-behavior-x: contain;
+  /* Its own scrollbar is replaced by .bk-hscroll (arrows at both ends). */
+  scrollbar-width: none;
+}
+.bk-kanban::-webkit-scrollbar { display: none; }
+/* Board scrollbar: a small arrow at each end (one column per click) around
+   a thin, draggable track. */
+.bk-hscroll { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-shrink: 0; }
+.bk-hscroll__btn {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative;
+  width: 20px; height: 20px; padding: 0; border: 1px solid var(--border-default); border-radius: var(--radius-chip, 6px);
+  background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;
+}
+.bk-hscroll__btn:hover:not(:disabled) { background: var(--bg-surface-hover); border-color: var(--border-strong); color: var(--text-primary); }
+.bk-hscroll__btn:disabled { color: var(--text-disabled); cursor: default; }
+.bk-hscroll__btn:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
+/* Track and thumb share one height and one fully rounded shape. The track
+   has an invisible 8px grab margin above and below so it is easy to hit. */
+.bk-hscroll__track {
+  position: relative; flex: 1; min-width: 0; height: 6px;
+  border-radius: 999px; background: var(--bg-raised); cursor: pointer;
+}
+.bk-hscroll__track::before { content: ''; position: absolute; inset: -8px 0; }
+.bk-hscroll__thumb {
+  position: absolute; top: 0; bottom: 0;
+  border-radius: 999px; background: var(--border-strong); cursor: grab; touch-action: none;
+}
+.bk-hscroll__thumb:hover { background: var(--text-tertiary); }
+.bk-hscroll__thumb:active { cursor: grabbing; background: var(--text-tertiary); }
+@media (pointer: coarse) { .bk-hscroll__btn::after { content: ''; position: absolute; inset: -12px; } }
 @media (max-width: 900px) {
-  .bk-kanban { grid-template-columns: repeat(5, minmax(260px, 1fr)); overflow-x: auto; padding-bottom: 8px; }
+  .bk-kanban { grid-auto-columns: minmax(260px, 85vw); }
 }
 
 /* Order progress: scrolls locally on phones rather than overlapping labels. */
@@ -473,7 +512,9 @@
 .bk-qcard__foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; }
 .bk-qcard__amount { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .bk-qcard__meta { font-size: 13px; line-height: 20px; color: var(--text-secondary); white-space: nowrap; }
-.bk-qcard__action { margin-top: 12px; }
+.bk-qcard__action { margin-top: 12px; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Cards never push a column sideways: only the board scrolls horizontally. */
+.bk-kanban .kanban-col-scroll { overflow-x: hidden; }
 
 /* Detail pages: shared shells use the principles radius and no hover lift. */
 .bk-detail .card.card { border-radius: var(--radius-card, 12px); box-shadow: none; }
@@ -730,6 +771,15 @@
 .bk-qcard__id { white-space: nowrap; }
 .bk-qcard__foot { flex-wrap: wrap; row-gap: 0; }
 
+/* Orders and History tabs: like the Quotes list, the tiles and toolbar stay
+   put and the table scrolls inside its own card with its header row pinned,
+   instead of the whole page scrolling. A short table keeps its own height
+   (no empty card below it); a long one shrinks to fit and scrolls. */
+.bk-tab-fill { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.bk-tab-fill > * { flex-shrink: 0; }
+.bk-tab-fill > .bk-table-wrap { flex: 0 1 auto; min-height: 0; overflow: auto; }
+.bk-tab-fill .bk-table thead th { position: sticky; top: 0; z-index: 2; background: var(--bg-surface); }
+
 /* Quotes list on phones (R9): the list flows with the page instead of
    scrolling inside a card, so "Load 10 more" is reached by scrolling the
    page. The board keeps its own column scrolls. */
@@ -741,4 +791,8 @@
     overflow: visible !important;
   }
   .bk-qlist-page .bk-table-wrap.bk-qlist-fill { overflow-x: auto !important; overflow-y: visible !important; }
+  /* Same for Orders and History: on phones the table flows with the page. */
+  .bk-tab-fill { flex: none; }
+  .bk-tab-fill > .bk-table-wrap { overflow-x: auto; overflow-y: visible; }
+  .bk-tab-fill .bk-table thead th { position: static; }
 }

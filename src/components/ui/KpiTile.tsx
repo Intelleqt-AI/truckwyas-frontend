@@ -1,4 +1,4 @@
-import { Children, type CSSProperties, type ReactNode } from 'react';
+import { Children, useId, type CSSProperties, type ReactNode } from 'react';
 import { FitText } from './FitText';
 
 /**
@@ -35,24 +35,39 @@ export interface KpiTileProps {
 }
 
 export function KpiTile({ label, figure, note, tone = 'neutral', emphasis, aside, onClick, href, className, ...rest }: KpiTileProps) {
-  const cls = ['tw-kpi', emphasis ? 'tw-kpi--emphasis' : '', onClick || href ? 'tw-kpi--link' : '', className ?? '']
+  const id = useId();
+  const clickable = !!(onClick || href);
+  const cls = ['tw-kpi', emphasis ? 'tw-kpi--emphasis' : '', clickable ? 'tw-kpi--link' : '', className ?? '']
     .filter(Boolean)
     .join(' ');
+  const hasNote = note !== undefined && note !== null && note !== '';
   const body = (
     <>
       <span className="tw-kpi__head">
-        <span className="tw-kpi__label">{label}</span>
-        {aside}
+        <span className="tw-kpi__label" id={`${id}-l`}>{label}</span>
+        {/* Above the tile's hit area, so a tip stays its own control. */}
+        {aside && <span className="tw-kpi__aside">{aside}</span>}
       </span>
-      <FitText className="tw-kpi__figure">{figure}</FitText>
-      {note !== undefined && note !== null && note !== '' && (
-        <span className={`tw-kpi__note tw-kpi__note--${tone}`}>{note}</span>
+      <FitText className="tw-kpi__figure" id={`${id}-f`}>{figure}</FitText>
+      {hasNote && (
+        <span className={`tw-kpi__note tw-kpi__note--${tone}`} id={`${id}-n`}>{note}</span>
       )}
     </>
   );
-  if (href) return <a className={cls} href={href} aria-label={rest['aria-label']}>{body}</a>;
-  if (onClick) return <button type="button" className={cls} onClick={onClick} aria-label={rest['aria-label']}>{body}</button>;
-  return <div className={cls} aria-label={rest['aria-label']}>{body}</div>;
+  if (!clickable) return <div className={cls} aria-label={rest['aria-label']}>{body}</div>;
+  // Clickable tile: the link/button is an empty control stretched over the
+  // tile (.tw-kpi__hit), not a wrapper, so an InfoTip in `aside` is never a
+  // button inside a button. Its name is the tile's own text.
+  const name = rest['aria-label'] ? { 'aria-label': rest['aria-label'] }
+    : { 'aria-labelledby': [`${id}-l`, `${id}-f`, hasNote ? `${id}-n` : ''].filter(Boolean).join(' ') };
+  return (
+    <div className={cls}>
+      {href
+        ? <a className="tw-kpi__hit" href={href} {...name} />
+        : <button type="button" className="tw-kpi__hit" onClick={onClick} {...name} />}
+      {body}
+    </div>
+  );
 }
 
 /**

@@ -57,6 +57,8 @@ export function AccountingProviderCards({ hideManage = false }: { hideManage?: b
   });
   const connection = q.data?.connection ?? null;
   const live = connection && connection.status !== 'DISABLED' ? connection : null;
+  // The connected system comes first; the ones it rules out follow.
+  if (live) providers.sort((a, b) => Number(b.provider === live.provider) - Number(a.provider === live.provider));
 
   const connect = async (p: ProviderInfo) => {
     setBusy(p.provider);

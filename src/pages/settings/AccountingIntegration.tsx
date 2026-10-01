@@ -151,7 +151,7 @@ export default function AccountingIntegration() {
         <AcctCard title="After you connect" description="Takes about 10 minutes and needs a company admin." flush>
           <ol className="acct-check">
             {[
-              ['Map accounts and VAT', 'Pick the income account and VAT rate for each kind of charge, and where supplier bills go.'],
+              ['Map charges, expenses and VAT', 'Tell TruckWys where each kind of charge and supplier bill goes in your books, and which VAT rates to use.'],
               ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
               ['Choose a cut-over date', 'We send documents from that date. Anything earlier should already be in your books.'],
             ].map(([t, d], i) => (

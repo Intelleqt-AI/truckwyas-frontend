@@ -29,7 +29,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: r.mapping_complete ? 'done' : 'todo',
       title: 'Map accounts and VAT',
       desc: r.mapping_complete
-        ? 'Every revenue type, expense category and VAT code has a home.'
+        ? 'Every charge, expense and VAT rate is mapped.'
         : missing.length
           ? `${missing.length} still to map.`
           : 'Tell TruckWys which account and VAT rate to use for each kind of charge.',
@@ -66,7 +66,9 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       title: 'Sync turns on',
       desc: r.sync_enabled
         ? `New invoices, credit notes and bills go to ${cfg.short} on their own, and payments come back every few minutes.`
-        : 'Starts by itself once the steps above are done.',
+        : providerBlockers(r).length && connection.status === 'ACTIVE' && !items0Open(r)
+          ? `Starts once the ${cfg.short} setting above is changed.`
+          : 'Starts by itself once the steps above are done.',
       tab: r.sync_enabled ? 'sync' : undefined,
       action: r.sync_enabled ? 'Sync status' : undefined,
     },
@@ -79,18 +81,18 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const open = items.filter(it => it.look !== 'done' && it.key !== 'live' && it.key !== 'connect').map(it => items.indexOf(it) + 1);
   const blockers = reauth ? [] : providerBlockers(r);
   const subtitle = blockers.length && !open.length
-    ? `Nothing is sent to ${cfg.short} until the ${blockers.length === 1 ? 'setting' : 'settings'} below ${blockers.length === 1 ? 'is' : 'are'} changed.`
+    ? `Everything in TruckWys is done. Nothing is sent until the ${cfg.short} ${blockers.length === 1 ? 'setting' : 'settings'} below ${blockers.length === 1 ? 'is' : 'are'} changed.`
     : r.sync_enabled
     ? `Done. ${cfg.short} and TruckWys now stay in step on their own.`
     : reauth
       ? `Steps 2–${items.length} wait until ${cfg.short} is reconnected.`
       : open.length
-        ? `One-time setup. Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done.`
+        ? `One-time setup. Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done${blockers.length ? ` and the ${cfg.short} setting below is changed` : ''}.`
         : `Sending your history to ${cfg.short}.`;
 
   return (
     <>
-    <AcctCard title={r.sync_enabled ? `${cfg.short} is set up` : `Finish setting up ${cfg.short}`} description={subtitle} flush>
+    <AcctCard title={r.sync_enabled ? `${cfg.short} is set up` : blockers.length && !open.length ? `One change needed in ${cfg.short}` : `Finish setting up ${cfg.short}`} description={subtitle} flush>
       {blockers.length > 0 && <ProviderBlockers connection={connection} blockers={blockers} />}
       <ol className="acct-check acct-check--steps">
         {items.map((it, i) => {
@@ -171,4 +173,9 @@ function ProviderBlockers({ connection, blockers }: { connection: Connection; bl
       </div>
     </div>
   );
+}
+
+/** True while a TruckWys-side setup step is still open. */
+function items0Open(r: Connection['readiness']): boolean {
+  return !r.mapping_complete || r.contacts_to_confirm > 0 || r.backfill_state !== 'DONE';
 }

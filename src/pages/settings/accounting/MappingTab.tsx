@@ -229,7 +229,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         title={m.complete && !dirty ? 'Everything required is mapped' : m.missing.length > 0 ? `${m.missing.length} required ${m.missing.length === 1 ? 'line' : 'lines'} still to map` : 'Unsaved changes'}
         description={<>
           Nothing is sent to {cfg.short} until every required line is mapped.
-          {m.options.fetched_at && <> Accounts last read from {cfg.short} {hoursAgo(m.options.fetched_at)}.</>}
+          {m.options.fetched_at && <> {itemsForRevenue ? 'Lists' : 'Accounts'} last read from {cfg.short} {hoursAgo(m.options.fetched_at)}.</>}
           {m.missing.length > 0 && !(m.complete && !dirty) && (
             <ul className="acct-jump-list">{m.missing.map(k => (
               <li key={k}><button type="button" className="acct-jumpbtn" onClick={() => jumpTo(k)}>{missingMappingLabel(k)}</button></li>
@@ -252,7 +252,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
       />
 
       <AcctCard
-        title={itemsForRevenue ? 'Income: product/service' : 'Income accounts'}
+        title={itemsForRevenue ? 'Products and services' : 'Income accounts'}
         description={itemsForRevenue
           ? `Which ${cfg.short} product/service each kind of charge on your invoices uses. Its income account decides where the money lands.`
           : 'Which income account each kind of charge on your invoices goes to.'}
@@ -369,6 +369,18 @@ export function MappingTab({ connection }: { connection: Connection }) {
                 {errors['tracking.vehicle_category_id'] && <div className="acct-error" role="alert">{errors['tracking.vehicle_category_id']}</div>}
               </div>
             </div>
+{tl.branchCatId ? <>
+            <div className="acct-map-row">
+              <label className="acct-map-row__label" id="lbl-branch-opt">{tl.branchCat}</label>
+              <div className="acct-map-row__field">
+                <PlainSelect labelledBy="lbl-branch-opt" value={tracking.branch_option || null} disabled={disabled || branchCats.length === 0} invalid={!!errors['tracking.branch_option']}
+                  options={(branchCats[0]?.options ?? []).map(o => ({ value: o.name, label: o.name }))} noneLabel={branchCats.length ? "Don't tag a location" : `Location tracking is off in ${cfg.short}`}
+                  onChange={v => setDraft(d => ({ ...d, tracking: { ...tracking, branch_category_id: v ? (branchCats[0]?.id ?? null) : null, branch_option: v ?? '' } }))} />
+                {tracking.branch_option && <div className="acct-hint">Every document is tagged with this location.</div>}
+                {(errors['tracking.branch_option'] || errors['tracking.branch_category_id']) && <div className="acct-error" role="alert">{errors['tracking.branch_option'] || errors['tracking.branch_category_id']}</div>}
+              </div>
+            </div>
+            </> : <>
             <div className="acct-map-row">
               <label className="acct-map-row__label" id="lbl-branch">{tl.branchCat}</label>
               <div className="acct-map-row__field">
@@ -390,6 +402,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
                 {errors['tracking.branch_option'] && <div className="acct-error" role="alert">{errors['tracking.branch_option']}</div>}
               </div>
             </div>
+            </>}
           </>
         )}
       </AcctCard>

@@ -287,8 +287,8 @@ export function DeskAdvanceDrawer({ ctx, advance, onClose }: { ctx: DeskCtx; adv
               <div>
                 <label className="fin-label" htmlFor="desk-act-1">{f.field}</label>
                 {mode === 'approve' || mode === 'decline' || mode === 'write-off'
-                  ? <textarea id="desk-act-1" className="fin-control" rows={3} value={text} onChange={(e) => setText(e.target.value)} required={f.required} data-autofocus />
-                  : <input id="desk-act-1" className="fin-control" value={text} onChange={(e) => setText(e.target.value)} required={f.required} data-autofocus />}
+                  ? <textarea id="desk-act-1" className="fin-control" rows={3} value={text} onChange={(e) => setText(e.target.value)} required={f.required} autoFocus />
+                  : <input id="desk-act-1" className="fin-control" value={text} onChange={(e) => setText(e.target.value)} required={f.required} autoFocus />}
               </div>
               {f.second && (
                 <div>

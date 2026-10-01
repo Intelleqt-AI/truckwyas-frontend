@@ -112,7 +112,6 @@ export default function AdvanceDetail() {
               <div className="fin-dl__row"><dt>Advance</dt><dd>{money(a.amount)}</dd></div>
               <div className="fin-dl__row"><dt>Fee, excl. VAT</dt><dd>−{money(a.fee_amount)}</dd></div>
               {a.fee_vat_amount > 0 && <div className="fin-dl__row"><dt>VAT on the platform fee</dt><dd>−{money(a.fee_vat_amount)}</dd></div>}
-              <div className="fin-dl__row is-total"><dt>To you</dt><dd>{money(a.net_amount)}</dd></div>
               <div className="fin-dl__row"><dt>Holdback<small>Paid to you when your customer pays, less any deductions</small></dt><dd>{money(a.holdback_amount)}</dd></div>
               {a.topup_pending > 0 && <div className="fin-dl__row"><dt>Queued top-up<small>Advanced when the line has room</small></dt><dd>{money(a.topup_pending)}</dd></div>}
             </dl>

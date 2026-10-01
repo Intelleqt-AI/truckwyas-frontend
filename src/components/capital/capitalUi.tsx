@@ -7,10 +7,15 @@ import { X } from 'lucide-react';
 import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 import { formatCurrency, formatDate, formatDateTime, formatPercent, MISSING } from '@/lib/formatters';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { wholeRand } from '@/components/finance/FinTile';
 import type { AdvanceStatus, Decision, Offer, Reason, TimelineEntry } from '@/lib/capital/types';
 import './fastpay.css';
 
 export const money = (v: number | null | undefined) => (v == null || Number.isNaN(Number(v)) ? MISSING : formatCurrency(v));
+/** Tile figure: whole rands, cents in the title (DESIGN-PRINCIPLES §10.3). */
+export const TileMoney = ({ v }: { v: number | null | undefined }) =>
+  v == null ? <>{MISSING}</> : <span title={formatCurrency(v)}>{wholeRand(v)}</span>;
+export const wholeMoney = (v: number | null | undefined) => (v == null ? MISSING : wholeRand(v));
 export const day = (d: string | null | undefined) => (d ? formatDate(d) : MISSING);
 export const dayTime = (d: string | null | undefined) => (d ? formatDateTime(d) : MISSING);
 export const pct = (v: number | null | undefined, decimals = 1) => (v == null ? MISSING : formatPercent(v, decimals));

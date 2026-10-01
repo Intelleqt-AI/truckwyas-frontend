@@ -5,7 +5,7 @@ import { InfoTip } from '@/components/ui/InfoTip';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { useDeskBook } from '@/lib/capital/api';
 import type { Book } from '@/lib/capital/types';
-import { CapBar, SkelCard, dayTime, money, pct } from '../capitalUi';
+import { CapBar, SkelCard, TileMoney, dayTime, money, pct, wholeMoney } from '../capitalUi';
 import { BandChip, HoldChip, num, type DeskCtx } from './common';
 
 const bandTone = (b: string | null | undefined) => (b === 'red' ? 'danger' : b === 'amber' ? 'warning' : 'neutral') as 'danger' | 'warning' | 'neutral';
@@ -37,12 +37,10 @@ function BookView({ b }: { b: Book }) {
 
   return (
     <div className="fin-stack fin-stack--16">
-      <p className="fin-help" style={{ margin: 0 }}>{b.funder.name} · as of {dayTime(b.as_of)}</p>
-
       <KpiRow>
-        <KpiTile label="Outstanding" figure={money(b.outstanding)} note={`${pct(b.utilisation_pct)} of the pot used`} />
-        <KpiTile label="Reserved" figure={money(b.reserved)} note="Requested, not yet paid out" />
-        <KpiTile label="Headroom" figure={money(b.headroom)} note={`of ${money(b.pot_limit)} pot`} emphasis />
+        <KpiTile label="Outstanding" figure={<TileMoney v={b.outstanding} />} note={`${pct(b.utilisation_pct)} of the pot`} />
+        <KpiTile label="Reserved" figure={<TileMoney v={b.reserved} />} note="Not yet paid out" />
+        <KpiTile label="Headroom" figure={<TileMoney v={b.headroom} />} note={`of ${wholeMoney(b.pot_limit)}`} emphasis />
         <KpiTile
           label="Book risk index"
           figure={ri.value != null ? num(ri.value, 1) : 'Not rated'}
@@ -66,7 +64,7 @@ function BookView({ b }: { b: Book }) {
           <div className="fin-panel-head">
             <div className="fin-panel-head__text">
               <h2 id="bk-pot" className="fin-panel-title">Pot used</h2>
-              <p className="fin-panel-desc">Outstanding and reserved within the pot</p>
+              <p className="fin-panel-desc">As of {dayTime(b.as_of)}</p>
             </div>
           </div>
           <div className="cap-stack" role="img" aria-label={`Outstanding ${pct(outPct)}, reserved ${pct(resPct)} of the pot`}>
@@ -171,7 +169,7 @@ function BookView({ b }: { b: Book }) {
               {b.grades.map((g) => (
                 <div key={g.grade} className="cap-row" role="row">
                   <span className="cap-row__label" role="cell">Grade {g.grade}</span>
-                  <CapBar value={g.pct} scale={gradeMax} tone="accent" />
+                  <CapBar value={g.pct} scale={gradeMax} />
                   <span className="cap-row__value" role="cell">{money(g.exposure)}</span>
                   <span className="cap-row__note" role="cell">{pct(g.pct)}</span>
                 </div>

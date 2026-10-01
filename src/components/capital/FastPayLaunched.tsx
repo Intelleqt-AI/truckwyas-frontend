@@ -19,7 +19,7 @@ import type { AdvanceRow, Offer } from '@/lib/capital/types';
 import { ApplicationCard } from './ApplicationCard';
 import { RequestFastPayDialog } from './RequestFastPayDialog';
 import {
-  AdvanceChip, DecisionChip, LIVE_STATUSES, ReasonList, SkelCard, day, money,
+  AdvanceChip, DecisionChip, LIVE_STATUSES, ReasonList, SkelCard, TileMoney, day, money, wholeMoney,
 } from './capitalUi';
 
 const PROVIDER = 'an independent finance provider';
@@ -69,6 +69,22 @@ export default function FastPayLaunched() {
     />
   );
 
+  const statusCode = (status.error as { status?: number } | null)?.status;
+  if (loadFailed(status) && loadFailed(invoices) && (statusCode === 404 || statusCode === 403)) {
+    // The Fast Pay service is not on for this account (or not deployed yet).
+    return (
+      <div className="fin-page">
+        {header}
+        <div className="fl-notice" role="status">
+          <Info size={16} aria-hidden="true" />
+          <div>
+            <strong>Fast Pay isn’t available on this account yet</strong>
+            Your invoices are unaffected. This page shows offers once Fast Pay is switched on for you.
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (loadFailed(status) && loadFailed(invoices)) {
     return (
       <div className="fin-page">
@@ -112,12 +128,12 @@ export default function FastPayLaunched() {
           <SkelCard height={106} label="Loading your Fast Pay line" />
         ) : line ? (
           <KpiRow>
-            <KpiTile label="Available now" figure={money(line.available)} note={`of ${money(line.limit)} line`} emphasis />
-            <KpiTile label="In use" figure={money(line.used)} note={`${live.length} ${live.length === 1 ? 'request' : 'requests'} open`} />
+            <KpiTile label="Available now" figure={<TileMoney v={line.available} />} note={`of ${wholeMoney(line.limit)}`} emphasis />
+            <KpiTile label="In use" figure={<TileMoney v={line.used} />} note={`${live.length} open`} />
             {totals && (
               <KpiTile
                 label="Ready for Fast Pay"
-                figure={money(totals.net_total)}
+                figure={<TileMoney v={totals.net_total} />}
                 note={`${totals.eligible_count} ${totals.eligible_count === 1 ? 'invoice' : 'invoices'}, after fees`}
               />
             )}
@@ -169,16 +185,16 @@ export default function FastPayLaunched() {
               <table className="fin-table fin-table--stack table-heading-roles">
                 <thead>
                   <tr>
-                    <th className="fin-cell-fill">Invoice</th>
+                    <th>Invoice</th>
                     <th className="num m-hide">Balance</th>
-                    <th>Why, and how to fix it</th>
+                    <th style={{ width: '60%' }}>Why, and how to fix it</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ineligible.map((o) => (
                     <tr key={o.invoice_id}>
-                      <td className="fin-strong m-party fin-cell-2 fin-cell-fill">
-                        <div className="fin-truncate fin-truncate--fill" title={o.customer_name}>{o.customer_name || '—'}</div>
+                      <td className="fin-strong m-party fin-cell-2">
+                        <div className="fin-truncate" title={o.customer_name}>{o.customer_name || '—'}</div>
                         <span className="fin-cell-sub"><Link to={`/finance/invoices/${o.invoice_id}`} className="fin-link fin-id">{o.invoice_number}</Link></span>
                       </td>
                       <td className="num m-hide">{money(o.invoice_balance)}</td>
@@ -249,7 +265,7 @@ function OffersCard({ loading, failed, query, offers, demo, canRequest, onReques
         <div className="fin-empty fin-empty--compact">No invoices are ready for Fast Pay. Delivered loads with proof of delivery show here once invoiced.</div>
       ) : (
         <div className="fin-table-scroll">
-          <table className="fin-table fin-table--stack table-heading-roles">
+          <table className="fin-table fin-table--stack cap-stack-table table-heading-roles">
             <thead>
               <tr>
                 <th className="fin-cell-fill">Invoice</th>

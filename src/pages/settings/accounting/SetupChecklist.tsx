@@ -1,5 +1,6 @@
 import { Check, Loader2, X } from 'lucide-react';
-import { missingMappingLabel, providerConfig, type Connection } from '@/lib/accounting';
+import { providerConfig, type Connection } from '@/lib/accounting';
+import { ConnectionDetails } from './ConnectionHeader';
 import { AcctCard, plural, type StepLook } from './shared';
 import type { AccountingTab } from './tabs';
 
@@ -14,7 +15,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     {
       key: 'connect',
       look: connection.status === 'ACTIVE' ? 'done' : 'bad',
-      title: `Connect ${cfg.short}`,
+      title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status === 'ACTIVE'
         ? `Linked to ${connection.tenant_name}.`
         : `Use Reconnect ${cfg.short} above.`,
@@ -26,7 +27,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       desc: r.mapping_complete
         ? 'Every revenue type, expense category and VAT code has a home.'
         : missing.length
-          ? `Still to map: ${missing.slice(0, 4).map(missingMappingLabel).join(', ')}${missing.length > 4 ? ` and ${missing.length - 4} more` : ''}.`
+          ? `${missing.length} still to map.`
           : 'Tell TruckWys which account and VAT rate to use for each kind of charge.',
       tab: 'mapping',
       action: r.mapping_complete ? 'Review' : 'Map accounts',
@@ -61,7 +62,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       title: 'Sync turns on',
       desc: r.sync_enabled
         ? `New invoices, credit notes and bills go to ${cfg.short} on their own, and payments come back every few minutes.`
-        : 'Automatic, once the steps above are done.',
+        : 'Starts by itself once the steps above are done.',
       tab: r.sync_enabled ? 'sync' : undefined,
       action: r.sync_enabled ? 'Sync status' : undefined,
     },
@@ -75,30 +76,27 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const subtitle = r.sync_enabled
     ? `Done. ${cfg.short} and TruckWys now stay in step on their own.`
     : reauth
-      ? `Reconnect ${cfg.short} first; the other steps wait for it.`
+      ? `Paused until ${cfg.short} is reconnected.`
       : open.length
-        ? `Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done. One-off; after this it all runs on its own.`
+        ? `Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done. You only do this once.`
         : `Sending your history to ${cfg.short}.`;
 
   return (
+    <>
     <AcctCard title={r.sync_enabled ? `${cfg.short} is set up` : `Finish setting up ${cfg.short}`} description={subtitle} flush>
       <ol className="acct-check acct-check--steps">
         {items.map((it, i) => {
           const auto = it.key === 'live';
-          const blocked = reauth && it.key !== 'connect';
+          const blocked = reauth;
           return (
             <li key={it.key}>
               <StepMarker look={it.look} n={i + 1} auto={auto} />
               <div style={{ minWidth: 0 }}>
-                <div className="acct-check__title">
-                  {!auto && <span className="acct-sr">Step {i + 1}: </span>}{it.title}
-                  {auto && <span className="acct-badge" style={{ marginLeft: 8 }}>Automatic</span>}
-                </div>
-                <div className="acct-check__desc">{blocked && it.look !== 'done' ? `Waits until ${cfg.short} is reconnected.` : it.desc}</div>
+                <div className="acct-check__title"><span className="acct-sr">Step {i + 1}: </span>{it.title}</div>
+                <div className="acct-check__desc">{it.key === 'connect' && blocked ? `Use Reconnect ${cfg.short} above.` : it.desc}</div>
               </div>
-              {it.tab && it.action ? (
-                <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}
-                  disabled={blocked && it.look !== 'done'} title={blocked ? `Reconnect ${cfg.short} first` : undefined}>
+              {it.tab && it.action && !(blocked && it.look !== 'done') ? (
+                <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>
                   {it.action}
                 </button>
               ) : <span />}
@@ -107,6 +105,8 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
         })}
       </ol>
     </AcctCard>
+    <ConnectionDetails connection={connection} />
+    </>
   );
 }
 
@@ -115,5 +115,5 @@ function StepMarker({ look, n, auto }: { look: StepLook; n: number; auto: boolea
   if (look === 'done') return <span className="acct-step-num is-done" aria-hidden="true"><Check size={12} strokeWidth={2.5} /></span>;
   if (look === 'bad') return <span className="acct-step-num is-bad" aria-hidden="true"><X size={12} strokeWidth={2.5} /></span>;
   if (look === 'busy') return <span className="acct-step-num is-busy" aria-hidden="true"><Loader2 size={12} className="animate-spin" /></span>;
-  return <span className={`acct-step-num${auto ? ' is-auto' : ''}`} aria-hidden="true">{auto ? '' : n}</span>;
+  return <span className={`acct-step-num${auto ? ' is-auto' : ''}`} aria-hidden="true">{n}</span>;
 }

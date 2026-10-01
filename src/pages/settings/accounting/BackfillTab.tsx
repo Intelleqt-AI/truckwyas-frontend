@@ -13,6 +13,16 @@ import {
 import { AcctCard, ErrorBlock, LoadingBlock, StepIcon, plural, useAccountingPermissions, type StepLook } from './shared';
 import type { AccountingTab } from './tabs';
 
+/** Plain-English step names (the server's labels are the fallback). */
+const STEP_LABEL: Record<string, (p: string) => string> = {
+  settings: p => `Read accounts, VAT rates and tracking from ${p}`,
+  contacts: () => 'Link customers and suppliers',
+  invoices: p => `Send invoices and credit notes to ${p}`,
+  receipts: p => `Send payments already recorded to ${p}`,
+  bills: p => `Send supplier bills to ${p}`,
+  payments: p => `Bring back payments from ${p}`,
+};
+
 const STEP_LOOK: Record<StepState, StepLook> = { PENDING: 'todo', RUNNING: 'busy', DONE: 'done', FAILED: 'bad', SKIPPED: 'skip' };
 
 /** First day of the current month, as YYYY-MM-DD: a sensible default cut-over. */
@@ -100,17 +110,22 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
     const total = totals[x.key];
     if (x.state === 'RUNNING') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : `${x.count.toLocaleString('en-ZA')} so far`;
     if (x.state === 'DONE') return x.count > 0 ? `${x.count.toLocaleString('en-ZA')} done` : 'Done';
-    return total ? `${total.toLocaleString('en-ZA')} to send` : '';
+    if (x.state === 'SKIPPED') return '';
+    return total ? `${total.toLocaleString('en-ZA')} to send` : 'Waiting';
   };
+  // The bar follows the documents (where the preview knows them), not the steps.
+  const itemTotal = Object.values(totals).reduce<number>((n, v) => n + (v ?? 0), 0);
+  const itemsDone = b.steps.reduce((n, x) => n + (totals[x.key] != null ? (x.state === 'DONE' ? totals[x.key]! : x.state === 'RUNNING' ? Math.min(x.count, totals[x.key]!) : 0) : 0), 0);
+  const updatedTime = new Date(q.dataUpdatedAt || Date.now()).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
   const doneSteps = b.steps.filter(x => x.state === 'DONE' || x.state === 'SKIPPED').length;
+  const pctDone = itemTotal ? (itemsDone / itemTotal) * 100 : b.steps.length ? (doneSteps / b.steps.length) * 100 : 0;
   const startedAt = b.started_at ? new Date(b.started_at) : null;
   const startedTime = startedAt && !isNaN(startedAt.getTime())
     ? startedAt.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false }) : null;
 
-  return (
-    <>
+  const cutoverCard = (
       <AcctCard
-        title="Cut-over date"
+        title="Cut-over"
         description={`From this date TruckWys sends every invoice, credit note and supplier bill to ${cfg.short}. Anything dated earlier is not sent: we assume it's already in your books.`}
       >
         <div className="acct-cutover">
@@ -171,31 +186,32 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
           </div>
         )}
       </AcctCard>
+  );
 
-      {(b.state !== 'NOT_STARTED' || b.steps.some(x => x.state !== 'PENDING')) && (
+  const progressCard = (b.state !== 'NOT_STARTED' || b.steps.some(x => x.state !== 'PENDING')) && (
         <AcctCard
           title="Progress"
           description={running
-            ? 'You can leave this page; sending carries on.'
+            ? `${startedTime ? `Started ${startedTime}` : 'Started'} · updated ${updatedTime}. You can leave this page; sending carries on.`
             : done
               ? `Finished ${b.finished_at ? formatDateTime(b.finished_at) : ''}.`
               : b.state === 'FAILED' ? 'Stopped. Fix what the failed step says, then try again.' : undefined}
-          actions={running
-            ? <StatusChip tone="info" label={startedTime ? `Sending · started ${startedTime}` : 'Sending'} />
-            : done ? <StatusChip tone="success" label="Done" /> : b.state === 'FAILED' ? <StatusChip tone="danger" label="Stopped" /> : undefined}
+          actions={done ? <StatusChip tone="success" label="Done" /> : b.state === 'FAILED' ? <StatusChip tone="danger" label="Stopped" /> : undefined}
           flush
         >
-          <div className="acct-progress" role="progressbar" aria-valuemin={0} aria-valuemax={b.steps.length} aria-valuenow={doneSteps}
-            aria-label={`${doneSteps} of ${b.steps.length} steps done`}>
-            <div className="acct-progress__bar"><span style={{ width: `${b.steps.length ? (doneSteps / b.steps.length) * 100 : 0}%` }} /></div>
-            <span className="acct-progress__text">{doneSteps} of {b.steps.length} steps</span>
+          <div className="acct-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pctDone)}
+            aria-label={itemTotal ? `${itemsDone} of ${itemTotal} documents sent` : `${doneSteps} of ${b.steps.length} steps done`}>
+            <div className="acct-progress__bar"><span style={{ width: `${pctDone}%` }} /></div>
+            <span className="acct-progress__text">
+              {itemTotal ? `${itemsDone.toLocaleString('en-ZA')} of ${itemTotal.toLocaleString('en-ZA')} sent` : `${doneSteps} of ${b.steps.length} steps`}
+            </span>
           </div>
           <ol className="acct-steps">
             {b.steps.map(x => (
               <li key={x.key}>
                 <StepIcon look={STEP_LOOK[x.state] ?? 'todo'} />
                 <div style={{ minWidth: 0 }}>
-                  <div className="acct-check__title">{x.label}</div>
+                  <div className="acct-check__title">{STEP_LABEL[x.key]?.(cfg.short) ?? x.label}</div>
                   {x.error && <div className="acct-error" style={{ marginTop: 0 }}>{x.error}</div>}
                   {x.state === 'SKIPPED' && <div className="acct-check__desc">Nothing to do</div>}
                 </div>
@@ -206,7 +222,8 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
             ))}
           </ol>
         </AcctCard>
-      )}
-    </>
   );
+
+  // While it runs, progress is what people came to see: it goes first.
+  return running ? <>{progressCard}{cutoverCard}</> : <>{cutoverCard}{progressCard}</>;
 }

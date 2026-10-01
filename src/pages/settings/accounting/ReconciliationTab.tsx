@@ -71,39 +71,38 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
 
   const { run: last, differences } = q.data;
   const statusChip = last
-    ? last.status === 'OK' ? <StatusChip tone="success" label="Matches" size="sm" />
-      : last.status === 'DIFFERENCES' ? <StatusChip tone="warning" label="Differences" size="sm" />
-        : <StatusChip tone="danger" label="Failed" size="sm" />
+    ? last.status === 'OK' ? <StatusChip tone="success" label="Matches" />
+      : last.status === 'DIFFERENCES' ? <StatusChip tone="warning" label={`${last.difference_count} ${last.difference_count === 1 ? 'difference' : 'differences'}`} />
+        : <StatusChip tone="danger" label="Check failed" />
     : null;
 
   return (
     <>
       <AcctCard
         title="Reconciliation"
-        description={`Every night TruckWys checks each invoice, each customer's balance and each month's sales and VAT against ${cfg.short}. Differences of ${formatCurrency(0.01)} or less are ignored.`}
-        actions={runButton}
+        description={`Every night TruckWys checks each invoice, each customer's balance and each month's sales and VAT against ${cfg.short}. Differences of ${formatCurrency(0.01)} or less are ignored. Difference = TruckWys minus ${cfg.short}.`}
+        actions={<>{statusChip}{runButton}</>}
       >
         {!last ? (
           <p className="acct-section-desc" style={{ margin: 0 }}>No check has run yet. Run one now, or wait for tonight's.</p>
         ) : (
           <>
-            <dl className="acct-facts acct-facts--4" style={{ margin: 0 }}>
-              <div><dt>Last checked</dt><dd>{formatDateTime(last.ran_at)}</dd></div>
-              <div><dt>Result</dt><dd>{statusChip}</dd></div>
-              <div><dt>Differences</dt><dd>{last.difference_count.toLocaleString('en-ZA')}</dd></div>
-              <div><dt>Checked</dt><dd>{[
-                last.checked.invoices != null && plural(last.checked.invoices, 'invoice'),
-                last.checked.customers != null && plural(last.checked.customers, 'customer'),
-                last.checked.months != null && plural(last.checked.months, 'month'),
-              ].filter(Boolean).join(' · ') || '—'}</dd></div>
-            </dl>
-            {last.status === 'FAILED' && last.error && <p className="acct-error" role="status" style={{ marginTop: 12 }}>{last.error}</p>}
+            {/* All good: say it once, first. */}
             {last.status !== 'FAILED' && differences.length === 0 && (
-              <p className="acct-ok-line" role="status">
-                <CheckCircle2 size={16} aria-hidden="true" />
-                Everything matches {cfg.short}. Next check tonight.
+              <p className="acct-ok-lead" role="status">
+                <CheckCircle2 size={18} aria-hidden="true" />
+                Everything matches {cfg.short}.
               </p>
             )}
+            <div className="acct-tiles acct-tiles--recon">
+              <div><span>Last checked</span><strong className="acct-tiles__text">{formatDateTime(last.ran_at)}</strong></div>
+              {differences.length > 0 && <div><span>Differences</span><strong>{last.difference_count.toLocaleString('en-ZA')}</strong></div>}
+              <div><span>Invoices checked</span><strong>{(last.checked.invoices ?? 0).toLocaleString('en-ZA')}</strong></div>
+              <div><span>Customers checked</span><strong>{(last.checked.customers ?? 0).toLocaleString('en-ZA')}</strong></div>
+              {differences.length === 0 && <div><span>Months checked</span><strong>{(last.checked.months ?? 0).toLocaleString('en-ZA')}</strong></div>}
+            </div>
+            {last.status === 'FAILED' && last.error && <p className="acct-error" role="status" style={{ marginTop: 12 }}>{last.error}</p>}
+            {last.status !== 'FAILED' && <p className="acct-section-desc" style={{ margin: '8px 0 0' }}>Next check tonight, around {nextCheck(last.ran_at)}.</p>}
           </>
         )}
       </AcctCard>
@@ -119,9 +118,9 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
             </section>
           );
         }
-        const hasLinks = rows.some(d => d.provider_url);
+        const hasLinks = true; // same column template in every table, link or not
         return (
-          <AcctCard key={scope} title={title} description={`${plural(rows.length, 'difference')}. Difference = TruckWys minus ${cfg.short}.`} flush>
+          <AcctCard key={scope} title={title} description={plural(rows.length, 'difference')} flush>
             <div className="acct-table-wrap acct-only-wide" role="region" aria-label={`${title} differences`} tabIndex={0}>
               <table className="acct-table acct-table--recon">
                 <colgroup>
@@ -170,7 +169,13 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
 }
 
 /** Money differences as rand; a status mismatch has no amount. */
-const diffText = (d: ReconDifference) => (isMoney(d.difference) && d.difference !== '' ? formatCurrency(d.difference) : '—');
+const diffText = (d: ReconDifference) => (isMoney(d.difference) && d.difference !== '' ? formatCurrency(d.difference) : 'Status');
+
+/** The hour of the last run, as "03:00". */
+function nextCheck(iso: string): string {
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '03:00' : d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
 
 function DiffRow({ d, providerName, hasLinks }: { d: ReconDifference; providerName: string; hasLinks: boolean }) {
   // "INV-00008 · Eagle Retail Group": the number links, the customer sits under it.

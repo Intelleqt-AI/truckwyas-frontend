@@ -100,7 +100,7 @@ export function ContactsTab({ connection }: { connection: Connection }) {
     <>
       <AcctCard
         title="Contacts"
-        description={`Each customer and supplier needs a ${cfg.short} contact. Matches on VAT, registration number or email are linked for you; name-only matches wait for you.`}
+        description={`We link matches on VAT, registration number or email automatically. Name-only matches need your OK.`}
         actions={
           <button type="button" className="tw-btn" onClick={runMatching} disabled={!canWrite || matching} title={writeTitle}>
             <RefreshCw size={14} aria-hidden="true" className={matching ? 'animate-spin' : undefined} />
@@ -113,14 +113,14 @@ export function ContactsTab({ connection }: { connection: Connection }) {
           <div className="acct-only-wide"><Segmented label="Status" value={status} onChange={setStatus} options={statusOptions} size="sm" /></div>
           <div className="acct-only-phone" style={{ flex: '1 1 160px', minWidth: 0 }}>
             <Select value={status} onValueChange={v => setStatus(v as StatusFilter)}>
-              <SelectTrigger aria-label="Status" style={{ minHeight: 36 }}><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Status" style={{ minHeight: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
               <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'All statuses' : o.label} ({o.count ?? 0})</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <span className="acct-toolbar__spacer" />
           <div className="acct-kind-filter">
             <Select value={kind} onValueChange={v => setKind(v as KindFilter)}>
-              <SelectTrigger aria-label="Show customers, suppliers or both" style={{ minHeight: 36 }}><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Show customers, suppliers or both" style={{ minHeight: 32, fontSize: 13 }}><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">Customers and suppliers</SelectItem>
                 <SelectItem value="CUSTOMER">Customers</SelectItem>
@@ -202,7 +202,7 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   if (canWrite) {
     if (row.status === 'SUGGESTED' && suggestedId) {
       primary = (
-        <button type="button" className="tw-btn tw-btn--primary tw-btn--sm" disabled={busy}
+        <button type="button" className="tw-btn tw-btn--sm" disabled={busy}
           onClick={() => onConfirm({ external_id: suggestedId }, `${row.local_name} linked to ${suggestedName ?? 'the suggested contact'}`)}>
           {busy ? 'Saving…' : 'Confirm match'}
         </button>

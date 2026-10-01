@@ -54,7 +54,10 @@ export function AccountingProviderCards({ hideManage = false }: { hideManage?: b
   };
 
   // Names and descriptions come from config, so the cards draw at once;
-  // only the status line and the button wait for the server.
+  // only the status line and the button wait for the server. Systems that
+  // aren't available yet share one quiet line instead of full cards.
+  const available = providers.filter(p => p.availability !== 'coming_soon');
+  const soon = providers.filter(p => p.availability === 'coming_soon');
   return (
     <div className="acct-cards" aria-busy={q.isLoading || undefined}>
       {q.isError && (
@@ -62,7 +65,7 @@ export function AccountingProviderCards({ hideManage = false }: { hideManage?: b
           {apiMessage(q.error, "Couldn't load your accounting connection. Refresh the page to try again.")}
         </p>
       )}
-      {providers.map(p => (
+      {available.map(p => (
         <ProviderCard
           key={p.provider}
           info={p}
@@ -75,6 +78,12 @@ export function AccountingProviderCards({ hideManage = false }: { hideManage?: b
           loading={q.isLoading}
         />
       ))}
+      {soon.length > 0 && (
+        <div className="acct-soon">
+          <span className="acct-soon__logos" aria-hidden="true">{soon.map(p => <ProviderLogo key={p.provider} provider={p.provider} size="sm" />)}</span>
+          <span><strong>Coming soon:</strong> {soon.map(p => providerConfig(p.provider).name).join(' and ')}.</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -90,76 +99,69 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
   loading: boolean;
 }) {
   const cfg = providerConfig(info.provider);
-  const comingSoon = info.availability === 'coming_soon';
   const mine = live && live.provider === info.provider ? live : null;
   const other = live && live.provider !== info.provider ? providerConfig(live.provider) : null;
   const chip = mine ? connectionChip(mine.status, mine.readiness) : null;
 
   // Same layout as the other integration cards on this page (Cartrack,
-  // CtrlFleet): logo, name and one line, status on the right; details in a
-  // nested box; actions underneath, left-aligned.
-  let meta: React.ReactNode = null;
+  // CtrlFleet): logo, name and one grey line, status on the right, the
+  // action underneath.
+  let desc: React.ReactNode = cfg.blurb;
+  let note: React.ReactNode = null;
   let actions: React.ReactNode = null;
-  const chipEl = loading && !comingSoon
-    ? <span className="ops-skel" style={{ width: 96, height: 12 }} aria-hidden="true" />
-    : comingSoon
-      ? <span className="acct-badge">Coming soon</span>
-      : chip ? <StatusChip tone={chip.tone} label={chip.label} /> : <StatusChip status="DISCONNECTED" />;
+  const btn = 'tw-btn acct-card__btn';
 
-  if (loading && !comingSoon) {
-    // Most states show a detail box; reserve one so the card doesn't grow.
-    meta = <span aria-hidden="true" style={{ display: 'block', height: 44 }}><span className="ops-skel" style={{ width: 200, height: 12, marginTop: 4 }} /><span className="ops-skel" style={{ width: 260, height: 12, marginTop: 12 }} /></span>;
-    actions = <span className="tw-btn" style={{ visibility: 'hidden', width: 120 }} aria-hidden="true" />;
-  } else if (comingSoon) {
-    meta = null;
+  if (loading) {
+    // Room for the usual connected state: org line, note line and chip.
+    desc = <span aria-hidden="true" style={{ display: 'block' }}><span className="acct-skel-line" style={{ height: 20 }}><span className="ops-skel" style={{ width: 200 }} /></span><span className="acct-skel-line" style={{ height: 20 }}><span className="ops-skel" style={{ width: 260, maxWidth: '100%' }} /></span></span>;
+    actions = <span className={btn} style={{ visibility: 'hidden', width: 120 }} aria-hidden="true" />;
   } else if (mine) {
-    meta = mine.status === 'PENDING_ORG'
-      ? <>Signed in to {cfg.short}. Choose which organisation holds this company's books.</>
-      : <>
-          <strong>Organisation:</strong> {mine.tenant_name || `${cfg.short} organisation`}
-          {mine.status === 'NEEDS_REAUTH' && <span className="acct-card__note acct-card__note--danger">{mine.status_reason || `${cfg.short} needs an admin to sign in again.`}</span>}
-          {mine.status === 'ACTIVE' && !mine.readiness.sync_enabled && <span className="acct-card__note">Nothing is sent to {cfg.short} until setup is finished.</span>}
-        </>;
+    desc = mine.status === 'PENDING_ORG'
+      ? `Signed in to ${cfg.short}; no organisation chosen yet.`
+      : mine.tenant_name || `${cfg.short} organisation`;
+    if (mine.status === 'NEEDS_REAUTH') note = <span className="acct-card__note acct-card__note--danger">{mine.status_reason || `Your ${cfg.short} sign-in has expired.`} Nothing is sent until an admin reconnects.</span>;
+    else if (mine.status === 'ACTIVE' && !mine.readiness.sync_enabled) note = <span className="acct-card__note">Nothing is sent to {cfg.short} until setup is finished.</span>;
+    const needsYou = mine.status === 'PENDING_ORG' || (mine.status === 'ACTIVE' && !mine.readiness.sync_enabled);
     actions = (
       <>
         {mine.status === 'NEEDS_REAUTH' && (
-          <button type="button" className="tw-btn tw-btn--primary" onClick={onConnect} disabled={!canWrite || busy} title={!canWrite ? disabledTitle : undefined}>
-            {busy ? 'Opening…' : 'Reconnect'}
+          <button type="button" className={`${btn} tw-btn--primary`} onClick={onConnect} disabled={!canWrite || busy} title={!canWrite ? disabledTitle : undefined}>
+            {busy ? 'Opening…' : `Reconnect ${cfg.short}`}
           </button>
         )}
         {!hideManage && (
-          <Link to={ACCOUNTING_PAGE} className={`tw-btn${mine.status !== 'NEEDS_REAUTH' && (mine.status === 'PENDING_ORG' || !mine.readiness.sync_enabled) ? ' tw-btn--primary' : ''}`}>
+          <Link to={ACCOUNTING_PAGE} className={`${btn}${needsYou ? ' tw-btn--primary' : ''}`}>
             {mine.status === 'PENDING_ORG' ? 'Choose organisation' : mine.status === 'ACTIVE' && !mine.readiness.sync_enabled ? 'Finish setup' : 'Manage'}
           </Link>
         )}
       </>
     );
   } else if (other) {
-    meta = <>Disconnect {other.short} first. Only one accounting system can be connected at a time.</>;
-    actions = <button type="button" className="tw-btn" disabled title={`Disconnect ${other.short} first`}>Connect {cfg.short}</button>;
+    note = <span className="acct-card__note">Disconnect {other.short} first. One accounting system at a time.</span>;
+    actions = <button type="button" className={btn} disabled title={`Disconnect ${other.short} first`}>Connect {cfg.short}</button>;
   } else if (!info.configured) {
-    meta = <>Not set up on this server yet. Ask TruckWys support to switch it on.</>;
-    actions = <button type="button" className="tw-btn" disabled>Connect {cfg.short}</button>;
+    note = <span className="acct-card__note">Not set up on this server yet. Ask TruckWys support to switch it on.</span>;
+    actions = <button type="button" className={btn} disabled>Connect {cfg.short}</button>;
   } else {
     actions = (
-      <button type="button" className="tw-btn tw-btn--primary" onClick={onConnect} disabled={!canWrite || busy} title={!canWrite ? disabledTitle : undefined}>
+      <button type="button" className={`${btn} tw-btn--primary`} onClick={onConnect} disabled={!canWrite || busy} title={!canWrite ? disabledTitle : undefined}>
         {busy ? 'Opening…' : `Connect ${cfg.short}`}
       </button>
     );
   }
 
   return (
-    <div className={`acct-card${comingSoon ? ' is-disabled' : ''}`}>
+    <div className="acct-card">
       <div className="acct-card__top">
         <ProviderLogo provider={info.provider} />
         <div className="acct-card__text">
           <h3 className="acct-card__title">{cfg.name}</h3>
-          {/* The blurb only where it helps: an available system not yet connected. */}
-          {!comingSoon && !mine && <p className="acct-card__desc">{cfg.blurb}</p>}
+          <p className="acct-card__desc">{desc}{note}</p>
         </div>
-        <div className="acct-card__chip">{chipEl}</div>
+        {loading
+          ? <div className="acct-card__chip" aria-hidden="true"><span className="tw-status" style={{ visibility: 'hidden' }}>Setup needed</span></div>
+          : chip && <div className="acct-card__chip"><StatusChip tone={chip.tone} label={chip.label} /></div>}
       </div>
-      {meta && <div className="acct-card__box">{meta}</div>}
       {actions && <div className="acct-card__actions">{actions}</div>}
     </div>
   );

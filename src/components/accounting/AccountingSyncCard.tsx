@@ -19,10 +19,10 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
   return (
     <section className="card acct-sync-card" aria-labelledby={titleId}>
       <div className="fin-panel-head" style={{ marginBottom: 4 }}>
-        <div className="fin-panel-head__text">
+        <div className="fin-panel-head__text" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%' }}>
           <h2 id={titleId} className="fin-panel-title">{name}</h2>
+          <StatusChip tone={chip.tone} label={chip.label} size="sm" />
         </div>
-        <StatusChip tone={chip.tone} label={chip.label} size="sm" />
       </div>
       <dl className="fin-dl">
         {/* Only when it differs from ours (it usually doesn't). */}
@@ -33,14 +33,10 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
           </div>
         )}
         <div className="fin-dl__row">
-          <dt>Last sent</dt>
+          <dt>{sync.status === 'SYNCED' ? 'Last sent' : 'Last sent successfully'}</dt>
           <dd style={{ whiteSpace: 'nowrap' }}>{sync.last_synced_at ? formatDate(sync.last_synced_at) : sync.status === 'PENDING' ? 'Not sent yet' : 'Not yet'}</dd>
         </div>
       </dl>
-      {/* The reason is in the notice above the document; here, just the way to fix it. */}
-      {(sync.status === 'ERROR' || sync.status === 'DEAD' || sync.status === 'BLOCKED') && (
-        <Link to="/settings/integrations/accounting?tab=sync" className="acct-link" style={{ fontSize: 13, marginTop: 8 }}>Fix in accounting settings</Link>
-      )}
       {sync.url && (
         <a href={sync.url} target="_blank" rel="noopener noreferrer" className="tw-btn" style={{ width: '100%', marginTop: 12 }}>
           Open {what} in {name}
@@ -58,7 +54,6 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
 export function PaymentsManagedNote({ providerName, recordUrl }: { providerName: string; recordUrl: string | null }) {
   return (
     <div className="acct-managed">
-      <p>Recorded in {providerName}; they show here after the next sync.</p>
       {recordUrl && (
         <a href={recordUrl} target="_blank" rel="noopener noreferrer" className="tw-btn" style={{ width: '100%' }}>
           Record in {providerName}
@@ -75,14 +70,14 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
   const name = providerConfig(sync.provider).short || sync.provider_name;
   const retrying = sync.status === 'ERROR';
   return (
-    <div className="fl-notice fl-notice--warning" role="status">
+    <div className="fl-notice fl-notice--warning acct-sync-notice" role="status">
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
         <strong>{retrying ? `The latest update didn't reach ${name}; retrying` : `This ${what} isn't up to date in ${name}`}</strong>
         {sync.last_error || `${name} refused it.`}
       </div>
       <Link to={`/settings/integrations/accounting?tab=${/account|tax|vat|tracking/i.test(sync.last_error) ? 'mapping' : 'sync'}`} className="tw-btn fl-notice__action">
-        {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix mapping' : 'View sync issue'}
+        {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix in Accounts and VAT' : 'View sync issue'}
       </Link>
     </div>
   );
@@ -95,7 +90,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
  */
 export function PaymentSourceBadge({ source, managed = false }: { source?: string | null; managed?: boolean }) {
   const manual = !source || source === 'MANUAL';
-  if (managed) return manual ? <span className="acct-source-badge">Recorded in TruckWys</span> : null;
+  if (managed) return manual ? <span className="acct-source-badge" title="Recorded in TruckWys before the accounting system was connected">Recorded in TruckWys</span> : null;
   if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;
   return <span className="acct-source-badge">{label}</span>;

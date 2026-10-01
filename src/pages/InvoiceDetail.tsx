@@ -941,13 +941,13 @@ export default function InvoiceDetail() {
                 <div className="fin-panel-head__text">
                   <h2 id="payments-title" className="fin-panel-title">Payments</h2>
                   <p className="fin-panel-desc">
-                    {`${payments.length} recorded, by payment date`}
+                    {managedHere
+                      ? (payments.length ? `${payments.length} ${payments.length === 1 ? 'payment' : 'payments'}. Record new ones in ${acctName}; they appear here within a few minutes.` : `Record payments in ${acctName}; they appear here within a few minutes.`)
+                      : `${payments.length} recorded, by payment date`}
                   </p>
                 </div>
               </div>
-              {managedHere && (
-                <PaymentsManagedNote providerName={acctName} recordUrl={canRecordInProvider ? recordInProviderUrl : null} />
-              )}
+
               <ul className="fin-paylist">
                 {payments.map((payment: any, idx: number) => {
                   const ref = payment.reference_number || payment.reference || payment.payment_number;
@@ -985,8 +985,13 @@ export default function InvoiceDetail() {
                   </li>
                 )}
               </ul>
+              {managedHere && canRecordInProvider && (
+                <PaymentsManagedNote providerName={acctName} recordUrl={recordInProviderUrl} />
+              )}
             </section>
           )}
+
+          <AccountingSyncCard sync={inv.accounting_sync} what="invoice" localNumber={inv.invoice_number} />
 
           {creditNotes.length > 0 && (
             <section className="card fin-table-card" aria-labelledby="credit-notes-title">
@@ -1031,8 +1036,6 @@ export default function InvoiceDetail() {
               </dl>
             </section>
           )}
-
-          <AccountingSyncCard sync={inv.accounting_sync} what="invoice" localNumber={inv.invoice_number} />
 
           <section className="card" aria-labelledby="activity-title">
             <div className="fin-panel-head" style={{ marginBottom: 4 }}>

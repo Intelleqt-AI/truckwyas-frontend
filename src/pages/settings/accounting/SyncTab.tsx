@@ -26,6 +26,19 @@ const LEVEL: Record<string, { tone: StatusTone; label: string }> = {
 };
 const OVERDUE_MS = 2 * 60 * 60 * 1000;
 
+/** "10:00 today", "08:30 tomorrow", else the date and time. */
+function nextTry(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const time = d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const day = (x: Date) => x.toLocaleDateString('en-CA');
+  const now = new Date();
+  const tomorrow = new Date(now.getTime() + 86_400_000);
+  if (day(d) === day(now)) return `${time} today`;
+  if (day(d) === day(tomorrow)) return `${time} tomorrow`;
+  return formatDateTime(iso);
+}
+
 /** In-app link for a document, or plain text when the server has none. */
 function DocLink({ url, children }: { url: string | null; children: React.ReactNode }) {
   if (!url) return <>{children}</>;
@@ -95,6 +108,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
         title="Sync"
         description={<>
           Documents go to {cfg.short} as you create them; payments come back every few minutes.
+          {!overdue && s.last_payment_sync_at && <> Last fetched {formatRelativeTime(s.last_payment_sync_at)}.</>}
           {overdue && (
             <span className="acct-hint is-required" style={{ display: 'flex', marginTop: 4 }}>
               Payment fetch is overdue: last fetched {s.last_payment_sync_at ? formatRelativeTime(s.last_payment_sync_at) : 'never'}.
@@ -113,13 +127,13 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
           <div className="acct-tiles">
             <div><span>In {cfg.short}</span><strong>{c.synced.toLocaleString('en-ZA')}</strong></div>
             <div><span>Waiting to send</span><strong>{c.queued.toLocaleString('en-ZA')}</strong></div>
-            <div><span>Failed, retrying</span><strong style={c.errors ? { color: 'var(--status-warning-text)' } : undefined}>{c.errors.toLocaleString('en-ZA')}</strong></div>
-            <div><span>Failed, stopped</span><strong style={c.dead ? { color: 'var(--status-danger-text)' } : undefined}>{c.dead.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Retrying</span><strong style={c.errors ? { color: 'var(--status-warning-text)' } : undefined}>{c.errors.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Stopped</span><strong style={c.dead ? { color: 'var(--status-danger-text)' } : undefined}>{c.dead.toLocaleString('en-ZA')}</strong></div>
           </div>
         </div>
       </AcctCard>
 
-      <AcctCard title="Needs attention" description={s.errors.length ? `Fix the cause (often a mapping or a contact), then retry.` : undefined} flush>
+      <AcctCard title={s.errors.length ? `Needs attention · ${s.errors.length}` : 'Needs attention'} description={s.errors.length ? `Fix the cause (often a mapping or a contact), then retry.` : undefined} flush>
         {s.errors.length === 0 ? (
           <div className="acct-empty">Nothing is stuck. Every document reached {cfg.short}.</div>
         ) : (
@@ -133,7 +147,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
                     <div className="acct-row__reason">{e.last_error || 'No reason given'}</div>
                     <div className="acct-row__sub">
                       {meta.label} · {e.attempts} {e.attempts === 1 ? 'try' : 'tries'}
-                      {e.next_attempt_at && e.status === 'ERROR' ? ` · next try ${formatDateTime(e.next_attempt_at)}` : ''}
+                      {e.next_attempt_at && e.status === 'ERROR' ? ` · next try ${nextTry(e.next_attempt_at)}` : ''}
                     </div>
                   </div>
                   <div className="acct-row__actions">

@@ -12,7 +12,7 @@ import { toast } from '@/lib/toast';
 import {
   ACCT_KEYS, accountingApi, apiMessage, invalidateAccounting, providerConfig, type Connection,
 } from '@/lib/accounting';
-import { settingsCardStyle, settingsCardTitleStyle } from '../settingsUi';
+import { settingsCardStyle } from '../settingsUi';
 import { SkelLine, useAccountingPermissions } from './shared';
 
 /** Disconnect (or cancel a half-finished connection) behind a confirm dialog. */
@@ -88,11 +88,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
           </p>
         </div>
         <div className="acct-head__actions">
-          {reauth ? (
-            <button type="button" className="tw-btn tw-btn--primary" onClick={reconnect} disabled={!canWrite || reconnecting} title={writeTitle}>
-              {reconnecting ? 'Opening…' : `Reconnect ${cfg.short}`}
-            </button>
-          ) : connection.web_url ? (
+          {!reauth && connection.web_url ? (
             <a href={connection.web_url} target="_blank" rel="noopener noreferrer" className="tw-btn acct-hide-phone">
               Open in {cfg.short}
               <ExternalLink size={14} aria-hidden="true" />
@@ -102,13 +98,17 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
         {menu.length > 0 && <div className="acct-head__menu"><RowActions label={`${cfg.short} connection`} items={menu} /></div>}
       </div>
 
+      {/* The why first, then the one thing to do about it. */}
       {reauth && (
-        <div className="acct-notice acct-notice--outline-danger" role="status" style={{ margin: '16px 0 0' }}>
+        <div className="acct-notice acct-notice--outline-danger acct-notice--action" role="status" style={{ margin: '16px 0 0' }}>
           <AlertTriangle size={16} aria-hidden="true" />
           <div>
             <strong>{connection.status_reason || `Your ${cfg.short} sign-in has expired.`}</strong>
             An admin needs to sign in to {cfg.short} again. Nothing is sent or fetched until then.
           </div>
+          <button type="button" className="tw-btn tw-btn--primary" onClick={reconnect} disabled={!canWrite || reconnecting} title={writeTitle}>
+            {reconnecting ? 'Opening…' : `Reconnect ${cfg.short}`}
+          </button>
         </div>
       )}
 
@@ -126,6 +126,23 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
           {live && <div><dt>Last checked</dt><dd>{connection.last_reconciled_at ? formatDateTime(connection.last_reconciled_at) : 'Not yet'}</dd></div>}
         </dl>
       )}
+    </section>
+  );
+}
+
+/** Who connected it and when: a short card at the end of the Setup tab. */
+export function ConnectionDetails({ connection }: { connection: Connection }) {
+  const live = connection.readiness?.sync_enabled ?? false;
+  return (
+    <section style={{ ...settingsCardStyle, padding: 'var(--card-pad, 20px)' }} aria-label="Connection details">
+      <dl className="acct-facts acct-facts--4" style={{ margin: 0 }}>
+        <div><dt>Connected by</dt><dd>{connection.connected_by || '—'}</dd></div>
+        <div><dt>Connected on</dt><dd>{connection.connected_at ? formatDate(connection.connected_at) : '—'}</dd></div>
+        <div><dt>Base currency</dt><dd>{connection.base_currency || '—'}</dd></div>
+        <div><dt>Cut-over date</dt><dd>{connection.cutover_date ? formatDate(connection.cutover_date) : 'Not chosen yet'}</dd></div>
+        {live && <div><dt>Payments last fetched</dt><dd>{connection.last_payment_sync_at ? formatDateTime(connection.last_payment_sync_at) : 'Not yet'}</dd></div>}
+        {live && <div><dt>Last checked</dt><dd>{connection.last_reconciled_at ? formatDateTime(connection.last_reconciled_at) : 'Not yet'}</dd></div>}
+      </dl>
     </section>
   );
 }
@@ -183,64 +200,59 @@ export function OrgPicker({ connection }: { connection: Connection }) {
   };
 
   return (
-    <section style={settingsCardStyle} aria-labelledby="acct-org-title">
+    <>
       {dis.modal}
-      <div className="acct-head" style={{ padding: '16px var(--card-pad, 20px)', borderBottom: '1px solid var(--border-subtle)' }}>
-        <ProviderLogo provider={connection.provider} />
-        <div className="acct-head__main">
-          <h2 id="acct-org-title" style={settingsCardTitleStyle}>Choose your {cfg.short} organisation</h2>
-          <p className="acct-head__caption">
-            <span>Signed in to {cfg.short}</span>
-            <StatusChip tone="warning" label="Organisation not chosen" size="sm" />
-          </p>
-        </div>
-      </div>
-      <p className="acct-section-desc" style={{ margin: 0, padding: '12px var(--card-pad, 20px)', borderBottom: '1px solid var(--border-row)' }}>
-        Pick the organisation that holds this company's books. Only organisations that keep their books in rand (ZAR) can be linked.
+      <h2 id="acct-org-title" className="acct-section-title">Choose your {cfg.short} organisation</h2>
+      <p className="acct-section-desc">
+        Signed in to {cfg.short}. Pick the organisation that holds this company's books; only organisations that keep their books in rand (ZAR) can be linked.
       </p>
-      {tenants.length === 0 ? (
-        <div className="acct-empty">No organisations came back from {cfg.short}. Cancel the connection and try again.</div>
-      ) : (
-        <div role="radiogroup" aria-labelledby="acct-org-title">
-          {tenants.map(t => {
-            const notZar = !isZar(t.currency);
-            const selected = choice === t.tenant_id;
-            return (
-              <label key={t.tenant_id} className={`acct-row acct-org${selected ? ' is-selected' : ''}${notZar ? ' is-disabled' : ''}`}>
-                {notZar ? (
-                  <Lock size={14} aria-hidden="true" style={{ margin: '3px 0 0 1px', color: 'var(--text-tertiary)' }} />
-                ) : (
-                  <input
-                    type="radio"
-                    name="acct-org"
-                    className="acct-radio"
-                    value={t.tenant_id}
-                    checked={selected}
-                    onChange={() => setChoice(t.tenant_id)}
-                    disabled={!canWrite}
-                  />
-                )}
-                <span style={{ minWidth: 0 }}>
-                  <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
-                  <span className="acct-row__sub">{notZar ? `Not available: books in ${t.currency}` : `Books in ${t.currency || 'ZAR'}`}</span>
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      )}
-      <div className="acct-formfoot">
-        {error && <p className="acct-error" role="alert" style={{ margin: 0, marginRight: 'auto' }}>{error}</p>}
-        {!canWrite && <p className="acct-section-desc" style={{ margin: 0, marginRight: 'auto' }}>{writeTitle}.</p>}
-        {canWrite && (
-          <button type="button" className="tw-btn tw-btn--ghost" onClick={dis.ask} disabled={dis.busy || busy}>
-            Use a different {cfg.short} login
-          </button>
+      <section style={settingsCardStyle} aria-labelledby="acct-org-title">
+        {tenants.length === 0 ? (
+          <div className="acct-empty">No organisations came back from {cfg.short}. Use a different login and try again.</div>
+        ) : (
+          <div role="radiogroup" aria-labelledby="acct-org-title">
+            {tenants.map(t => {
+              const notZar = !isZar(t.currency);
+              const selected = choice === t.tenant_id;
+              return (
+                <label key={t.tenant_id} className={`acct-row acct-org${selected ? ' is-selected' : ''}${notZar ? ' is-disabled' : ''}`}>
+                  <span className="acct-org__mark">
+                    {notZar ? (
+                      <Lock size={14} aria-hidden="true" style={{ color: 'var(--text-tertiary)' }} />
+                    ) : (
+                      <input
+                        type="radio"
+                        name="acct-org"
+                        className="acct-radio"
+                        value={t.tenant_id}
+                        checked={selected}
+                        onChange={() => setChoice(t.tenant_id)}
+                        disabled={!canWrite}
+                      />
+                    )}
+                  </span>
+                  <span style={{ minWidth: 0 }}>
+                    <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
+                    <span className="acct-row__sub">{notZar ? `Not available: books in ${t.currency}` : `Books in ${t.currency || 'ZAR'}`}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
         )}
-        <button type="button" className="tw-btn tw-btn--primary" onClick={submit} disabled={!canWrite || !choice || busy}>
-          {busy ? 'Linking…' : 'Link organisation'}
-        </button>
-      </div>
-    </section>
+        <div className="acct-formfoot">
+          {error && <p className="acct-error" role="alert" style={{ margin: 0, marginRight: 'auto' }}>{error}</p>}
+          {!canWrite && <p className="acct-section-desc" style={{ margin: 0, marginRight: 'auto' }}>{writeTitle}.</p>}
+          {canWrite && (
+            <button type="button" className="tw-btn" onClick={dis.ask} disabled={dis.busy || busy}>
+              Use a different {cfg.short} login
+            </button>
+          )}
+          <button type="button" className="tw-btn tw-btn--primary acct-formfoot__primary" onClick={submit} disabled={!canWrite || !choice || busy}>
+            {busy ? 'Linking…' : 'Link organisation'}
+          </button>
+        </div>
+      </section>
+    </>
   );
 }

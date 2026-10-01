@@ -148,7 +148,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
     return (
       <>
         <AcctCard
-          title="Accounts and VAT"
+          title={<SkelLine width={140} lineHeight={24} />}
           description={<><SkelLine width="90%" /><SkelLine width="55%" /></>}
           actionsBelow
           actions={<><span className="tw-btn" style={{ visibility: 'hidden', width: 160 }} aria-hidden="true" /><span className="tw-btn" style={{ visibility: 'hidden', width: 160 }} aria-hidden="true" /></>}
@@ -181,12 +181,11 @@ export function MappingTab({ connection }: { connection: Connection }) {
       return (
         <div className={`acct-hint acct-hint--stack${requiredGap(section, key) ? ' is-required' : ''}`}>
           <span>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {describe(s)}</span>
-          {canWrite && <button type="button" className="acct-linkbtn" onClick={() => setSection(section, key, s)}>Use suggestion</button>}
+          {canWrite && <button type="button" className="tw-btn tw-btn--sm" onClick={() => setSection(section, key, s)}>Use suggestion</button>}
         </div>
       );
     }
     if (requiredGap(section, key)) return <div className="acct-hint is-required">Required. No suggestion: pick where it should go.</div>;
-    if (empty) return <div className="acct-hint">Only needed if you use it.</div>;
     return null;
   };
   const optionalTag = (section: MappingSection, key: string) =>
@@ -198,28 +197,26 @@ export function MappingTab({ connection }: { connection: Connection }) {
   return (
     <>
       <AcctCard
-        title="Accounts and VAT"
+        title={m.complete && !dirty ? 'Everything required is mapped' : m.missing.length > 0 ? `${m.missing.length} still to map` : 'Unsaved changes'}
         description={<>
-          {m.complete && !dirty
-            ? <span style={{ color: 'var(--status-success-text)' }}>Everything required is mapped.</span>
-            : m.missing.length > 0
-              ? <><strong style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{m.missing.length} still to map:</strong> {m.missing.map(missingMappingLabel).join(', ')}.</>
-              : 'Review your changes, then save.'}
-          {' '}Accounts and VAT rates read from {cfg.short}{m.options.fetched_at ? ` ${formatRelativeTime(m.options.fetched_at)}` : ''}.
+          {m.missing.length > 0 && !(m.complete && !dirty) ? <>{m.missing.map(missingMappingLabel).join(', ')}. </> : null}
+          Nothing is sent to {cfg.short} until every required line is mapped.
           {!canWrite && <> {writeTitle}; you can look but not change anything.</>}
         </>}
         actionsBelow
         actions={<>
-          {canWrite && pendingSuggestions.length > 1 && (
-            <button type="button" className="tw-btn" onClick={applyAllSuggestions}>Apply {pendingSuggestions.length} suggestions</button>
+          {canWrite && pendingSuggestions.length > 0 && (
+            <button type="button" className="tw-btn tw-btn--primary" onClick={applyAllSuggestions}>
+              Apply {pendingSuggestions.length === 1 ? 'suggestion' : `${pendingSuggestions.length} suggestions`}
+            </button>
           )}
-          <button type="button" className="tw-btn" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
+          <button type="button" className="tw-btn tw-btn--ghost" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
             <RefreshCw size={14} aria-hidden="true" className={refreshing ? 'animate-spin' : undefined} />
             {refreshing ? 'Reading…' : `Refresh from ${cfg.short}`}
           </button>
+          {m.options.fetched_at && <span className="acct-section-desc" style={{ margin: 0, alignSelf: 'center' }}>Read {formatRelativeTime(m.options.fetched_at)}</span>}
         </>}
-      >
-      </AcctCard>
+      />
 
       <AcctCard title="Income accounts" description="Which income account each kind of charge on your invoices goes to." flush>
         {m.revenue_types.map(row => {
@@ -260,8 +257,8 @@ export function MappingTab({ connection }: { connection: Connection }) {
           key={section}
           title={section === 'tax_sales' ? 'VAT on sales' : 'VAT on purchases'}
           description={section === 'tax_sales'
-            ? `The ${cfg.short} tax rate for each VAT code on invoices and credit notes. Each needs the same percentage.`
-            : `The ${cfg.short} tax rate for each VAT code on supplier bills. Each needs the same percentage.`}
+            ? `For invoices and credit notes. Pick a ${cfg.short} rate with the same percentage.`
+            : `For supplier bills. Pick a ${cfg.short} rate with the same percentage.`}
           flush
         >
           {m[section].map(row => {
@@ -290,7 +287,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
       ))}
 
       <AcctCard
-        title="Bank account for payments already recorded"
+        title="Bank account for past payments"
         description={`Only needed if you recorded customer payments in TruckWys for invoices after the cut-over date. They are sent to ${cfg.short} into this bank account.`}
         flush
       >

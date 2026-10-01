@@ -79,7 +79,7 @@ export default function AccountingIntegration() {
 
   const r = live?.readiness;
   const tabBadge = (t: AccountingTab): number | undefined => {
-    if (!live || !r) return undefined;
+    if (!live || !r || live.status !== 'ACTIVE') return undefined;
     if (t === 'contacts' && r.contacts_to_confirm > 0) return r.contacts_to_confirm;
     if (t === 'mapping' && !r.mapping_complete && r.missing_mappings.length) return r.missing_mappings.length;
     if (t === 'sync' && (live.counts.errors + live.counts.dead) > 0) return live.counts.errors + live.counts.dead;
@@ -89,8 +89,9 @@ export default function AccountingIntegration() {
   // Phones: the tab strip scrolls sideways; keep the open tab in view.
   const tabsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const el = tabsRef.current?.querySelector<HTMLElement>('.is-active');
-    if (el && tabsRef.current) tabsRef.current.scrollLeft = Math.max(0, el.offsetLeft - 16);
+    const strip = tabsRef.current;
+    const el = strip?.querySelector<HTMLElement>('.is-active');
+    if (el && strip) strip.scrollLeft = Math.max(0, el.offsetLeft - (strip.clientWidth - el.offsetWidth) / 2);
   }, [tab, live?.id]);
 
   const tabCountTitle = (t: AccountingTab, n: number) =>
@@ -100,7 +101,7 @@ export default function AccountingIntegration() {
   if (conn.isLoading) {
     body = (
       <>
-        <ConnectionHeaderSkeleton compact={tab !== 'setup'} />
+        <ConnectionHeaderSkeleton compact />
         <div className="acct-tabs" aria-hidden="true"><span className="ops-skel" style={{ width: 'min(100%, 520px)', height: 32, borderRadius: 8 }} /></div>
         <section style={settingsCardStyle}><LoadingBlock label="Loading setup" rows={5} /></section>
       </>
@@ -125,18 +126,17 @@ export default function AccountingIntegration() {
         <section style={settingsCardStyle} aria-labelledby="acct-how-title">
           <div style={{ padding: '16px var(--card-pad, 20px)', borderBottom: '1px solid var(--border-subtle)' }}>
             <h2 id="acct-how-title" style={{ margin: 0, font: '600 16px/24px var(--font-sans)', color: 'var(--text-primary)' }}>After you connect</h2>
-            <p className="acct-section-desc" style={{ margin: '2px 0 0' }}>About ten minutes, once. An admin does it.</p>
+            <p className="acct-section-desc" style={{ margin: '2px 0 0' }}>Takes about ten minutes, once. Needs a company admin.</p>
           </div>
           <ol className="acct-check">
             {[
               ['Map accounts and VAT', 'Pick the income account and VAT rate for each kind of charge, and where supplier bills go.'],
               ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
               ['Choose a cut-over date', 'Documents from that date on are sent; anything earlier is assumed to be in your books.'],
-              ['Record payments in your accounting system', 'They come back to TruckWys on their own, so invoices show as paid.'],
             ].map(([t, d], i) => (
               <li key={t}>
                 <span className="acct-step-num" aria-hidden="true">{i + 1}</span>
-                <div style={{ minWidth: 0 }}>
+                <div style={{ minWidth: 0, maxWidth: 560 }}>
                   <div className="acct-check__title">{t}</div>
                   <div className="acct-check__desc">{d}</div>
                 </div>
@@ -144,6 +144,9 @@ export default function AccountingIntegration() {
               </li>
             ))}
           </ol>
+          <p className="acct-section-desc" style={{ margin: 0, padding: '12px var(--card-pad, 20px)', borderTop: '1px solid var(--border-row)' }}>
+            After that, payments you record in your accounting system come back to TruckWys on their own.
+          </p>
         </section>
       </>
     );
@@ -156,7 +159,7 @@ export default function AccountingIntegration() {
   } else {
     body = (
       <>
-        <ConnectionHeader connection={live} compact={tab !== 'setup'} />
+        <ConnectionHeader connection={live} compact />
         <div className="acct-tabs">
           <div className="tw-seg" role="tablist" ref={tabsRef} aria-label={`${cfg!.short} settings`}>
             {ACCOUNTING_TABS.map(t => {

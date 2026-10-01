@@ -1565,3 +1565,8 @@ textarea,
 /* Display lives here, not inline, so page rules can hide a trigger
    (e.g. a phone-only filter select at desktop widths). */
 .tw-select-trigger { display: flex; }
+
+/* A popover opened from inside a dialog (e.g. a date picker's calendar)
+   renders in its own portal at z-50, behind the z-10000 dialog. Lift popper
+   layers above an open dialog; outside dialogs nothing changes. */
+body:has([role="dialog"][data-state="open"]) [data-radix-popper-content-wrapper] { z-index: 10001 !important; }

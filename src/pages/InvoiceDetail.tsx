@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { BellRing, Banknote, Send, FileSearch } from "lucide-react";
+import { BellRing, Banknote, Send, FileSearch, Pencil } from "lucide-react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -76,6 +78,7 @@ export default function InvoiceDetail() {
   const [editingDue, setEditingDue] = useState(false);
   const [dueDraft, setDueDraft] = useState('');
   const [savingDue, setSavingDue] = useState(false);
+  const [dueError, setDueError] = useState<string | null>(null);
   // Outgoing messages are previewed and confirmed before they are sent.
   const [preview, setPreview] = useState<InvoiceMessageKind | null>(null);
 
@@ -125,6 +128,7 @@ export default function InvoiceDetail() {
   const handleSaveDueDate = async () => {
     if (!id || !dueDraft) return;
     setSavingDue(true);
+    setDueError(null);
     try {
       await patchData({ url: `api/v1/invoices/${id}/`, data: { due_date: dueDraft } });
       setEditingDue(false);
@@ -133,8 +137,7 @@ export default function InvoiceDetail() {
       refetch();
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
     } catch (error) {
-      setToast({ msg: error instanceof Error ? error.message : "Couldn't change the due date", isError: true });
-      setTimeout(() => setToast(null), 4000);
+      setDueError(error instanceof Error ? error.message : "Couldn't change the due date");
     } finally {
       setSavingDue(false);
     }
@@ -320,7 +323,7 @@ export default function InvoiceDetail() {
   // A draft whose due date has already passed: said once, calmly, before it is sent.
   const draftPastDue = status === 'DRAFT' && daysPastDue != null && daysPastDue > 0;
   const canEditDue = status !== 'PAID' && status !== 'CANCELLED';
-  const startDueEdit = () => { setDueDraft(String(invoice.due_date || '').slice(0, 10)); setEditingDue(true); };
+  const startDueEdit = () => { setDueDraft(String(invoice.due_date || '').slice(0, 10)); setDueError(null); setEditingDue(true); };
   // Part-paid: the document ends with "Paid to date" and "Balance due".
   const partPaid = showBalance && Math.abs(balance - total) > 0.005;
   const paidInDoc = partPaid ? (paidToDate ?? total - balance) : null;
@@ -408,28 +411,20 @@ export default function InvoiceDetail() {
           <dd>{safeDate(invoice.issue_date || invoice.created_at)}</dd>
         </div>
         <div>
-          <dt>Due</dt>
-          {editingDue ? (
-            <dd className="fin-due-edit">
-              <DatePicker id="invoice-due-date" value={dueDraft} onChange={setDueDraft} />
-              <span className="fin-due-edit__actions">
-                <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={handleSaveDueDate} disabled={savingDue || !dueDraft}>
-                  {savingDue ? 'Saving…' : 'Save'}
-                </button>
-                <button type="button" className="tw-btn tw-btn--sm tw-btn--ghost" onClick={() => setEditingDue(false)} disabled={savingDue}>Cancel</button>
-              </span>
-            </dd>
-          ) : (
-            <dd>
-              {safeDate(invoice.due_date)}
-              {daysLate != null && daysLate > 0 && (
-                <span className="fin-doc__late fin-text-danger">{daysLate} {daysLate === 1 ? 'day' : 'days'} late</span>
-              )}
-              {canEditDue && (
-                <button type="button" className="fin-link fin-due-change" onClick={startDueEdit} aria-label="Change due date">Change</button>
-              )}
-            </dd>
-          )}
+          <dt className="fin-due-label">
+            Due
+            {canEditDue && (
+              <button type="button" className="fin-due-edit-btn" onClick={startDueEdit} aria-label="Edit due date" title="Edit due date">
+                <Pencil size={12} aria-hidden="true" />
+              </button>
+            )}
+          </dt>
+          <dd>
+            {safeDate(invoice.due_date)}
+            {daysLate != null && daysLate > 0 && (
+              <span className="fin-doc__late fin-text-danger">{daysLate} {daysLate === 1 ? 'day' : 'days'} late</span>
+            )}
+          </dd>
         </div>
         {terms && (
           <div>
@@ -441,7 +436,7 @@ export default function InvoiceDetail() {
       {draftPastDue && (
         <p className="fin-docfacts__note">
           Draft · due date {safeDate(invoice.due_date)} has passed. Sent as it is, it arrives {daysPastDue} {daysPastDue === 1 ? 'day' : 'days'} overdue.
-          {!editingDue && <>{' '}<button type="button" className="fin-link" onClick={startDueEdit}>Change due date</button></>}
+          {' '}<button type="button" className="fin-link" onClick={startDueEdit}>Change due date</button>
         </p>
       )}
     </div>
@@ -449,6 +444,28 @@ export default function InvoiceDetail() {
 
   return (
     <div className="fin-page fin-page--invoice">
+      {/* Edit due date: a small modal (the date picker's calendar opens above it). */}
+      <Dialog open={editingDue} onOpenChange={(open) => { if (!savingDue) setEditingDue(open); }}>
+        <DialogContent className="fin-due-dialog" aria-describedby="fin-due-dialog-sub">
+          <DialogPrimitive.Title className="fin-due-dialog__title">Change due date</DialogPrimitive.Title>
+          <p id="fin-due-dialog-sub" className="fin-due-dialog__sub">
+            {invoice.invoice_number} · issued {safeDate(invoice.issue_date || invoice.created_at)}
+          </p>
+          <label htmlFor="invoice-due-date" className="fin-due-dialog__label">Due date</label>
+          <DatePicker id="invoice-due-date" value={dueDraft} onChange={(v) => { setDueDraft(v); setDueError(null); }} />
+          <p className={`fin-due-dialog__help${dueError ? ' is-error' : ''}`} role={dueError ? 'alert' : undefined}>
+            {dueError || 'Reminders and overdue status follow the new date.'}
+          </p>
+          <div className="fin-due-dialog__actions">
+            <button type="button" className="tw-btn" onClick={() => setEditingDue(false)} disabled={savingDue}>Cancel</button>
+            <button type="button" className="tw-btn tw-btn--primary" onClick={handleSaveDueDate}
+              disabled={savingDue || !dueDraft || dueDraft === String(invoice.due_date || '').slice(0, 10)}>
+              {savingDue ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {toast && (
         <div className={`fin-toast${toast.isError ? ' fin-toast--error' : ''}`} role={toast.isError ? 'alert' : 'status'}>
           {toast.msg}

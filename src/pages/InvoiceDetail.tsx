@@ -25,6 +25,7 @@ import { FinDialog, ReasonDialog } from "@/components/finance/FinDialog";
 import { PaymentEditDialog } from "@/components/finance/PaymentEditDialog";
 import { isManualPayment, paymentSourceTag } from "@/lib/finance/payments";
 import { TotalsBreakdown } from "@/components/finance/TotalsBreakdown";
+import { FastPayInvoicePanel } from "@/components/capital/FastPayInvoicePanel";
 import RowActions from "@/components/ui/RowActions";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { FIN_URL, errorText, invalidateInvoiceData } from "@/lib/finance/api";
@@ -117,6 +118,8 @@ export default function InvoiceDetail() {
   const { data: capitalData } = useQuery({
     queryKey: ['capital-eligible'],
     queryFn: () => fetchData('api/v1/capital/eligible/').catch(() => null),
+    // Launched, the Fast Pay panel reads the server offers instead.
+    enabled: !CAPITAL_LAUNCHED,
   });
   const eligibleInvoices: any[] = capitalData?.invoices || [];
   const capitalEntry = eligibleInvoices.find((e: any) => String(e.id) === String(id));
@@ -1006,7 +1009,10 @@ export default function InvoiceDetail() {
             </dl>
           </section>
 
-          {(capitalEntry || ineligibleEntry) && (
+          {CAPITAL_LAUNCHED && id && <FastPayInvoicePanel invoiceId={id} />}
+
+          {/* Pre-launch view, unchanged until CAPITAL_LAUNCHED is flipped. */}
+          {!CAPITAL_LAUNCHED && (capitalEntry || ineligibleEntry) && (
             <section className="card" aria-labelledby="fastpay-title">
               <div className="fin-panel-head">
                 <div className="fin-panel-head__text">

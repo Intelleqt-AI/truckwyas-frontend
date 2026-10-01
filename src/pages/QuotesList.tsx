@@ -2,7 +2,8 @@ import './bookings-typography.css';
 import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import './table-heading-roles.css';
 import './bookings-section.css';
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { BoardScrollbar } from "@/components/BoardScrollbar";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { fetchData, patchData, postData } from "@/lib/Api";
@@ -390,6 +391,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     })
   );
 
+  const kanbanRef = useRef<HTMLDivElement>(null);
   const { data: loadsData } = useQuery(loadsQuery);
   const loadByQuoteId = mapLoadsByQuoteId(loadsData);
   // The quote API names its load (booked_load); the loads list is only page
@@ -725,7 +727,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           {/* Quotes Kanban — fills whatever height is left below the controls; each
               column scrolls its own card list instead of the whole page growing. */}
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-            <div className="bk-kanban">
+            <div className="bk-kanban" ref={kanbanRef}>
               {BOARD_COLUMNS.map(col => {
                 const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading: colLoading, isFetchingNextPage, fetchNextPage } = boardColumn(col);
                 const isExpiredCol = col === 'EXPIRED';
@@ -820,6 +822,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                 );
               })}
             </div>
+            <BoardScrollbar target={kanbanRef} label="Scroll the quote board" />
           </div>
 
           {/* Drag Overlay */}

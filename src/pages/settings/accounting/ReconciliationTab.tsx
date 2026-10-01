@@ -88,16 +88,16 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
             ) : (
               <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}</p>
             )}
-            <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}>Checked {formatDateTime(last.ran_at)} · next check tomorrow at {nextCheck(last.ran_at)}</p>
+            <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}>Checked {formatDateTime(last.ran_at)} · next check tomorrow at{'\u00a0'}{nextCheck(last.ran_at)}</p>
             <div className="acct-tiles acct-tiles--3">
               {SCOPES.map(sc => {
                 const n = sc.scope === 'INVOICE' ? last.checked.invoices : sc.scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;
                 const bad = differences.filter(d => d.scope === sc.scope).length;
                 return (
                   <div key={sc.scope}>
-                    <span>{sc.scope === 'MONTH' ? 'Months (sales and VAT)' : sc.scope === 'CUSTOMER' ? 'Customer balances' : 'Invoices'} checked</span>
+                    <span>{sc.scope === 'MONTH' ? 'Months' : sc.scope === 'CUSTOMER' ? 'Customers' : 'Invoices'}</span>
                     <strong>{(n ?? 0).toLocaleString('en-ZA')}</strong>
-                    {differences.length > 0 && <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>}
+                    <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>
                   </div>
                 );
               })}
@@ -110,6 +110,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
       {last && last.status !== 'FAILED' && differences.length > 0 && SCOPES.map(({ scope, title, first }, i) => {
         const rows = differences.filter(d => d.scope === scope);
                 if (!rows.length) return null;
+        void i;
         const hasLinks = true; // same column template in every table, link or not
         return (
           <AcctCard key={scope} title={title} description={plural(rows.length, 'difference')} flush>
@@ -133,7 +134,9 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                   {rows.map(d => <DiffRow key={d.id} d={d} providerName={cfg.short} hasLinks={hasLinks} />)}
                 </tbody>
               </table>
-              <p className="acct-table-note">Difference is TruckWys minus {cfg.short}. Correct it in {cfg.short} or TruckWys; it clears on the next check.</p>
+              {i === SCOPES.findIndex(x => differences.some(d => d.scope === x.scope)) && (
+                <p className="acct-table-note">Difference is TruckWys minus {cfg.short}. Correct it in {cfg.short} or TruckWys; it clears on the next check.</p>
+              )}
             </div>
             {/* Phones: one block per difference instead of a squeezed table. */}
             <ul className="acct-list acct-only-phone">
@@ -146,9 +149,9 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                         {d.local_url ? <Link className="acct-link" to={d.local_url}>{head}</Link> : <span className="acct-row__title">{head}</span>}
                         {rest.length > 0 && <span className="acct-row__sub"> · {rest.join(' · ')}</span>}
                       </span>
-                      <strong className="acct-diff">{diffText(d)}</strong>
+                      <strong className={`acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : 'Status differs'}</strong>
                     </div>
-                    <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)}: TruckWys {showValue(d.truckwys)} · {cfg.short} {showValue(d.provider)}</div>
+                    <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)}: TruckWys{'\u00a0'}{showValue(d.truckwys)} · {cfg.short}{'\u00a0'}{showValue(d.provider)}</div>
                     {d.provider_url && <a className="acct-link" style={{ fontSize: 13 }} href={d.provider_url} target="_blank" rel="noopener noreferrer">Open in {cfg.short} <ExternalLink size={12} aria-hidden="true" /></a>}
                   </li>
                 );

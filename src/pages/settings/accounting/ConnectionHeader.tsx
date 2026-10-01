@@ -243,12 +243,12 @@ export function OrgPicker({ connection }: { connection: Connection }) {
         )}
         {unavailable.map(t => (
           <div key={t.tenant_id} className="acct-row acct-org acct-org--confirm is-disabled">
-            <span className="acct-org__mark" style={{ opacity: 0.5 }}><ProviderLogo provider={connection.provider} /></span>
+            <span className="acct-org__mark"><ProviderLogo provider={connection.provider} /></span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
-              <span className="acct-row__sub">Books in {t.currency}. TruckWys supports ZAR only.</span>
+              <span className="acct-row__sub">Books in {t.currency}</span>
             </span>
-            <StatusChip tone="neutral" label="Can't be linked" size="sm" />
+            <StatusChip tone="neutral" label="Can't be linked: ZAR only" size="sm" />
           </div>
         ))}
         <div className="acct-formfoot">

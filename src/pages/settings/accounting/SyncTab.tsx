@@ -129,8 +129,8 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
         <div style={{ padding: 'var(--card-pad, 20px)' }}>
           <div className="acct-tiles">
             <div><span>In {cfg.short}</span><strong>{c.synced.toLocaleString('en-ZA')}</strong></div>
-            <div><span>Queued</span><strong>{c.queued.toLocaleString('en-ZA')}</strong></div>
-            <div><span>Retrying</span><strong className={c.errors ? undefined : 'is-zero'}>{c.errors.toLocaleString('en-ZA')}</strong>{c.errors > 0 && <em className="acct-tile-status is-bad">Needs a fix</em>}</div>
+            <div><span>Queued</span><strong className={c.queued ? undefined : 'is-zero'}>{c.queued.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Needs a fix</span><strong className={c.errors ? undefined : 'is-zero'}>{c.errors.toLocaleString('en-ZA')}</strong></div>
             <div><span>Stopped</span><strong className={c.dead ? undefined : 'is-zero'}>{c.dead.toLocaleString('en-ZA')}</strong></div>
           </div>
         </div>
@@ -149,7 +149,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
                     <div className="acct-row__title">{e.last_error || 'No reason given'}</div>
                     <div className="acct-row__sub" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                       <span>{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} <DocLink url={e.local_url}>{e.label}</DocLink></span>
-                      <StatusChip tone={meta.tone} label={e.next_attempt_at && e.status === 'ERROR' ? `Retrying · next try ${nextTry(e.next_attempt_at)}` : meta.label} size="sm" />
+                      <StatusChip tone={meta.tone} label={e.status === 'ERROR' ? 'Needs a fix' : meta.label} size="sm" />
                     </div>
                   </div>
                   <div className="acct-row__actions">
@@ -173,20 +173,20 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
         )}
       </AcctCard>
 
-      <AcctCard title="Recent activity" description="Latest sends and fetches." flush>
+      <AcctCard title="Recent activity" flush>
         {s.recent.length === 0 ? (
           <div className="acct-empty">No activity yet.</div>
         ) : (
           <ul className="acct-list">
-            {s.recent.map(ev => (
+            {[...s.recent].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map(ev => (
               <li key={ev.id} className="acct-row acct-row--event">
                 <span className={`acct-dot acct-dot--${(LEVEL[ev.level] ?? LEVEL.INFO).tone}`} title={(LEVEL[ev.level] ?? LEVEL.INFO).label} aria-label={(LEVEL[ev.level] ?? LEVEL.INFO).label} role="img" />
                 <div style={{ minWidth: 0 }}>
                   <div className="acct-row__title" style={{ fontWeight: 400 }}>
-                    {ev.label ? <><DocLink url={ev.local_id && /INVOICE/.test(ev.object_type) ? `/finance/invoices/${ev.local_id}` : null}>{ev.label}</DocLink> · </> : null}{ev.message || humanise(ev.action)}
+                    {ev.label ? <><DocLink url={ev.local_id ? (/CREDIT_NOTE/.test(ev.object_type) ? `/finance/credit-notes/${ev.local_id}` : /INVOICE/.test(ev.object_type) ? `/finance/invoices/${ev.local_id}` : null) : null}>{ev.label}</DocLink> · </> : null}{ev.message || humanise(ev.action)}
                   </div>
-                  <div className="acct-row__sub" title={formatDateTime(ev.created_at)}>{formatRelativeTime(ev.created_at)}</div>
                 </div>
+                <span className="acct-event-time" title={formatDateTime(ev.created_at)}>{formatRelativeTime(ev.created_at)}</span>
               </li>
             ))}
           </ul>

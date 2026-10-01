@@ -121,7 +121,7 @@ export function ContactsTab({ connection }: { connection: Connection }) {
             <Select value={kind} onValueChange={v => setKind(v as KindFilter)}>
               <SelectTrigger aria-label="Show customers, suppliers or both" style={{ minHeight: 36, height: 36, fontSize: 13 }} className="acct-select"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">Customers and suppliers</SelectItem>
+                <SelectItem value="ALL">All contacts</SelectItem>
                 <SelectItem value="CUSTOMER">Customers</SelectItem>
                 <SelectItem value="SUPPLIER">Suppliers</SelectItem>
               </SelectContent>
@@ -189,7 +189,10 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
       </>
     );
   } else if (row.status === 'CREATE') {
-    match = <div className="acct-row__sub">A new {providerName} contact is created when the first document is sent.</div>;
+    match = <>
+      <div className="acct-row__sub acct-row__match">Will create “{row.local_name}”</div>
+      <div className="acct-row__sub">In {providerName}, when the first document is sent</div>
+    </>;
   } else if (row.status === 'SKIPPED') {
     match = <div className="acct-row__sub">Not synced. Their documents stay in TruckWys only and show as sync errors.</div>;
   } else {

@@ -15,7 +15,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const items: { key: string; look: StepLook; title: string; desc: string; tab?: AccountingTab; action?: string }[] = [
     {
       key: 'connect',
-      look: connection.status === 'ACTIVE' ? 'done' : 'warn',
+      look: connection.status === 'ACTIVE' ? 'done' : 'bad',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status !== 'ACTIVE'
         ? 'Your sign-in expired.'
@@ -79,7 +79,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     : reauth
       ? `Paused until ${cfg.short} is reconnected.`
       : open.length
-        ? `Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done. This is a one-time setup.`
+        ? `One-time setup. Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done.`
         : `Sending your history to ${cfg.short}.`;
 
   return (
@@ -100,7 +100,8 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
                 <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>
                   {it.action}
                 </button>
-              ) : blocked && it.tab && it.look !== 'done' ? <span className="acct-step-auto">Paused</span>
+              ) : blocked && it.key === 'connect' ? <span className="acct-step-auto" style={{ color: 'var(--status-danger-text)' }}>Action needed</span>
+                : blocked && it.tab && it.look !== 'done' ? <span className="acct-step-auto">Paused</span>
                 : auto && it.look !== 'done' ? <span className="acct-step-auto">Automatic</span> : <span />}
             </li>
           );

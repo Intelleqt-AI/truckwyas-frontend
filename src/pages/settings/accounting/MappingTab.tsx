@@ -345,7 +345,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
                 {errors['tracking.branch_category_id'] && <div className="acct-error" role="alert">{errors['tracking.branch_category_id']}</div>}
               </div>
             </div>
-            <div className="acct-map-row">
+            <div className={`acct-map-row${branchCat ? '' : ' is-disabled-row'}`}>
               <label className="acct-map-row__label" id="lbl-branch-opt">
                 Branch
               </label>

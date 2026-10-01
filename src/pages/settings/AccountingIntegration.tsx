@@ -145,9 +145,9 @@ export default function AccountingIntegration() {
     body = (
       <>
         <h2 className="acct-section-title">Connect your accounting system</h2>
-        <p className="acct-section-desc acct-desc-cap">You can connect one accounting system.</p>
+        <p className="acct-section-desc acct-desc-cap">Send invoices and bills to your books. One system per company.</p>
         <AccountingProviderCards hideManage />
-        <p className="acct-section-desc acct-desc-cap" style={{ marginTop: -12, marginBottom: 24 }}><ComingSoonNote /></p>
+        <p className="acct-section-desc acct-desc-cap" style={{ marginTop: -4, marginBottom: 24 }}><ComingSoonNote /></p>
         <AcctCard title="After you connect" description="Takes about 10 minutes and needs a company admin." flush>
           <ol className="acct-check">
             {[
@@ -156,7 +156,7 @@ export default function AccountingIntegration() {
               ['Choose a cut-over date', 'We send documents from that date. Anything earlier should already be in your books.'],
             ].map(([t, d], i) => (
               <li key={t}>
-                <span className="acct-step-num" aria-hidden="true">{i + 1}</span>
+                <span className="acct-step-num is-auto" aria-hidden="true">{i + 1}</span>
                 <div style={{ minWidth: 0 }}>
                   <div className="acct-check__title">{t}</div>
                   <div className="acct-check__desc">{d}</div>

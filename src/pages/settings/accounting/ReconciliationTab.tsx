@@ -84,27 +84,26 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
             {last.status === 'FAILED' ? (
               <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />The last check didn't finish</p>
             ) : differences.length === 0 ? (
-              <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}<span className="acct-lead-meta">checked {formatDateTime(last.ran_at)}</span></p>
+              <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}</p>
             ) : (
-              <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}<span className="acct-lead-meta">checked {formatDateTime(last.ran_at)}</span></p>
+              <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}</p>
             )}
-            <div className="acct-tiles__label">Checked</div>
+            <p className="acct-section-desc" style={{ margin: '-10px 0 14px 26px' }}>Checked {formatDateTime(last.ran_at)} · next check tonight at {nextCheck(last.ran_at)}</p>
             <div className="acct-tiles acct-tiles--3">
-              <div><span>Invoices</span><strong>{(last.checked.invoices ?? 0).toLocaleString('en-ZA')}</strong></div>
-              <div><span>Customers</span><strong>{(last.checked.customers ?? 0).toLocaleString('en-ZA')}</strong></div>
-              <div><span>Months</span><strong>{(last.checked.months ?? 0).toLocaleString('en-ZA')}</strong></div>
+              {SCOPES.map(sc => {
+                const n = sc.scope === 'INVOICE' ? last.checked.invoices : sc.scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;
+                const bad = differences.filter(d => d.scope === sc.scope).length;
+                return (
+                  <div key={sc.scope}>
+                    <span>{sc.scope === 'MONTH' ? 'VAT months' : sc.title} checked</span>
+                    <strong>{(n ?? 0).toLocaleString('en-ZA')}</strong>
+                    <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>
+                  </div>
+                );
+              })}
             </div>
             {last.status === 'FAILED' && last.error && <p className="acct-error" role="status" style={{ marginTop: 12 }}>{last.error}</p>}
-            {differences.length > 0 && SCOPES.filter(sc => !differences.some(d => d.scope === sc.scope)).map(sc => {
-              const n = sc.scope === 'INVOICE' ? last.checked.invoices : sc.scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;
-              return (
-                <p key={sc.scope} className="acct-match-inline">
-                  <CheckCircle2 size={14} aria-hidden="true" />
-                  {n != null ? `All ${plural(n, sc.title.toLowerCase().replace(/s$/, ''))} match ${cfg.short}.` : `${sc.title}: no differences.`}
-                </p>
-              );
-            })}
-            <p className="acct-section-desc" style={{ margin: '12px 0 0' }}>Next check tonight at {nextCheck(last.ran_at)}.</p>
+            {differences.length > 0 && <p className="acct-section-desc" style={{ margin: '12px 0 0' }}>Difference is TruckWys minus {cfg.short}. Correct it in {cfg.short} or TruckWys; it clears on the next check.</p>}
           </>
         )}
       </AcctCard>
@@ -114,7 +113,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                 if (!rows.length) return null;
         const hasLinks = true; // same column template in every table, link or not
         return (
-          <AcctCard key={scope} title={title} description={`${plural(rows.length, 'difference')}. Difference is TruckWys minus ${cfg.short}. Correct it in ${cfg.short} or TruckWys; it clears on the next check.`} flush>
+          <AcctCard key={scope} title={title} description={plural(rows.length, 'difference')} flush>
             <div className="acct-table-wrap acct-only-wide" role="region" aria-label={`${title} differences`} tabIndex={0}>
               <table className="acct-table acct-table--recon">
                 <colgroup>
@@ -149,8 +148,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                       </span>
                       <strong className="acct-diff">{diffText(d)}</strong>
                     </div>
-                    <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)}</div>
-                    <div className="acct-row__sub">TruckWys {showValue(d.truckwys)} · {cfg.short} {showValue(d.provider)}</div>
+                    <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)}: TruckWys {showValue(d.truckwys)} · {cfg.short} {showValue(d.provider)}</div>
                     {d.provider_url && <a className="acct-link" style={{ fontSize: 13 }} href={d.provider_url} target="_blank" rel="noopener noreferrer">Open in {cfg.short} <ExternalLink size={12} aria-hidden="true" /></a>}
                   </li>
                 );
@@ -165,7 +163,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
 
 /** Money differences as rand; a status mismatch has no amount. */
 const diffText = (d: ReconDifference) => {
-  if (!isMoney(d.difference) || d.difference === '') return 'Status differs';
+  if (!isMoney(d.difference) || d.difference === '') return '—';
   const n = parseFloat(d.difference);
   return n > 0 ? `+${formatCurrency(d.difference)}` : formatCurrency(d.difference);
 };

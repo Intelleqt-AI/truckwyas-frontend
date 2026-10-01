@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, ExternalLink, Lock } from 'lucide-react';
+import { AlertTriangle, Check, ExternalLink, Lock } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -71,6 +71,8 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
   };
 
   const menu: RowActionItem[] = [];
+  // On phones the header shows no "Open in" button; the menu always has it.
+  if (connection.web_url) menu.push({ label: `Open in ${cfg.short}`, onSelect: () => window.open(connection.web_url!, '_blank', 'noopener,noreferrer') });
   if (canWrite) menu.push({ label: dis.busy ? 'Disconnecting…' : `Disconnect ${cfg.short}`, onSelect: dis.ask, disabled: dis.busy, danger: true });
 
   return (
@@ -88,8 +90,8 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
         </div>
         <div className="acct-head__actions">
           {connection.web_url ? (
-            <a href={connection.web_url} target="_blank" rel="noopener noreferrer" className="tw-btn acct-open-btn" aria-label={`Open in ${cfg.short}`} title={`Open in ${cfg.short}`}>
-              <span className="acct-open-btn__text">Open in {cfg.short}</span>
+            <a href={connection.web_url} target="_blank" rel="noopener noreferrer" className="tw-btn acct-hide-phone">
+              <span>Open in {cfg.short}</span>
               <ExternalLink size={14} aria-hidden="true" />
             </a>
           ) : null}
@@ -207,7 +209,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
       </h2>
       <p className="acct-section-desc">
         {single
-          ? `This is the ${cfg.short} organisation TruckWys will send this company's invoices and bills to.`
+          ? `TruckWys will send your invoices and bills to this ${cfg.short} organisation.`
           : `Pick the ${cfg.short} organisation that holds this company's books.`}
       </p>
       <section style={settingsCardStyle} className="acct-org-card" aria-labelledby="acct-org-title">
@@ -220,6 +222,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
               <span className="acct-row__title" style={{ display: 'block' }}>{single.name}</span>
               <span className="acct-row__sub">Books in {single.currency || 'ZAR'}</span>
             </span>
+            <span className="acct-will-link" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Check size={14} aria-hidden="true" style={{ color: 'var(--status-success-text)' }} />Will be linked</span>
           </div>
         ) : (
           <div role="radiogroup" aria-labelledby="acct-org-title">

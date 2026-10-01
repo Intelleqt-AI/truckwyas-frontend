@@ -109,9 +109,9 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
   const stepCount = (x: Backfill['steps'][number]) => {
     const total = totals[x.key];
     if (x.state === 'RUNNING') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : `${x.count.toLocaleString('en-ZA')} so far`;
-    if (x.state === 'DONE') return x.count > 0 ? `${x.count.toLocaleString('en-ZA')} done` : 'Done';
+    if (x.state === 'DONE') return x.count > 0 ? `${x.count.toLocaleString('en-ZA')} of ${x.count.toLocaleString('en-ZA')}` : 'Done';
     if (x.state === 'SKIPPED') return '';
-    return total ? `${total.toLocaleString('en-ZA')} queued` : 'Starts after the steps above';
+    return total ? `0 of ${total.toLocaleString('en-ZA')}` : 'Waiting';
   };
   // The bar follows the documents (where the preview knows them), not the steps.
   const itemTotal = Object.values(totals).reduce<number>((n, v) => n + (v ?? 0), 0);
@@ -149,20 +149,28 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
           </div>
         </div>
 
-        <div className="acct-field-label" style={{ marginTop: 24 }}>
-          {locked ? 'Total to send' : previewDate ? `What will be sent, from ${formatDate(previewDate)}` : 'What will be sent'}
-        </div>
-        {p ? (
-          <div className="acct-tiles">
-            <div><span>Invoices</span><strong>{p.invoices.toLocaleString('en-ZA')}</strong></div>
-            <div><span>Credit notes</span><strong>{p.credit_notes.toLocaleString('en-ZA')}</strong></div>
-            <div><span>Supplier bills</span><strong>{p.bills.toLocaleString('en-ZA')}</strong></div>
-            <div><span>Recorded payments</span><strong>{p.historic_receipts.toLocaleString('en-ZA')}</strong></div>
-          </div>
+        {locked && p ? (
+          <p className="acct-section-desc" style={{ margin: '12px 0 0' }}>
+            {(p.invoices + p.credit_notes + p.bills + p.historic_receipts).toLocaleString('en-ZA')} documents from {formatDate(b.cutover_date)}: {p.invoices} invoices, {p.credit_notes} credit notes, {p.bills} supplier bills and {p.historic_receipts} recorded payments.
+          </p>
         ) : (
-          <p className="acct-section-desc" style={{ margin: 0 }}>Choose a date to see the counts.</p>
+          <>
+            <div className="acct-field-label" style={{ marginTop: 20 }}>
+              {previewDate ? `What will be sent, from ${formatDate(previewDate)}` : 'What will be sent'}
+            </div>
+            {p ? (
+              <div className="acct-tiles">
+                <div><span>Invoices</span><strong>{p.invoices.toLocaleString('en-ZA')}</strong></div>
+                <div><span>Credit notes</span><strong>{p.credit_notes.toLocaleString('en-ZA')}</strong></div>
+                <div><span>Supplier bills</span><strong>{p.bills.toLocaleString('en-ZA')}</strong></div>
+                <div><span>Recorded payments</span><strong>{p.historic_receipts.toLocaleString('en-ZA')}</strong></div>
+              </div>
+            ) : (
+              <p className="acct-section-desc" style={{ margin: 0 }}>Choose a date to see the counts.</p>
+            )}
+          </>
         )}
-        {p && p.historic_receipts > 0 && (
+        {!locked && p && p.historic_receipts > 0 && (
           <p className="acct-section-desc" style={{ margin: '8px 0 0' }}>
             Payments already recorded in TruckWys go into the bank account chosen under{' '}
             <button type="button" className="acct-linkbtn" onClick={() => onOpen('mapping')}>Accounts and VAT</button>.

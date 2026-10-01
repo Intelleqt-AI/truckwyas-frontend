@@ -19,9 +19,9 @@ type StatusFilter = 'ALL' | ContactStatus;
 type KindFilter = 'ALL' | ContactKind;
 
 const STATUS_META: Record<ContactStatus, { tone: StatusTone; label: string }> = {
-  SUGGESTED: { tone: 'warning', label: 'Needs confirming' },
+  SUGGESTED: { tone: 'warning', label: 'To confirm' },
   UNMATCHED: { tone: 'danger', label: 'Not found' },
-  CREATE: { tone: 'info', label: 'Will be created' },
+  CREATE: { tone: 'info', label: 'New contact' },
   MATCHED: { tone: 'success', label: 'Matched' },
   SKIPPED: { tone: 'neutral', label: 'Skipped' },
 };
@@ -121,7 +121,7 @@ export function ContactsTab({ connection }: { connection: Connection }) {
             <Select value={kind} onValueChange={v => setKind(v as KindFilter)}>
               <SelectTrigger aria-label="Show customers, suppliers or both" style={{ minHeight: 36, height: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">Customers and suppliers</SelectItem>
+                <SelectItem value="ALL">All contacts</SelectItem>
                 <SelectItem value="CUSTOMER">Customers</SelectItem>
                 <SelectItem value="SUPPLIER">Suppliers</SelectItem>
               </SelectContent>
@@ -193,7 +193,7 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   } else if (row.status === 'SKIPPED') {
     match = <div className="acct-row__sub">Not synced. Their documents stay in TruckWys only and show as sync errors.</div>;
   } else {
-    match = <div className="acct-row__sub">No {providerName} contact found{row.candidates.length ? `; ${row.candidates.length} possible` : ''}.</div>;
+    match = <div className="acct-row__sub">Pick an existing {providerName} contact, or we'll create one.{row.candidates.length ? ` ${row.candidates.length} possible.` : ''}</div>;
   }
 
   const menu: RowActionItem[] = [];

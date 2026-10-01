@@ -15,9 +15,9 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const items: { key: string; look: StepLook; title: string; desc: string; tab?: AccountingTab; action?: string }[] = [
     {
       key: 'connect',
-      look: 'done',
+      look: connection.status === 'ACTIVE' ? 'done' : 'warn',
       title: `Connect ${cfg.short}`,
-      desc: true
+      desc: connection.status === 'ACTIVE'
         ? `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`
         : `Use Reconnect ${cfg.short} above.`,
     },
@@ -77,7 +77,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const subtitle = r.sync_enabled
     ? `Done. ${cfg.short} and TruckWys now stay in step on their own.`
     : reauth
-      ? 'Steps unlock after you reconnect.'
+      ? `Paused. ${open.length ? `${open.length} steps wait` : 'Sync waits'} until ${cfg.short} is reconnected.`
       : open.length
         ? `Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done. You only do this once.`
         : `Sending your history to ${cfg.short}.`;

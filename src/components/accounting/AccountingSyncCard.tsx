@@ -90,7 +90,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
  */
 export function PaymentSourceBadge({ source, managed = false }: { source?: string | null; managed?: boolean }) {
   const manual = !source || source === 'MANUAL';
-  if (managed) return manual ? <span className="acct-source-note"> · recorded in TruckWys</span> : null;
+  if (managed) return manual ? <span className="acct-source-note">Recorded in TruckWys</span> : null;
   if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;
   return <span className="acct-source-badge">{label}</span>;

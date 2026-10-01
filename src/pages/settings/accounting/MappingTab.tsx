@@ -148,13 +148,14 @@ export function MappingTab({ connection }: { connection: Connection }) {
     return (
       <>
         <AcctCard
+          id="acct-map-skel"
           title={<SkelLine width={140} lineHeight={24} />}
           description={<><SkelLine width="90%" /><SkelLine width="70%" /><SkelLine width="40%" /></>}
           actionsBelow
           actions={<><span className="tw-btn" style={{ visibility: 'hidden', width: 160 }} aria-hidden="true" /><span className="tw-btn" style={{ visibility: 'hidden', width: 160 }} aria-hidden="true" /></>}
         />
         <AcctCard title="Income accounts" description="Which income account each kind of charge on your invoices goes to." flush>
-          <LoadingBlock label="Loading mapping" rows={6} />
+          <div className="acct-skel-map"><LoadingBlock label="Loading mapping" rows={6} /></div>
         </AcctCard>
       </>
     );

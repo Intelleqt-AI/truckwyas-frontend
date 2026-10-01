@@ -344,8 +344,8 @@
 .acct-hint--stack > span { display: block; }
 .acct-hint--stack > .tw-btn { margin-top: 6px; }
 
-.acct-kind-filter { flex: 0 0 196px; min-width: 0; margin-left: auto; }
-.acct-toolbar { flex-wrap: wrap; }
+.acct-kind-filter { flex: 0 0 160px; min-width: 0; margin-left: auto; }
+.acct-toolbar { flex-wrap: nowrap; }
 .acct-toolbar > .acct-only-wide { flex: 0 1 auto; min-width: 0; }
 @media (max-width: 640px) {
   .acct-toolbar { flex-direction: column; align-items: stretch; }
@@ -479,7 +479,7 @@
 .acct-paylist-top .fin-paylist__row { align-items: flex-start; }
 
 .acct-tiles__label { display: block; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); margin: 0 0 6px; }
-.acct-map-row { grid-template-columns: minmax(0, 220px) minmax(0, 1fr); }
+@media (min-width: 641px) { .acct-map-row { grid-template-columns: minmax(0, 220px) minmax(0, 1fr); } }
 @media (max-width: 640px) {
   .acct-map-savebar { flex-wrap: nowrap; }
   .acct-map-savebar .cs-savebar__note { display: none; }
@@ -505,7 +505,7 @@
 .acct-check--steps li > .tw-btn { align-self: center; }
 .acct-check--steps li { align-items: center; }
 .acct-check--steps li > .acct-step-num, .acct-check--steps li > svg { align-self: start; margin-top: 0; }
-@media (max-width: 560px) { .acct-check--steps li > .tw-btn { justify-self: stretch !important; } }
+@media (max-width: 560px) { .acct-check--steps li > .tw-btn { justify-self: start !important; } }
 
 .acct-jump-list { list-style: none; margin: 6px 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .acct-jumpbtn { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--radius-pill); border: 1px solid var(--status-warning); background: transparent; color: var(--text-primary); font: 500 12px/16px var(--font-sans); cursor: pointer; }
@@ -513,3 +513,33 @@
 .acct-jumpbtn:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
 .acct-map-row.is-required { padding-bottom: 16px; }
 .acct-diff--text { font-weight: 400; color: var(--text-secondary); }
+
+.acct-logo img { transform: scale(1.35); }
+.acct-card__top { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+@media (max-width: 480px) {
+  .acct-card__top { grid-template-columns: 48px minmax(0, 1fr); align-items: start; }
+  .acct-card__chip { grid-column: 2; grid-row: 2; }
+}
+.acct-tab-count.is-todo { border-color: var(--status-warning); }
+.acct-jumpbtn::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--status-warning-dot); margin-right: 6px; }
+.acct-jumpbtn:hover { text-decoration: underline; }
+.acct-optional { font-size: inherit; font-weight: 400; color: var(--text-tertiary); }
+@media (max-width: 560px) { .acct-notice--action > .tw-btn { justify-self: stretch !important; grid-column: 1 / -1; } }
+.acct-org--confirm { grid-template-columns: 40px minmax(0, 1fr) auto; }
+.acct-org--confirm .acct-org__mark { width: 40px; height: 40px; }
+.acct-org--confirm .acct-logo--sm { width: 40px; height: 40px; }
+.acct-org-unavailable__row svg { flex: none; width: 14px; height: 14px; align-self: flex-start; margin-top: 3px; }
+.acct-org-unavailable .acct-tiles__label, .acct-will-link { font: 500 12px/16px var(--font-sans); color: var(--text-secondary); }
+.acct-formfoot__link { margin-right: 4px; }
+.acct-tabs .tw-seg__opt:disabled { color: var(--text-secondary); opacity: 0.85; }
+
+.acct-row--contact .acct-row__chip { margin-top: -1px; }
+.acct-tiles strong.is-zero { color: var(--text-tertiary); }
+
+.acct-tile-status { display: block; font: 400 12px/16px var(--font-sans); font-style: normal; color: var(--status-success-text); margin-top: 2px; }
+.acct-tile-status.is-bad { color: var(--status-warning-text); }
+@media (max-width: 640px) { .acct-tiles--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .acct-tiles--3 span { font-size: 12px; line-height: 16px; } }
+.acct-source-note { display: block; }
+@media (max-width: 640px) { .acct-skel-map .acct-skel-rows > div { min-height: 101px !important; grid-template-columns: minmax(0, 1fr); align-content: center; } }
+#acct-map-skel { min-height: 164px; box-sizing: border-box; }
+@media (max-width: 640px) { #acct-map-skel { min-height: 304px; } }

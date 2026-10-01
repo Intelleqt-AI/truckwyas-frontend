@@ -196,7 +196,7 @@ export default function AccountingIntegration() {
                 >
                   {live.status === 'NEEDS_REAUTH' && t.id !== 'setup' && <Lock size={11} aria-hidden="true" />}
                   {t.label}
-                  {n != null && <span className="acct-tab-count" title={tabCountTitle(t.id, n)} aria-label={tabCountTitle(t.id, n)}>{n}</span>}
+                  {n != null && <span className={`acct-tab-count${t.id === 'mapping' || t.id === 'contacts' || t.id === 'sync' || t.id === 'reconciliation' ? ' is-todo' : ''}`} title={tabCountTitle(t.id, n)} aria-label={tabCountTitle(t.id, n)}>{n}</span>}
                 </button>
               );
             })}

@@ -16,6 +16,7 @@ import { MicroBars, RevenueCostBars, PipelineBars, usePipeline, boardStage } fro
 import { presentSignal, staleSignal, idleSignal, isInTransitSignal, isIdleVehiclesSignal, idleVehiclesUrl } from "@/components/overview/signals";
 import { isOpenLoad, staleWork } from "@/lib/staleWork";
 import { useAllQuotes, useAllVehicles, useHomeLedger } from "@/components/overview/ledger";
+import { FitText } from "@/components/ui/FitText";
 
 // Fetches + derives all dashboard data. Lives in the queryFn so the result is
 // cached by TanStack Query (keyed below) and survives navigation — revisiting
@@ -375,9 +376,9 @@ export default function Overview() {
             </h2>
           </div>
           <div className="td-kpi__body">
-            <div className="td-kpi__value" title={money ? formatMoney(outstanding) : undefined}>
+            <FitText as="div" className="td-kpi__value" title={money ? formatMoney(outstanding) : undefined}>
               {moneyLoading ? skeleton : money ? wholeRand(outstanding) : "—"}
-            </div>
+            </FitText>
             {money && pastShare > 0 && pastShare < 1 && (
               <div className="td-kpi__strip" role="img" aria-label={`${Math.round(pastShare * 100)}% of what you are owed is past due`}>
                 <span style={{ width: `${pastShare * 100}%` }} />
@@ -400,9 +401,9 @@ export default function Overview() {
             </h2>
           </div>
           <div className="td-kpi__body">
-            <div className="td-kpi__value" title={money ? formatMoney(money.received) : undefined}>
+            <FitText as="div" className="td-kpi__value" title={money ? formatMoney(money.received) : undefined}>
               {moneyLoading ? skeleton : money ? wholeRand(money.received) : "—"}
-            </div>
+            </FitText>
           </div>
           <div className="td-kpi__meta">
             {money ? (
@@ -421,9 +422,9 @@ export default function Overview() {
             </h2>
           </div>
           <div className="td-kpi__body">
-            <div className="td-kpi__value">
+            <FitText as="div" className="td-kpi__value">
               {moneyLoading ? skeleton : money && money.margin != null ? formatPercent(money.margin) : "—"}
-            </div>
+            </FitText>
             {/* The figure it becomes, read with the note under it: "−R 60 698 · if the R 87 129 pending is approved". */}
             {money && money.margin != null && money.pending > 0.005 && (
               <span className={`td-kpi__alt td-hide-sm${afterPending < 0 ? " is-loss" : ""}`}>{wholeRand(afterPending)}</span>
@@ -456,7 +457,7 @@ export default function Overview() {
             <Link to="/bookings/orders" className="td-kpi__go" aria-label="Open orders"><ArrowUpRight size={16} strokeWidth={1.75} /></Link>
           </div>
           <div className="td-kpi__body">
-            <div className="td-kpi__value">{!loadsReady ? skeleton : loadsFailed ? "—" : activeLoadsCount}</div>
+            <FitText as="div" className="td-kpi__value">{!loadsReady ? skeleton : loadsFailed ? "—" : activeLoadsCount}</FitText>
             <MicroBars values={heatmapData} ariaLabel={`Loads booked per day, last 28 days: ${loads28} in total`} />
           </div>
           <div className="td-kpi__meta">

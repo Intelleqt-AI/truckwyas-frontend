@@ -73,31 +73,41 @@ function financeTabsFor(pathname: string) {
 // Fetches invoices + stats. Lives in the queryFn so the result is cached by
 // TanStack Query (keyed below) and survives navigation — revisiting the page
 // no longer refires these requests until the cache goes stale.
-// The list endpoint pages at 20. Filters and the Overdue tile must agree, so the
-// remaining pages are fetched too (same endpoint, `?page=n`, in parallel), up to
-// a bound that keeps request volume modest under the API's per-user rate limit.
+// Filters, chip counts and the tiles must agree, so the whole ledger is loaded:
+// 100 rows a page (`?page_size=`, clamped to 100 by the API; an API that
+// ignores it returns 20 and the page count follows), the remaining pages in
+// small parallel batches to stay well under the per-user read rate limit.
+// The bound matches the Reports ledger (fetchAllPages: 1 000 rows at 20 a
+// page); a tenant above it gets a list labelled "latest N of M" and chip
+// counts from the server's status counts, so chips still match the tiles.
 // A later page that fails leaves the list partial (and labelled so), never
 // failing the whole page.
-const MAX_INVOICE_PAGES = 10;
+const INVOICE_PAGE_SIZE = 100;
+const MAX_INVOICE_ROWS = 1000;
+const PAGE_BATCH = 4;
+const invoicesUrl = (page: number) =>
+  `/api/v1/invoices/?page_size=${INVOICE_PAGE_SIZE}${page > 1 ? `&page=${page}` : ""}`;
 
 async function loadInvoicesPage() {
   const [data, statsData] = await Promise.all([
-    fetchData("/api/v1/invoices/"),
+    fetchData(invoicesUrl(1)),
     fetchData("/api/v1/invoices/stats/").catch(() => null),
   ]);
   // API returns paginated {count, results} — extract results
   const invoices = Array.isArray(data) ? [...data] : [...(data?.results || [])];
   const pageSize = invoices.length;
   if (!Array.isArray(data) && data?.next && typeof data?.count === "number" && pageSize > 0) {
-    const pages = Math.min(Math.ceil(data.count / pageSize), MAX_INVOICE_PAGES);
-    const rest = await Promise.all(
-      Array.from({ length: Math.max(0, pages - 1) }, (_, i) =>
-        fetchData(`/api/v1/invoices/?page=${i + 2}`).catch(() => null),
-      ),
-    );
-    for (const pageData of rest) {
-      if (!pageData) break; // keep pages in order; stop at the first gap
-      invoices.push(...(Array.isArray(pageData) ? pageData : pageData?.results || []));
+    const pages = Math.min(Math.ceil(data.count / pageSize), Math.ceil(MAX_INVOICE_ROWS / pageSize));
+    const rest: number[] = Array.from({ length: Math.max(0, pages - 1) }, (_, i) => i + 2);
+    let gap = false;
+    for (let b = 0; b < rest.length && !gap; b += PAGE_BATCH) {
+      const batch = await Promise.all(
+        rest.slice(b, b + PAGE_BATCH).map((n) => fetchData(invoicesUrl(n)).catch(() => null)),
+      );
+      for (const pageData of batch) {
+        if (!pageData) { gap = true; break; } // keep pages in order; stop at the first gap
+        invoices.push(...(Array.isArray(pageData) ? pageData : pageData?.results || []));
+      }
     }
   }
   return {
@@ -321,11 +331,21 @@ export default function Invoices() {
     return `${pct >= 0 ? "+" : "−"}${formatPercent(Math.abs(pct), 0)} vs ${lastMonthName}`;
   })();
 
-  // Counts over the loaded list, with the same rules as the filter.
+  // Counts with the same rules as the filter, over the full list. Only when the
+  // list is partial (above the row bound) do they come from the server's
+  // counts, the same source the tiles then use, so chips and tiles agree.
+  const serverCount = (st: string): number | undefined => {
+    if (!stats) return undefined;
+    if (st === "All") return totalInvoices;
+    if (st === "OVERDUE") return overdueCount;
+    return typeof byStatus[st] === "number" ? byStatus[st] : undefined;
+  };
   const statusOptions = STATUSES.map((st) => ({
     value: st,
     label: st === "All" ? "All" : formatStatus(st),
-    count: loading ? undefined : allInvoices.filter((inv) => statusMatches(inv, st)).length,
+    count: loading
+      ? undefined
+      : (truncatedList ? serverCount(st) : undefined) ?? allInvoices.filter((inv) => statusMatches(inv, st)).length,
   }));
 
   const showStatus = (s: string) => {

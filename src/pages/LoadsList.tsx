@@ -403,7 +403,7 @@ export default function LoadsList() {
 
       {/* ORDERS TAB */}
       {activeTab === 'orders' && !body && (
-        <div>
+        <div className="bk-tab-fill">
           {loading ? <TilesSkeleton count={3} /> : activeLoads.length > 0 ? summary([
             {
               // Only orders that can still get a vehicle (Pending, Assigned).
@@ -481,7 +481,7 @@ export default function LoadsList() {
 
       {/* HISTORY TAB */}
       {activeTab === 'history' && !body && (
-        <div>
+        <div className="bk-tab-fill">
           {loading ? <TilesSkeleton count={3} /> : historyLoads.length > 0 && summary([
             {
               label: 'Delivered, not invoiced',

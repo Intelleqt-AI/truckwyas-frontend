@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Map chrome (Leaflet) for RouteMapView, MapLocationPicker, ExpandableRouteMap.
+   Map chrome (Leaflet) for RouteMapView and ExpandableRouteMap.
    Look only: tile URLs, providers and request behaviour live in the
    components and are unchanged. Everything here reads theme tokens, so a
    live theme switch (html[data-theme]) restyles markers, lines and controls

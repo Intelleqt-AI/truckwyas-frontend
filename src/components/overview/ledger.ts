@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { fetchAllPages } from '@/components/insights/findings';
+import { isLiveConnected } from '@/lib/liveData';
 import {
   inPeriod, isApproved, isOpen, isPending, monthsIn, num, priorPeriod, resolvePeriod, shownMonths, todayISO, trimNote,
   vatShare, ymOf, type Ledger, type Period,
@@ -116,6 +117,16 @@ const HOME_SOURCES = [
   ['loads', 'api/v1/loads/'],
 ] as const;
 
+/** Home is kept current by live updates over the WebSocket (lib/liveData:
+ *  every save marks the affected ledgers stale and they refetch at once).
+ *  Only while that socket is down does Home fall back to refetching every
+ *  5 minutes and on returning to the tab. Per-observer options: Reports and
+ *  Insights reading the same keys keep their own behaviour. */
+export const HOME_LIVE = {
+  refetchInterval: () => (isLiveConnected() ? false : STALE),
+  refetchOnWindowFocus: () => !isLiveConnected(),
+} as const;
+
 /**
  * Home's ledger: invoices, payments, expenses and loads in full, on the same
  * query keys and fetcher as Reports and Insights (one shared cache). Unlike
@@ -130,12 +141,18 @@ export function useHomeLedger() {
       queryFn: () => fetchAllPages<any>(path),
       staleTime: STALE,
       ...RETRY,
+      ...HOME_LIVE,
     })),
   });
   const error = qs.some((q) => q.isError && !q.data && !q.isFetching);
   const loading = !error && qs.some((q) => !q.data);
   const retry = () => qs.forEach((q) => { if (!q.data) q.refetch(); });
   const dataUpdatedAt = Math.max(0, ...qs.map((q) => q.dataUpdatedAt || 0));
+  // Freshness for Home's "out of date" notice: the OLDEST ledger, and whether
+  // a refresh failed while older figures stay on screen.
+  const oldestUpdatedAt = qs.every((q) => q.dataUpdatedAt) ? Math.min(...qs.map((q) => q.dataUpdatedAt)) : 0;
+  const refreshFailed = qs.some((q) => q.isRefetchError);
+  const fetching = qs.some((q) => q.isFetching);
   const data: Ledger | null = useMemo(() => {
     if (qs.some((q) => !q.data)) return null;
     const [inv, pay, exp, lds] = qs.map((q) => q.data!);
@@ -150,7 +167,7 @@ export function useHomeLedger() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataUpdatedAt, qs.every((q) => !!q.data)]);
   const money = useMemo(() => (data ? computeHomeMoney(data) : null), [data]);
-  return { loading, error, retry, data, money };
+  return { loading, error, retry, data, money, oldestUpdatedAt, refreshFailed, fetching };
 }
 
 /** Every quote (all pages), shared with Insights' quotes source. */
@@ -160,6 +177,7 @@ export function useAllQuotes() {
     queryFn: () => fetchAllPages<any>('api/v1/quotes/'),
     staleTime: STALE,
     ...RETRY,
+    ...HOME_LIVE,
   });
 }
 
@@ -170,5 +188,6 @@ export function useAllVehicles() {
     queryFn: () => fetchAllPages<any>('api/v1/vehicles/'),
     staleTime: STALE,
     ...RETRY,
+    ...HOME_LIVE,
   });
 }

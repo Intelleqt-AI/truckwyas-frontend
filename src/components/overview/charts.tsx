@@ -101,13 +101,23 @@ export function FleetActivity({ loads, loadsTotal, vehicles, activeVehicles, tot
 
 const SENT = ['SENT', 'ACCEPTED', 'DECLINED', 'EXPIRED', 'IT', 'COMPLETED'];
 const WON = ['ACCEPTED', 'IT', 'COMPLETED'];
-const MOVING = ['IT', 'COMPLETED'];
+// Load statuses once a booked job is moving / done. Legacy IT/COMPLETED
+// quotes (from before quotes converted into loads) count the same way.
+const LOAD_MOVING = ['IN_TRANSIT', 'DELIVERED', 'INVOICED'];
+const LOAD_DONE = ['DELIVERED', 'INVOICED'];
+type FunnelQuote = { status?: string; converted?: boolean; booked_load?: { status?: string } | null };
 
-/** "How do quotes convert?" Stages follow the quote status lifecycle. */
+/** "How do quotes convert?" Quote stages, then the booked load's progress. */
 export function QuoteConversion({ quotes }: { quotes: any[] }) {
   const stages = useMemo<FunnelStage[]>(() => {
     const st = (q: any) => String(q.status || '').toUpperCase();
-    const count = (set: string[]) => quotes.filter((q) => set.includes(st(q))).length;
+    const loadSt = (q: FunnelQuote) => String(q.booked_load?.status || '').toUpperCase();
+    // Same "Booked" rule as the Quotes board: a load exists (or a legacy status).
+    const isBooked = (q: FunnelQuote) => !!q.booked_load || !!q.converted || st(q) === 'IT' || st(q) === 'COMPLETED';
+    const isMoving = (q: FunnelQuote) => LOAD_MOVING.includes(loadSt(q)) || st(q) === 'IT' || st(q) === 'COMPLETED';
+    const isDone = (q: FunnelQuote) => LOAD_DONE.includes(loadSt(q)) || st(q) === 'COMPLETED';
+    const count = (set: string[]) => quotes.filter((q) => set.includes(st(q)) || isBooked(q)).length;
+    const where = (fn: (q: FunnelQuote) => boolean) => quotes.filter(fn).length;
     const by = (s: string) => quotes.filter((q) => st(q) === s).length;
     const notWon = [
       by('SENT') ? `${by('SENT')} awaiting a reply` : null,
@@ -118,8 +128,9 @@ export function QuoteConversion({ quotes }: { quotes: any[] }) {
       { key: 'quoted', label: 'Quoted', count: quotes.length },
       { key: 'sent', label: 'Sent', count: count(SENT), dropNote: 'still drafts' },
       { key: 'won', label: 'Accepted', count: count(WON), dropNote: `not accepted${notWon ? ` (${notWon})` : ''}` },
-      { key: 'moving', label: 'On the road', sub: 'In transit or completed', count: count(MOVING), dropNote: 'accepted, not yet on the road' },
-      { key: 'done', label: 'Completed', count: count(['COMPLETED']), dropNote: 'still in transit' },
+      { key: 'booked', label: 'Booked', count: where(isBooked), dropNote: 'accepted, not yet booked' },
+      { key: 'moving', label: 'On the road', sub: 'In transit or delivered', count: where(isMoving), dropNote: 'booked, not yet on the road' },
+      { key: 'done', label: 'Delivered', count: where(isDone), dropNote: 'still in transit' },
     ];
   }, [quotes]);
   return <Funnel stages={stages} noun="quote" ariaLabel="Quotes by how far they progressed" />;

@@ -10,6 +10,7 @@ import DemoAccountPanel from '@/pages/admin/DemoAccountPanel';
 import SearchPanel from '@/pages/admin/SearchPanel';
 import PlatformHealth from '@/pages/admin/PlatformHealth';
 import AuditLogPanel from '@/pages/admin/AuditLogPanel';
+import AiUsagePanel from '@/pages/admin/AiUsagePanel';
 import VehicleTypesPanel from '@/pages/admin/VehicleTypesPanel';
 import CrossBorderRatesPanel from '@/pages/admin/CrossBorderRatesPanel';
 import '@/components/layout/section-header.css';
@@ -49,6 +50,7 @@ const SECTIONS: Section[] = [
     group: 'Platform',
     items: [
       { id: 'health', label: 'Platform health', component: PlatformHealth },
+      { id: 'ai-usage', label: 'AI usage & cost', component: AiUsagePanel },
       { id: 'audit-log', label: 'Audit log', component: AuditLogPanel },
     ],
   },

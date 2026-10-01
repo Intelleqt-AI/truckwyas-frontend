@@ -677,3 +677,18 @@
 .acct-check li.is-blocked:not(:first-child) .acct-check__title, .acct-check li.is-blocked:not(:first-child) .acct-check__desc { color: var(--text-tertiary); }
 .acct-check li.is-blocked:not(:first-child) .acct-step-num { opacity: 0.5; }
 .acct-select[data-empty], .acct-select[data-empty] > span { color: var(--text-tertiary) !important; }
+
+/* Lettermark for providers without a logo file: a filled disc, sized like the Xero mark. */
+.acct-logo__mark { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; font: 700 15px/1 var(--font-sans); letter-spacing: -0.02em; text-transform: lowercase; }
+.acct-logo--sm .acct-logo__mark { width: 24px; height: 24px; font-size: 11px; }
+/* Settings that must change inside the accounting system before anything is sent. */
+.acct-blockers { margin: 0; padding: 16px var(--card-pad, 20px); border-bottom: 1px solid var(--border-subtle); display: grid; gap: 12px; }
+.acct-blockers__head { display: flex; align-items: flex-start; gap: 10px; }
+.acct-blockers__head svg { flex: none; margin-top: 2px; color: var(--status-warning-text); }
+.acct-blockers__title { font: 600 14px/20px var(--font-sans); color: var(--text-primary); margin: 0; }
+.acct-blockers__list { margin: 6px 0 0; padding: 0 0 0 18px; display: grid; gap: 6px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.acct-blockers__actions { padding-left: 26px; }
+@media (max-width: 560px) { .acct-blockers__actions { padding-left: 0; } .acct-blockers__actions .tw-btn { width: 100%; justify-content: center; } }
+.acct-blockers { background: var(--status-warning-bg); }
+.acct-blockers__one { padding-left: 0; }
+.acct-blockers__list { color: var(--text-primary); }

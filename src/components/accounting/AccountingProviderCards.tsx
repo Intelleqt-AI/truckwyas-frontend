@@ -123,10 +123,10 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
   } else if (mine) {
     desc = mine.status === 'PENDING_ORG'
       ? `Signed in to ${cfg.short}; no organisation chosen yet.`
-      : `Linked to ${mine.tenant_name || `your ${cfg.short} organisation`}`;
+      : `Linked to ${mine.tenant_name || `your ${cfg.short} ${cfg.orgWord}`}`;
     const left = mine.status === 'ACTIVE' && !mine.readiness.sync_enabled
       ? [!mine.readiness.mapping_complete, mine.readiness.contacts_to_confirm > 0, mine.readiness.backfill_state !== 'DONE'].filter(Boolean).length : 0;
-    if (left > 0) desc = <>{mine.tenant_name || `${cfg.short} organisation`}<span className="acct-card__note">{left} setup {left === 1 ? 'step' : 'steps'} left</span></>;
+    if (left > 0) desc = <>{mine.tenant_name || `${cfg.short} ${cfg.orgWord}`}<span className="acct-card__note">{left} setup {left === 1 ? 'step' : 'steps'} left</span></>;
     if (mine.status === 'NEEDS_REAUTH') note = <span className="acct-card__note acct-card__note--danger">{mine.status_reason || `Your ${cfg.short} sign-in has expired.`} Nothing is sent until an admin reconnects.</span>;
     const needsYou = mine.status === 'PENDING_ORG' || (mine.status === 'ACTIVE' && !mine.readiness.sync_enabled);
     actions = (

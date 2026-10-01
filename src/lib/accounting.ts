@@ -29,23 +29,48 @@ export interface ProviderConfig {
   initials: string;
   /** One line under the card title. */
   blurb: string;
+  /** What the provider calls one set of books ("organisation", "company"). */
+  orgWord: 'organisation' | 'company';
+  /** Lettermark colours when there is no logo file. */
+  mark?: { bg: string; fg: string };
+  /** Account codes people recognise (Xero "200") or internal ids we shouldn't show (QuickBooks). */
+  showAccountCodes: boolean;
+  /** Revenue types map to accounts (Xero) or products/services (QuickBooks items). */
+  revenueTarget: 'account' | 'item';
+  /** Tracking row labels; `vehicleCat`/`branchCat` pin the category id when the provider has fixed ones. */
+  tracking: { vehicle: string; branchCat: string; branch: string; vehicleCat?: string; branchCatId?: string };
 }
+
+const XERO_TRACKING = { vehicle: 'Vehicle category', branchCat: 'Branch category', branch: 'Branch' };
 
 /** Display config keyed by provider code. The server says which are available. */
 export const PROVIDERS: Record<ProviderCode, ProviderConfig> = {
   XERO: {
     code: 'XERO', slug: 'xero', name: 'Xero', short: 'Xero', logo: '/Xero_logo.jpg', initials: 'X',
     blurb: 'Invoices, credit notes and bills go to Xero; payments come back.',
+    orgWord: 'organisation', revenueTarget: 'account', showAccountCodes: true, tracking: XERO_TRACKING,
   },
   QBO: {
-    code: 'QBO', slug: 'quickbooks', name: 'QuickBooks Online', short: 'QuickBooks', logo: null, initials: 'QB',
+    code: 'QBO', slug: 'quickbooks', name: 'QuickBooks Online', short: 'QuickBooks', logo: null, initials: 'qb',
     blurb: 'Invoices, credit notes and bills go to QuickBooks; payments come back.',
+    orgWord: 'company', mark: { bg: '#2CA01C', fg: '#FFFFFF' }, revenueTarget: 'item', showAccountCodes: false,
+    tracking: { vehicle: 'Vehicle (Class)', branchCat: 'Branch (Location)', branch: 'Location', vehicleCat: 'class', branchCatId: 'location' },
   },
   SAGE: {
     code: 'SAGE', slug: 'sage', name: 'Sage Business Cloud Accounting', short: 'Sage', logo: null, initials: 'S',
     blurb: 'Invoices, credit notes and bills go to Sage; payments come back.',
+    orgWord: 'organisation', revenueTarget: 'account', showAccountCodes: true, tracking: XERO_TRACKING,
   },
 };
+
+/**
+ * Readiness reasons that come from settings inside the accounting system
+ * (e.g. QuickBooks "Custom transaction numbers"), as opposed to setup steps
+ * in TruckWys, which the checklist already shows.
+ */
+const SETUP_REASON = /^(Choose which organisation|Reconnect |Disconnected|Map every |Confirm |Choose a cut-over date)/;
+export const providerBlockers = (r: Readiness | null | undefined): string[] =>
+  (r?.blocking_reasons ?? []).filter(x => !SETUP_REASON.test(x));
 
 export const PROVIDER_ORDER: ProviderCode[] = ['XERO', 'QBO', 'SAGE'];
 
@@ -412,7 +437,7 @@ export const paymentsManagedRecordUrl = (e: unknown): string | null =>
 // ---------------------------------------------------------------- copy
 
 /** Friendly sentence for the OAuth callback's ?result=&reason=. */
-export function callbackMessage(result: string | null, reason: string | null, providerName: string): { tone: 'success' | 'warning' | 'danger'; title: string; body: string } | null {
+export function callbackMessage(result: string | null, reason: string | null, providerName: string, org: 'organisation' | 'company' = 'organisation'): { tone: 'success' | 'warning' | 'danger'; title: string; body: string } | null {
   if (!result) return null;
   if (result === 'connected') {
     return { tone: 'success', title: `${providerName} is connected`, body: 'Next, map your accounts and VAT, confirm your contacts and choose a cut-over date.' };
@@ -424,14 +449,18 @@ export function callbackMessage(result: string | null, reason: string | null, pr
     denied: `The connection was cancelled in ${providerName}. Nothing was changed.`,
     state_invalid: 'The sign-in link expired or was opened in a different browser. Start the connection again from this page.',
     token_exchange_failed: `${providerName} didn't finish the sign-in. Wait a minute and try again.`,
-    no_organisations: `Your ${providerName} login doesn't have access to any organisation. Ask whoever runs your ${providerName} subscription to give you access, then try again.`,
-    currency_not_supported: `This ${providerName} organisation's base currency isn't ZAR. TruckWys only supports rand books for now.`,
-    org_already_linked: `That ${providerName} organisation is already linked to another TruckWys company. An organisation can only be linked to one company.`,
+    no_organisations: `Your ${providerName} login doesn't have access to any ${org}. Ask whoever runs your ${providerName} subscription to give you access, then try again.`,
+    currency_not_supported: `This ${providerName} ${org}'s ${org === 'company' ? 'home' : 'base'} currency isn't ZAR. TruckWys only supports rand books for now.`,
+    org_already_linked: org === 'company'
+      ? `That ${providerName} company is already linked to another TruckWys company. Each ${providerName} company can only be linked once.`
+      : `That ${providerName} organisation is already linked to another TruckWys company. An organisation can only be linked to one company.`,
     already_connected: 'This company already has an accounting system connected. Disconnect it first, then connect the new one.',
     not_configured: `${providerName} isn't set up on this server yet.`,
     browser_mismatch: 'Finish connecting in the same browser you started from. Start again from TruckWys.',
-    org_mismatch: `You reconnected without the organisation TruckWys was syncing with. Reconnect and tick that organisation.`,
-    invalid_org: `That ${providerName} organisation can't be used. Start again and choose the organisation that holds this company's books.`,
+    org_mismatch: org === 'company'
+      ? `You reconnected to a different ${providerName} company. Reconnect and pick the company TruckWys was syncing with.`
+      : `You reconnected without the organisation TruckWys was syncing with. Reconnect and tick that organisation.`,
+    invalid_org: `That ${providerName} ${org} can't be used. Start again and choose the ${org} that holds this company's books.`,
   };
   return {
     tone: 'danger',

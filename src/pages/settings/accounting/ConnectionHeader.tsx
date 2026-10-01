@@ -81,7 +81,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
       <div className="acct-head">
         <ProviderLogo provider={connection.provider} />
         <div className="acct-head__main">
-          <h2 id="acct-conn-title" className="acct-head__name">{connection.tenant_name || `${cfg.short} organisation`}</h2>
+          <h2 id="acct-conn-title" className="acct-head__name">{connection.tenant_name || `${cfg.short} ${cfg.orgWord}`}</h2>
           {/* The status always sits on the caption line, in the same place in every state. */}
           <p className="acct-head__caption">
             <span>{cfg.name}</span>

@@ -42,7 +42,7 @@ export default function AccountingIntegration() {
     const result = params.get('result') ?? (params.get('xero') === 'connected' ? 'connected' : params.get('xero') === 'error' ? 'error' : null);
     if (!result) return;
     const provider = providerBySlug(params.get('provider')) ?? providerConfig('XERO');
-    setBanner(callbackMessage(result, params.get('reason'), provider.short));
+    setBanner(callbackMessage(result, params.get('reason'), provider.short, provider.orgWord));
     invalidateAccounting(qc);
     const next = new URLSearchParams(params);
     ['provider', 'result', 'reason', 'xero'].forEach(k => next.delete(k));

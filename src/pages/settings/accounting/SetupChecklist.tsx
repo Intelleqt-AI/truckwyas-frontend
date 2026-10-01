@@ -1,8 +1,11 @@
-import { Check, Loader2, X } from 'lucide-react';
-import { providerConfig, type Connection } from '@/lib/accounting';
+import { useState } from 'react';
+import { AlertTriangle, Check, Loader2, RefreshCw, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from '@/lib/toast';
+import { ACCT_KEYS, accountingApi, apiMessage, invalidateAccounting, providerBlockers, providerConfig, type Connection } from '@/lib/accounting';
 import { formatDate } from '@/lib/formatters';
 import { ConnectionDetails } from './ConnectionHeader';
-import { AcctCard, plural, type StepLook } from './shared';
+import { AcctCard, plural, useAccountingPermissions, type StepLook } from './shared';
 import type { AccountingTab } from './tabs';
 
 /** What still has to happen before documents start flowing, in order. */
@@ -48,7 +51,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: backfillLook,
       title: 'Choose a cut-over date',
       desc: r.backfill_state === 'DONE'
-        ? `Documents from ${connection.cutover_date ?? 'the cut-over date'} onwards are in ${cfg.short}.`
+        ? `Documents from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the cut-over date'} onwards are in ${cfg.short}.`
         : r.backfill_state === 'RUNNING'
           ? `Sending documents to ${cfg.short} now.`
           : r.backfill_state === 'FAILED'
@@ -74,7 +77,10 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const reauth = connection.status !== 'ACTIVE';
   const nextKey = reauth ? undefined : items.find(it => it.look !== 'done' && it.tab && it.action)?.key;
   const open = items.filter(it => it.look !== 'done' && it.key !== 'live' && it.key !== 'connect').map(it => items.indexOf(it) + 1);
-  const subtitle = r.sync_enabled
+  const blockers = reauth ? [] : providerBlockers(r);
+  const subtitle = blockers.length && !open.length
+    ? `Nothing is sent to ${cfg.short} until the ${blockers.length === 1 ? 'setting' : 'settings'} below ${blockers.length === 1 ? 'is' : 'are'} changed.`
+    : r.sync_enabled
     ? `Done. ${cfg.short} and TruckWys now stay in step on their own.`
     : reauth
       ? `Steps 2–${items.length} wait until ${cfg.short} is reconnected.`
@@ -85,6 +91,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   return (
     <>
     <AcctCard title={r.sync_enabled ? `${cfg.short} is set up` : `Finish setting up ${cfg.short}`} description={subtitle} flush>
+      {blockers.length > 0 && <ProviderBlockers connection={connection} blockers={blockers} />}
       <ol className="acct-check acct-check--steps">
         {items.map((it, i) => {
           const auto = it.key === 'live';
@@ -121,4 +128,47 @@ function StepMarker({ look, n, auto }: { look: StepLook; n: number; auto: boolea
   if (look === 'bad') return <span className="acct-step-num is-bad" aria-hidden="true"><X size={12} strokeWidth={2.5} /></span>;
   if (look === 'busy') return <span className="acct-step-num is-busy" aria-hidden="true"><Loader2 size={12} className="animate-spin" /></span>;
   return <span className={`acct-step-num${auto ? ' is-auto' : ''}`} aria-hidden="true">{n}</span>;
+}
+
+/**
+ * Settings inside the accounting system that stop every document (e.g.
+ * QuickBooks "Custom transaction numbers"). Fixed there, then re-read here.
+ */
+function ProviderBlockers({ connection, blockers }: { connection: Connection; blockers: string[] }) {
+  const cfg = providerConfig(connection.provider);
+  const qc = useQueryClient();
+  const { canWrite, writeTitle } = useAccountingPermissions();
+  const [busy, setBusy] = useState(false);
+  const refresh = async () => {
+    setBusy(true);
+    try {
+      const fresh = await accountingApi.refreshOptions();
+      qc.setQueryData(ACCT_KEYS.mapping, fresh);
+      await invalidateAccounting(qc);
+      toast.success(`Settings read again from ${cfg.short}`);
+    } catch (e) {
+      toast.error(apiMessage(e, `Couldn't read from ${cfg.short}. Try again.`));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="acct-blockers" role="status">
+      <div className="acct-blockers__head">
+        <AlertTriangle size={16} aria-hidden="true" />
+        <div style={{ minWidth: 0 }}>
+          <p className="acct-blockers__title">Change {blockers.length === 1 ? 'this setting' : `these ${blockers.length} settings`} in {cfg.short}</p>
+          {blockers.length === 1
+            ? <p className="acct-blockers__list acct-blockers__one">{blockers[0]}</p>
+            : <ul className="acct-blockers__list">{blockers.map(b => <li key={b}>{b}</li>)}</ul>}
+        </div>
+      </div>
+      <div className="acct-blockers__actions">
+        <button type="button" className="tw-btn" onClick={refresh} disabled={!canWrite || busy} title={writeTitle}>
+          <RefreshCw size={14} aria-hidden="true" className={busy ? 'animate-spin' : undefined} />
+          {busy ? 'Reading…' : `Refresh from ${cfg.short}`}
+        </button>
+      </div>
+    </div>
+  );
 }

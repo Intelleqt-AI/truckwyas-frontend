@@ -42,7 +42,8 @@ const pct = (s: string | null | undefined) => {
   const n = num(s);
   return n == null ? '' : `${Number.isInteger(n) ? n : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%`;
 };
-const accountLabel = (a: ProviderAccount) => (a.code ? `${a.code} · ${a.name}` : a.name);
+// Items ("item:12") and QuickBooks account ids mean nothing to people: name only.
+const accountLabel = (a: ProviderAccount, showCodes = true) => (!showCodes || a.type === 'ITEM' || !a.code ? a.name : `${a.code} · ${a.name}`);
 const taxLabel = (t: ProviderTaxRate) => `${t.name} (${pct(t.rate)})`;
 
 /**
@@ -174,9 +175,17 @@ export function MappingTab({ connection }: { connection: Connection }) {
     return <AcctCard title="Accounts and VAT"><ErrorBlock message={apiMessage(q.error, "Couldn't load the mapping.")} onRetry={() => q.refetch()} /></AcctCard>;
   }
 
-  const accounts = m.options.accounts ?? [];
+  const allAccounts = m.options.accounts ?? [];
+  // QuickBooks: revenue types go to products/services (ITEM); everything else to plain accounts.
+  const itemsForRevenue = cfg.revenueTarget === 'item';
+  const items = allAccounts.filter(a => a.type === 'ITEM');
+  const accounts = itemsForRevenue ? allAccounts.filter(a => a.type !== 'ITEM') : allAccounts;
+  const revenueOptions = itemsForRevenue ? items : allAccounts;
   const taxRates = m.options.tax_rates ?? [];
   const cats = m.options.tracking_categories ?? [];
+  const tl = cfg.tracking;
+  const vehicleCats = tl.vehicleCat ? cats.filter(c => c.id === tl.vehicleCat) : cats;
+  const branchCats = tl.branchCatId ? cats.filter(c => c.id === tl.branchCatId) : cats;
   const disabled = !canWrite || saving;
   const branchCat = cats.find(c => c.id === tracking.branch_category_id);
 
@@ -211,7 +220,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
     el?.closest('.acct-map-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
   const rowClass = (section: MappingSection, key: string) => `acct-map-row${requiredGap(section, key) ? ' is-required' : ''}`;
-  const describeAccount = (code: string) => { const a = accounts.find(x => x.code === code); return a ? accountLabel(a) : code; };
+  const describeAccount = (code: string) => { const a = allAccounts.find(x => x.code === code); return a ? accountLabel(a, cfg.showAccountCodes) : code; };
   const describeTax = (code: string) => { const t = taxRates.find(x => x.code === code); return t ? taxLabel(t) : code; };
 
   return (
@@ -242,14 +251,23 @@ export function MappingTab({ connection }: { connection: Connection }) {
         </> : undefined}
       />
 
-      <AcctCard title="Income accounts" description="Which income account each kind of charge on your invoices goes to." flush>
+      <AcctCard
+        title={itemsForRevenue ? 'Income: product/service' : 'Income accounts'}
+        description={itemsForRevenue
+          ? `Which ${cfg.short} product/service each kind of charge on your invoices uses. Its income account decides where the money lands.`
+          : 'Which income account each kind of charge on your invoices goes to.'}
+        flush
+      >
+        {itemsForRevenue && items.length === 0 && (
+          <div className="acct-hint" style={{ padding: '12px var(--card-pad, 20px) 0' }}>No products or services came back from {cfg.short}. Add a Service item there, then refresh.</div>
+        )}
         {m.revenue_types.map(row => {
           const field = `revenue_types.${row.key}`;
           return (
             <div className={rowClass('revenue_types', row.key)} key={row.key}>
               <label className="acct-map-row__label" id={`lbl-${field}`}>{row.label}{optionalTag('revenue_types', row.key)}</label>
               <div className="acct-map-row__field">
-                <AccountSelect labelledBy={`lbl-${field}`} accounts={accounts} prefer={a => a.class === 'REVENUE'} preferLabel="Income accounts"
+                <AccountSelect showCodes={cfg.showAccountCodes} labelledBy={`lbl-${field}`} accounts={revenueOptions} prefer={a => a.class === 'REVENUE'} preferLabel={itemsForRevenue ? 'Products/services' : 'Income accounts'}
                   value={sectionValue('revenue_types', row.key)} onChange={v => setSection('revenue_types', row.key, v)} disabled={disabled} invalid={!!errors[field]}
                   noneLabel={isOptional('revenue_types', row.key) ? 'Not used' : 'Not mapped'} />
                 {suggestionHint('revenue_types', row.key, describeAccount)}
@@ -267,7 +285,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
             <div className={rowClass('expense_categories', row.key)} key={row.key}>
               <label className="acct-map-row__label" id={`lbl-${field}`}>{row.label}{optionalTag('expense_categories', row.key)}</label>
               <div className="acct-map-row__field">
-                <AccountSelect labelledBy={`lbl-${field}`} accounts={accounts} prefer={a => a.class === 'EXPENSE'} preferLabel="Expense accounts"
+                <AccountSelect showCodes={cfg.showAccountCodes} labelledBy={`lbl-${field}`} accounts={accounts} prefer={a => a.class === 'EXPENSE'} preferLabel="Expense accounts"
                   value={sectionValue('expense_categories', row.key)} onChange={v => setSection('expense_categories', row.key, v)} disabled={disabled} invalid={!!errors[field]}
                   noneLabel={isOptional('expense_categories', row.key) ? 'Not used' : 'Not mapped'} />
                 {suggestionHint('expense_categories', row.key, describeAccount)}
@@ -321,7 +339,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         <div className="acct-map-row">
           <label className="acct-map-row__label" id="lbl-receipts">{cfg.short} bank account</label>
           <div className="acct-map-row__field">
-            <AccountSelect labelledBy="lbl-receipts" accounts={accounts.filter(a => a.is_bank)} prefer={() => true} preferLabel="Bank accounts"
+            <AccountSelect showCodes={cfg.showAccountCodes} labelledBy="lbl-receipts" accounts={accounts.filter(a => a.is_bank)} prefer={() => true} preferLabel="Bank accounts"
               value={receipts} onChange={v => { setDraft(d => ({ ...d, receipts_account: v })); setErrors(e => { const n = { ...e }; delete n.receipts_account; return n; }); }}
               disabled={disabled} invalid={!!errors.receipts_account} noneLabel="Don't send payments" />
             {accounts.every(a => !a.is_bank) && <div className="acct-hint">No bank accounts came back from {cfg.short}. Add one there, then refresh.</div>}
@@ -330,41 +348,45 @@ export function MappingTab({ connection }: { connection: Connection }) {
         </div>
       </AcctCard>
 
-      <AcctCard title={<>Tracking<span className="acct-optional"> · optional</span></>} description={`Tag invoice and bill lines in ${cfg.short} with the vehicle and branch, so you can report profit per truck in ${cfg.short}.`} flush>
+      <AcctCard title={<>Tracking<span className="acct-optional"> · optional</span></>} description={tl.vehicleCat
+        ? `Tag documents in ${cfg.short} with the vehicle (a class per truck) and the branch (a location), so you can report profit per truck in ${cfg.short}.`
+        : `Tag invoice and bill lines in ${cfg.short} with the vehicle and branch, so you can report profit per truck in ${cfg.short}.`} flush>
         {cats.length === 0 ? (
-          <div className="acct-empty" style={{ textAlign: 'left' }}>Your {cfg.short} organisation has no tracking categories. You can skip this.</div>
+          <div className="acct-empty" style={{ textAlign: 'left' }}>{itemsForRevenue
+            ? <>Class and Location tracking are off in {cfg.short}. To tag vehicles and branches, turn them on in {cfg.short} (Settings → Account and settings → Advanced → Categories), then refresh. You can skip this.</>
+            : <>Your {cfg.short} {cfg.orgWord} has no tracking categories. You can skip this.</>}</div>
         ) : (
           <>
             <div className="acct-map-row">
               <label className="acct-map-row__label" id="lbl-veh">
-                Vehicle category
+                {tl.vehicle}
               </label>
               <div className="acct-map-row__field">
                 <PlainSelect labelledBy="lbl-veh" value={tracking.vehicle_category_id} disabled={disabled} invalid={!!errors['tracking.vehicle_category_id']}
-                  options={cats.map(c => ({ value: c.id, label: c.name }))} noneLabel="Don't tag vehicles"
+                  options={vehicleCats.map(c => ({ value: c.id, label: c.name }))} noneLabel="Don't tag vehicles"
                   onChange={v => setDraft(d => ({ ...d, tracking: { ...tracking, vehicle_category_id: v } }))} />
-                {tracking.vehicle_category_id && <div className="acct-hint">Lines are tagged with the vehicle's registration.</div>}
+                {tracking.vehicle_category_id && <div className="acct-hint">{tl.vehicleCat ? `Each vehicle gets its own ${cfg.short} class, named after its registration.` : "Lines are tagged with the vehicle's registration."}</div>}
                 {errors['tracking.vehicle_category_id'] && <div className="acct-error" role="alert">{errors['tracking.vehicle_category_id']}</div>}
               </div>
             </div>
             <div className="acct-map-row">
-              <label className="acct-map-row__label" id="lbl-branch">Branch category</label>
+              <label className="acct-map-row__label" id="lbl-branch">{tl.branchCat}</label>
               <div className="acct-map-row__field">
                 <PlainSelect labelledBy="lbl-branch" value={tracking.branch_category_id} disabled={disabled} invalid={!!errors['tracking.branch_category_id']}
-                  options={cats.map(c => ({ value: c.id, label: c.name }))} noneLabel="Don't tag a branch"
+                  options={branchCats.map(c => ({ value: c.id, label: c.name }))} noneLabel="Don't tag a branch"
                   onChange={v => setDraft(d => ({ ...d, tracking: { ...tracking, branch_category_id: v, branch_option: '' } }))} />
                 {errors['tracking.branch_category_id'] && <div className="acct-error" role="alert">{errors['tracking.branch_category_id']}</div>}
               </div>
             </div>
             <div className={`acct-map-row${branchCat ? '' : ' is-disabled-row'}`}>
               <label className="acct-map-row__label" id="lbl-branch-opt">
-                Branch
+                {tl.branch}
               </label>
               <div className="acct-map-row__field">
                 <PlainSelect labelledBy="lbl-branch-opt" value={tracking.branch_option || null} disabled={disabled || !branchCat} invalid={!!errors['tracking.branch_option']}
-                  options={(branchCat?.options ?? []).map(o => ({ value: o.name, label: o.name }))} noneLabel={branchCat ? 'Choose a branch' : 'Choose a branch category first'}
+                  options={(branchCat?.options ?? []).map(o => ({ value: o.name, label: o.name }))} noneLabel={branchCat ? `Choose a ${tl.branch.toLowerCase()}` : `Choose ${tl.branchCatId ? 'Location tracking' : 'a branch category'} first`}
                   onChange={v => setDraft(d => ({ ...d, tracking: { ...tracking, branch_option: v ?? '' } }))} />
-                {tracking.branch_option && <div className="acct-hint">Every line is tagged with this branch.</div>}
+                {tracking.branch_option && <div className="acct-hint">{tl.branchCatId ? 'Every document is tagged with this location.' : 'Every line is tagged with this branch.'}</div>}
                 {errors['tracking.branch_option'] && <div className="acct-error" role="alert">{errors['tracking.branch_option']}</div>}
               </div>
             </div>
@@ -391,7 +413,8 @@ export function MappingTab({ connection }: { connection: Connection }) {
 
 // ---------------------------------------------------------------- selects
 
-function AccountSelect({ accounts, prefer, preferLabel, value, onChange, disabled, invalid, labelledBy, noneLabel = 'Not mapped' }: {
+function AccountSelect({ accounts, prefer, preferLabel, value, onChange, disabled, invalid, labelledBy, noneLabel = 'Not mapped', showCodes = true }: {
+  showCodes?: boolean;
   accounts: ProviderAccount[];
   prefer: (a: ProviderAccount) => boolean;
   preferLabel: string;
@@ -415,13 +438,13 @@ function AccountSelect({ accounts, prefer, preferLabel, value, onChange, disable
         {first.length > 0 && (
           <SelectGroup>
             <SelectLabel>{preferLabel}</SelectLabel>
-            {first.map(a => <SelectItem key={a.code} value={a.code}>{accountLabel(a)}</SelectItem>)}
+            {first.map(a => <SelectItem key={a.code} value={a.code}>{accountLabel(a, showCodes)}</SelectItem>)}
           </SelectGroup>
         )}
         {rest.length > 0 && (
           <SelectGroup>
             <SelectLabel>Other accounts</SelectLabel>
-            {rest.map(a => <SelectItem key={a.code} value={a.code}>{accountLabel(a)}</SelectItem>)}
+            {rest.map(a => <SelectItem key={a.code} value={a.code}>{accountLabel(a, showCodes)}</SelectItem>)}
           </SelectGroup>
         )}
       </SelectContent>

@@ -100,11 +100,11 @@ export default function AccountingIntegration() {
       const pos = (n: HTMLElement) => n.getBoundingClientRect().left - base;
       const tabsEls = Array.from(strip.querySelectorAll<HTMLElement>('.tw-seg__opt'));
       const elRight = pos(el) + el.offsetWidth;
-      let left = 0;
-      for (const t of tabsEls) {
-        if (elRight - pos(t) <= strip.clientWidth - 40) { left = pos(t) - 2; break; }
-      }
-      strip.scrollLeft = Math.max(0, tabsEls[0] && left <= pos(tabsEls[0]) ? 0 : left);
+      // Smallest scroll that shows the open tab whole (plus room for the fade),
+      // rounded to the start of a tab so no word is cut on the left.
+      const need = Math.max(0, elRight + 28 - strip.clientWidth);
+      const start = tabsEls.map(pos).find(x => x >= need) ?? need;
+      strip.scrollLeft = need === 0 ? 0 : Math.max(0, Math.min(start, pos(el)) - 2);
     }
     // Fade whichever edge hides more tabs, so it reads as a strip that scrolls.
     const edges = () => {
@@ -116,7 +116,7 @@ export default function AccountingIntegration() {
     strip?.addEventListener('scroll', edges, { passive: true });
     window.addEventListener('resize', edges);
     return () => { strip?.removeEventListener('scroll', edges); window.removeEventListener('resize', edges); };
-  }, [tab, live?.id]);
+  }, [tab, live?.id, recon.data?.run?.difference_count]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tabCountTitle = (t: AccountingTab, n: number) =>
     t === 'contacts' ? `${n} need action` : t === 'mapping' ? `${n} still to map` : t === 'reconciliation' ? `${n} differences` : `${n} failed to send`;

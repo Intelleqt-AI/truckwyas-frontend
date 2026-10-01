@@ -209,7 +209,7 @@ export interface Book {
     note: string;
   };
   concentration: { hhi: number; n_eff: number | null; top1_pct: number; top10_pct: number; top10_band: 'ok' | 'soft' | 'hard' };
-  sectors: { sector: string; label: string; exposure: number; pct_of_pot: number; cap: number }[];
+  sectors: { sector: string; label: string; exposure: number; pct_of_pot: number; cap: number /* rand */; cap_pct_of_pot: number }[];
   grades: { grade: string; exposure: number; pct: number }[];
   top_debtors: { debtor_id: number; name: string; grade: string | null; sector: string; exposure: number; cap: number; utilisation_pct: number; hold: boolean }[];
   transporters: { company_id: number; name: string; grade: string | null; exposure: number; line_limit: number; utilisation_pct: number }[];

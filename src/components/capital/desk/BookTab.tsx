@@ -32,7 +32,7 @@ function BookView({ b }: { b: Book }) {
   const ri = b.risk_index;
   const outPct = b.pot_limit > 0 ? (b.outstanding / b.pot_limit) * 100 : 0;
   const resPct = b.pot_limit > 0 ? (b.reserved / b.pot_limit) * 100 : 0;
-  const sectorMax = Math.max(1, ...b.sectors.map((s) => Math.max(s.pct_of_pot, s.cap)));
+  const sectorMax = Math.max(1, ...b.sectors.map((s) => Math.max(s.pct_of_pot, s.cap_pct_of_pot)));
   const gradeMax = Math.max(1, ...b.grades.map((g) => g.pct));
 
   return (
@@ -148,9 +148,9 @@ function BookView({ b }: { b: Book }) {
               {b.sectors.map((s) => (
                 <div key={s.sector} className="cap-row" role="row">
                   <span className="cap-row__label" role="cell" title={s.label}>{s.label}</span>
-                  <CapBar value={s.pct_of_pot} cap={s.cap} scale={sectorMax} label={`${pct(s.pct_of_pot)} of pot, cap ${pct(s.cap)}`} />
+                  <CapBar value={s.pct_of_pot} cap={s.cap_pct_of_pot} scale={sectorMax} label={`${pct(s.pct_of_pot)} of pot, cap ${pct(s.cap_pct_of_pot)} (${money(s.cap)})`} />
                   <span className="cap-row__value" role="cell">{money(s.exposure)}<span className="cap-sub">{pct(s.pct_of_pot)}</span></span>
-                  <span className="cap-row__note" role="cell">{pct(s.cap)}</span>
+                  <span className="cap-row__note" role="cell">{pct(s.cap_pct_of_pot)}</span>
                 </div>
               ))}
             </div>

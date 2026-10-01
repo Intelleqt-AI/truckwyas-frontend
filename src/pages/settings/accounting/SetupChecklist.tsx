@@ -18,7 +18,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: connection.status === 'ACTIVE' ? 'done' : 'bad',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status !== 'ACTIVE'
-        ? 'Your sign-in expired. Use Reconnect above.'
+        ? 'Waiting for an admin to sign in again.'
         : `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`,
     },
     {
@@ -77,7 +77,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const subtitle = r.sync_enabled
     ? `Done. ${cfg.short} and TruckWys now stay in step on their own.`
     : reauth
-      ? `Paused until ${cfg.short} is reconnected.`
+      ? `Steps 2–${items.length} wait until ${cfg.short} is reconnected.`
       : open.length
         ? `One-time setup. Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done.`
         : `Sending your history to ${cfg.short}.`;

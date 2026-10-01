@@ -1006,7 +1006,7 @@ export default function InvoiceDetail() {
                   return (
                     <li key={c.id} className="fin-paylist__row">
                       <span className="fin-paylist__main">
-                        <Link to={`/finance/credit-notes/${c.id}`} className="fin-link fin-id">{c.credit_note_number}</Link>
+                        <Link to={`/finance/credit-notes/${c.id}`} className="fin-id acct-ink-link">{c.credit_note_number}</Link>
                         <span className="fin-paylist__sub">{safeDate(c.issue_date)}{voided ? ' · Void' : ''}</span>
                       </span>
                       <span className="fin-paylist__amt" style={voided ? { textDecoration: 'line-through', color: 'var(--text-tertiary)' } : undefined}>

@@ -34,8 +34,8 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         )}
         {(sync.status === 'ERROR' || sync.status === 'DEAD' || sync.status === 'BLOCKED') && (
           <div className="fin-dl__row">
-            <dt>Pending</dt>
-            <dd>1 change, see above</dd>
+            <dt>Latest change</dt>
+            <dd>{sync.status === 'BLOCKED' ? 'Waiting on you' : 'Not sent yet'}</dd>
           </div>
         )}
         <div className="fin-dl__row">
@@ -80,7 +80,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
         <strong>{retrying ? `Last change didn't reach ${name}` : `This ${what} isn't up to date in ${name}`}</strong>
-        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? "We retry once it's fixed." : 'Fix it, then retry.'}
+        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? "We keep retrying; it goes through once that's fixed." : "Fix it, then retry from the Sync tab."}
       </div>
       <Link to={`/settings/integrations/accounting?tab=${/account|tax|vat|tracking/i.test(sync.last_error) ? 'mapping' : 'sync'}`} className="tw-btn fl-notice__action">
         {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix account mapping' : 'View sync issue'}

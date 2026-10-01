@@ -89,15 +89,14 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
             ) : (
               <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}</p>
             )}
-            <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}>Checked {formatDateTime(last.ran_at)} · next check tomorrow at{'\u00a0'}{nextCheck(last.ran_at)}</p>
-            <div className="acct-tiles__label">Checked</div>
+            <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}>Checked {formatDateTime(last.ran_at)} · <span style={{ whiteSpace: 'nowrap' }}>next check tomorrow at {nextCheck(last.ran_at)}</span></p>
             <div className="acct-tiles acct-tiles--3">
               {SCOPES.map(sc => {
                 const n = sc.scope === 'INVOICE' ? last.checked.invoices : sc.scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;
                 const bad = differences.filter(d => d.scope === sc.scope).length;
                 return (
                   <div key={sc.scope}>
-                    <span>{sc.scope === 'MONTH' ? 'Months' : sc.scope === 'CUSTOMER' ? 'Customers' : 'Invoices'}</span>
+                    <span>{sc.scope === 'MONTH' ? 'Months checked' : sc.scope === 'CUSTOMER' ? 'Customers checked' : 'Invoices checked'}</span>
                     <strong>{(n ?? 0).toLocaleString('en-ZA')}</strong>
                     {differences.length > 0 && <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>}
                   </div>

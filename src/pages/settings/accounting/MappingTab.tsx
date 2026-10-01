@@ -376,7 +376,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         // The same sticky save bar as Company details.
         <div className="cs-savebar acct-map-savebar">
           <span className="cs-savebar__note" role={formError ? 'alert' : undefined} style={formError ? { color: 'var(--status-danger-text)' } : undefined}>
-            {formError || (dirty ? `${changeCount} unsaved ${changeCount === 1 ? 'change' : 'changes'}` : 'No unsaved changes')}
+            {formError || (dirty ? `${changeCount} unsaved ${changeCount === 1 ? 'change' : 'changes'}` : m.missing.length > 0 ? `${m.missing.length} required ${m.missing.length === 1 ? 'line' : 'lines'} still to map` : 'All changes saved')}
           </span>
           {dirty && <button type="button" className="tw-btn tw-btn--ghost" onClick={() => { setDraft(EMPTY_DRAFT); setErrors({}); setFormError(''); }} disabled={saving}>Discard</button>}
           <button type="button" className="btn-action settings-control acct-save-btn" onClick={save} disabled={!dirty || saving}
@@ -408,7 +408,7 @@ function AccountSelect({ accounts, prefer, preferLabel, value, onChange, disable
   const unknown = value && !withCode.some(a => a.code === value);
   return (
     <Select value={value ?? NONE} onValueChange={v => onChange(v === NONE ? null : v)} disabled={disabled}>
-      <SelectTrigger className="acct-select" aria-labelledby={labelledBy} aria-invalid={invalid || undefined}><SelectValue /></SelectTrigger>
+      <SelectTrigger className="acct-select" data-empty={value ? undefined : ''} aria-labelledby={labelledBy} aria-invalid={invalid || undefined}><SelectValue /></SelectTrigger>
       <SelectContent>
         <SelectItem value={NONE}>{noneLabel}</SelectItem>
         {unknown && <SelectItem value={value!}>{value} (no longer in the list)</SelectItem>}
@@ -445,7 +445,7 @@ function TaxSelect({ rates, prefer, preferLabel, value, onChange, disabled, inva
   const unknown = value && !rates.some(t => t.code === value);
   return (
     <Select value={value ?? NONE} onValueChange={v => onChange(v === NONE ? null : v)} disabled={disabled}>
-      <SelectTrigger className="acct-select" aria-labelledby={labelledBy} aria-invalid={invalid || undefined}><SelectValue /></SelectTrigger>
+      <SelectTrigger className="acct-select" data-empty={value ? undefined : ''} aria-labelledby={labelledBy} aria-invalid={invalid || undefined}><SelectValue /></SelectTrigger>
       <SelectContent>
         <SelectItem value={NONE}>{noneLabel}</SelectItem>
         {unknown && <SelectItem value={value!}>{value} (no longer in the list)</SelectItem>}
@@ -478,7 +478,7 @@ function PlainSelect({ options, value, onChange, disabled, invalid, labelledBy, 
   const unknown = value && !options.some(o => o.value === value);
   return (
     <Select value={value ?? NONE} onValueChange={v => onChange(v === NONE ? null : v)} disabled={disabled}>
-      <SelectTrigger className="acct-select" aria-labelledby={labelledBy} aria-invalid={invalid || undefined}><SelectValue /></SelectTrigger>
+      <SelectTrigger className="acct-select" data-empty={value ? undefined : ''} aria-labelledby={labelledBy} aria-invalid={invalid || undefined}><SelectValue /></SelectTrigger>
       <SelectContent>
         <SelectItem value={NONE}>{noneLabel}</SelectItem>
         {unknown && <SelectItem value={value!}>{value}</SelectItem>}

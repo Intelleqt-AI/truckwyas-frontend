@@ -216,7 +216,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
         {tenants.length === 0 ? (
           <div className="acct-empty">No organisations came back from {cfg.short}. Use a different login and try again.</div>
         ) : single ? (
-          <div className="acct-row acct-org acct-org--confirm">
+          <div className="acct-row acct-org acct-org--confirm is-selected">
             <span className="acct-org__radio"><input type="radio" className="acct-radio" checked readOnly aria-label={`${single.name} selected`} /></span>
             <span className="acct-org__mark"><ProviderLogo provider={connection.provider} /></span>
             <span style={{ minWidth: 0 }}>

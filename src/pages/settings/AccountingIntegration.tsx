@@ -193,7 +193,8 @@ export default function AccountingIntegration() {
                   className={`tw-seg__opt${tab === t.id ? ' is-active' : ''}`}
                   onClick={() => openTab(t.id)}
                   disabled={live.status === 'NEEDS_REAUTH' && t.id !== 'setup'}
-                  title={live.status === 'NEEDS_REAUTH' && t.id !== 'setup' ? `Reconnect ${cfg!.short} first` : undefined}
+                  title={live.status === 'NEEDS_REAUTH' && t.id !== 'setup' ? `Locked until you reconnect ${cfg!.short}` : undefined}
+                  data-locked={live.status === 'NEEDS_REAUTH' && t.id !== 'setup' ? '' : undefined}
                 >
                   {live.status === 'NEEDS_REAUTH' && t.id !== 'setup' && <Lock size={11} aria-hidden="true" />}
                   {t.label}

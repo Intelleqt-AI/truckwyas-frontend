@@ -655,3 +655,24 @@
 .acct-diff-kv dd { margin: 0; text-align: right; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .acct-jump-list { margin: 12px 0 4px !important; }
 .acct-card-actions--below { margin-top: 16px; }
+
+/* Final pass: placeholders, selection, locked tabs, step labels, ink links. */
+.acct-select[data-empty] { color: var(--text-tertiary); }
+.acct-select[data-empty][aria-invalid="true"] { color: var(--text-secondary); }
+.acct-org--confirm.is-selected { background: var(--surface-tint-hover); box-shadow: inset 3px 0 0 var(--text-primary) !important; }
+.acct-org--confirm.is-disabled .acct-org__mark { filter: none !important; opacity: 0.45 !important; }
+.acct-org--confirm.is-disabled .acct-org__mark .acct-logo { opacity: 1; }
+@media (max-width: 480px) {
+  .acct-org--confirm.is-disabled > .tw-status { display: inline-flex !important; grid-column: 3; grid-row: 2; justify-self: start; margin-top: 2px; }
+}
+.tw-seg__opt[data-locked] { color: var(--text-tertiary) !important; opacity: 0.45; cursor: not-allowed; background: transparent !important; }
+.tw-seg__opt[data-locked] .acct-tab-count { display: none; }
+@media (max-width: 560px) {
+  .acct-check--steps .acct-step-inline { display: inline-flex !important; align-items: center; white-space: nowrap; height: 20px; margin-top: 8px; padding: 0 8px; border: 1px solid var(--border-default); border-radius: 10px; font: 500 12px/18px var(--font-sans); color: var(--text-secondary); }
+  .acct-check--steps li > .tw-btn { justify-self: stretch !important; width: 100%; }
+}
+.acct-ink-link { color: var(--text-primary) !important; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px; }
+.acct-ink-link:hover { text-decoration-color: currentColor; }
+.acct-check li.is-blocked:not(:first-child) .acct-check__title, .acct-check li.is-blocked:not(:first-child) .acct-check__desc { color: var(--text-tertiary); }
+.acct-check li.is-blocked:not(:first-child) .acct-step-num { opacity: 0.5; }
+.acct-select[data-empty], .acct-select[data-empty] > span { color: var(--text-tertiary) !important; }

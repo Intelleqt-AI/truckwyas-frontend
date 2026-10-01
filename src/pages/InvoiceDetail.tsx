@@ -859,6 +859,7 @@ export default function InvoiceDetail() {
           {!bal.inMain('facts') && (
             <section className="card fin-facts-card" aria-label="Invoice dates and terms">{facts(true)}</section>
           )}
+          <AccountingSyncCard sync={inv.accounting_sync} what="invoice" localNumber={inv.invoice_number} />
           {showPaymentForm && !managedHere && (
             <section className="card" id="record-payment" aria-labelledby="record-payment-title">
               <div className="fin-panel-head">
@@ -942,7 +943,7 @@ export default function InvoiceDetail() {
                   <h2 id="payments-title" className="fin-panel-title">Payments</h2>
                   <p className="fin-panel-desc">
                     {managedHere
-                      ? (payments.length ? `${payments.length} ${payments.length === 1 ? 'payment' : 'payments'}. Record new ones in ${acctName}; they appear here within a few minutes.` : `Record payments in ${acctName}; they appear here within a few minutes.`)
+                      ? (payments.length ? `Paid ${formatCurrency(totalPaid)}. Record new payments in ${acctName}; they appear here within a few minutes.` : `Record payments in ${acctName}; they appear here within a few minutes.`)
                       : `${payments.length} recorded, by payment date`}
                   </p>
                 </div>
@@ -958,8 +959,8 @@ export default function InvoiceDetail() {
                         <span className="fin-paylist__sub">
                           {methodLabel(payment.payment_method || payment.method || 'EFT')}
                           {ref && <> · <span className="fin-id">{ref}</span></>}
+                          <PaymentSourceBadge source={payment.source} managed={managedHere} />
                         </span>
-                        <PaymentSourceBadge source={payment.source} managed={managedHere} />
                       </span>
                       <span className="fl-pay-actions">
                         <span className="fin-paylist__amt">{formatCurrency(num(payment.amount))}</span>
@@ -991,7 +992,6 @@ export default function InvoiceDetail() {
             </section>
           )}
 
-          <AccountingSyncCard sync={inv.accounting_sync} what="invoice" localNumber={inv.invoice_number} />
 
           {creditNotes.length > 0 && (
             <section className="card fin-table-card" aria-labelledby="credit-notes-title">

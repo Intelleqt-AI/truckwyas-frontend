@@ -26,10 +26,13 @@ const LEVEL: Record<string, { tone: StatusTone; label: string }> = {
 };
 const OVERDUE_MS = 2 * 60 * 60 * 1000;
 
-/** "10:00 today", "08:30 tomorrow", else the date and time. */
+/** "in 4 min", "due now", "10:00 tomorrow", else the date and time. */
 function nextTry(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
+  const mins = Math.round((d.getTime() - Date.now()) / 60000);
+  if (mins <= 0) return 'due now';
+  if (mins < 60) return `in ${mins} min`;
   const time = d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
   const day = (x: Date) => x.toLocaleDateString('en-CA');
   const now = new Date();
@@ -123,8 +126,8 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
         }
         flush
       >
-        <div style={{ padding: 'var(--card-pad, 20px)' }}>
-          <div className="acct-tiles">
+        <div>
+          <div className="acct-tiles acct-tiles--card">
             <div><span>In {cfg.short}</span><strong>{c.synced.toLocaleString('en-ZA')}</strong></div>
             <div><span>Waiting to send</span><strong>{c.queued.toLocaleString('en-ZA')}</strong></div>
             <div><span>Retrying</span><strong style={c.errors ? { color: 'var(--status-warning-text)' } : undefined}>{c.errors.toLocaleString('en-ZA')}</strong></div>
@@ -143,7 +146,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
               return (
                 <li key={e.id} className="acct-row acct-row--error">
                   <div style={{ minWidth: 0 }}>
-                    <div className="acct-row__title"><DocLink url={e.local_url}>{e.label}</DocLink> <span className="acct-row__sub">{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)}</span></div>
+                    <div className="acct-row__title">{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} <DocLink url={e.local_url}>{e.label}</DocLink></div>
                     <div className="acct-row__reason">{e.last_error || 'No reason given'}</div>
                     <div className="acct-row__sub">
                       {meta.label} · {e.attempts} {e.attempts === 1 ? 'try' : 'tries'}
@@ -153,10 +156,10 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
                   <div className="acct-row__actions">
                     {/* The usual cause is a mapping or a contact: fix that first, then retry. */}
                     {onOpen && /account|tax|vat|tracking/i.test(e.last_error) && (
-                      <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={() => onOpen('mapping')}>Fix in Accounts and VAT</button>
+                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => onOpen('mapping')}>Fix in Accounts and VAT</button>
                     )}
                     {onOpen && /contact/i.test(e.last_error) && (
-                      <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={() => onOpen('contacts')}>Fix in Contacts</button>
+                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => onOpen('contacts')}>Fix in Contacts</button>
                     )}
                     {canWrite && (
                       <button type="button" className="tw-btn tw-btn--sm" onClick={() => retry(e)} disabled={retrying === e.id}>
@@ -171,7 +174,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
         )}
       </AcctCard>
 
-      <AcctCard title="Recent activity" description="The latest sends and fetches, newest first." flush>
+      <AcctCard title="Recent activity" description={`The last ${s.recent.length || ''} sends and fetches, newest first.`.replace('  ', ' ')} flush>
         {s.recent.length === 0 ? (
           <div className="acct-empty">No activity yet.</div>
         ) : (

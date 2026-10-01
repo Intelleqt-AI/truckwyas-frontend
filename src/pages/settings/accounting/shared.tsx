@@ -74,13 +74,13 @@ export function ErrorBlock({ message, onRetry }: { message: string; onRetry?: ()
   );
 }
 
-export type StepLook = 'done' | 'todo' | 'busy' | 'bad' | 'skip';
+export type StepLook = 'done' | 'todo' | 'busy' | 'bad' | 'skip' | 'warn';
 
 export function StepIcon({ look }: { look: StepLook }) {
   const common = { size: 18, 'aria-hidden': true as const };
   if (look === 'done') return <CheckCircle2 {...common} className="acct-check__icon is-done" />;
   if (look === 'busy') return <Loader2 {...common} className="acct-check__icon is-busy animate-spin" />;
-  if (look === 'bad') return <XCircle {...common} className="acct-check__icon is-bad" />;
+  if (look === 'bad' || look === 'warn') return <XCircle {...common} className="acct-check__icon is-bad" />;
   if (look === 'skip') return <MinusCircle {...common} className="acct-check__icon is-todo" />;
   return <Circle {...common} className="acct-check__icon is-todo" />;
 }

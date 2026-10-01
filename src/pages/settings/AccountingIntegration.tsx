@@ -63,6 +63,11 @@ export default function AccountingIntegration() {
   const title = 'Accounting';
   // A sub-page of Integrations: the subtitle line carries the way back, as on
   // every detail page (the settings nav keeps "Integrations" highlighted).
+  const stateLine = !live ? 'Connect your accounting system'
+    : live.status === 'PENDING_ORG' ? 'Choose an organisation'
+      : live.status === 'NEEDS_REAUTH' ? `${cfg!.short} sign-in expired`
+        : live.readiness.sync_enabled ? `${cfg!.short} connection and sync`
+          : `Setting up ${cfg!.short}`;
   const description = (
     <>
       <Link to="/settings/integrations" className="section-header__back">
@@ -70,7 +75,7 @@ export default function AccountingIntegration() {
         Integrations
       </Link>
       <span aria-hidden="true" className="section-header__sep">·</span>
-      Connect your accounting system
+      {conn.isLoading ? 'Accounting system' : stateLine}
     </>
   );
 
@@ -82,7 +87,7 @@ export default function AccountingIntegration() {
     if (!live || !r || live.status !== 'ACTIVE') return undefined;
     if (t === 'contacts' && r.contacts_to_confirm > 0) return r.contacts_to_confirm;
     if (t === 'mapping' && !r.mapping_complete && r.missing_mappings.length) return r.missing_mappings.length;
-    if (t === 'sync' && (live.counts.errors + live.counts.dead) > 0) return live.counts.errors + live.counts.dead;
+    if (t === 'sync' && r.sync_enabled && (live.counts.errors + live.counts.dead) > 0) return live.counts.errors + live.counts.dead;
     return undefined;
   };
 
@@ -92,6 +97,16 @@ export default function AccountingIntegration() {
     const strip = tabsRef.current;
     const el = strip?.querySelector<HTMLElement>('.is-active');
     if (el && strip) strip.scrollLeft = Math.max(0, el.offsetLeft - (strip.clientWidth - el.offsetWidth) / 2);
+    // Fade whichever edge hides more tabs, so it reads as a strip that scrolls.
+    const edges = () => {
+      if (!strip) return;
+      strip.dataset.moreLeft = String(strip.scrollLeft > 2);
+      strip.dataset.moreRight = String(strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 2);
+    };
+    edges();
+    strip?.addEventListener('scroll', edges, { passive: true });
+    window.addEventListener('resize', edges);
+    return () => { strip?.removeEventListener('scroll', edges); window.removeEventListener('resize', edges); };
   }, [tab, live?.id]);
 
   const tabCountTitle = (t: AccountingTab, n: number) =>
@@ -120,13 +135,13 @@ export default function AccountingIntegration() {
   } else if (!live) {
     body = (
       <>
-        <h2 className="acct-section-title">Choose your accounting system</h2>
+        <h2 className="acct-section-title">Connect your accounting system</h2>
         <p className="acct-section-desc">One accounting system can be connected at a time.</p>
         <AccountingProviderCards hideManage />
         <section style={settingsCardStyle} aria-labelledby="acct-how-title">
           <div style={{ padding: '16px var(--card-pad, 20px)', borderBottom: '1px solid var(--border-subtle)' }}>
             <h2 id="acct-how-title" style={{ margin: 0, font: '600 16px/24px var(--font-sans)', color: 'var(--text-primary)' }}>After you connect</h2>
-            <p className="acct-section-desc" style={{ margin: '2px 0 0' }}>Takes about ten minutes, once. Needs a company admin.</p>
+            <p className="acct-section-desc" style={{ margin: '2px 0 0' }}>Takes about ten minutes, once, and needs a company admin. Afterwards, payments you record in your accounting system update TruckWys on their own.</p>
           </div>
           <ol className="acct-check">
             {[
@@ -144,9 +159,7 @@ export default function AccountingIntegration() {
               </li>
             ))}
           </ol>
-          <p className="acct-section-desc" style={{ margin: 0, padding: '12px var(--card-pad, 20px)', borderTop: '1px solid var(--border-row)' }}>
-            After that, payments you record in your accounting system come back to TruckWys on their own.
-          </p>
+
         </section>
       </>
     );
@@ -176,7 +189,7 @@ export default function AccountingIntegration() {
                   onClick={() => openTab(t.id)}
                 >
                   {t.label}
-                  {n != null && <span className="acct-tab-count" title={tabCountTitle(t.id, n)} aria-label={tabCountTitle(t.id, n)}>{n}</span>}
+                  {n != null && <span className="acct-tab-count" title={tabCountTitle(t.id, n)} aria-label={tabCountTitle(t.id, n)}><span className="acct-tab-count__dot" aria-hidden="true" />{n}</span>}
                 </button>
               );
             })}

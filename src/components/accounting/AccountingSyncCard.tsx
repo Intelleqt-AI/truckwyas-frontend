@@ -38,9 +38,9 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         </div>
       </dl>
       {sync.url && (
-        <a href={sync.url} target="_blank" rel="noopener noreferrer" className="tw-btn" style={{ width: '100%', marginTop: 12 }}>
+        <a href={sync.url} target="_blank" rel="noopener noreferrer" className="acct-link" style={{ fontSize: 13, marginTop: 8 }}>
           Open {what} in {name}
-          <ExternalLink size={14} aria-hidden="true" />
+          <ExternalLink size={12} aria-hidden="true" />
         </a>
       )}
     </section>
@@ -73,7 +73,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
     <div className="fl-notice fl-notice--warning acct-sync-notice" role="status">
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
-        <strong>{retrying ? `The latest update didn't reach ${name}; retrying` : `This ${what} isn't up to date in ${name}`}</strong>
+        <strong>{retrying ? `Latest change didn't reach ${name}. Retrying automatically.` : `This ${what} isn't up to date in ${name}`}</strong>
         {sync.last_error || `${name} refused it.`}
       </div>
       <Link to={`/settings/integrations/accounting?tab=${/account|tax|vat|tracking/i.test(sync.last_error) ? 'mapping' : 'sync'}`} className="tw-btn fl-notice__action">

@@ -100,13 +100,24 @@ export function ContactsTab({ connection }: { connection: Connection }) {
     <>
       <AcctCard
         title="Contacts"
-        description={`We link matches on VAT, registration number or email automatically. Name-only matches need your OK.`}
-        actions={
+        description="We link matches on VAT, registration number or email automatically. Name-only matches need your confirmation."
+        actions={<>
+          <div className="acct-kind-filter">
+            <Select value={kind} onValueChange={v => setKind(v as KindFilter)}>
+              <SelectTrigger aria-label="Show customers, suppliers or both" style={{ minHeight: 36, height: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Customers and suppliers</SelectItem>
+                <SelectItem value="CUSTOMER">Customers</SelectItem>
+                <SelectItem value="SUPPLIER">Suppliers</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <button type="button" className="tw-btn" onClick={runMatching} disabled={!canWrite || matching} title={writeTitle}>
             <RefreshCw size={14} aria-hidden="true" className={matching ? 'animate-spin' : undefined} />
             {matching ? 'Matching…' : 'Run matching again'}
           </button>
-        }
+        </>}
+        actionsBelow
         flush
       >
         <div className="acct-toolbar">
@@ -115,17 +126,6 @@ export function ContactsTab({ connection }: { connection: Connection }) {
             <Select value={status} onValueChange={v => setStatus(v as StatusFilter)}>
               <SelectTrigger aria-label="Status" style={{ minHeight: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
               <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'All statuses' : o.label} ({o.count ?? 0})</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <span className="acct-toolbar__spacer" />
-          <div className="acct-kind-filter">
-            <Select value={kind} onValueChange={v => setKind(v as KindFilter)}>
-              <SelectTrigger aria-label="Show customers, suppliers or both" style={{ minHeight: 32, fontSize: 13 }}><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Customers and suppliers</SelectItem>
-                <SelectItem value="CUSTOMER">Customers</SelectItem>
-                <SelectItem value="SUPPLIER">Suppliers</SelectItem>
-              </SelectContent>
             </Select>
           </div>
         </div>

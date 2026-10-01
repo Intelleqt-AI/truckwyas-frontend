@@ -189,7 +189,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
     return null;
   };
   const optionalTag = (section: MappingSection, key: string) =>
-    !sectionValue(section, key) && !requiredGap(section, key) ? <span className="acct-badge" style={{ marginLeft: 8 }}>Optional</span> : null;
+    !sectionValue(section, key) && !requiredGap(section, key) ? <span className="acct-optional"> (optional)</span> : null;
   const rowClass = (section: MappingSection, key: string) => `acct-map-row${requiredGap(section, key) ? ' is-required' : ''}`;
   const describeAccount = (code: string) => { const a = accounts.find(x => x.code === code); return a ? accountLabel(a) : code; };
   const describeTax = (code: string) => { const t = taxRates.find(x => x.code === code); return t ? taxLabel(t) : code; };
@@ -199,7 +199,6 @@ export function MappingTab({ connection }: { connection: Connection }) {
       <AcctCard
         title={m.complete && !dirty ? 'Everything required is mapped' : m.missing.length > 0 ? `${m.missing.length} still to map` : 'Unsaved changes'}
         description={<>
-          {m.missing.length > 0 && !(m.complete && !dirty) ? <>{m.missing.map(missingMappingLabel).join(', ')}. </> : null}
           Nothing is sent to {cfg.short} until every required line is mapped.
           {!canWrite && <> {writeTitle}; you can look but not change anything.</>}
         </>}

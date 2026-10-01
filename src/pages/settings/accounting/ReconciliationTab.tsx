@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, ExternalLink, Play } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, Play } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { StatusChip } from '@/components/ui/StatusChip';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency, formatDateTime } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
@@ -11,7 +10,6 @@ import {
   type Connection, type ReconDifference, type ReconScope, type Reconciliation,
 } from '@/lib/accounting';
 import { AcctCard, ErrorBlock, LoadingBlock, plural, useAccountingPermissions } from './shared';
-import { settingsCardStyle } from '../settingsUi';
 
 const SCOPES: { scope: ReconScope; title: string; first: string }[] = [
   { scope: 'INVOICE', title: 'Invoices', first: 'Invoice' },
@@ -70,62 +68,56 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
   if (q.isError || !q.data) return <AcctCard title="Reconciliation"><ErrorBlock message={apiMessage(q.error, "Couldn't load the reconciliation.")} onRetry={() => q.refetch()} /></AcctCard>;
 
   const { run: last, differences } = q.data;
-  const statusChip = last
-    ? last.status === 'OK' ? <StatusChip tone="success" label="Matches" />
-      : last.status === 'DIFFERENCES' ? <StatusChip tone="warning" label={`${last.difference_count} ${last.difference_count === 1 ? 'difference' : 'differences'}`} />
-        : <StatusChip tone="danger" label="Check failed" />
-    : null;
 
   return (
     <>
       <AcctCard
         title="Reconciliation"
-        description={`Every night TruckWys checks each invoice, each customer's balance and each month's sales and VAT against ${cfg.short}. Differences of ${formatCurrency(0.01)} or less are ignored. Difference = TruckWys minus ${cfg.short}.`}
-        actions={<>{statusChip}{runButton}</>}
+        description={`Every night TruckWys checks each invoice, each customer's balance and each month's sales and VAT against ${cfg.short}. Differences of ${formatCurrency(0.01)} or less are ignored.`}
+        actions={runButton}
       >
         {!last ? (
           <p className="acct-section-desc" style={{ margin: 0 }}>No check has run yet. Run one now, or wait for tonight's.</p>
         ) : (
           <>
-            {/* All good: say it once, first. */}
-            {last.status !== 'FAILED' && differences.length === 0 && (
-              <p className="acct-ok-lead" role="status">
-                <CheckCircle2 size={18} aria-hidden="true" />
-                Everything matches {cfg.short}.
-              </p>
+            {/* The result, said once, first. */}
+            {last.status === 'FAILED' ? (
+              <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />The last check didn't finish.</p>
+            ) : differences.length === 0 ? (
+              <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}.</p>
+            ) : (
+              <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}.</p>
             )}
-            <div className="acct-tiles acct-tiles--recon">
-              <div><span>Last checked</span><strong className="acct-tiles__text">{formatDateTime(last.ran_at)}</strong></div>
-              {differences.length > 0 && <div><span>Differences</span><strong>{last.difference_count.toLocaleString('en-ZA')}</strong></div>}
+            <div className="acct-tiles">
               <div><span>Invoices checked</span><strong>{(last.checked.invoices ?? 0).toLocaleString('en-ZA')}</strong></div>
               <div><span>Customers checked</span><strong>{(last.checked.customers ?? 0).toLocaleString('en-ZA')}</strong></div>
-              {differences.length === 0 && <div><span>Months checked</span><strong>{(last.checked.months ?? 0).toLocaleString('en-ZA')}</strong></div>}
+              <div><span>Months checked</span><strong>{(last.checked.months ?? 0).toLocaleString('en-ZA')}</strong></div>
+              <div><span>Differences</span><strong>{last.difference_count.toLocaleString('en-ZA')}</strong></div>
             </div>
             {last.status === 'FAILED' && last.error && <p className="acct-error" role="status" style={{ marginTop: 12 }}>{last.error}</p>}
-            {last.status !== 'FAILED' && <p className="acct-section-desc" style={{ margin: '8px 0 0' }}>Next check tonight, around {nextCheck(last.ran_at)}.</p>}
+            <p className="acct-section-desc" style={{ margin: '12px 0 0' }}>
+              Last checked {formatDateTime(last.ran_at)}. Next check tonight, around {nextCheck(last.ran_at)}.
+            </p>
           </>
         )}
       </AcctCard>
 
-      {last && last.status !== 'FAILED' && differences.length > 0 && SCOPES.map(({ scope, title, first }) => {
+      {last && last.status !== 'FAILED' && differences.length > 0 && SCOPES.map(({ scope, title, first }, i) => {
         const rows = differences.filter(d => d.scope === scope);
         const checked = scope === 'INVOICE' ? last.checked.invoices : scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;
         if (!rows.length) {
           return (
-            <section key={scope} style={{ ...settingsCardStyle }} className="acct-match-line">
-              <CheckCircle2 size={16} aria-hidden="true" />
-              <span><strong>{title}</strong> {checked != null ? `All ${plural(checked, title.toLowerCase().replace(/s$/, ''))} match ${cfg.short}.` : `No differences.`}</span>
-            </section>
+            <AcctCard key={scope} title={title} description={checked != null ? `All ${plural(checked, title.toLowerCase().replace(/s$/, ''))} match ${cfg.short}.` : 'No differences.'} />
           );
         }
         const hasLinks = true; // same column template in every table, link or not
         return (
-          <AcctCard key={scope} title={title} description={plural(rows.length, 'difference')} flush>
+          <AcctCard key={scope} title={title} description={i === SCOPES.findIndex(x => differences.some(d => d.scope === x.scope)) ? `${plural(rows.length, 'difference')}. Difference is TruckWys minus ${cfg.short}.` : plural(rows.length, 'difference')} flush>
             <div className="acct-table-wrap acct-only-wide" role="region" aria-label={`${title} differences`} tabIndex={0}>
               <table className="acct-table acct-table--recon">
                 <colgroup>
-                  <col style={{ width: '34%' }} /><col style={{ width: '16%' }} /><col style={{ width: '16%' }} />
-                  <col style={{ width: '16%' }} /><col style={{ width: '18%' }} />{hasLinks && <col style={{ width: 44 }} />}
+                  <col style={{ width: '25%' }} /><col style={{ width: '17%' }} /><col style={{ width: '19%' }} />
+                  <col style={{ width: '19%' }} /><col style={{ width: '20%' }} />{hasLinks && <col style={{ width: 44 }} />}
                 </colgroup>
                 <thead>
                   <tr>
@@ -169,7 +161,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
 }
 
 /** Money differences as rand; a status mismatch has no amount. */
-const diffText = (d: ReconDifference) => (isMoney(d.difference) && d.difference !== '' ? formatCurrency(d.difference) : 'Status');
+const diffText = (d: ReconDifference) => (isMoney(d.difference) && d.difference !== '' ? formatCurrency(d.difference) : 'Mismatch');
 
 /** The hour of the last run, as "03:00". */
 function nextCheck(iso: string): string {

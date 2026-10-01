@@ -79,10 +79,7 @@ export function AccountingProviderCards({ hideManage = false }: { hideManage?: b
         />
       ))}
       {soon.length > 0 && (
-        <div className="acct-soon">
-          <span className="acct-soon__logos" aria-hidden="true">{soon.map(p => <ProviderLogo key={p.provider} provider={p.provider} size="sm" />)}</span>
-          <span><strong>Coming soon:</strong> {soon.map(p => providerConfig(p.provider).name).join(' and ')}.</span>
-        </div>
+        <p className="acct-soon">{soon.map(p => providerConfig(p.provider).name).join(' and ')} coming soon.</p>
       )}
     </div>
   );
@@ -106,21 +103,20 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
   // Same layout as the other integration cards on this page (Cartrack,
   // CtrlFleet): logo, name and one grey line, status on the right, the
   // action underneath.
-  let desc: React.ReactNode = cfg.blurb;
+  let desc: React.ReactNode = 'Invoices, credit notes and supplier bills';
   let note: React.ReactNode = null;
   let actions: React.ReactNode = null;
   const btn = 'tw-btn acct-card__btn';
 
   if (loading) {
     // Room for the usual connected state: org line, note line and chip.
-    desc = <span aria-hidden="true" style={{ display: 'block' }}><span className="acct-skel-line" style={{ height: 20 }}><span className="ops-skel" style={{ width: 200 }} /></span><span className="acct-skel-line" style={{ height: 20 }}><span className="ops-skel" style={{ width: 260, maxWidth: '100%' }} /></span></span>;
+    desc = <span aria-hidden="true" style={{ display: 'block' }}><span className="acct-skel-line" style={{ height: 20 }}><span className="ops-skel" style={{ width: 200 }} /></span></span>;
     actions = <span className={btn} style={{ visibility: 'hidden', width: 120 }} aria-hidden="true" />;
   } else if (mine) {
     desc = mine.status === 'PENDING_ORG'
       ? `Signed in to ${cfg.short}; no organisation chosen yet.`
       : mine.tenant_name || `${cfg.short} organisation`;
     if (mine.status === 'NEEDS_REAUTH') note = <span className="acct-card__note acct-card__note--danger">{mine.status_reason || `Your ${cfg.short} sign-in has expired.`} Nothing is sent until an admin reconnects.</span>;
-    else if (mine.status === 'ACTIVE' && !mine.readiness.sync_enabled) note = <span className="acct-card__note">Nothing is sent to {cfg.short} until setup is finished.</span>;
     const needsYou = mine.status === 'PENDING_ORG' || (mine.status === 'ACTIVE' && !mine.readiness.sync_enabled);
     actions = (
       <>
@@ -155,12 +151,15 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
       <div className="acct-card__top">
         <ProviderLogo provider={info.provider} />
         <div className="acct-card__text">
-          <h3 className="acct-card__title">{cfg.name}</h3>
+          {/* The status always sits on the title row, at every width. */}
+          <div className="acct-card__titlerow">
+            <h3 className="acct-card__title" style={{ margin: 0 }}>{cfg.name}</h3>
+            {loading
+              ? <span className="tw-status" style={{ visibility: 'hidden' }} aria-hidden="true">Setup needed</span>
+              : chip ? <StatusChip tone={chip.tone} label={chip.label} /> : <StatusChip status="DISCONNECTED" />}
+          </div>
           <p className="acct-card__desc">{desc}{note}</p>
         </div>
-        {loading
-          ? <div className="acct-card__chip" aria-hidden="true"><span className="tw-status" style={{ visibility: 'hidden' }}>Setup needed</span></div>
-          : chip && <div className="acct-card__chip"><StatusChip tone={chip.tone} label={chip.label} /></div>}
       </div>
       {actions && <div className="acct-card__actions">{actions}</div>}
     </div>

@@ -14,7 +14,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const items: { key: string; look: StepLook; title: string; desc: string; tab?: AccountingTab; action?: string }[] = [
     {
       key: 'connect',
-      look: connection.status === 'ACTIVE' ? 'done' : 'bad',
+      look: connection.status === 'ACTIVE' ? 'done' : 'warn',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status === 'ACTIVE'
         ? `Linked to ${connection.tenant_name}.`
@@ -93,7 +93,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
               <StepMarker look={it.look} n={i + 1} auto={auto} />
               <div style={{ minWidth: 0 }}>
                 <div className="acct-check__title"><span className="acct-sr">Step {i + 1}: </span>{it.title}</div>
-                <div className="acct-check__desc">{it.key === 'connect' && blocked ? `Use Reconnect ${cfg.short} above.` : it.desc}</div>
+                <div className="acct-check__desc">{it.key === 'connect' && blocked ? 'Sign-in expired. Reconnect to continue.' : it.desc}</div>
               </div>
               {it.tab && it.action && !(blocked && it.look !== 'done') ? (
                 <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>
@@ -113,6 +113,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
 /** One 20px marker for every state, so the list reads as one component. */
 function StepMarker({ look, n, auto }: { look: StepLook; n: number; auto: boolean }) {
   if (look === 'done') return <span className="acct-step-num is-done" aria-hidden="true"><Check size={12} strokeWidth={2.5} /></span>;
+  if (look === 'warn') return <span className="acct-step-num is-warn" aria-hidden="true">!</span>;
   if (look === 'bad') return <span className="acct-step-num is-bad" aria-hidden="true"><X size={12} strokeWidth={2.5} /></span>;
   if (look === 'busy') return <span className="acct-step-num is-busy" aria-hidden="true"><Loader2 size={12} className="animate-spin" /></span>;
   return <span className={`acct-step-num${auto ? ' is-auto' : ''}`} aria-hidden="true">{n}</span>;

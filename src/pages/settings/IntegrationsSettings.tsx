@@ -371,7 +371,7 @@ export function IntegrationsSettings() {
 
       {/* Accounting: Xero, QuickBooks Online, Sage (one connected at a time). */}
       <h2 className="acct-section-title">Accounting</h2>
-      <p className="acct-section-desc">Send invoices, credit notes and supplier bills to your books; payments come back on their own.</p>
+      <p className="acct-section-desc">Send invoices, credit notes and supplier bills to your books. Payments you record there update TruckWys.</p>
       <AccountingProviderCards />
 
       <h2 className="acct-section-title">Fleet tracking</h2>

@@ -141,7 +141,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
               </>
             )}
             <p className="acct-section-desc" style={{ margin: '6px 0 0' }}>
-              {locked ? "Locked once the first send has started." : 'Usually the first day of a month or VAT period still open in your books.'}
+              {locked ? 'Locked because sending has started.' : 'Usually the first day of a month or VAT period still open in your books.'}
               {!locked && !date && (
                 <> <button type="button" className="acct-linkbtn" onClick={() => setDate(firstOfMonth())}>Use {formatDate(firstOfMonth())}</button></>
               )}
@@ -192,7 +192,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
         <AcctCard
           title="Progress"
           description={running
-            ? `${startedTime ? `Started ${startedTime}` : 'Started'} · updated ${updatedTime}. You can leave this page; sending carries on.`
+            ? `${startedAt && startedTime ? `Started ${formatDate(b.started_at)}, ${startedTime}` : 'Started'}. Updated ${updatedTime}. You can leave this page; sending carries on.`
             : done
               ? `Finished ${b.finished_at ? formatDateTime(b.finished_at) : ''}.`
               : b.state === 'FAILED' ? 'Stopped. Fix what the failed step says, then try again.' : undefined}
@@ -208,7 +208,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
           </div>
           <ol className="acct-steps">
             {b.steps.map(x => (
-              <li key={x.key}>
+              <li key={x.key} className={x.state === 'RUNNING' ? 'is-running' : undefined}>
                 <StepIcon look={STEP_LOOK[x.state] ?? 'todo'} />
                 <div style={{ minWidth: 0 }}>
                   <div className="acct-check__title">{STEP_LABEL[x.key]?.(cfg.short) ?? x.label}</div>

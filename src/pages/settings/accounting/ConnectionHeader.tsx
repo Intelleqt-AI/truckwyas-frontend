@@ -71,6 +71,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
   };
 
   const menu: RowActionItem[] = [];
+  // Phones hide the "Open in" button; the menu always offers it.
   if (connection.web_url) menu.push({ label: `Open in ${cfg.short}`, onSelect: () => window.open(connection.web_url!, '_blank', 'noopener,noreferrer') });
   if (canWrite) menu.push({ label: dis.busy ? 'Disconnecting…' : `Disconnect ${cfg.short}`, onSelect: dis.ask, disabled: dis.busy, danger: true });
 
@@ -88,7 +89,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
           </p>
         </div>
         <div className="acct-head__actions">
-          {!reauth && connection.web_url ? (
+          {connection.web_url ? (
             <a href={connection.web_url} target="_blank" rel="noopener noreferrer" className="tw-btn acct-hide-phone">
               Open in {cfg.short}
               <ExternalLink size={14} aria-hidden="true" />
@@ -202,11 +203,9 @@ export function OrgPicker({ connection }: { connection: Connection }) {
   return (
     <>
       {dis.modal}
-      <h2 id="acct-org-title" className="acct-section-title">Choose your {cfg.short} organisation</h2>
-      <p className="acct-section-desc">
-        Signed in to {cfg.short}. Pick the organisation that holds this company's books; only organisations that keep their books in rand (ZAR) can be linked.
-      </p>
-      <section style={settingsCardStyle} aria-labelledby="acct-org-title">
+      <h2 id="acct-org-title" className="acct-section-title acct-title-logo"><ProviderLogo provider={connection.provider} size="sm" />Choose your {cfg.short} organisation</h2>
+      <p className="acct-section-desc">Pick the {cfg.short} organisation that holds this company's books.</p>
+      <section style={settingsCardStyle} className="acct-org-card" aria-labelledby="acct-org-title">
         {tenants.length === 0 ? (
           <div className="acct-empty">No organisations came back from {cfg.short}. Use a different login and try again.</div>
         ) : (

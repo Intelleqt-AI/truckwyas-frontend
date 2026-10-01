@@ -71,6 +71,8 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
   };
 
   const menu: RowActionItem[] = [];
+  // Phones show no "Open in" button in the header; the menu always has it.
+  if (connection.web_url) menu.push({ label: `Open in ${cfg.short}`, onSelect: () => window.open(connection.web_url!, '_blank', 'noopener,noreferrer') });
   if (canWrite) menu.push({ label: dis.busy ? 'Disconnecting…' : `Disconnect ${cfg.short}`, onSelect: dis.ask, disabled: dis.busy, danger: true });
 
   return (
@@ -220,7 +222,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
               <span className="acct-row__title" style={{ display: 'block' }}>{single.name}</span>
               <span className="acct-row__sub">Books in {single.currency || 'ZAR'}</span>
             </span>
-            <StatusChip tone="success" label="Will be linked" size="sm" />
+            <span className="acct-org__radio"><input type="radio" className="acct-radio" checked readOnly aria-label={`${single.name} selected`} /></span>
           </div>
         ) : (
           <div role="radiogroup" aria-labelledby="acct-org-title">
@@ -246,9 +248,9 @@ export function OrgPicker({ connection }: { connection: Connection }) {
             <span className="acct-org__mark"><ProviderLogo provider={connection.provider} /></span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
-              <span className="acct-row__sub">Books in {t.currency}</span>
+              <span className="acct-row__sub">Books in {t.currency} · only ZAR books can be linked</span>
             </span>
-            <StatusChip tone="neutral" label="Can't be linked: ZAR only" size="sm" />
+            <StatusChip tone="neutral" label="Not supported" size="sm" />
           </div>
         ))}
         <div className="acct-formfoot">

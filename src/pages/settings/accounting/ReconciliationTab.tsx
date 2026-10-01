@@ -113,7 +113,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
         void i;
         const hasLinks = true; // same column template in every table, link or not
         return (
-          <AcctCard key={scope} title={title} description={plural(rows.length, 'difference')} flush>
+          <AcctCard key={scope} title={<>{title}<span className="acct-optional"> · {plural(rows.length, 'difference')}</span></>} flush>
             <div className="acct-table-wrap acct-only-wide" role="region" aria-label={`${title} differences`} tabIndex={0}>
               <table className="acct-table acct-table--recon">
                 <colgroup>
@@ -189,7 +189,7 @@ function DiffRow({ d, providerName, hasLinks }: { d: ReconDifference; providerNa
       <td>{FIELD_LABEL[d.field] ?? humanise(d.field)}</td>
       <td className="num">{showValue(d.truckwys)}</td>
       <td className="num">{showValue(d.provider)}</td>
-      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : '—'}</td>
+      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : 'Status differs'}</td>
       {hasLinks && (
         <td>
           {d.provider_url && (

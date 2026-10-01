@@ -121,9 +121,9 @@ export function ContactsTab({ connection }: { connection: Connection }) {
             <Select value={kind} onValueChange={v => setKind(v as KindFilter)}>
               <SelectTrigger aria-label="Show customers, suppliers or both" style={{ minHeight: 36, height: 36, fontSize: 13 }} className="acct-select"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">All contacts</SelectItem>
-                <SelectItem value="CUSTOMER">Customers</SelectItem>
-                <SelectItem value="SUPPLIER">Suppliers</SelectItem>
+                <SelectItem value="ALL">Type: all</SelectItem>
+                <SelectItem value="CUSTOMER">Type: customers</SelectItem>
+                <SelectItem value="SUPPLIER">Type: suppliers</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -184,7 +184,7 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   if (row.status === 'MATCHED' || row.status === 'SUGGESTED') {
     match = (
       <>
-        <div className="acct-row__sub acct-row__match">{providerName} contact “{suggestedName ?? '—'}”</div>
+        <div className="acct-row__sub acct-row__match">{providerName} contact: {suggestedName ?? '—'}</div>
         <div className="acct-row__sub">{row.method ? `Matched on ${MATCH_METHOD_LABEL[row.method] ?? row.method}` : `In ${providerName}`}</div>
       </>
     );

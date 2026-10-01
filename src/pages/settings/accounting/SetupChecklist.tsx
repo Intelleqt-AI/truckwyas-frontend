@@ -100,9 +100,10 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
                 <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>
                   {it.action}
                 </button>
-              ) : blocked && it.key === 'connect' ? <span className="acct-step-auto" style={{ color: 'var(--status-danger-text)' }}>Action needed</span>
+              ) : blocked && it.key === 'connect' ? <span className="acct-step-auto">Action needed</span>
                 : blocked && it.tab && it.look !== 'done' ? <span className="acct-step-auto">Paused</span>
-                : auto && it.look !== 'done' ? <span className="acct-step-auto">Automatic</span> : <span />}
+                : auto && it.look !== 'done' ? <span className="acct-step-auto">Automatic</span>
+                : it.look === 'done' ? <span className="acct-step-auto">Done</span> : <span />}
             </li>
           );
         })}

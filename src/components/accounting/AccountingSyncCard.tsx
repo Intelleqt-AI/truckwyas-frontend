@@ -35,7 +35,7 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         {(sync.status === 'ERROR' || sync.status === 'DEAD' || sync.status === 'BLOCKED') && (
           <div className="fin-dl__row">
             <dt>Latest change</dt>
-            <dd>Not sent yet</dd>
+            <dd>{sync.status === 'ERROR' ? 'Failed, retrying' : sync.status === 'BLOCKED' ? 'Waiting on a fix' : 'Failed'}</dd>
           </div>
         )}
         <div className="fin-dl__row">
@@ -44,7 +44,7 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         </div>
       </dl>
       {sync.url && (
-        <a href={sync.url} target="_blank" rel="noopener noreferrer" className="tw-btn tw-btn--sm" style={{ marginTop: 12, alignSelf: 'flex-start' }}>
+        <a href={sync.url} target="_blank" rel="noopener noreferrer" className="tw-btn" style={{ marginTop: 12, alignSelf: 'flex-start' }}>
           Open {what} in {name}
           <ExternalLink size={12} aria-hidden="true" />
         </a>
@@ -61,7 +61,7 @@ export function PaymentsManagedNote({ providerName, recordUrl }: { providerName:
   return (
     <div className="acct-managed">
       {recordUrl && (
-        <a href={recordUrl} target="_blank" rel="noopener noreferrer" className="tw-btn tw-btn--sm acct-record-btn">
+        <a href={recordUrl} target="_blank" rel="noopener noreferrer" className="tw-btn acct-record-btn">
           Record in {providerName}
           <ExternalLink size={14} aria-hidden="true" />
         </a>
@@ -80,7 +80,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
         <strong>{retrying ? `Last change didn't reach ${name}` : `This ${what} isn't up to date in ${name}`}</strong>
-        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? "We'll keep retrying; it goes through once that's fixed." : 'Fix it, then retry from the sync page.'}
+        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? "Retrying; it goes through once that's fixed." : 'Fix it, then retry from the sync page.'}
       </div>
       <Link to={`/settings/integrations/accounting?tab=${/account|tax|vat|tracking/i.test(sync.last_error) ? 'mapping' : 'sync'}`} className="tw-btn fl-notice__action">
         {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix in Accounts and VAT' : 'View sync issue'}
@@ -96,7 +96,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
  */
 export function PaymentSourceBadge({ source, managed = false }: { source?: string | null; managed?: boolean }) {
   const manual = !source || source === 'MANUAL';
-  if (managed) return <span className="acct-source-note">{manual ? 'Recorded in TruckWys' : `From ${source === 'BANK' ? 'bank feed' : providerConfig(source).short}`}</span>;
+  if (managed) return <span className="acct-source-note"> · {manual ? 'From TruckWys' : `From ${source === 'BANK' ? 'bank feed' : providerConfig(source).short}`}</span>;
   if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;
   return <span className="acct-source-badge">{label}</span>;

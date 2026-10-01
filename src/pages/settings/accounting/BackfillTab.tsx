@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { Lock } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DatePicker } from '@/components/ui/date-picker';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -111,7 +110,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
     if (x.state === 'RUNNING') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : `${x.count.toLocaleString('en-ZA')} so far`;
     if (x.state === 'DONE') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : 'Done';
     if (x.state === 'SKIPPED') return '';
-    return total ? `0 of ${total.toLocaleString('en-ZA')}` : 'After sending';
+    return total ? `0 of ${total.toLocaleString('en-ZA')}` : 'Waiting';
   };
   // The bar follows the documents (where the preview knows them), not the steps.
   const itemTotal = Object.values(totals).reduce<number>((n, v) => n + (v ?? 0), 0);
@@ -132,7 +131,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
           <div className="acct-cutover__date">
             {locked ? (
               <>
-                <div className="acct-big-date"><Lock size={16} aria-hidden="true" />{formatDate(b.cutover_date)}</div>
+                <div className="acct-big-date">{formatDate(b.cutover_date)}<StatusChip tone="neutral" label="Locked" size="sm" className="acct-lock-chip" /></div>
               </>
             ) : (
               <>
@@ -141,7 +140,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
               </>
             )}
             <p className="acct-section-desc" style={{ margin: '6px 0 0' }}>
-              {locked ? 'Locked because sending has started.' : 'Usually the first day of a month or VAT period still open in your books.'}
+              {locked ? 'It can’t change once sending has started.' : 'Usually the first day of a month or VAT period still open in your books.'}
               {!locked && !date && (
                 <> <button type="button" className="acct-linkbtn" onClick={() => setDate(firstOfMonth())}>Use {formatDate(firstOfMonth())}</button></>
               )}
@@ -149,11 +148,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
           </div>
         </div>
 
-        {locked && p ? (
-          <p className="acct-section-desc" style={{ margin: '12px 0 0' }}>
-            {(p.invoices + p.credit_notes + p.bills + p.historic_receipts).toLocaleString('en-ZA')} documents: {p.invoices} invoices, {p.credit_notes} credit notes, {p.bills} supplier bills and {p.historic_receipts} recorded payments.
-          </p>
-        ) : (
+        {locked ? null : (
           <>
             <div className="acct-field-label" style={{ marginTop: 20 }}>
               {previewDate ? `What will be sent, from ${formatDate(previewDate)}` : 'What will be sent'}

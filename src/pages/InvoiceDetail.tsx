@@ -943,14 +943,14 @@ export default function InvoiceDetail() {
                   <h2 id="payments-title" className="fin-panel-title">Payments</h2>
                   <p className="fin-panel-desc">
                     {managedHere
-                      ? `${formatCurrency(totalPaid)} received. Record new payments in ${acctName}; they appear here within a few minutes.`
+                      ? `Recorded in ${acctName}; they appear here within a few minutes.`
                       : `${payments.length} recorded, by payment date`}
                   </p>
                 </div>
                 {managedHere && canRecordInProvider && <PaymentsManagedNote providerName={acctName} recordUrl={recordInProviderUrl} />}
               </div>
 
-              <ul className="fin-paylist">
+              <ul className={`fin-paylist${managedHere ? ' acct-paylist-top' : ''}`}>
                 {payments.map((payment: any, idx: number) => {
                   const ref = payment.reference_number || payment.reference || payment.payment_number;
                   return (

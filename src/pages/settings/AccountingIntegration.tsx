@@ -145,9 +145,9 @@ export default function AccountingIntegration() {
     body = (
       <>
         <h2 className="acct-section-title">Connect your accounting system</h2>
-        <p className="acct-section-desc acct-desc-cap">Send invoices and bills to your books. One system per company.</p>
+        <p className="acct-section-desc acct-desc-cap">Send invoices and bills to your books. Payments come back automatically.</p>
         <AccountingProviderCards hideManage />
-        <p className="acct-section-desc acct-desc-cap" style={{ marginTop: -4, marginBottom: 24 }}><ComingSoonNote /></p>
+        <p className="acct-section-desc acct-desc-cap" style={{ marginTop: 0, marginBottom: 24 }}><ComingSoonNote /></p>
         <AcctCard title="After you connect" description="Takes about 10 minutes and needs a company admin." flush>
           <ol className="acct-check">
             {[

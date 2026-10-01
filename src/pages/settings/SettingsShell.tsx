@@ -30,6 +30,8 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
       { id: 'users', label: 'Users and permissions', adminOnly: true },
       { id: 'billing', label: 'Billing', adminOnly: true },
       { id: 'integrations', label: 'Integrations', adminOnly: true },
+      // Readable by finance roles; only admins can save (the API's can_edit).
+      { id: 'invoice-numbering', label: 'Invoice numbering' },
     ],
   },
   {

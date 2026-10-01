@@ -277,7 +277,13 @@ export function changeText(now: number, before: number, label: string, higherIsG
 export type ColType = 'text' | 'money' | 'int' | 'pct' | 'date' | 'km';
 export interface Col { label: string; type?: ColType; /** false: left out on phones (a secondary column). */ phone?: boolean }
 export type RowKind = 'section' | 'row' | 'subtotal' | 'total' | 'grand' | 'muted' | 'ratio';
-export interface SRow { key: string; kind?: RowKind; cells: CsvCell[]; href?: string; indent?: boolean; /** Overrides the column type for number cells (e.g. a margin row). */ fmt?: ColType }
+/** A modelled (not recorded) figure: drawn muted and italic with an "est." tag, and the title explains it. */
+export interface CellFlag { est?: boolean; title?: string }
+export interface SRow {
+  key: string; kind?: RowKind; cells: CsvCell[]; href?: string; indent?: boolean;
+  /** Overrides the column type for number cells (e.g. a margin row). */ fmt?: ColType;
+  /** Per-cell flags by column index (estimates). */ flags?: Record<number, CellFlag>;
+}
 export interface Statement { columns: Col[]; rows: SRow[] }
 
 /** Display density of a fitted statement: 0 full ("R 38 550,00"), 1 tighter
@@ -543,7 +549,8 @@ export function StatementTable({ table, caption, stickyFirst = true, footer, fit
                       const isZero = typeof v === 'number' && Math.abs(v) < 0.005 && type === 'money';
                       const content = cell(v, type, level);
                       const exact = level >= 2 && type === 'money' && typeof v === 'number' ? money(Math.abs(v) < 0.005 ? 0 : v) : undefined;
-                      const cls = [numeric ? 'is-num' : '', isZero ? 'is-zero' : '', typeof v === 'number' && v < -0.004 && type === 'money' ? 'is-neg' : '', i === 0 && r.indent ? 'is-indent' : '', columns[i]?.phone === false ? 'fr-col--wide' : ''].filter(Boolean).join(' ') || undefined;
+                      const flag = r.flags?.[i];
+                      const cls = [numeric ? 'is-num' : '', isZero ? 'is-zero' : '', flag?.est ? 'is-est' : '', typeof v === 'number' && v < -0.004 && type === 'money' ? 'is-neg' : '', i === 0 && r.indent ? 'is-indent' : '', columns[i]?.phone === false ? 'fr-col--wide' : ''].filter(Boolean).join(' ') || undefined;
                       if (i === 0) {
                         return (
                           <th key={i} scope="row" className={cls} title={!numeric && typeof content === 'string' ? content : undefined}>
@@ -551,7 +558,8 @@ export function StatementTable({ table, caption, stickyFirst = true, footer, fit
                           </th>
                         );
                       }
-                      return <td key={i} className={cls} title={exact ?? (!numeric && typeof content === 'string' && content.length > 24 ? content : undefined)}>{content}</td>;
+                      const tip = flag?.title ? `${exact ? `${exact}. ` : ''}${flag.title}` : exact ?? (!numeric && typeof content === 'string' && content.length > 24 ? content : undefined);
+                      return <td key={i} className={cls} title={tip}>{content}{flag?.est && v != null && v !== '' && <span className="fr-est" aria-label=", estimated">est.</span>}</td>;
                     })}
                   </tr>
                 );

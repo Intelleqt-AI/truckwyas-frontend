@@ -17,6 +17,13 @@ import { presentSignal, staleSignal, idleSignal, isInTransitSignal, isIdleVehicl
 import { isOpenLoad, staleWork } from "@/lib/staleWork";
 import { HOME_LIVE, useAllQuotes, useAllVehicles, useHomeLedger } from "@/components/overview/ledger";
 import { FitText } from "@/components/ui/FitText";
+import { Segmented } from "@/components/ui/Segmented";
+import { BASIS_LABEL, type RevenueBasis } from "@/components/reports/data";
+
+const BASIS_KEY = "tw-home-revenue-basis";
+function readBasis(): RevenueBasis {
+  try { return localStorage.getItem(BASIS_KEY) === "accrual" ? "accrual" : "cash"; } catch { return "cash"; }
+}
 
 // Fetches + derives all dashboard data. Lives in the queryFn so the result is
 // cached by TanStack Query (keyed below) and survives navigation — revisiting
@@ -226,7 +233,12 @@ export default function Overview() {
   const availableVehicles = data?.availableVehicles ?? 0;
   // Money, loads and quotes come from the full ledgers the Reports use, so
   // Home agrees with Cash, P&L and Debtors (see components/overview/ledger.ts).
-  const ledger = useHomeLedger();
+  // Revenue basis for the revenue and margin tiles and the chart: Cash
+  // (received, the P&L default) or Accrual (invoiced less credit notes).
+  const [basis, setBasisState] = useState<RevenueBasis>(readBasis);
+  const setBasis = (b: RevenueBasis) => { setBasisState(b); try { localStorage.setItem(BASIS_KEY, b); } catch { /* private mode */ } };
+  const basisWord = basis === "cash" ? "cash (received)" : "accrual (invoiced)";
+  const ledger = useHomeLedger(basis);
   const money = ledger.money;
   const moneyLoading = ledger.loading;
   const moneyFailed = ledger.error;
@@ -302,13 +314,9 @@ export default function Overview() {
   const outstanding = money?.owed ?? 0;
   const overdue = money?.pastDue ?? 0;
   const pastShare = outstanding > 0 ? Math.min(Math.max(overdue, 0), outstanding) / outstanding : 0;
-  const receivedChange = money && money.receivedPrior != null && money.receivedPrior > 0.005
-    ? ((money.received - money.receivedPrior) / money.receivedPrior) * 100 : null;
+  const revenueChange = money && money.revenuePrior != null && money.revenuePrior > 0.005
+    ? ((money.revenueExcl - money.revenuePrior) / money.revenuePrior) * 100 : null;
   const marginChange = money && money.margin != null && money.marginPrior != null ? money.margin - money.marginPrior : null;
-  // Net after pending costs: revenue excl. VAT less approved and pending costs (Margin tab "With pending costs").
-  const afterPending = money ? money.revenueExcl - money.costs - money.pending : 0;
-  const marginDeltaText = marginChange != null && money && money.pending > 0.005
-    ? `${marginChange >= 0 ? "Up" : "Down"} ${formatPercent(Math.abs(marginChange)).replace("%", "")} pts vs the prior 12 months` : "";
 
   // Active loads and the 28-day bars use every load (all pages), not page 1.
   // R7: "active" means open AND current. Open loads past their delivery date
@@ -418,23 +426,28 @@ export default function Overview() {
           </div>
         </section>
 
-        <section className="td-kpi" aria-label="Revenue received, last 12 months">
+        <section className="td-kpi" aria-label={`Revenue excl. VAT, ${basisWord}, last 12 months`}>
           <div className="td-kpi__head">
             <h2 className="td-kpi__label">
-              <span>Revenue<span className="td-hide-sm"> received</span>, 12 months</span>
-              <InfoTip>Money received from customers in the last 12 months, incl. VAT, by payment date: the Cash report&rsquo;s money in for the same period.</InfoTip>
+              <span>Revenue<span className="td-hide-sm"> excl. VAT</span>, 12 months</span>
+              <InfoTip>
+                {basis === "cash"
+                  ? "Money received from customers in the last 12 months, by payment date, less the VAT share of each invoice: the Profit and loss revenue on the cash basis."
+                  : "Invoices issued in the last 12 months (not drafts or void), by issue date, excl. VAT, less credit notes: the Profit and loss revenue on the accrual basis."}
+                {money ? ` Received incl. VAT in the same period: ${wholeRand(money.received)}.` : ""} Switch the basis on the Revenue vs costs card.
+              </InfoTip>
             </h2>
           </div>
           <div className="td-kpi__body">
-            <FitText as="div" className="td-kpi__value" title={money ? formatMoney(money.received) : undefined}>
-              {moneyLoading ? skeleton : money ? wholeRand(money.received) : "—"}
+            <FitText as="div" className="td-kpi__value" title={money ? formatMoney(money.revenueExcl) : undefined}>
+              {moneyLoading ? skeleton : money ? wholeRand(money.revenueExcl) : "—"}
             </FitText>
           </div>
           <div className="td-kpi__meta">
             {money ? (
-              receivedChange != null
-                ? <><span>Incl. VAT · </span><Delta value={Math.round(receivedChange * 10) / 10} unit="%" period="vs prior 12 months" /></>
-                : <span>Paid, incl. VAT</span>
+              revenueChange != null
+                ? <><span>{basis === "cash" ? "Cash" : "Accrual"} · </span><Delta value={Math.round(revenueChange * 10) / 10} unit="%" period="vs prior 12 months" /></>
+                : <span>Excl. VAT, {basisWord}</span>
             ) : unavailable ? <span>Unavailable</span> : null}
           </div>
         </section>
@@ -443,29 +456,21 @@ export default function Overview() {
           <div className="td-kpi__head">
             <h2 className="td-kpi__label">
               <span><span className="td-hide-sm">Net margin</span><span className="td-show-sm">Margin</span>, 12 months</span>
-              <InfoTip>Revenue received excl. VAT, minus approved expenses, as a share of that revenue. The same figure as the Profit and loss report, cash basis, last 12 months. Pending expenses are not deducted{money && money.pending > 0.005 ? `: ${money.pendingCount} (${wholeRand(money.pending)}) are waiting for approval, and approving them leaves ${wholeRand(afterPending)}` : ""}.{marginDeltaText ? ` ${marginDeltaText}.` : ""}</InfoTip>
+              <InfoTip>Revenue excl. VAT ({basisWord}), minus every expense that is not rejected (approved or awaiting approval), excl. VAT, as a share of that revenue. The same figure as the Profit and loss report on the {basis === "cash" ? "cash" : "accrual"} basis, last 12 months.{money && money.pending > 0.005 ? ` Costs include ${wholeRand(money.pending)} awaiting approval (${money.pendingCount}).` : ""}</InfoTip>
             </h2>
           </div>
           <div className="td-kpi__body">
             <FitText as="div" className="td-kpi__value">
               {moneyLoading ? skeleton : money && money.margin != null ? formatPercent(money.margin) : "—"}
             </FitText>
-            {/* The figure it becomes, read with the note under it: "−R 60 698 · if the R 87 129 pending is approved". */}
-            {money && money.margin != null && money.pending > 0.005 && (
-              <span className={`td-kpi__alt td-hide-sm${afterPending < 0 ? " is-loss" : ""}`}>{wholeRand(afterPending)}</span>
-            )}
           </div>
           <div className="td-kpi__meta">
             {money ? (
               money.margin == null ? <span>No revenue yet</span>
-                // R6: pending costs change the answer, so the tile says what it becomes (the Margin tab's rule).
-                : money.pending > 0.005 ? (
-                  <span className="td-kpi__if">
-                    <span className={`td-show-sm${afterPending < 0 ? " is-loss" : ""}`}>{wholeRand(afterPending)} </span>if <span className="td-hide-sm">the </span>{wholeRand(money.pending)} pending is approved
-                  </span>
-                )
+                // Pending costs are already deducted; the note says how much of the costs that is.
+                : money.pending > 0.005 ? <span>Includes {wholeRand(money.pending)} awaiting approval</span>
                 : marginChange != null ? <Delta value={Math.round(marginChange * 10) / 10} unit="pts" period="vs prior 12 months" />
-                  : <span>Excl. VAT, cash basis</span>
+                  : <span>Excl. VAT, {basisWord}</span>
             ) : unavailable ? <span>Unavailable</span> : null}
           </div>
         </section>
@@ -504,17 +509,31 @@ export default function Overview() {
               <h2 id="td-chart-title" className="tw-card__title">
                 Revenue vs costs
                 <InfoTip>
-                  Revenue: money received in the month, excl. VAT (cash basis, as in the Profit and loss report). Costs: approved expenses dated in the month.
+                  {basis === "cash"
+                    ? "Revenue: money received in the month, excl. VAT (cash basis, as in the Profit and loss report)."
+                    : "Revenue: invoices issued in the month, excl. VAT, less credit notes (accrual basis, as in the Profit and loss report)."} Costs: expenses dated in the month that are not rejected (approved or awaiting approval), excl. VAT.
                   {money?.trimmed ? ` ${money.trimmed}` : ""}
                 </InfoTip>
               </h2>
               <p className="tw-card__sub">
-                {trend.length ? `Excl. VAT, cash basis, ${spanText}` : "Excl. VAT, cash basis"}
+                {trend.length ? `Excl. VAT, ${basisWord}, ${spanText}` : `Excl. VAT, ${basisWord}`}
               </p>
             </div>
-            <div className="td-legend" aria-hidden="true">
-              <span><i className="td-legend__rev" />Revenue</span>
-              <span><i className="td-legend__cost" />Costs</span>
+            <div className="td-chart-tools">
+              <Segmented<RevenueBasis>
+                size="sm"
+                label="Revenue basis"
+                value={basis}
+                onChange={setBasis}
+                options={[
+                  { value: "cash", label: "Cash", ariaLabel: BASIS_LABEL.cash },
+                  { value: "accrual", label: "Accrual", ariaLabel: BASIS_LABEL.accrual },
+                ]}
+              />
+              <div className="td-legend" aria-hidden="true">
+                <span><i className="td-legend__rev" />Revenue</span>
+                <span><i className="td-legend__cost" />Costs</span>
+              </div>
             </div>
           </div>
           {moneyLoading ? (

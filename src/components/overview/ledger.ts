@@ -3,8 +3,8 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import { fetchAllPages } from '@/components/insights/findings';
 import { isLiveConnected } from '@/lib/liveData';
 import {
-  inPeriod, isApproved, isOpen, isPending, monthsIn, num, priorPeriod, resolvePeriod, shownMonths, todayISO, trimNote,
-  vatShare, ymOf, type Ledger, type Period,
+  expenseNet, inPeriod, isOpen, isPending, isRejected, monthsIn, num, priorPeriod, resolvePeriod, revenueByMonth, shownMonths, todayISO, trimNote,
+  ymOf, type Ledger, type Period, type RevenueBasis,
 } from '@/components/reports/data';
 
 /**
@@ -16,13 +16,18 @@ import {
  * so its "revenue" disagrees with the Cash and P&L reports.
  *
  *   received      = Cash report "Money in" for the last 12 months (incl. VAT)
- *   revenueExcl   = P&L revenue, cash basis, excl. VAT (same period)
- *   margin        = P&L net margin, cash basis: (revenueExcl - approved costs) / revenueExcl
+ *   revenueExcl   = P&L revenue excl. VAT on the chosen basis (same period):
+ *                   accrual = issued invoices less credit notes; cash = received
+ *   margin        = P&L net margin on that basis: (revenueExcl - approved costs) / revenueExcl
+ *   costs         = every expense not rejected (approved and pending), net of input VAT;
+ *                   `pending` is the part of it still awaiting approval (information only)
  *   owed, pastDue = Debtors report "Owed to you now" (open balances), past due by due date
  *   months        = P&L monthly revenue (excl. VAT, cash) and approved costs
  */
 export interface HomeMoney {
   period: Period;
+  basis: RevenueBasis;
+  revenuePrior: number | null;
   received: number;
   receivedPrior: number | null;
   receipts: number;
@@ -30,7 +35,7 @@ export interface HomeMoney {
   costs: number;
   margin: number | null;
   marginPrior: number | null;
-  /** Expenses still pending in the period (not deducted), as on the Margin tab. */
+  /** The part of `costs` still awaiting approval (already deducted). */
   pending: number;
   pendingCount: number;
   owed: number;
@@ -41,26 +46,16 @@ export interface HomeMoney {
   partial: string[];
 }
 
-function revenueOf(d: Ledger, r: { from: string; to: string }) {
-  const invById = new Map(d.invoices.map((i) => [i.id, i]));
+function receivedOf(d: Ledger, r: { from: string; to: string }) {
   const paid = d.payments.filter((p) => inPeriod(p.payment_date, r));
-  let incl = 0; let excl = 0;
-  const byMonth = new Map<string, number>();
-  paid.forEach((p) => {
-    const amt = num(p.amount);
-    const ex = amt * (1 - vatShare(p.invoice != null ? invById.get(p.invoice) : undefined));
-    incl += amt; excl += ex;
-    const m = ymOf(p.payment_date);
-    byMonth.set(m, (byMonth.get(m) || 0) + ex);
-  });
-  return { incl, excl, count: paid.length, byMonth };
+  return { incl: paid.reduce((s2, p) => s2 + num(p.amount), 0), count: paid.length };
 }
 
 function costsOf(d: Ledger, r: { from: string; to: string }) {
   const byMonth = new Map<string, number>();
   let total = 0;
-  d.expenses.filter((e) => isApproved(e) && inPeriod(e.expense_date, r)).forEach((e) => {
-    const a = num(e.amount);
+  d.expenses.filter((e) => !isRejected(e) && inPeriod(e.expense_date, r)).forEach((e) => {
+    const a = expenseNet(e);
     total += a;
     const m = ymOf(e.expense_date);
     byMonth.set(m, (byMonth.get(m) || 0) + a);
@@ -68,18 +63,20 @@ function costsOf(d: Ledger, r: { from: string; to: string }) {
   return { total, byMonth };
 }
 
-export function computeHomeMoney(d: Ledger): HomeMoney {
+export function computeHomeMoney(d: Ledger, basis: RevenueBasis = 'cash'): HomeMoney {
   const period = resolvePeriod('last-12');
   const prior = priorPeriod(period);
-  const now = revenueOf(d, period);
-  const before = revenueOf(d, prior);
+  const now = revenueByMonth(d, basis, period);
+  const before = revenueByMonth(d, basis, prior);
+  const got = receivedOf(d, period);
+  const gotBefore = receivedOf(d, prior);
   const c = costsOf(d, period);
   const cPrior = costsOf(d, prior);
   const margin = now.excl > 0.005 ? ((now.excl - c.total) / now.excl) * 100 : null;
   const marginPrior = before.excl > 0.005 ? ((before.excl - cPrior.total) / before.excl) * 100 : null;
 
   let pending = 0; let pendingCount = 0;
-  d.expenses.filter((e) => isPending(e) && inPeriod(e.expense_date, period)).forEach((e) => { pending += num(e.amount); pendingCount += 1; });
+  d.expenses.filter((e) => isPending(e) && inPeriod(e.expense_date, period)).forEach((e) => { pending += expenseNet(e); pendingCount += 1; });
 
   const today = todayISO();
   const open = d.invoices.filter(isOpen);
@@ -90,10 +87,12 @@ export function computeHomeMoney(d: Ledger): HomeMoney {
   const shown = shownMonths(all, (m) => now.byMonth.has(m) || c.byMonth.has(m));
   return {
     period,
-    received: now.incl,
-    receivedPrior: before.count > 0 ? before.incl : null,
-    receipts: now.count,
+    basis,
+    received: got.incl,
+    receivedPrior: gotBefore.count > 0 ? gotBefore.incl : null,
+    receipts: got.count,
     revenueExcl: now.excl,
+    revenuePrior: before.entries.length > 0 ? before.excl : null,
     costs: c.total,
     margin,
     marginPrior,
@@ -115,6 +114,7 @@ const HOME_SOURCES = [
   ['payments', 'api/v1/payments/'],
   ['expenses', 'api/v1/expenses/'],
   ['loads', 'api/v1/loads/'],
+  ['creditNotes', 'api/v1/credit-notes/'],
 ] as const;
 
 /** Home is kept current by live updates over the WebSocket (lib/liveData:
@@ -134,11 +134,15 @@ export const HOME_LIVE = {
  * page's other requests land) keeps the skeleton; only a final failure is an
  * error, so Home does not flash "couldn't load" on a transient throttle.
  */
-export function useHomeLedger() {
+export function useHomeLedger(basis: RevenueBasis = 'cash') {
   const qs = useQueries({
     queries: HOME_SOURCES.map(([name, path]) => ({
       queryKey: ['insights-source', name],
-      queryFn: () => fetchAllPages<any>(path),
+      // Credit notes only refine accrual revenue: if they fail to load, Home
+      // still shows its figures (and says the list is partial).
+      queryFn: name === 'creditNotes'
+        ? () => fetchAllPages<Record<string, unknown>>(path).catch(() => ({ rows: [] as Record<string, unknown>[], count: 0, complete: false }))
+        : () => fetchAllPages<any>(path),
       staleTime: STALE,
       ...RETRY,
       ...HOME_LIVE,
@@ -155,18 +159,20 @@ export function useHomeLedger() {
   const fetching = qs.some((q) => q.isFetching);
   const data: Ledger | null = useMemo(() => {
     if (qs.some((q) => !q.data)) return null;
-    const [inv, pay, exp, lds] = qs.map((q) => q.data!);
+    const [inv, pay, exp, lds, cns] = qs.map((q) => q.data!);
     const partial = HOME_SOURCES
       .map(([name], i) => ({ name, d: qs[i].data! }))
       .filter((x) => !x.d.complete)
-      .map((x) => `first ${x.d.rows.length} of ${x.d.count} ${x.name}`);
+      .map((x) => (x.name === 'creditNotes' && x.d.count === 0
+        ? 'invoices without credit notes (credit notes couldn’t load)'
+        : `first ${x.d.rows.length} of ${x.d.count} ${x.name === 'creditNotes' ? 'credit notes' : x.name}`));
     return {
-      invoices: inv.rows, payments: pay.rows, expenses: exp.rows, loads: lds.rows, customers: [], vehicles: [],
+      invoices: inv.rows, payments: pay.rows, expenses: exp.rows, loads: lds.rows, customers: [], vehicles: [], creditNotes: cns.rows,
       partial, loadedAt: dataUpdatedAt,
     } as Ledger;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataUpdatedAt, qs.every((q) => !!q.data)]);
-  const money = useMemo(() => (data ? computeHomeMoney(data) : null), [data]);
+  const money = useMemo(() => (data ? computeHomeMoney(data, basis) : null), [data, basis]);
   return { loading, error, retry, data, money, oldestUpdatedAt, refreshFailed, fetching };
 }
 

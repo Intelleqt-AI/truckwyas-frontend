@@ -25,6 +25,12 @@ export interface Payment {
 export interface Expense {
   id: number; expense_number?: string; category: string; description?: string; amount: string | number;
   expense_date: string; status: string; vehicle: number | null; vendor?: string; created_at: string;
+  /** Input VAT inside `amount` (gross); absent on old records (then 0). */
+  vat_amount?: string | number | null; supplier_name?: string | null; tax_code?: string;
+}
+export interface CreditNoteRec {
+  id: number; credit_note_number: string; invoice: number; invoice_number: string; customer: number | null; customer_name: string;
+  issue_date: string; status: string; subtotal: string | number; vat_amount: string | number; total_amount: string | number;
 }
 export interface Load {
   id: number; load_number: string; customer: number | null; customer_name: string; status: string;
@@ -46,17 +52,21 @@ function useList<T>(name: string, path: string, enabled = true) {
   });
 }
 
-export type SourceName = 'invoices' | 'payments' | 'expenses' | 'loads' | 'customers' | 'vehicles';
+export type SourceName = 'invoices' | 'payments' | 'expenses' | 'loads' | 'customers' | 'vehicles' | 'creditNotes';
 const PATHS: Record<SourceName, string> = {
   invoices: 'api/v1/invoices/', payments: 'api/v1/payments/', expenses: 'api/v1/expenses/',
   loads: 'api/v1/loads/', customers: 'api/v1/customers/', vehicles: 'api/v1/vehicles/',
+  creditNotes: 'api/v1/credit-notes/',
 };
 const NOUN: Record<SourceName, string> = {
   invoices: 'invoices', payments: 'payments', expenses: 'expenses', loads: 'loads', customers: 'customers', vehicles: 'vehicles',
+  creditNotes: 'credit notes',
 };
 
 export interface Ledger {
   invoices: Invoice[]; payments: Payment[]; expenses: Expense[]; loads: Load[]; customers: Customer[]; vehicles: Vehicle[];
+  /** Every credit note (issued and void); revenue nets the ISSUED ones. */
+  creditNotes: CreditNoteRec[];
   /** "first 40 of 52 invoices" style notes when a list could not be loaded in full. */
   partial: string[];
   loadedAt: number;
@@ -72,6 +82,7 @@ export function useLedger(need: SourceName[]) {
     loads: useList<Load>('loads', PATHS.loads, need.includes('loads')),
     customers: useList<Customer>('customers', PATHS.customers, need.includes('customers')),
     vehicles: useList<Vehicle>('vehicles', PATHS.vehicles, need.includes('vehicles')),
+    creditNotes: useList<CreditNoteRec>('creditNotes', PATHS.creditNotes, need.includes('creditNotes')),
   };
   const used = need.map(n => q[n]);
   // Failing (even while still retrying) with nothing to show counts as an error,
@@ -87,6 +98,7 @@ export function useLedger(need: SourceName[]) {
   const data: Ledger = {
     invoices: rows<Invoice>('invoices'), payments: rows<Payment>('payments'), expenses: rows<Expense>('expenses'),
     loads: rows<Load>('loads'), customers: rows<Customer>('customers'), vehicles: rows<Vehicle>('vehicles'),
+    creditNotes: rows<CreditNoteRec>('creditNotes'),
     partial,
     loadedAt: Math.max(...used.map(x => x.dataUpdatedAt || 0)),
   };
@@ -285,13 +297,105 @@ export const vatShare = (i?: Invoice) => {
   return t > 0 ? num(i.vat_amount) / t : 0;
 };
 
+// ------------------------------------------------- revenue (one definition)
+//
+// Mirrors the backend's accounting_reports (docs/foundation/REPORTS.md), so
+// every page and report says the same revenue:
+//   accrual: issued invoices (not draft, not void) by issue date, total − VAT,
+//            minus ISSUED credit-note subtotals on the credit note's own date;
+//   cash:    each payment's ex-VAT share of its invoice, by payment date;
+//            the part of a payment above the invoice total is not revenue.
+// Expenses: net of their input VAT (amount − vat_amount).
+
+export type RevenueBasis = 'accrual' | 'cash';
+export const BASIS_LABEL: Record<RevenueBasis, string> = { accrual: 'Accrual (invoiced)', cash: 'Cash (received)' };
+/** "excl. VAT, accrual (invoiced)" for sub-lines and CSV headers. */
+export const basisText = (b: RevenueBasis) => `excl. VAT, ${b === 'accrual' ? 'accrual (invoiced)' : 'cash (received)'}`;
+/** Read a basis from a URL value; older links used "invoice" and "payments". */
+export const parseBasis = (v: string | null | undefined, fallback: RevenueBasis): RevenueBasis =>
+  v === 'accrual' || v === 'invoice' ? 'accrual' : v === 'cash' || v === 'payments' ? 'cash' : fallback;
+
+export const isCreditIssued = (c: Pick<CreditNoteRec, 'status'>) => st(c.status) === 'ISSUED';
+
+export interface RevenueEntry {
+  kind: 'invoice' | 'credit' | 'payment';
+  date: string; ref: string; customer: number | null; party: string;
+  /** Signed: credit notes are negative. */
+  excl: number; vat: number; incl: number;
+  /** Cash basis: the part of the payment above what the invoice was worth (not revenue). */
+  over?: number;
+}
+
+/** Revenue entries in a range, on one basis. Sum `excl` for revenue excl. VAT. */
+type RevenueSource = Pick<Ledger, 'invoices' | 'payments'> & { creditNotes?: CreditNoteRec[] };
+
+export function revenueEntries(d: RevenueSource, basis: RevenueBasis, r: { from: string; to: string }): RevenueEntry[] {
+  if (basis === 'accrual') {
+    const inv = d.invoices.filter(i => isIssued(i) && inPeriod(i.issue_date, r)).map<RevenueEntry>(i => {
+      const t = num(i.total_amount); const v = num(i.vat_amount);
+      return { kind: 'invoice', date: i.issue_date, ref: i.invoice_number, customer: i.customer, party: i.customer_name, excl: t - v, vat: v, incl: t };
+    });
+    const cn = (d.creditNotes ?? []).filter(c => isCreditIssued(c) && inPeriod(c.issue_date, r)).map<RevenueEntry>(c => ({
+      kind: 'credit', date: c.issue_date, ref: `${c.credit_note_number}${c.invoice_number ? `, ${c.invoice_number}` : ''}`,
+      customer: c.customer, party: c.customer_name, excl: -num(c.subtotal), vat: -num(c.vat_amount), incl: -num(c.total_amount),
+    }));
+    return [...inv, ...cn];
+  }
+  // Cash: allocate every payment to its invoice in date order, so a payment
+  // past the invoice total (an overpayment) is not counted as revenue.
+  const invById = new Map(d.invoices.map(i => [i.id, i]));
+  const paidSoFar = new Map<number, number>();
+  const ordered = [...d.payments].sort((a, b) => (a.payment_date || '').localeCompare(b.payment_date || '') || a.id - b.id);
+  const out: RevenueEntry[] = [];
+  for (const p of ordered) {
+    const amt = num(p.amount);
+    const inv = p.invoice != null ? invById.get(p.invoice) : undefined;
+    let alloc = amt;
+    if (inv) {
+      const before = paidSoFar.get(inv.id) || 0;
+      alloc = Math.max(0, Math.min(amt, num(inv.total_amount) - before));
+      paidSoFar.set(inv.id, before + amt);
+    }
+    if (!inPeriod(p.payment_date, r)) continue;
+    const v = alloc * vatShare(inv);
+    out.push({
+      kind: 'payment', date: p.payment_date, ref: `${p.payment_number || `PMT-${p.id}`}${p.invoice_number ? `, ${p.invoice_number}` : ''}`,
+      customer: p.customer ?? inv?.customer ?? null, party: p.customer_name || inv?.customer_name || 'Unknown customer',
+      excl: alloc - v, vat: v, incl: alloc, over: amt - alloc,
+    });
+  }
+  return out;
+}
+
+export const sumOf = <T,>(xs: T[], f: (x: T) => number) => xs.reduce((s, x) => s + f(x), 0);
+
+/** Revenue excl. VAT per month, plus totals, for a basis and range. */
+export function revenueByMonth(d: RevenueSource, basis: RevenueBasis, r: { from: string; to: string }) {
+  const entries = revenueEntries(d, basis, r);
+  const byMonth = new Map<string, number>();
+  entries.forEach(e => { const m = ymOf(e.date); byMonth.set(m, (byMonth.get(m) || 0) + e.excl); });
+  return {
+    entries, byMonth,
+    excl: sumOf(entries, e => e.excl), vat: sumOf(entries, e => e.vat), incl: sumOf(entries, e => e.incl),
+    invoices: entries.filter(e => e.kind === 'invoice').length,
+    credits: entries.filter(e => e.kind === 'credit'),
+    payments: entries.filter(e => e.kind === 'payment').length,
+    over: sumOf(entries, e => e.over || 0),
+  };
+}
+
+/** An expense excl. its input VAT. */
+export const expenseNet = (e: Expense) => num(e.amount) - num(e.vat_amount);
+export const expenseVat = (e: Expense) => num(e.vat_amount);
+export const isRejected = (e: Expense) => st(e.status) === 'REJECTED';
+
 export const CATEGORY_LABEL: Record<string, string> = {
   FUEL: 'Fuel', TOLLS: 'Tolls', DRIVER: 'Driver costs', MAINTENANCE: 'Maintenance and repairs',
-  INSURANCE: 'Insurance', OVERHEAD: 'Overheads and admin',
+  INSURANCE: 'Insurance', OVERHEAD: 'Overheads and admin', SUBCONTRACTOR: 'Subcontractors', DRIVER_COST: 'Driver costs',
 };
 export const catLabel = (c: string) => CATEGORY_LABEL[st(c)] ?? (c ? c.charAt(0) + c.slice(1).toLowerCase().replace(/_/g, ' ') : 'Uncategorised');
 /** Transport P&L: costs that move with the work vs fixed running costs. */
-export const DIRECT = ['FUEL', 'TOLLS', 'DRIVER', 'MAINTENANCE'];
+export const DIRECT = ['FUEL', 'TOLLS', 'DRIVER', 'DRIVER_COST', 'SUBCONTRACTOR', 'MAINTENANCE'];
 export const OVERHEADS = ['INSURANCE', 'OVERHEAD'];
 
 export const methodLabel = (m?: string) => {

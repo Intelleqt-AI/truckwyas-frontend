@@ -6,16 +6,18 @@
    repeats the P&L's default basis exactly, so for the same months the Margin
    tab and the P&L print the same numbers:
 
-     revenue  = payments received in the month, less each invoice's VAT share
-                (cash basis, excl. VAT; ProfitLoss.tsx `revenue(d, 'cash')`)
-     costs    = approved expenses by expense date (all categories)
+     revenue  = payments received in the month, less each invoice's VAT share,
+                overpayment excluded (cash basis, excl. VAT; reports/data.ts
+                `revenueEntries(d, 'cash')`, the backend's cash definition)
+     costs    = every expense that is not rejected (approved and pending), by
+                expense date, net of its input VAT: the backend's definition
      net      = revenue - costs
-     pending  = expenses still waiting for approval, by expense date (not deducted)
+     pending  = the part of costs still awaiting approval (informational)
 
    Periods are whole calendar months, resolved by the same resolvePeriod(). */
 
 import {
-  inPeriod, isApproved, isPending, monthsIn, num, vatShare, ymOf,
+  expenseNet, inPeriod, isApproved, isPending, monthsIn, revenueEntries, ymOf,
   type Ledger, type Period,
 } from '@/components/reports/data';
 
@@ -32,20 +34,19 @@ export interface MarginResult {
 export function marginFromLedger(d: Pick<Ledger, 'invoices' | 'payments' | 'expenses'>, period: Period): MarginResult {
   const all = monthsIn(period.from, period.to);
   const by = new Map<string, MarginMonth>(all.map(ym => [ym, { ym, revenue: 0, costs: 0, pending: 0, net: 0 }]));
-  const invById = new Map(d.invoices.map(i => [i.id, i]));
   let revenue = 0; let vat = 0; let costs = 0; let pending = 0; let pendingCount = 0; let paymentCount = 0;
 
-  d.payments.filter(p => inPeriod(p.payment_date, period)).forEach(p => {
-    const amt = num(p.amount);
-    const v = amt * vatShare(p.invoice != null ? invById.get(p.invoice) : undefined);
-    const m = by.get(ymOf(p.payment_date));
-    if (m) m.revenue += amt - v;
-    revenue += amt - v; vat += v; paymentCount += 1;
+  revenueEntries(d, 'cash', period).forEach(p => {
+    const m = by.get(ymOf(p.date));
+    if (m) m.revenue += p.excl;
+    revenue += p.excl; vat += p.vat; paymentCount += 1;
   });
   d.expenses.filter(e => inPeriod(e.expense_date, period)).forEach(e => {
     const m = by.get(ymOf(e.expense_date));
-    if (isApproved(e)) { costs += num(e.amount); if (m) m.costs += num(e.amount); }
-    else if (isPending(e)) { pending += num(e.amount); pendingCount += 1; if (m) m.pending += num(e.amount); }
+    const net = expenseNet(e);
+    if (!isApproved(e) && !isPending(e)) return; // rejected: never a cost
+    costs += net; if (m) m.costs += net;
+    if (isPending(e)) { pending += net; pendingCount += 1; if (m) m.pending += net; }
   });
   const months = all.map(ym => { const m = by.get(ym)!; return { ...m, net: m.revenue - m.costs }; });
   const net = revenue - costs;

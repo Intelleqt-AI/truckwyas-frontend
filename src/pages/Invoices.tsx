@@ -580,7 +580,7 @@ export default function Invoices() {
                   // Days relative to the due date, stated in words next to it:
                   // whole SA calendar days, the Debtors report's count.
                   const ageDays = dueDate ? daysBetween(String(dueDate), today) : 0;
-                  const open = invStatus !== "PAID" && invStatus !== "DRAFT" && !!dueDate;
+                  const open = invStatus !== "PAID" && invStatus !== "DRAFT" && invStatus !== "CANCELLED" && invStatus !== "CREDITED" && !!dueDate;
                   const agingLabel = !open
                     ? null
                     : ageDays > 0
@@ -620,7 +620,8 @@ export default function Invoices() {
                       </td>
                       <td className="m-status">
                         <span className="fin-inline-list" style={{ flexWrap: "nowrap" }}>
-                          <StatusChip status={invStatus} size="sm" />
+                          {/* Cancelled invoices are shown as "Void". */}
+                          <StatusChip status={invStatus} label={invStatus === "CANCELLED" ? "Void" : undefined} size="sm" />
                           {capitalEntry && tier && (
                             <StatusChip
                               tone={TIER_TONE[tier] ?? "neutral"}
@@ -631,12 +632,16 @@ export default function Invoices() {
                           )}
                         </span>
                       </td>
-                      <td className={`num m-amount${invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005 ? " fin-cell-2" : ""}`}>
+                      <td className={`num m-amount${(invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005) || (invStatus !== "CREDITED" && parseFloat(inv.credited_amount || "0") > 0.005) ? " fin-cell-2" : ""}`}>
                         {/* Lists show whole rands; cents stay on the invoice and in the title (R8). */}
                         <span title={formatCurrency(amount)}>{wholeRand(amount)}</span>
                         {/* Part-paid: what is still owed, under the invoice total. */}
                         {invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005 && (
                           <span className="fin-cell-sub" title={`${formatCurrency(invoiceBalance(inv))} due`}>{wholeRand(invoiceBalance(inv))} due</span>
+                        )}
+                        {/* Part-credited: what credit notes took off. */}
+                        {invStatus !== "PARTIALLY_PAID" && invStatus !== "CREDITED" && parseFloat(inv.credited_amount || "0") > 0.005 && (
+                          <span className="fin-cell-sub" title={`${formatCurrency(inv.credited_amount)} credited`}>{wholeRand(parseFloat(inv.credited_amount))} credited</span>
                         )}
                       </td>
                       <td className="actions" onClick={(e) => e.stopPropagation()}>
@@ -644,6 +649,9 @@ export default function Invoices() {
                           label={`Invoice ${invNumber}`}
                           items={[
                             { label: "Open invoice", onSelect: () => navigate(`/finance/invoices/${inv.id}`) },
+                            ...(invStatus === "DRAFT"
+                              ? [{ label: "Edit draft", onSelect: () => navigate(`/finance/invoices/${inv.id}/edit`) }]
+                              : []),
                             ...(invStatus === "DRAFT"
                               ? [{
                                   label: sendingId === inv.id ? "Sending…" : "Send to customer",

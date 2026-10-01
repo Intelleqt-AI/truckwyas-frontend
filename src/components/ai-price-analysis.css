@@ -1,114 +1,134 @@
-/* AI price check card on the quote builder (AIPriceAnalysisPanel).
+/* Market price check card on the quote builder (AIPriceAnalysisPanel).
    v3 only (docs/brand/DESIGN-PRINCIPLES.md): tokens from theme.css, the same
    head, row and figure anatomy as the Cost breakdown card beside it. */
 
 .aip { margin-bottom: var(--card-gap, 16px); }
 
-/* ---- Head: title + one-line subtitle + tip, status and Re-check right --- */
+/* ---- Head: title + one-line subtitle + tip; status and one action right -- */
 .aip__head {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 12px;
   padding: var(--card-pad) var(--card-pad) 0;
 }
-.aip__tools { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.aip__head:last-child { padding-bottom: var(--card-pad); }
+.aip__tools { display: flex; align-items: center; gap: 12px; flex-shrink: 0; min-height: 28px; }
+/* Fixed widths so "Checking… 4 s / Cancel" and "Checked just now / Re-check"
+   occupy the same box and nothing moves when a result lands. */
+.aip-meta { min-width: 112px; text-align: right; font: 400 12px/16px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-tertiary); white-space: nowrap; }
+.aip__tools > .tw-btn { min-width: 84px; }
 .aip__body { padding: 16px var(--card-pad) var(--card-pad); }
-.aip__body.is-busy { opacity: 0.5; transition: opacity 150ms ease; }
+.aip-num { font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.aip-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
-/* ---- One short message (loading, not ready, failed, out of date) ------- */
-.aip-msg { display: flex; align-items: flex-start; gap: 12px; }
-.aip-msg__title { margin: 0; font: 600 14px/20px var(--font-sans); color: var(--text-primary); }
-.aip-msg__text { margin: 2px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
-.aip-msg__time { font: 400 12px/16px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-tertiary); }
+/* Lane benchmark: always visible, whatever the check's state. */
+.aip-bench { margin: 0; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
+.aip__body > .aip-bench + * { margin-top: 16px; }
 
-/* ---- Figures: price | margin | win chance, one row of cells ------------ */
-.aip-figs {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid var(--border-row); border-radius: var(--radius-nested, 8px);
+/* One short message (unavailable, paused, failed, out of date). */
+.aip-msg { margin: 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); max-width: 72ch; }
+.aip-msg__title { font-weight: 600; color: var(--text-primary); }
+.aip-msg.is-quiet .aip-msg__title { font-weight: 500; }
+
+/* ---- Result: figures left, the four items right ------------------------ */
+.aip-result {
+  display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 0 32px; align-items: start;
+  transition: opacity 150ms ease;
 }
-.aip-fig { padding: 12px 16px; min-width: 0; }
-.aip-fig + .aip-fig { border-left: 1px solid var(--border-row); }
-.aip-fig__label { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }
-.aip-fig__value {
-  margin-top: 4px; font: 600 28px/36px var(--font-sans); letter-spacing: -0.02em;
+.aip-result.is-busy { opacity: 0.6; }
+.aip-stats { display: grid; gap: 16px; padding-top: 2px; }
+.aip-stat { min-width: 0; }
+.aip-stat__label { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); min-height: 16px; }
+.aip-stat__figure {
+  margin-top: 4px; min-height: 34px; font: 600 28px/34px var(--font-sans); letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap;
 }
-.aip-fig__note { margin-top: 2px; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
-.aip-fig__note.is-warn { color: var(--status-warning-text); }
+/* A sentence in the figure's place ("Matches your quote"): smaller, same box. */
+.aip-stat__figure.is-text { font-size: 20px; letter-spacing: -0.01em; display: flex; align-items: flex-end; white-space: normal; }
+.aip-stat__figure.is-muted { color: var(--text-secondary); font-weight: 500; }
+.aip-stat__note { margin-top: 2px; min-height: 16px; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.aip-stat__note.is-warn { color: var(--status-warning-text); }
 
-/* ---- Supporting lines under the figures -------------------------------- */
-.aip-notes { display: grid; gap: 4px; margin-top: 12px; max-width: 72ch; }
-.aip-note { margin: 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
-.aip-note--muted { color: var(--text-tertiary); }
-.aip-note--warn { color: var(--status-warning-text); }
-.aip-note__num { font-variant-numeric: tabular-nums; color: var(--text-primary); }
+/* The items: label | yours → market | basis chip | choice. A table on wide
+   screens (aligned columns), stacked rows on phones. */
+.aip-items { width: 100%; border-collapse: collapse; font: 400 13px/20px var(--font-sans); }
+.aip-row > th, .aip-row > td {
+  height: 48px; box-sizing: border-box; padding: 6px 16px 6px 0; vertical-align: middle;
+  border-bottom: 1px solid var(--border-row); text-align: left;
+}
+.aip-row:first-child > th, .aip-row:first-child > td { border-top: 1px solid var(--border-row); }
+.aip-row > :last-child { padding-right: 0; }
+.aip-row__label { width: 132px; font-weight: 500; color: var(--text-primary); white-space: nowrap; }
+.aip-row__vals { white-space: nowrap; }
+/* Fixed chip and choice columns: the skeleton and the result share them, so
+   no column moves when the figures land. */
+.aip-row__chip { width: 272px; white-space: nowrap; }
+.aip-row__chip .tw-status { max-width: 100%; }
+.aip-row__act { width: 104px; text-align: right !important; white-space: nowrap; }
+.aip-row__act .tw-btn--sm { width: 104px; }
+.aip-skel--btn { height: 28px; width: 104px; border-radius: var(--radius-control, 8px); }
+.aip-vals { display: inline-flex; align-items: baseline; gap: 8px; font-variant-numeric: tabular-nums; }
+.aip-vals .is-on { color: var(--text-primary); font-weight: 600; }
+.aip-vals .is-off { color: var(--text-tertiary); }
+.aip-vals__arrow { color: var(--text-tertiary); }
+.aip-vals__note { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
 
-/* Quiet link-style buttons and source links. */
+/* Skeleton bars (same boxes as the result, so nothing moves when it lands). */
+.aip-skel { pointer-events: none; display: inline-block; flex-shrink: 0; height: 12px; width: 100px; max-width: 100%; border-radius: 4px; background: var(--bg-raised); vertical-align: middle; }
+.aip-skel--fig { height: 24px; width: 140px; margin-top: 5px; }
+.aip-skel--chip { height: 22px; width: 150px; border-radius: 999px; }
+.is-skeleton .aip-skel { animation: aip-pulse 1.4s ease-in-out infinite; }
+@keyframes aip-pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .is-skeleton .aip-skel { animation: none; } }
+
+/* ---- Details: how each figure was checked, 2 up ------------------------ */
+.aip-details { padding: 0 var(--card-pad) var(--card-pad); }
+.aip-warnline { margin: 0 0 16px; font: 400 13px/20px var(--font-sans); color: var(--status-warning-text); max-width: 72ch; }
+.aip-dgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 32px; }
+.aip-d { min-width: 0; }
+.aip-d__title { margin: 0 0 4px; font: 600 13px/20px var(--font-sans); color: var(--text-primary); }
+.aip-d__line { margin: 0; font: 400 12px/16px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-tertiary); }
+.aip-d__line + .aip-d__line { margin-top: 2px; }
+.aip-d__reason { margin: 8px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); max-width: 72ch; }
+.aip-d__foot { margin-top: 20px; max-width: 72ch; }
+.aip-plazas { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.aip-plaza { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; font: 400 12px/16px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.aip-plaza__note { color: var(--text-tertiary); }
+.aip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--status-neutral-dot); flex-shrink: 0; }
+.aip-dot.is-ok { background: var(--status-success-dot); }
+.aip-dot.is-warn { background: var(--status-warning-dot); }
+
+/* Sources: the site's hostname as a text chip (no third-party favicon fetch). */
+.aip-srcs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.aip-src {
+  display: inline-flex; align-items: center; height: 32px; padding: 0 10px; box-sizing: border-box; position: relative;
+  border: 1px solid var(--border-default); border-radius: var(--radius-chip, 6px);
+  font: 500 12px/16px var(--font-sans); color: var(--link); text-decoration: none; white-space: nowrap;
+}
+.aip-src:hover { border-color: var(--border-strong); background: var(--bg-surface-hover); }
+.aip-src:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
+
+/* Quiet text actions. */
 .aip-link {
   display: inline; padding: 0; border: 0; background: none; cursor: pointer; position: relative;
   font: inherit; color: var(--link); text-decoration: underline; text-underline-offset: 2px;
 }
 .aip-link:hover { color: var(--accent-primary-hover); }
-.aip-link:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
+.aip-link:focus-visible, .aip-toggle:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
 .aip-toggle {
-  display: inline-flex; align-items: center; gap: 4px; margin-top: 12px;
-  padding: 0; border: 0; background: none; cursor: pointer; position: relative;
+  display: inline-flex; align-items: center; gap: 4px; height: 36px; padding: 0; border: 0; background: none; cursor: pointer; position: relative;
   font: 500 13px/20px var(--font-sans); color: var(--text-secondary);
 }
-.aip-toggle:hover { color: var(--text-primary); text-decoration: underline; text-underline-offset: 2px; }
-.aip-toggle:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
+.aip-toggle svg { color: var(--text-tertiary); }
+.aip-toggle:hover { color: var(--text-primary); }
 
-/* ---- Tables: base-rate scenarios and the per-item breakdown ------------ */
-.aip-scroll { margin-top: 16px; overflow-x: auto; }
-.aip-table { width: 100%; border-collapse: collapse; font: 400 13px/20px var(--font-sans); }
-.aip-table th {
-  padding: 0 16px 8px 0; text-align: left; white-space: nowrap;
-  font: 500 12px/16px var(--font-sans); color: var(--text-tertiary);
-  border-bottom: 1px solid var(--border-row);
+/* ---- Notice, action row and banner ------------------------------------- */
+.aip-notice { padding: 10px var(--card-pad); border-top: 1px solid var(--border-row); font: 400 13px/20px var(--font-sans); color: var(--status-warning-text); }
+.aip__foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+  /* One control row (+ its border), whether or not Apply shows, so the
+     skeleton and every result state are the same height. */
+  min-height: calc(var(--control-h, 36px) + 25px); box-sizing: border-box;
+  padding: 12px var(--card-pad); border-top: 1px solid var(--border-row);
 }
-.aip-table td {
-  height: 40px; padding: 8px 16px 8px 0; box-sizing: border-box; vertical-align: top;
-  border-bottom: 1px solid var(--border-row); color: var(--text-primary);
-}
-.aip-table th:last-child, .aip-table td:last-child { padding-right: 0; }
-.aip-table .is-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.aip-table .is-end { text-align: right; }
-.aip-table .is-muted { color: var(--text-tertiary); }
-.aip-table tr.is-selected td { font-weight: 600; }
-.aip-table tr.is-total td { font-weight: 600; border-bottom: 0; }
-.aip-table--scen { width: auto; min-width: 360px; }
-.aip-table--items { min-width: 600px; }
-
-/* Breakdown cells: amount, how it was built, whether it was verified. */
-.aip-amt { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-primary); }
-.aip-amt.is-chosen { font-weight: 600; }
-.aip-amt.is-muted { color: var(--text-tertiary); }
-.aip-sub { margin-top: 2px; font: 400 12px/16px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-tertiary); }
-.aip-check { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 4px; }
-.aip-item {
-  display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none;
-  cursor: pointer; position: relative; text-align: left;
-  font: 500 13px/20px var(--font-sans); color: var(--text-primary);
-}
-.aip-item svg { color: var(--text-tertiary); flex-shrink: 0; }
-.aip-item:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
-.aip-more td { padding-top: 12px; padding-bottom: 12px; }
-.aip-more__body { display: grid; gap: 4px; padding-left: 18px; max-width: 72ch; }
-/* The sources line sits a little apart from the explanation above it. */
-.aip-more__body .aip-sources { margin-top: 8px; }
-.aip-plaza { font: 400 12px/16px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-tertiary); }
-.aip-sources { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
-/* A source: its site logo in a small neutral tile, the name in the tooltip. */
-.aip-src {
-  display: inline-flex; align-items: center; justify-content: center; position: relative;
-  width: 24px; height: 24px; box-sizing: border-box; flex-shrink: 0;
-  border: 1px solid var(--border-default); border-radius: var(--radius-chip, 6px);
-  background: var(--bg-surface); text-decoration: none;
-  font: 600 11px/16px var(--font-sans); color: var(--text-secondary);
-}
-.aip-src:hover { border-color: var(--border-strong); background: var(--bg-surface-hover); }
-.aip-src:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
-.aip-src img { width: 16px; height: 16px; border-radius: 3px; display: block; }
-
-/* ---- Banners and the action row ---------------------------------------- */
 .aip-banner {
   padding: 10px var(--card-pad); border-top: 1px solid var(--border-row);
   font: 400 13px/20px var(--font-sans); color: var(--text-secondary);
@@ -118,18 +138,36 @@
 .aip-banner__label { font-weight: 600; }
 .aip-banner--warning .aip-banner__label { color: var(--status-warning-text); }
 .aip-banner--danger .aip-banner__label { color: var(--status-danger-text); }
-.aip-notice { padding: 10px var(--card-pad); border-top: 1px solid var(--border-row); font: 400 13px/20px var(--font-sans); color: var(--status-warning-text); }
-.aip__foot {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-  padding: 12px var(--card-pad); border-top: 1px solid var(--border-row);
+
+/* ---- Tablets: figures above the items ---------------------------------- */
+@media (max-width: 1024px) {
+  .aip-result { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .aip-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
 }
 
-/* ---- Phones: cells stack, the breakdown scrolls inside the card -------- */
+/* ---- Phones: stacked rows, no table, nothing wider than the card ------- */
 @media (max-width: 640px) {
   .aip__head { flex-wrap: wrap; }
-  .aip-figs { grid-template-columns: minmax(0, 1fr); }
-  .aip-fig + .aip-fig { border-left: 0; border-top: 1px solid var(--border-row); }
-}
-@media (max-width: 768px), (pointer: coarse) {
-  .aip-link::after, .aip-toggle::after, .aip-item::after, .aip-src::after { content: ''; position: absolute; inset: -12px -8px; }
+  .aip__tools { margin-left: auto; }
+  .aip-stats { grid-template-columns: minmax(0, 1fr); }
+  .aip-dgrid { grid-template-columns: minmax(0, 1fr); }
+  .aip-items, .aip-items tbody { display: block; }
+  /* Three lines per item: name and choice, the figures, then the basis chip
+     (full width, so "Checked on <site> · <date>" never truncates). Every
+     line has a fixed height, so nothing moves when the skeleton is replaced. */
+  .aip-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px;
+    padding: 12px 0; border-bottom: 1px solid var(--border-row);
+  }
+  .aip-row::before, .aip-row::after { content: ''; flex-basis: 100%; height: 0; }
+  .aip-row::before { order: 3; }
+  .aip-row::after { order: 5; }
+  .aip-row:first-child { border-top: 1px solid var(--border-row); }
+  .aip-row > th, .aip-row > td { display: flex; align-items: center; height: auto; padding: 0; border: 0 !important; width: auto; min-width: 0; }
+  .aip-row__label { order: 1; min-height: 32px; flex: 1 1 auto; }
+  .aip-row__act { order: 2; min-height: 32px; }
+  .aip-row__vals { order: 4; min-height: 20px; margin-top: 4px; }
+  .aip-row__chip { order: 6; min-height: 22px; margin-top: 6px; max-width: 100%; }
+  .aip-skel--btn { height: 32px; }
+  .aip-skel--chip { width: 120px; }
 }

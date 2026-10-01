@@ -11,6 +11,7 @@ import SearchPanel from '@/pages/admin/SearchPanel';
 import PlatformHealth from '@/pages/admin/PlatformHealth';
 import AuditLogPanel from '@/pages/admin/AuditLogPanel';
 import AiUsagePanel from '@/pages/admin/AiUsagePanel';
+import RateUpdatesPanel from '@/pages/admin/RateUpdatesPanel';
 import VehicleTypesPanel from '@/pages/admin/VehicleTypesPanel';
 import CrossBorderRatesPanel from '@/pages/admin/CrossBorderRatesPanel';
 import '@/components/layout/section-header.css';
@@ -44,13 +45,14 @@ const SECTIONS: Section[] = [
     items: [
       { id: 'vehicle-types', label: 'Truck types', component: VehicleTypesPanel },
       { id: 'cross-border-rates', label: 'Cross-border rates', component: CrossBorderRatesPanel },
+      { id: 'rate-updates', label: 'Rate updates', component: RateUpdatesPanel },
     ],
   },
   {
     group: 'Platform',
     items: [
       { id: 'health', label: 'Platform health', component: PlatformHealth },
-      { id: 'ai-usage', label: 'AI usage & cost', component: AiUsagePanel },
+      { id: 'ai-usage', label: 'AI usage and cost', component: AiUsagePanel },
       { id: 'audit-log', label: 'Audit log', component: AuditLogPanel },
     ],
   },

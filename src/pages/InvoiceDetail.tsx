@@ -25,7 +25,7 @@ import { FinDialog, ReasonDialog } from "@/components/finance/FinDialog";
 import { PaymentEditDialog } from "@/components/finance/PaymentEditDialog";
 import { isManualPayment } from "@/lib/finance/payments";
 import { ACCT_KEYS, isPaymentsManagedError, paymentsManagedRecordUrl, usePaymentsManaged } from "@/lib/accounting";
-import { AccountingSyncCard, PaymentSourceBadge, PaymentsManagedPanel } from "@/components/accounting/AccountingSyncCard";
+import { AccountingSyncCard, AccountingSyncNotice, PaymentSourceBadge, PaymentsManagedNote } from "@/components/accounting/AccountingSyncCard";
 import { TotalsBreakdown } from "@/components/finance/TotalsBreakdown";
 import RowActions from "@/components/ui/RowActions";
 import { ConfirmModal } from "@/components/ConfirmModal";
@@ -673,8 +673,8 @@ export default function InvoiceDetail() {
               onClick={() => setPreview('reminder')} disabled={sendingReminder} />
           ) : primary === 'send' ? (
             <HeadAction icon={<Send size={16} strokeWidth={1.75} aria-hidden="true" />}
-              label={sending ? 'Sending…' : status === 'VIEWED' ? 'Resend to customer' : 'Send to customer'}
-              short={sending ? 'Sending…' : status === 'VIEWED' ? 'Resend' : 'Send'}
+              label={sending ? 'Sending…' : status === 'VIEWED' || status === 'SENT' ? 'Resend to customer' : 'Send to customer'}
+              short={sending ? 'Sending…' : status === 'VIEWED' || status === 'SENT' ? 'Resend' : 'Send'}
               onClick={() => setPreview('invoice')} disabled={sending} />
           ) : primary === 'pay' ? (
             <HeadAction icon={<Banknote size={16} strokeWidth={1.75} aria-hidden="true" />} label="Record payment" short="Record payment"
@@ -698,6 +698,7 @@ export default function InvoiceDetail() {
           Dates are facts in the document, not KPI tiles; each figure once. */}
       <div className="fin-detail-grid">
         <div className="fin-main-col" ref={bal.mainRef}>
+        <AccountingSyncNotice sync={inv.accounting_sync} what="invoice" />
         {/* Why this invoice can't change: void, financed, or sent (locked). */}
         {isVoid ? (
           <div className="fl-notice fl-notice--danger" role="status">
@@ -858,9 +859,6 @@ export default function InvoiceDetail() {
           {!bal.inMain('facts') && (
             <section className="card fin-facts-card" aria-label="Invoice dates and terms">{facts(true)}</section>
           )}
-          {canRecordInProvider && (
-            <PaymentsManagedPanel providerName={acctName} recordUrl={recordInProviderUrl} />
-          )}
           {showPaymentForm && !managedHere && (
             <section className="card" id="record-payment" aria-labelledby="record-payment-title">
               <div className="fin-panel-head">
@@ -937,14 +935,19 @@ export default function InvoiceDetail() {
             </section>
           )}
 
-          {payments && payments.length > 0 && (
+          {((payments && payments.length > 0) || canRecordInProvider) && (
             <section className="card fin-table-card" aria-labelledby="payments-title">
               <div className="fin-panel-head">
                 <div className="fin-panel-head__text">
                   <h2 id="payments-title" className="fin-panel-title">Payments</h2>
-                  <p className="fin-panel-desc">{payments.length} recorded, by payment date</p>
+                  <p className="fin-panel-desc">
+                    {managedHere ? `Managed in ${acctName}` : `${payments.length} recorded, by payment date`}
+                  </p>
                 </div>
               </div>
+              {managedHere && (
+                <PaymentsManagedNote providerName={acctName} recordUrl={canRecordInProvider ? recordInProviderUrl : null} />
+              )}
               <ul className="fin-paylist">
                 {payments.map((payment: any, idx: number) => {
                   const ref = payment.reference_number || payment.reference || payment.payment_number;

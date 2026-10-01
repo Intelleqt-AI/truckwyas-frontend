@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DatePicker } from '@/components/ui/date-picker';
+import { StatusChip } from '@/components/ui/StatusChip';
 import { formatDate, formatDateTime } from '@/lib/formatters';
 import { fetchData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
@@ -90,6 +91,10 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
   };
 
   const previewDate = b.cutover_date ?? date;
+  const doneSteps = b.steps.filter(x => x.state === 'DONE' || x.state === 'SKIPPED').length;
+  const startedAt = b.started_at ? new Date(b.started_at) : null;
+  const startedTime = startedAt && !isNaN(startedAt.getTime())
+    ? startedAt.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false }) : null;
 
   return (
     <>
@@ -97,45 +102,46 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
         title="Cut-over date"
         description={`From this date TruckWys sends every invoice, credit note and supplier bill to ${cfg.short}. Anything dated earlier is not sent: we assume it's already in your books.`}
       >
-        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', alignItems: 'start' }}>
-          <div>
-            <label className="fin-label" htmlFor="acct-cutover" style={{ display: 'block', font: '500 13px/20px var(--font-sans)', color: 'var(--text-primary)', marginBottom: 6 }}>Cut-over date</label>
+        <div className="acct-cutover">
+          <div className="acct-cutover__date">
             {locked ? (
-              <p style={{ margin: 0, font: '500 14px/40px var(--font-sans)', color: 'var(--text-primary)' }}>{formatDate(b.cutover_date)}</p>
-            ) : (
-              <DatePicker id="acct-cutover" value={date} onChange={setDate} />
-            )}
-            <p className="acct-section-desc" style={{ margin: '6px 0 0' }}>
-              {locked ? "Can't be changed once the first send has started." : 'Usually the first day of a month or VAT period that is still open in your books.'}
-            </p>
-            {!locked && !date && (
-              <button type="button" className="acct-linkbtn" style={{ font: '500 13px/20px var(--font-sans)', marginTop: 4 }} onClick={() => setDate(firstOfMonth())}>
-                Use {formatDate(firstOfMonth())}
-              </button>
-            )}
-          </div>
-          <div>
-            <div style={{ font: '500 13px/20px var(--font-sans)', color: 'var(--text-primary)', marginBottom: 6 }}>
-              {previewDate ? `What will be sent (from ${formatDate(previewDate)})` : 'What will be sent'}
-            </div>
-            {p ? (
-              <dl className="acct-facts" style={{ margin: 0, gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
-                <div><dt>Invoices</dt><dd>{p.invoices.toLocaleString('en-ZA')}</dd></div>
-                <div><dt>Credit notes</dt><dd>{p.credit_notes.toLocaleString('en-ZA')}</dd></div>
-                <div><dt>Supplier bills</dt><dd>{p.bills.toLocaleString('en-ZA')}</dd></div>
-                <div><dt>Payments recorded in TruckWys</dt><dd>{p.historic_receipts.toLocaleString('en-ZA')}</dd></div>
+              <dl className="acct-facts" style={{ margin: 0, gridTemplateColumns: 'minmax(0, 1fr)' }}>
+                <div><dt>Cut-over date</dt><dd>{formatDate(b.cutover_date)}</dd></div>
               </dl>
             ) : (
-              <p className="acct-section-desc" style={{ margin: 0 }}>Choose a date to see the counts.</p>
+              <>
+                <label htmlFor="acct-cutover" className="acct-field-label">Cut-over date</label>
+                <DatePicker id="acct-cutover" value={date} onChange={setDate} />
+              </>
             )}
-            {p && p.historic_receipts > 0 && (
-              <p className="acct-section-desc" style={{ margin: '8px 0 0' }}>
-                Payments already recorded in TruckWys go into the bank account you chose under{' '}
-                <button type="button" className="acct-linkbtn" onClick={() => onOpen('mapping')}>Accounts and VAT</button>.
-              </p>
-            )}
+            <p className="acct-section-desc" style={{ margin: '6px 0 0' }}>
+              {locked ? "Locked once the first send has started." : 'Usually the first day of a month or VAT period still open in your books.'}
+              {!locked && !date && (
+                <> <button type="button" className="acct-linkbtn" onClick={() => setDate(firstOfMonth())}>Use {formatDate(firstOfMonth())}</button></>
+              )}
+            </p>
           </div>
         </div>
+
+        <div className="acct-field-label" style={{ marginTop: 20 }}>
+          {previewDate ? `What will be sent, from ${formatDate(previewDate)}` : 'What will be sent'}
+        </div>
+        {p ? (
+          <div className="acct-tiles">
+            <div><span>Invoices</span><strong>{p.invoices.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Credit notes</span><strong>{p.credit_notes.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Supplier bills</span><strong>{p.bills.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Earlier payments</span><strong>{p.historic_receipts.toLocaleString('en-ZA')}</strong></div>
+          </div>
+        ) : (
+          <p className="acct-section-desc" style={{ margin: 0 }}>Choose a date to see the counts.</p>
+        )}
+        {p && p.historic_receipts > 0 && (
+          <p className="acct-section-desc" style={{ margin: '8px 0 0' }}>
+            Earlier payments are payments already recorded in TruckWys. They go into the bank account chosen under{' '}
+            <button type="button" className="acct-linkbtn" onClick={() => onOpen('mapping')}>Accounts and VAT</button>.
+          </p>
+        )}
 
         {!locked && (
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: 20 }}>
@@ -155,26 +161,36 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
         )}
       </AcctCard>
 
-      {(b.state !== 'NOT_STARTED' || b.steps.some(s => s.state !== 'PENDING')) && (
+      {(b.state !== 'NOT_STARTED' || b.steps.some(x => x.state !== 'PENDING')) && (
         <AcctCard
           title="Progress"
           description={running
-            ? `Working… this page updates every few seconds. You can leave it; the send carries on.`
+            ? 'You can leave this page; sending carries on.'
             : done
               ? `Finished ${b.finished_at ? formatDateTime(b.finished_at) : ''}.`
               : b.state === 'FAILED' ? 'Stopped. Fix what the failed step says, then try again.' : undefined}
+          actions={running
+            ? <StatusChip tone="info" label={startedTime ? `Sending · started ${startedTime}` : 'Sending'} />
+            : done ? <StatusChip tone="success" label="Done" /> : b.state === 'FAILED' ? <StatusChip tone="danger" label="Stopped" /> : undefined}
           flush
         >
+          <div className="acct-progress" role="progressbar" aria-valuemin={0} aria-valuemax={b.steps.length} aria-valuenow={doneSteps}
+            aria-label={`${doneSteps} of ${b.steps.length} steps done`}>
+            <div className="acct-progress__bar"><span style={{ width: `${b.steps.length ? (doneSteps / b.steps.length) * 100 : 0}%` }} /></div>
+            <span className="acct-progress__text">{doneSteps} of {b.steps.length} steps</span>
+          </div>
           <ol className="acct-steps">
-            {b.steps.map(s => (
-              <li key={s.key}>
-                <StepIcon look={STEP_LOOK[s.state] ?? 'todo'} />
+            {b.steps.map(x => (
+              <li key={x.key}>
+                <StepIcon look={STEP_LOOK[x.state] ?? 'todo'} />
                 <div style={{ minWidth: 0 }}>
-                  <div className="acct-check__title">{s.label}</div>
-                  {s.error && <div className="acct-error" style={{ marginTop: 0 }}>{s.error}</div>}
-                  {s.state === 'SKIPPED' && <div className="acct-check__desc">Nothing to do</div>}
+                  <div className="acct-check__title">{x.label}</div>
+                  {x.error && <div className="acct-error" style={{ marginTop: 0 }}>{x.error}</div>}
+                  {x.state === 'SKIPPED' && <div className="acct-check__desc">Nothing to do</div>}
                 </div>
-                <span className="acct-steps__count">{s.count > 0 ? s.count.toLocaleString('en-ZA') : ''}</span>
+                <span className="acct-steps__count">
+                  {x.count > 0 ? `${x.count.toLocaleString('en-ZA')} ${x.state === 'RUNNING' ? 'so far' : 'done'}` : ''}
+                </span>
               </li>
             ))}
           </ol>

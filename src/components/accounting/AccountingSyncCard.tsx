@@ -1,4 +1,5 @@
-import { ExternalLink } from 'lucide-react';
+import { AlertTriangle, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { formatDateTime } from '@/lib/formatters';
 import { providerConfig, type AccountingSync } from '@/lib/accounting';
@@ -29,12 +30,12 @@ export function AccountingSyncCard({ sync, what }: { sync: AccountingSync | null
           <dd>{sync.external_number || (sync.status === 'PENDING' ? 'Not sent yet' : '—')}</dd>
         </div>
         <div className="fin-dl__row">
-          <dt>Last sent</dt>
+          <dt>Last sent successfully</dt>
           <dd>{sync.last_synced_at ? formatDateTime(sync.last_synced_at) : 'Not yet'}</dd>
         </div>
       </dl>
       {sync.last_error && (sync.status === 'ERROR' || sync.status === 'DEAD' || sync.status === 'BLOCKED') && (
-        <p className="acct-sync-err" role="status">{sync.last_error}</p>
+        <p className="acct-sync-err" role="status">Latest attempt failed: {sync.last_error}</p>
       )}
       {sync.url && (
         <a href={sync.url} target="_blank" rel="noopener noreferrer" className="tw-btn" style={{ width: '100%', marginTop: 12 }}>
@@ -47,32 +48,37 @@ export function AccountingSyncCard({ sync, what }: { sync: AccountingSync | null
 }
 
 /**
- * Shown where payments would be recorded while an accounting system owns
- * them: one button that opens the invoice in that system, and why.
+ * Top of the Payments card while an accounting system owns payments: where
+ * to record them, and that they come back here on their own.
  */
-export function PaymentsManagedPanel({ providerName, recordUrl }: { providerName: string; recordUrl: string | null }) {
+export function PaymentsManagedNote({ providerName, recordUrl }: { providerName: string; recordUrl: string | null }) {
   return (
-    <section className="card" aria-labelledby="acct-managed-title">
-      <div className="fin-panel-head">
-        <div className="fin-panel-head__text">
-          <h2 id="acct-managed-title" className="fin-panel-title">Record a payment</h2>
-          <p className="fin-panel-desc">Payments sync from {providerName} automatically.</p>
-        </div>
-      </div>
-      <p className="fin-help" style={{ margin: '0 0 12px' }}>
-        Record this payment in {providerName}. It shows here, with the balance updated, after the next sync.
-      </p>
-      {recordUrl ? (
+    <div className="acct-managed">
+      <p>Record payments in {providerName}. They show here, with the balance updated, after the next sync.</p>
+      {recordUrl && (
         <a href={recordUrl} target="_blank" rel="noopener noreferrer" className="tw-btn" style={{ width: '100%' }}>
           Record in {providerName}
           <ExternalLink size={14} aria-hidden="true" />
         </a>
-      ) : (
-        <button type="button" className="tw-btn" style={{ width: '100%' }} disabled title={`This invoice hasn't reached ${providerName} yet`}>
-          Record in {providerName}
-        </button>
       )}
-    </section>
+    </div>
+  );
+}
+
+/** Above the document: this one didn't reach the accounting system, and where to fix it. */
+export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | null | undefined; what: 'invoice' | 'credit note' }) {
+  if (!sync || !['ERROR', 'DEAD', 'BLOCKED'].includes(sync.status)) return null;
+  const name = providerConfig(sync.provider).short || sync.provider_name;
+  const retrying = sync.status === 'ERROR';
+  return (
+    <div className="fl-notice fl-notice--warning" role="status">
+      <AlertTriangle size={16} aria-hidden="true" />
+      <div>
+        <strong>{retrying ? `The latest update didn't reach ${name}; retrying` : `This ${what} isn't up to date in ${name}`}</strong>
+        {sync.last_error || `${name} refused it.`}
+      </div>
+      <Link to="/settings/integrations/accounting?tab=sync" className="tw-btn fl-notice__action">Sync status</Link>
+    </div>
   );
 }
 

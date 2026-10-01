@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, Info, X, XCircle } from 'lucide-react';
 import { AccountingProviderCards } from '@/components/accounting/AccountingProviderCards';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   apiMessage, apiStatus, callbackMessage, invalidateAccounting, providerBySlug, providerConfig, useAccountingConnection,
 } from '@/lib/accounting';
 import { SettingsShell } from './SettingsShell';
 import { SettingsPageHeader, settingsCardStyle } from './settingsUi';
-import { ConnectionHeader, OrgPicker } from './accounting/ConnectionHeader';
+import { ConnectionHeader, ConnectionHeaderSkeleton, OrgPicker } from './accounting/ConnectionHeader';
 import { SetupChecklist } from './accounting/SetupChecklist';
 import { MappingTab } from './accounting/MappingTab';
 import { ContactsTab } from './accounting/ContactsTab';
@@ -54,14 +55,25 @@ export default function AccountingIntegration() {
   const openTab = (t: AccountingTab) => {
     const next = new URLSearchParams(params);
     if (t === 'setup') next.delete('tab'); else next.set('tab', t);
+    qc.invalidateQueries({ queryKey: ['accounting', 'connection'] });
     setParams(next, { replace: true });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const title = cfg ? cfg.name : 'Accounting';
-  const description = cfg
-    ? `Keep TruckWys and ${cfg.short} in step: documents go there, payments come back.`
-    : 'Connect your accounting system so invoices, credit notes and bills flow into your books.';
+  // One short line, the same before and after the data lands (no head jump).
+  const title = 'Accounting';
+  // A sub-page of Integrations: the subtitle line carries the way back, as on
+  // every detail page (the settings nav keeps "Integrations" highlighted).
+  const description = (
+    <>
+      <Link to="/settings/integrations" className="section-header__back">
+        <ChevronLeft size={14} strokeWidth={1.75} aria-hidden="true" />
+        Integrations
+      </Link>
+      <span aria-hidden="true" className="section-header__sep">·</span>
+      Xero, QuickBooks and Sage
+    </>
+  );
 
   const bannerIcon = banner?.tone === 'success' ? <CheckCircle2 size={16} aria-hidden="true" />
     : banner?.tone === 'warning' ? <Info size={16} aria-hidden="true" /> : <XCircle size={16} aria-hidden="true" />;
@@ -75,9 +87,19 @@ export default function AccountingIntegration() {
     return undefined;
   };
 
+  const tabCountTitle = (t: AccountingTab, n: number) =>
+    t === 'contacts' ? `${n} to confirm` : t === 'mapping' ? `${n} still to map` : `${n} failed to send`;
+
   let body: React.ReactNode;
   if (conn.isLoading) {
-    body = <section style={settingsCardStyle}><LoadingBlock label="Loading your accounting connection" /></section>;
+    body = (
+      <>
+        <ConnectionHeaderSkeleton />
+        <div className="acct-tabs" aria-hidden="true"><span className="ops-skel" style={{ width: 'min(100%, 520px)', height: 32, borderRadius: 8 }} /></div>
+        <div className="acct-tabs-phone" aria-hidden="true"><span className="ops-skel" style={{ width: '100%', height: 48, borderRadius: 8 }} /></div>
+        <section style={settingsCardStyle}><LoadingBlock label="Loading setup" rows={5} /></section>
+      </>
+    );
   } else if (conn.isError) {
     body = (
       <section style={settingsCardStyle}>
@@ -93,10 +115,31 @@ export default function AccountingIntegration() {
     body = (
       <>
         <h2 className="acct-section-title">Choose your accounting system</h2>
-        <p className="acct-section-desc">
-          Once connected, TruckWys sends your invoices, credit notes and supplier bills, and payments recorded there come back here on their own. One system at a time.
-        </p>
+        <p className="acct-section-desc">One accounting system can be connected at a time.</p>
         <AccountingProviderCards hideManage />
+        <section style={settingsCardStyle} aria-labelledby="acct-how-title">
+          <div style={{ padding: '16px var(--card-pad, 20px)', borderBottom: '1px solid var(--border-subtle)' }}>
+            <h2 id="acct-how-title" style={{ margin: 0, font: '600 16px/24px var(--font-sans)', color: 'var(--text-primary)' }}>After you connect</h2>
+            <p className="acct-section-desc" style={{ margin: '2px 0 0' }}>About ten minutes, once. An admin does it.</p>
+          </div>
+          <ol className="acct-check">
+            {[
+              ['Map accounts and VAT', 'Pick the income account and VAT rate for each kind of charge, and where supplier bills go.'],
+              ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
+              ['Choose a cut-over date', 'Documents from that date on are sent; anything earlier is assumed to be in your books.'],
+              ['Record payments in your accounting system', 'They come back to TruckWys on their own, so invoices show as paid.'],
+            ].map(([t, d], i) => (
+              <li key={t}>
+                <span className="acct-step-num" aria-hidden="true">{i + 1}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div className="acct-check__title">{t}</div>
+                  <div className="acct-check__desc">{d}</div>
+                </div>
+                <span />
+              </li>
+            ))}
+          </ol>
+        </section>
       </>
     );
   } else if (live.status === 'PENDING_ORG') {
@@ -110,6 +153,18 @@ export default function AccountingIntegration() {
     body = (
       <>
         <ConnectionHeader connection={live} />
+        {/* Phones: one picker, like the settings section picker above it. */}
+        <div className="acct-tabs-phone">
+          <Select value={tab} onValueChange={v => openTab(v as AccountingTab)}>
+            <SelectTrigger aria-label={`${cfg!.short} section`}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {ACCOUNTING_TABS.map(t => {
+                const n = tabBadge(t.id);
+                return <SelectItem key={t.id} value={t.id}>{t.label}{n != null ? ` · ${tabCountTitle(t.id, n)}` : ''}</SelectItem>;
+              })}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="acct-tabs">
           <div className="tw-seg" role="tablist" aria-label={`${cfg!.short} settings`}>
             {ACCOUNTING_TABS.map(t => {
@@ -126,7 +181,7 @@ export default function AccountingIntegration() {
                   onClick={() => openTab(t.id)}
                 >
                   {t.label}
-                  {n != null && <span style={{ color: 'var(--status-warning-text)', fontVariantNumeric: 'tabular-nums' }}>{n}</span>}
+                  {n != null && <span className="acct-tab-count" title={tabCountTitle(t.id, n)} aria-label={tabCountTitle(t.id, n)}>{n}</span>}
                 </button>
               );
             })}
@@ -162,7 +217,7 @@ export default function AccountingIntegration() {
           </div>
         )}
 
-        {!canWrite && !conn.isLoading && (
+        {!canWrite && (
           <div className="acct-notice" role="note">
             <AlertTriangle size={16} aria-hidden="true" />
             <div>

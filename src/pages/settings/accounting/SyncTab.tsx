@@ -12,12 +12,18 @@ import {
 } from '@/lib/accounting';
 import { AcctCard, ErrorBlock, LoadingBlock, useAccountingPermissions } from './shared';
 
+// One vocabulary for failures, used in the list and the activity log.
 const ERROR_META: Record<string, { tone: StatusTone; label: string }> = {
-  ERROR: { tone: 'warning', label: 'Will retry' },
-  DEAD: { tone: 'danger', label: 'Gave up' },
-  BLOCKED: { tone: 'neutral', label: 'Blocked' },
+  ERROR: { tone: 'warning', label: 'Failed, retrying' },
+  DEAD: { tone: 'danger', label: 'Failed, stopped' },
+  BLOCKED: { tone: 'neutral', label: 'Waiting on you' },
 };
-const LEVEL_TONE: Record<string, StatusTone> = { INFO: 'neutral', WARNING: 'warning', ERROR: 'danger' };
+const LEVEL: Record<string, { tone: StatusTone; label: string }> = {
+  INFO: { tone: 'success', label: 'Done' },
+  WARNING: { tone: 'warning', label: 'Warning' },
+  ERROR: { tone: 'warning', label: 'Failed, retrying' },
+};
+const OVERDUE_MS = 2 * 60 * 60 * 1000;
 
 /** In-app link for a document, or plain text when the server has none. */
 function DocLink({ url, children }: { url: string | null; children: React.ReactNode }) {
@@ -79,6 +85,8 @@ export function SyncTab({ connection }: { connection: Connection }) {
 
   const s = q.data;
   const c = s.counts;
+  const lastFetch = s.last_payment_sync_at ? new Date(s.last_payment_sync_at).getTime() : null;
+  const overdue = connection.status === 'ACTIVE' && connection.readiness.sync_enabled && (lastFetch == null || Date.now() - lastFetch > OVERDUE_MS);
 
   return (
     <>
@@ -86,7 +94,11 @@ export function SyncTab({ connection }: { connection: Connection }) {
         title="Sync"
         description={<>
           Documents go to {cfg.short} as you create them; payments come back every few minutes.
-          {' '}Payments last fetched {s.last_payment_sync_at ? formatRelativeTime(s.last_payment_sync_at) : 'never'}.
+          {overdue && (
+            <span className="acct-hint is-required" style={{ display: 'flex', marginTop: 4 }}>
+              Payment fetch is overdue: last fetched {s.last_payment_sync_at ? formatRelativeTime(s.last_payment_sync_at) : 'never'}.
+            </span>
+          )}
         </>}
         actions={
           <button type="button" className="tw-btn" onClick={syncNow} disabled={!canWrite || syncing || connection.status !== 'ACTIVE'} title={writeTitle}>
@@ -96,11 +108,13 @@ export function SyncTab({ connection }: { connection: Connection }) {
         }
         flush
       >
-        <div className="acct-stats">
-          <div className="acct-stat"><div className="acct-stat__label">In {cfg.short}</div><div className="acct-stat__value">{c.synced.toLocaleString('en-ZA')}</div></div>
-          <div className="acct-stat"><div className="acct-stat__label">Waiting to send</div><div className="acct-stat__value">{c.queued.toLocaleString('en-ZA')}</div></div>
-          <div className="acct-stat"><div className="acct-stat__label">Failed, retrying</div><div className="acct-stat__value" style={c.errors ? { color: 'var(--status-warning-text)' } : undefined}>{c.errors.toLocaleString('en-ZA')}</div></div>
-          <div className="acct-stat"><div className="acct-stat__label">Gave up</div><div className="acct-stat__value" style={c.dead ? { color: 'var(--status-danger-text)' } : undefined}>{c.dead.toLocaleString('en-ZA')}</div></div>
+        <div style={{ padding: 'var(--card-pad, 20px)' }}>
+          <div className="acct-tiles">
+            <div><span>In {cfg.short}</span><strong>{c.synced.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Waiting to send</span><strong>{c.queued.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Failed, retrying</span><strong style={c.errors ? { color: 'var(--status-warning-text)' } : undefined}>{c.errors.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Failed, stopped</span><strong style={c.dead ? { color: 'var(--status-danger-text)' } : undefined}>{c.dead.toLocaleString('en-ZA')}</strong></div>
+          </div>
         </div>
       </AcctCard>
 
@@ -112,17 +126,17 @@ export function SyncTab({ connection }: { connection: Connection }) {
             {s.errors.map(e => {
               const meta = ERROR_META[e.status] ?? { tone: 'neutral' as StatusTone, label: humanise(e.status) };
               return (
-                <li key={e.id} className="acct-row">
+                <li key={e.id} className="acct-row acct-row--error">
                   <div style={{ minWidth: 0 }}>
                     <div className="acct-row__title"><DocLink url={e.local_url}>{e.label}</DocLink></div>
                     <div className="acct-row__sub">{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} · {e.attempts} {e.attempts === 1 ? 'try' : 'tries'}{e.next_attempt_at && e.status === 'ERROR' ? ` · next try ${formatDateTime(e.next_attempt_at)}` : ''}</div>
                   </div>
                   <div className="acct-row__sub" style={{ color: 'var(--text-secondary)' }}>{e.last_error || 'No reason given'}</div>
+                  <div className="acct-row__chip"><StatusChip tone={meta.tone} label={meta.label} size="sm" /></div>
                   <div className="acct-row__actions">
-                    <StatusChip tone={meta.tone} label={meta.label} size="sm" />
                     {canWrite && (
                       <button type="button" className="tw-btn tw-btn--sm" onClick={() => retry(e)} disabled={retrying === e.id}>
-                        {retrying === e.id ? 'Retrying…' : 'Retry'}
+                        {retrying === e.id ? 'Retrying…' : 'Retry now'}
                       </button>
                     )}
                   </div>
@@ -133,20 +147,20 @@ export function SyncTab({ connection }: { connection: Connection }) {
         )}
       </AcctCard>
 
-      <AcctCard title="Recent activity" flush>
+      <AcctCard title="Recent activity" description="The latest sends and fetches, newest first." flush>
         {s.recent.length === 0 ? (
           <div className="acct-empty">No activity yet.</div>
         ) : (
           <ul className="acct-list">
             {s.recent.map(ev => (
-              <li key={ev.id} className="acct-row" style={{ gridTemplateColumns: 'minmax(0, 1fr) auto' }}>
+              <li key={ev.id} className="acct-row acct-row--event">
+                <span className={`acct-dot acct-dot--${(LEVEL[ev.level] ?? LEVEL.INFO).tone}`} title={(LEVEL[ev.level] ?? LEVEL.INFO).label} aria-label={(LEVEL[ev.level] ?? LEVEL.INFO).label} role="img" />
                 <div style={{ minWidth: 0 }}>
                   <div className="acct-row__title" style={{ fontWeight: 400 }}>
                     {ev.label ? <><strong style={{ fontWeight: 500 }}>{ev.label}</strong> · </> : null}{ev.message || humanise(ev.action)}
                   </div>
                   <div className="acct-row__sub">{formatDateTime(ev.created_at)}</div>
                 </div>
-                {ev.level !== 'INFO' && <StatusChip tone={LEVEL_TONE[ev.level] ?? 'neutral'} label={humanise(ev.level)} size="sm" />}
               </li>
             ))}
           </ul>

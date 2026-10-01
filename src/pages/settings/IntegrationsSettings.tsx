@@ -370,7 +370,7 @@ export function IntegrationsSettings() {
       <SettingsPageHeader title="Integrations" description="Connect TruckWys to your existing tools" />
 
       {/* Accounting: Xero, QuickBooks Online, Sage (one connected at a time). */}
-      <h2 className="acct-section-title" style={{ marginTop: 0 }}>Accounting</h2>
+      <h2 className="acct-section-title">Accounting</h2>
       <p className="acct-section-desc">Send invoices, credit notes and supplier bills to your books; payments come back on their own.</p>
       <AccountingProviderCards />
 
@@ -684,6 +684,9 @@ export function IntegrationsSettings() {
           </button>
         )}
       </div>
+
+      <h2 className="acct-section-title">Developers</h2>
+      <p className="acct-section-desc">Connect your own systems to TruckWys.</p>
 
       {/* Partner API Keys Card */}
       <div style={cardStyle}>

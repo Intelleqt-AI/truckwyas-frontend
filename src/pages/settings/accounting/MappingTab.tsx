@@ -9,7 +9,7 @@ import {
   ACCT_KEYS, ACCT_URL, accountingApi, apiFieldErrors, apiMessage, invalidateAccounting, missingMappingLabel, providerConfig,
   type Connection, type Mapping, type MappingSection, type MappingUpdate, type ProviderAccount, type ProviderTaxRate, type TrackingMapping,
 } from '@/lib/accounting';
-import { AcctCard, ErrorBlock, LoadingBlock, useAccountingPermissions } from './shared';
+import { AcctCard, ErrorBlock, LoadingBlock, SkelLine, useAccountingPermissions } from './shared';
 
 const NONE = '__none';
 
@@ -143,7 +143,24 @@ export function MappingTab({ connection }: { connection: Connection }) {
     }
   };
 
-  if (q.isLoading) return <AcctCard title="Accounts and VAT"><LoadingBlock label="Loading mapping" /></AcctCard>;
+  if (q.isLoading) {
+    // The same cards as the loaded page, with placeholder rows.
+    return (
+      <>
+        <AcctCard
+          title="Accounts and VAT"
+          description={<>Where each kind of charge and cost goes in {cfg.short}. Nothing is sent until every required line is mapped.</>}
+          actionsBelow
+          actions={<><span className="tw-btn" style={{ visibility: 'hidden', width: 160 }} aria-hidden="true" /><span className="tw-btn" style={{ visibility: 'hidden', width: 160 }} aria-hidden="true" /></>}
+        >
+          <SkelLine width="60%" />
+        </AcctCard>
+        <AcctCard title="Income accounts" description="Which income account each kind of charge on your invoices goes to." flush>
+          <LoadingBlock label="Loading mapping" rows={6} />
+        </AcctCard>
+      </>
+    );
+  }
   if (q.isError || !m) {
     return <AcctCard title="Accounts and VAT"><ErrorBlock message={apiMessage(q.error, "Couldn't load the mapping.")} onRetry={() => q.refetch()} /></AcctCard>;
   }
@@ -154,16 +171,27 @@ export function MappingTab({ connection }: { connection: Connection }) {
   const disabled = !canWrite || saving;
   const branchCat = cats.find(c => c.id === tracking.branch_category_id);
 
+  // The server's "missing" list says which empty rows block the sync; any
+  // other empty row is optional. Both are labelled, so nothing is guesswork.
+  const PREFIX: Record<MappingSection, string> = { revenue_types: 'revenue', expense_categories: 'expense', tax_sales: 'tax_sales', tax_purchases: 'tax_purchases' };
+  const requiredGap = (section: MappingSection, key: string) =>
+    !sectionValue(section, key) && (m.missing ?? []).includes(`${PREFIX[section]}:${key}`);
   const suggestionHint = (section: MappingSection, key: string, describe: (v: string) => string) => {
     const s = m.suggestions?.[section]?.[key];
-    if (!s || sectionValue(section, key) === s) return null;
-    return (
-      <div className="acct-hint">
-        <span>Suggested: {describe(s)}</span>
-        {canWrite && <button type="button" className="acct-linkbtn" onClick={() => setSection(section, key, s)}>Use suggestion</button>}
-      </div>
-    );
+    const empty = !sectionValue(section, key);
+    if (s && sectionValue(section, key) !== s) {
+      return (
+        <div className={`acct-hint${requiredGap(section, key) ? ' is-required' : ''}`}>
+          <span>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {describe(s)}</span>
+          {canWrite && <button type="button" className="acct-linkbtn" onClick={() => setSection(section, key, s)}>Use suggestion</button>}
+        </div>
+      );
+    }
+    if (requiredGap(section, key)) return <div className="acct-hint is-required">Required. No suggestion: pick where it should go.</div>;
+    if (empty) return <div className="acct-hint">Optional. Lines of this kind are rare; map it if you use it.</div>;
+    return null;
   };
+  const rowClass = (section: MappingSection, key: string) => `acct-map-row${requiredGap(section, key) ? ' is-required' : ''}`;
   const describeAccount = (code: string) => { const a = accounts.find(x => x.code === code); return a ? accountLabel(a) : code; };
   const describeTax = (code: string) => { const t = taxRates.find(x => x.code === code); return t ? taxLabel(t) : code; };
 
@@ -172,12 +200,13 @@ export function MappingTab({ connection }: { connection: Connection }) {
       <AcctCard
         title="Accounts and VAT"
         description={<>
-          Tell TruckWys where each kind of charge and cost goes in {cfg.short}. Nothing is sent until every line is mapped.
+          Where each kind of charge and cost goes in {cfg.short}. Nothing is sent until every required line is mapped.
           {m.options.fetched_at && <> Read from {cfg.short} {formatRelativeTime(m.options.fetched_at)}.</>}
         </>}
+        actionsBelow
         actions={<>
           {canWrite && pendingSuggestions.length > 1 && (
-            <button type="button" className="tw-btn" onClick={applyAllSuggestions}>Use all {pendingSuggestions.length} suggestions</button>
+            <button type="button" className="tw-btn" onClick={applyAllSuggestions}>Apply {pendingSuggestions.length} suggestions</button>
           )}
           <button type="button" className="tw-btn" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
             <RefreshCw size={14} aria-hidden="true" className={refreshing ? 'animate-spin' : undefined} />
@@ -199,7 +228,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         {m.revenue_types.map(row => {
           const field = `revenue_types.${row.key}`;
           return (
-            <div className="acct-map-row" key={row.key}>
+            <div className={rowClass('revenue_types', row.key)} key={row.key}>
               <label className="acct-map-row__label" id={`lbl-${field}`}>{row.label}</label>
               <div className="acct-map-row__field">
                 <AccountSelect labelledBy={`lbl-${field}`} accounts={accounts} prefer={a => a.class === 'REVENUE'} preferLabel="Income accounts"
@@ -216,7 +245,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         {m.expense_categories.map(row => {
           const field = `expense_categories.${row.key}`;
           return (
-            <div className="acct-map-row" key={row.key}>
+            <div className={rowClass('expense_categories', row.key)} key={row.key}>
               <label className="acct-map-row__label" id={`lbl-${field}`}>{row.label}</label>
               <div className="acct-map-row__field">
                 <AccountSelect labelledBy={`lbl-${field}`} accounts={accounts} prefer={a => a.class === 'EXPENSE'} preferLabel="Expense accounts"
@@ -234,8 +263,8 @@ export function MappingTab({ connection }: { connection: Connection }) {
           key={section}
           title={section === 'tax_sales' ? 'VAT on sales' : 'VAT on purchases'}
           description={section === 'tax_sales'
-            ? `The ${cfg.short} tax rate for each VAT code on your invoices and credit notes.`
-            : `The ${cfg.short} tax rate for each VAT code on supplier bills.`}
+            ? `The ${cfg.short} tax rate for each VAT code on invoices and credit notes. Each needs the same percentage.`
+            : `The ${cfg.short} tax rate for each VAT code on supplier bills. Each needs the same percentage.`}
           flush
         >
           {m[section].map(row => {
@@ -243,10 +272,9 @@ export function MappingTab({ connection }: { connection: Connection }) {
             const chosen = taxRates.find(t => t.code === sectionValue(section, row.key));
             const mismatch = chosen && num(chosen.rate) != null && num(row.rate) != null && num(chosen.rate) !== num(row.rate);
             return (
-              <div className="acct-map-row" key={row.key}>
+              <div className={rowClass(section, row.key)} key={row.key}>
                 <label className="acct-map-row__label" id={`lbl-${field}`}>
                   {row.label}
-                  <small>Needs a {pct(row.rate)} rate</small>
                 </label>
                 <div className="acct-map-row__field">
                   <TaxSelect labelledBy={`lbl-${field}`} rates={taxRates} prefer={t => (section === 'tax_sales' ? t.revenue : t.expenses)}
@@ -265,7 +293,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
       ))}
 
       <AcctCard
-        title="Bank account for earlier payments"
+        title="Bank account for payments already recorded"
         description={`Only needed if you recorded customer payments in TruckWys for invoices after the cut-over date. They are sent to ${cfg.short} into this bank account.`}
         flush
       >
@@ -274,7 +302,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
           <div className="acct-map-row__field">
             <AccountSelect labelledBy="lbl-receipts" accounts={accounts.filter(a => a.is_bank)} prefer={() => true} preferLabel="Bank accounts"
               value={receipts} onChange={v => { setDraft(d => ({ ...d, receipts_account: v })); setErrors(e => { const n = { ...e }; delete n.receipts_account; return n; }); }}
-              disabled={disabled} invalid={!!errors.receipts_account} noneLabel="Not needed" />
+              disabled={disabled} invalid={!!errors.receipts_account} noneLabel="None, no payments to send" />
             {accounts.every(a => !a.is_bank) && <div className="acct-hint">No bank accounts came back from {cfg.short}. Add one there, then refresh.</div>}
             {errors.receipts_account && <div className="acct-error" role="alert">{errors.receipts_account}</div>}
           </div>
@@ -324,8 +352,8 @@ export function MappingTab({ connection }: { connection: Connection }) {
       </AcctCard>
 
       {canWrite && (
-        <div className={`acct-savebar${dirty || formError ? ' is-dirty' : ''}`}>
-          <span className="acct-savebar__note" role={formError ? 'alert' : undefined} style={formError ? { color: 'var(--status-danger-text)' } : undefined}>
+        <div className={`acct-savebar${formError ? ' has-error' : ''}`}>
+          <span className={`acct-savebar__note${formError ? ' acct-savebar__error' : ''}`} role={formError ? 'alert' : undefined} style={formError ? { color: 'var(--status-danger-text)' } : undefined}>
             {formError || (dirty ? `${changeCount} unsaved ${changeCount === 1 ? 'change' : 'changes'}` : 'No unsaved changes')}
           </span>
           <button type="button" className="tw-btn" onClick={() => { setDraft(EMPTY_DRAFT); setErrors({}); setFormError(''); }} disabled={!dirty || saving}>Discard</button>

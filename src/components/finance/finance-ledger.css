@@ -67,6 +67,10 @@
   .fl-lines__table td.fl-cell-del { grid-column: 3; }
   .fl-lines__table td.fl-cell-amt { grid-column: 1 / -1; grid-row: auto; }
   .fl-cell-amt .fl-amt { padding-top: 0; }
+  /* Qty / price, then discount / tax, two to a row: never the 40px delete
+     column (the discount used to land there and was cut off). */
+  .fl-lines__table td:nth-child(2), .fl-lines__table td:nth-child(4) { grid-column: 1; }
+  .fl-lines__table td:nth-child(3), .fl-lines__table td:nth-child(5) { grid-column: 2 / 4; }
 }
 .fl-lines-card { container-type: inline-size; }
 /* The new-invoice details card keeps its three-across container rule inside the main column. */

@@ -11,15 +11,16 @@ import { toast } from '@/lib/toast';
 import {
   ACCT_KEYS, accountingApi, apiMessage, invalidateAccounting, providerConfig, type Connection,
 } from '@/lib/accounting';
-import { settingsCardStyle, settingsDangerButtonStyle } from '../settingsUi';
-import { useAccountingPermissions } from './shared';
+import { settingsCardStyle } from '../settingsUi';
+import RowActions from '@/components/ui/RowActions';
+import { SkelLine, useAccountingPermissions } from './shared';
 
 /** Org name, status, who connected it and when, and the connection's actions. */
 export function ConnectionHeader({ connection }: { connection: Connection }) {
   const qc = useQueryClient();
   const { canWrite, writeTitle } = useAccountingPermissions();
   const cfg = providerConfig(connection.provider);
-  const chip = connectionChip(connection.status);
+  const chip = connectionChip(connection.status, connection.readiness?.sync_enabled ?? true);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState<'disconnect' | 'reconnect' | null>(null);
 
@@ -61,45 +62,50 @@ export function ConnectionHeader({ connection }: { connection: Connection }) {
         <ProviderLogo provider={connection.provider} />
         <div className="acct-head__main">
           <h2 id="acct-conn-title" className="acct-head__name">
-            {pending ? cfg.name : connection.tenant_name || `${cfg.short} organisation`}
-            <StatusChip tone={chip.tone} label={chip.label} size="sm" />
+            {pending ? `${cfg.short} organisation` : connection.tenant_name || `${cfg.short} organisation`}
           </h2>
-          <p className="acct-card__desc">
-            {pending ? `Signed in to ${cfg.short}; no organisation chosen yet.` : cfg.name}
+          {/* The status always sits on the caption line, in the same place in every state. */}
+          <p className="acct-head__caption">
+            <span>{cfg.name}</span>
+            <StatusChip tone={chip.tone} label={chip.label} size="sm" />
           </p>
         </div>
-        <div className="acct-head__actions">
-          {connection.web_url && !pending && (
-            <a href={connection.web_url} target="_blank" rel="noopener noreferrer" className="tw-btn">
-              Open in {cfg.short}
-              <ExternalLink size={14} aria-hidden="true" />
-            </a>
-          )}
-          {connection.status === 'NEEDS_REAUTH' && (
-            <button type="button" className="tw-btn tw-btn--primary" onClick={reconnect} disabled={!canWrite || busy !== null} title={writeTitle}>
-              {busy === 'reconnect' ? 'Opening…' : 'Reconnect'}
-            </button>
-          )}
-          {canWrite && (
-            <button
-              type="button"
-              className="settings-control"
-              style={settingsDangerButtonStyle}
-              onClick={() => setConfirming(true)}
-              disabled={busy !== null}
-            >
-              {busy === 'disconnect' ? 'Disconnecting…' : pending ? 'Cancel connection' : 'Disconnect'}
-            </button>
-          )}
-        </div>
+        {(connection.web_url && !pending) || connection.status === 'NEEDS_REAUTH' ? (
+          <div className="acct-head__actions">
+            {connection.status === 'NEEDS_REAUTH' && (
+              <button type="button" className="tw-btn tw-btn--primary" onClick={reconnect} disabled={!canWrite || busy !== null} title={writeTitle}>
+                {busy === 'reconnect' ? 'Opening…' : `Reconnect ${cfg.short}`}
+              </button>
+            )}
+            {connection.web_url && !pending && (
+              <a href={connection.web_url} target="_blank" rel="noopener noreferrer" className="tw-btn">
+                Open in {cfg.short}
+                <ExternalLink size={14} aria-hidden="true" />
+              </a>
+            )}
+          </div>
+        ) : null}
+        {canWrite && (
+          <div className="acct-head__menu">
+            <RowActions
+              label={`${cfg.short} connection`}
+              items={[{
+                label: busy === 'disconnect' ? 'Disconnecting…' : pending ? 'Cancel connection' : `Disconnect ${cfg.short}`,
+                onSelect: () => setConfirming(true),
+                disabled: busy !== null,
+                danger: true,
+              }]}
+            />
+          </div>
+        )}
       </div>
 
       {connection.status === 'NEEDS_REAUTH' && (
         <div className="acct-notice acct-notice--danger" role="status" style={{ margin: '16px 0 0' }}>
           <AlertTriangle size={16} aria-hidden="true" />
           <div>
-            <strong>{cfg.short} needs you to sign in again</strong>
-            {connection.status_reason || `${cfg.short} stopped accepting TruckWys' access.`} Nothing is sent or fetched until an admin reconnects.
+            <strong>{connection.status_reason || `Your ${cfg.short} sign-in has expired.`}</strong>
+            An admin needs to sign in to {cfg.short} again. Nothing is sent or fetched until then.
           </div>
         </div>
       )}
@@ -118,15 +124,39 @@ export function ConnectionHeader({ connection }: { connection: Connection }) {
   );
 }
 
+/** Same box as ConnectionHeader while the connection loads. */
+export function ConnectionHeaderSkeleton() {
+  return (
+    <section style={{ ...settingsCardStyle, padding: 'var(--card-pad, 20px)' }} aria-busy="true" aria-label="Loading your accounting connection" role="status">
+      <div className="acct-head">
+        <span className="acct-logo" aria-hidden="true" />
+        <div className="acct-head__main">
+          <SkelLine width="55%" lineHeight={24} />
+          <SkelLine width="30%" lineHeight={22} />
+        </div>
+        <div className="acct-head__actions"><span className="tw-btn" style={{ width: 120, visibility: 'hidden' }} aria-hidden="true" /></div>
+      </div>
+      <dl className="acct-facts">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i}><dt><SkelLine width={90} /></dt><dd><SkelLine width={110 - (i % 3) * 15} /></dd></div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 /** PENDING_ORG: the login sees several organisations; pick the one with this company's books. */
 export function OrgPicker({ connection }: { connection: Connection }) {
   const qc = useQueryClient();
   const { canWrite, writeTitle } = useAccountingPermissions();
   const cfg = providerConfig(connection.provider);
-  const [choice, setChoice] = useState<string>('');
+  const tenants = connection.pending_tenants ?? [];
+  const isZar = (c: string) => !c || c.toUpperCase() === 'ZAR';
+  const eligible = tenants.filter(t => isZar(t.currency));
+  // One organisation that can be linked: choose it for them.
+  const [choice, setChoice] = useState<string>(eligible.length === 1 ? eligible[0].tenant_id : '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const tenants = connection.pending_tenants ?? [];
 
   const submit = async () => {
     if (!choice) return;
@@ -156,30 +186,29 @@ export function OrgPicker({ connection }: { connection: Connection }) {
       ) : (
         <div role="radiogroup" aria-labelledby="acct-org-title">
           {tenants.map(t => {
-            const notZar = t.currency && t.currency.toUpperCase() !== 'ZAR';
+            const notZar = !isZar(t.currency);
+            const selected = choice === t.tenant_id;
             return (
-              <label key={t.tenant_id} className="acct-row" style={{ gridTemplateColumns: '20px minmax(0, 1fr) auto', cursor: canWrite ? 'pointer' : 'default' }}>
+              <label key={t.tenant_id} className={`acct-row acct-org${selected ? ' is-selected' : ''}${notZar ? ' is-disabled' : ''}`}>
                 <input
                   type="radio"
                   name="acct-org"
+                  className="acct-radio"
                   value={t.tenant_id}
-                  checked={choice === t.tenant_id}
+                  checked={selected}
                   onChange={() => setChoice(t.tenant_id)}
-                  disabled={!canWrite}
+                  disabled={!canWrite || notZar}
                 />
                 <span style={{ minWidth: 0 }}>
                   <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
-                  <span className="acct-row__sub">
-                    Base currency {t.currency || 'unknown'}{notZar ? '. TruckWys only supports rand books for now.' : ''}
-                  </span>
+                  <span className="acct-row__sub">{notZar ? `Can't be linked: books in ${t.currency}` : `Books in ${t.currency || 'ZAR'}`}</span>
                 </span>
-                {notZar && <StatusChip tone="warning" label="Not ZAR" size="sm" />}
               </label>
             );
           })}
         </div>
       )}
-      <div style={{ padding: '12px var(--card-pad, 20px)', borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      <div style={{ padding: '16px var(--card-pad, 20px)', borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         {error && <p className="acct-error" role="alert" style={{ margin: 0, marginRight: 'auto' }}>{error}</p>}
         {!canWrite && <p className="acct-section-desc" style={{ margin: 0, marginRight: 'auto' }}>{writeTitle}.</p>}
         <button type="button" className="tw-btn tw-btn--primary" onClick={submit} disabled={!canWrite || !choice || busy}>

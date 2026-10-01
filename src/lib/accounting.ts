@@ -35,15 +35,15 @@ export interface ProviderConfig {
 export const PROVIDERS: Record<ProviderCode, ProviderConfig> = {
   XERO: {
     code: 'XERO', slug: 'xero', name: 'Xero', short: 'Xero', logo: '/Xero_logo.jpg', initials: 'X',
-    blurb: 'Send invoices, credit notes and supplier bills to Xero; payments come back automatically.',
+    blurb: 'Invoices, credit notes and bills go to Xero; payments come back.',
   },
   QBO: {
     code: 'QBO', slug: 'quickbooks', name: 'QuickBooks Online', short: 'QuickBooks', logo: null, initials: 'QB',
-    blurb: 'Send invoices, credit notes and supplier bills to QuickBooks; payments come back automatically.',
+    blurb: 'Invoices, credit notes and bills go to QuickBooks; payments come back.',
   },
   SAGE: {
     code: 'SAGE', slug: 'sage', name: 'Sage Business Cloud Accounting', short: 'Sage', logo: null, initials: 'S',
-    blurb: 'Sage Business Cloud Accounting for South African businesses.',
+    blurb: 'Invoices, credit notes and bills go to Sage; payments come back.',
   },
 };
 
@@ -437,7 +437,7 @@ export function callbackMessage(result: string | null, reason: string | null, pr
 }
 
 const SECTION_LABEL: Record<string, string> = {
-  revenue: 'Revenue',
+  revenue: 'Income',
   expense: 'Expense',
   tax_sales: 'VAT on sales',
   tax_purchases: 'VAT on purchases',
@@ -445,11 +445,11 @@ const SECTION_LABEL: Record<string, string> = {
   tracking: 'Tracking',
 };
 
-/** "revenue:FUEL_SURCHARGE" -> "Revenue: Fuel surcharge". */
+/** "revenue:FUEL_SURCHARGE" -> "Fuel surcharge (revenue)". */
 export function missingMappingLabel(key: string): string {
   const [section, item] = key.split(':');
   const head = SECTION_LABEL[section] ?? humanise(section);
-  return item ? `${head}: ${humanise(item)}` : head;
+  return item ? `${humanise(item)} (${head.charAt(0).toLowerCase()}${head.slice(1)})` : head;
 }
 
 /** "FUEL_SURCHARGE" -> "Fuel surcharge". */

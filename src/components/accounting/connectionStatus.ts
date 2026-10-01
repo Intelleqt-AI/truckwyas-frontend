@@ -2,11 +2,12 @@ import type { StatusTone } from '@/components/ui/StatusChip';
 import type { ConnectionStatus, DocumentSyncStatus } from '@/lib/accounting';
 
 /** Chip tone + label for a connection's status. */
-export function connectionChip(status: ConnectionStatus): { tone: StatusTone; label: string } {
+export function connectionChip(status: ConnectionStatus, syncEnabled = true): { tone: StatusTone; label: string } {
+  if (status === 'ACTIVE' && !syncEnabled) return { tone: 'warning', label: 'Setup needed' };
   switch (status) {
     case 'ACTIVE': return { tone: 'success', label: 'Connected' };
-    case 'NEEDS_REAUTH': return { tone: 'danger', label: 'Needs reconnecting' };
-    case 'PENDING_ORG': return { tone: 'warning', label: 'Choose organisation' };
+    case 'NEEDS_REAUTH': return { tone: 'danger', label: 'Sign-in expired' };
+    case 'PENDING_ORG': return { tone: 'warning', label: 'Organisation not chosen' };
     default: return { tone: 'neutral', label: 'Disconnected' };
   }
 }

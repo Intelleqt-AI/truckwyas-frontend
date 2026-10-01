@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Segmented } from '@/components/ui/Segmented';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 import RowActions, { type RowActionItem } from '@/components/ui/RowActions';
 import { FinDialog } from '@/components/finance/FinDialog';
@@ -91,14 +92,15 @@ export function ContactsTab({ connection }: { connection: Connection }) {
 
   const statusOptions: { value: StatusFilter; label: string; count?: number }[] = [
     { value: 'ALL', label: 'All', count: total },
-    ...ORDER.map(s => ({ value: s as StatusFilter, label: STATUS_META[s].label, count: summary[s] ?? 0 })),
+    // Empty statuses stay out of the way (the current one always shows).
+    ...ORDER.filter(s => (summary[s] ?? 0) > 0 || s === status).map(s => ({ value: s as StatusFilter, label: STATUS_META[s].label, count: summary[s] ?? 0 })),
   ];
 
   return (
     <>
       <AcctCard
         title="Contacts"
-        description={`Every customer and supplier with documents to send needs a ${cfg.short} contact. Matches on VAT number, registration number or email are linked for you; name-only matches wait for you to confirm.`}
+        description={`Each customer and supplier needs a ${cfg.short} contact. Matches on VAT, registration number or email are linked for you; name-only matches wait for you.`}
         actions={
           <button type="button" className="tw-btn" onClick={runMatching} disabled={!canWrite || matching} title={writeTitle}>
             <RefreshCw size={14} aria-hidden="true" className={matching ? 'animate-spin' : undefined} />
@@ -108,15 +110,24 @@ export function ContactsTab({ connection }: { connection: Connection }) {
         flush
       >
         <div className="acct-toolbar">
-          <Segmented label="Status" value={status} onChange={setStatus} options={statusOptions} size="sm" />
+          <div className="acct-only-wide"><Segmented label="Status" value={status} onChange={setStatus} options={statusOptions} size="sm" /></div>
+          <div className="acct-only-phone" style={{ flex: '1 1 160px', minWidth: 0 }}>
+            <Select value={status} onValueChange={v => setStatus(v as StatusFilter)}>
+              <SelectTrigger aria-label="Status"><SelectValue /></SelectTrigger>
+              <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label} ({o.count ?? 0})</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
           <span className="acct-toolbar__spacer" />
-          <Segmented
-            label="Kind"
-            value={kind}
-            onChange={setKind}
-            size="sm"
-            options={[{ value: 'ALL', label: 'Everyone' }, { value: 'CUSTOMER', label: 'Customers' }, { value: 'SUPPLIER', label: 'Suppliers' }]}
-          />
+          <div style={{ flex: '0 1 170px', minWidth: 0 }}>
+            <Select value={kind} onValueChange={v => setKind(v as KindFilter)}>
+              <SelectTrigger aria-label="Customers or suppliers" style={{ minHeight: 32 }}><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All contacts</SelectItem>
+                <SelectItem value="CUSTOMER">Customers</SelectItem>
+                <SelectItem value="SUPPLIER">Suppliers</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         {(summary.SUGGESTED ?? 0) > 0 && status === 'ALL' && (
           <p className="acct-section-desc" style={{ margin: 0, padding: '12px var(--card-pad, 20px)', borderBottom: '1px solid var(--border-row)' }}>
@@ -170,7 +181,8 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   onPick: () => void;
 }) {
   const meta = STATUS_META[row.status] ?? { tone: 'neutral' as StatusTone, label: row.status };
-  const ids = [row.local_vat && `VAT ${row.local_vat}`, row.local_registration && `Reg ${row.local_registration}`, row.local_email].filter(Boolean).join(' · ');
+  // One identifier is enough to recognise them: VAT, else registration, else email.
+  const ids = row.local_vat ? `VAT ${row.local_vat}` : row.local_registration ? `Reg ${row.local_registration}` : row.local_email;
   const suggestedId = row.external_id ?? row.candidates[0]?.external_id ?? null;
   const suggestedName = row.external_name ?? row.candidates[0]?.name ?? null;
 
@@ -178,7 +190,7 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   if (row.status === 'MATCHED' || row.status === 'SUGGESTED') {
     match = (
       <>
-        <div className="acct-row__title">{suggestedName ?? '—'}</div>
+        <div className="acct-row__title"><span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>{providerName}: </span>{suggestedName ?? '—'}</div>
         <div className="acct-row__sub">{row.method ? `Matched on ${MATCH_METHOD_LABEL[row.method] ?? row.method}` : `In ${providerName}`}</div>
       </>
     );
@@ -211,16 +223,19 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   }
 
   return (
-    <li className={`acct-row${row.status === 'SUGGESTED' ? ' is-highlight' : ''}`}>
+    <li className={`acct-row acct-row--contact${row.status === 'SUGGESTED' ? ' is-highlight' : ''}`}>
       <div style={{ minWidth: 0 }}>
         <div className="acct-row__title">{row.local_name}</div>
         <div className="acct-row__sub">{row.kind === 'SUPPLIER' ? 'Supplier' : 'Customer'}{ids ? ` · ${ids}` : ''}</div>
       </div>
-      <div style={{ minWidth: 0 }}>{match}</div>
+      {/* Status first, then the match: every chip starts at the same x. */}
+      <div style={{ minWidth: 0 }}>
+        <div className="acct-row__chip" style={{ marginBottom: 4 }}><StatusChip tone={meta.tone} label={meta.label} size="sm" /></div>
+        {match}
+      </div>
       <div className="acct-row__actions">
-        <StatusChip tone={meta.tone} label={meta.label} size="sm" />
         {primary}
-        {menu.length > 0 && <RowActions label={row.local_name} items={menu} />}
+        <span className="acct-row__menu">{menu.length > 0 && <RowActions label={row.local_name} items={menu} />}</span>
       </div>
     </li>
   );

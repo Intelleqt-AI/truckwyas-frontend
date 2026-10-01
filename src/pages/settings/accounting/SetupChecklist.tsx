@@ -58,23 +58,29 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     {
       key: 'live',
       look: r.sync_enabled ? 'done' : 'todo',
-      title: 'Sync switched on',
+      title: 'Sync turns on',
       desc: r.sync_enabled
         ? `New invoices, credit notes and bills go to ${cfg.short} on their own, and payments come back every few minutes.`
-        : 'Switches on by itself once the steps above are done.',
+        : 'Automatic, once the steps above are done.',
       tab: r.sync_enabled ? 'sync' : undefined,
       action: r.sync_enabled ? 'Sync status' : undefined,
     },
   ];
 
+  // Only the next step to do gets the primary button; while the sign-in has
+  // expired, Reconnect (in the header) is the only one.
+  const reauth = connection.status !== 'ACTIVE';
+  const nextKey = reauth ? undefined : items.find(it => it.look !== 'done' && it.tab && it.action)?.key;
+  const todo = items.filter(it => it.look !== 'done' && it.key !== 'live').length;
+
   return (
     <>
-      {r.blocking_reasons.length > 0 ? (
+      {reauth ? null : !r.sync_enabled && todo > 0 ? (
         <div className="acct-notice acct-notice--warning" role="status">
           <AlertTriangle size={16} aria-hidden="true" />
           <div>
             <strong>Nothing is sent to {cfg.short} yet</strong>
-            <ul>{r.blocking_reasons.map(b => <li key={b}>{b}</li>)}</ul>
+            Finish the {todo === 1 ? 'step' : `${todo} steps`} below and sync turns on by itself.
           </div>
         </div>
       ) : r.sync_enabled ? (
@@ -86,17 +92,17 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
           </div>
         </div>
       ) : null}
-      <AcctCard title="Setup" description={`Five steps, once. After that ${cfg.short} and TruckWys stay in step on their own.`} flush>
-        <ol className="acct-check">
-          {items.map(it => (
+      <AcctCard title="Steps" description={`Once only. After that ${cfg.short} and TruckWys stay in step on their own.`} flush>
+        <ol className="acct-check acct-check--steps">
+          {items.map((it, i) => (
             <li key={it.key}>
-              <StepIcon look={it.look} />
+              {it.look === 'todo' ? <span className="acct-step-num" aria-hidden="true">{i + 1}</span> : <StepIcon look={it.look} />}
               <div style={{ minWidth: 0 }}>
-                <div className="acct-check__title">{it.title}</div>
+                <div className="acct-check__title"><span className="acct-sr">Step {i + 1}: </span>{it.title}</div>
                 <div className="acct-check__desc">{it.desc}</div>
               </div>
               {it.tab && it.action ? (
-                <button type="button" className={`tw-btn${it.look === 'done' ? '' : ' tw-btn--primary'}`} onClick={() => onOpen(it.tab!)}>
+                <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>
                   {it.action}
                 </button>
               ) : <span />}

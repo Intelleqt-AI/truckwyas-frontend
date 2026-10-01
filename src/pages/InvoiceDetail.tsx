@@ -959,8 +959,9 @@ export default function InvoiceDetail() {
                         <span className="fin-paylist__sub">
                           {methodLabel(payment.payment_method || payment.method || 'EFT')}
                           {ref && <> · <span className="fin-id">{ref}</span></>}
+                          {managedHere && <PaymentSourceBadge source={payment.source} managed />}
                         </span>
-                        <PaymentSourceBadge source={payment.source} managed={managedHere} />
+                        {!managedHere && <PaymentSourceBadge source={payment.source} />}
                       </span>
                       <span className="fl-pay-actions">
                         <span className="fin-paylist__amt">{formatCurrency(num(payment.amount))}</span>

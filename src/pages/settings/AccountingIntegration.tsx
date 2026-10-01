@@ -63,10 +63,8 @@ export default function AccountingIntegration() {
   const title = 'Accounting';
   // A sub-page of Integrations: the subtitle line carries the way back, as on
   // every detail page (the settings nav keeps "Integrations" highlighted).
-  const stateLine = !live ? 'Not connected'
-    : live.status === 'PENDING_ORG' ? 'Choose an organisation'
-      : live.readiness.sync_enabled ? `${cfg!.short} connection and sync`
-        : `Setting up ${cfg!.short}`;
+  // The subtitle names the system; the chip carries the state.
+  const stateLine = !live ? 'Accounting system' : `${cfg!.name} connection`;
   const description = (
     <>
       <Link to="/settings/integrations" className="section-header__back">
@@ -145,11 +143,11 @@ export default function AccountingIntegration() {
   } else if (!live) {
     body = (
       <>
-        <h2 className="acct-section-title">Choose your accounting system</h2>
+        <h2 className="acct-section-title">Connect your accounting system</h2>
         <p className="acct-section-desc">One can be connected at a time.<ComingSoonNote /></p>
         <AccountingProviderCards hideManage />
         <h3 className="acct-section-title" style={{ fontSize: 14, lineHeight: '20px' }}>After you connect</h3>
-        <p className="acct-section-desc">
+        <p className="acct-section-desc" style={{ maxWidth: 560 }}>
           Takes about 10 minutes and needs a company admin. You only do it once. After that, payments recorded in your accounting system mark TruckWys invoices as paid.
         </p>
         <ol className="acct-check acct-check--plain">
@@ -194,6 +192,8 @@ export default function AccountingIntegration() {
                   aria-controls="acct-tabpanel"
                   className={`tw-seg__opt${tab === t.id ? ' is-active' : ''}`}
                   onClick={() => openTab(t.id)}
+                  disabled={live.status === 'NEEDS_REAUTH' && t.id !== 'setup'}
+                  title={live.status === 'NEEDS_REAUTH' && t.id !== 'setup' ? `Reconnect ${cfg!.short} first` : undefined}
                 >
                   {t.label}
                   {n != null && <span className="acct-tab-count" title={tabCountTitle(t.id, n)} aria-label={tabCountTitle(t.id, n)}>{n}</span>}

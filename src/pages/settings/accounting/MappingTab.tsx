@@ -223,7 +223,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
               Apply {pendingSuggestions.length === 1 ? 'suggestion' : `${pendingSuggestions.length} suggestions`}
             </button>
           )}
-          <button type="button" className="tw-btn tw-btn--ghost" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
+          <button type="button" className="tw-btn tw-btn--ghost acct-ghost-flush" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
             <RefreshCw size={14} aria-hidden="true" className={refreshing ? 'animate-spin' : undefined} />
             {refreshing ? 'Reading…' : `Refresh from ${cfg.short}`}
           </button>
@@ -300,7 +300,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
 
       <AcctCard
         title="Bank account for past payments"
-        description={`Only needed if you recorded customer payments in TruckWys for invoices after the cut-over date. They are sent to ${cfg.short} into this bank account.`}
+        description={`Payments you recorded in TruckWys after the cut-over date are sent to this ${cfg.short} bank account.`}
         flush
       >
         <div className="acct-map-row">
@@ -308,7 +308,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
           <div className="acct-map-row__field">
             <AccountSelect labelledBy="lbl-receipts" accounts={accounts.filter(a => a.is_bank)} prefer={() => true} preferLabel="Bank accounts"
               value={receipts} onChange={v => { setDraft(d => ({ ...d, receipts_account: v })); setErrors(e => { const n = { ...e }; delete n.receipts_account; return n; }); }}
-              disabled={disabled} invalid={!!errors.receipts_account} noneLabel="None, no payments to send" />
+              disabled={disabled} invalid={!!errors.receipts_account} noneLabel="Don't send payments" />
             {accounts.every(a => !a.is_bank) && <div className="acct-hint">No bank accounts came back from {cfg.short}. Add one there, then refresh.</div>}
             {errors.receipts_account && <div className="acct-error" role="alert">{errors.receipts_account}</div>}
           </div>
@@ -328,7 +328,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
                 <PlainSelect labelledBy="lbl-veh" value={tracking.vehicle_category_id} disabled={disabled} invalid={!!errors['tracking.vehicle_category_id']}
                   options={cats.map(c => ({ value: c.id, label: c.name }))} noneLabel="Don't tag vehicles"
                   onChange={v => setDraft(d => ({ ...d, tracking: { ...tracking, vehicle_category_id: v } }))} />
-                <div className="acct-hint">{tracking.vehicle_category_id ? "Lines are tagged with the vehicle's registration." : 'Pick a category to tag lines by vehicle.'}</div>
+                {tracking.vehicle_category_id && <div className="acct-hint">Lines are tagged with the vehicle's registration.</div>}
                 {errors['tracking.vehicle_category_id'] && <div className="acct-error" role="alert">{errors['tracking.vehicle_category_id']}</div>}
               </div>
             </div>
@@ -364,8 +364,8 @@ export function MappingTab({ connection }: { connection: Connection }) {
             {formError || (dirty ? `${changeCount} unsaved ${changeCount === 1 ? 'change' : 'changes'}` : 'No unsaved changes')}
           </span>
           {dirty && <button type="button" className="tw-btn tw-btn--ghost" onClick={() => { setDraft(EMPTY_DRAFT); setErrors({}); setFormError(''); }} disabled={saving}>Discard</button>}
-          <button type="button" className="btn-action settings-control" onClick={save} disabled={!dirty || saving}
-            style={{ opacity: !dirty ? 0.5 : saving ? 0.6 : 1 }}>
+          <button type="button" className="btn-action settings-control acct-save-btn" onClick={save} disabled={!dirty || saving}
+            style={{ opacity: saving ? 0.6 : 1 }}>
             {saving ? 'Saving…' : 'Save mapping'}
           </button>
         </div>

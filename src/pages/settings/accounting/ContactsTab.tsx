@@ -113,15 +113,15 @@ export function ContactsTab({ connection }: { connection: Connection }) {
           <div className="acct-only-wide"><Segmented label="Status" value={status} onChange={setStatus} options={statusOptions} size="sm" /></div>
           <div className="acct-only-phone" style={{ flex: '1 1 160px', minWidth: 0 }}>
             <Select value={status} onValueChange={v => setStatus(v as StatusFilter)}>
-              <SelectTrigger aria-label="Status" style={{ minHeight: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
-              <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'All statuses' : o.label} ({o.count ?? 0})</SelectItem>)}</SelectContent>
+              <SelectTrigger aria-label="Status" style={{ minHeight: 36, height: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
+              <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'All statuses' : o.label} · {o.count ?? 0}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="acct-kind-filter">
             <Select value={kind} onValueChange={v => setKind(v as KindFilter)}>
               <SelectTrigger aria-label="Show customers, suppliers or both" style={{ minHeight: 36, height: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">Everyone</SelectItem>
+                <SelectItem value="ALL">Customers and suppliers</SelectItem>
                 <SelectItem value="CUSTOMER">Customers</SelectItem>
                 <SelectItem value="SUPPLIER">Suppliers</SelectItem>
               </SelectContent>
@@ -184,7 +184,7 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   if (row.status === 'MATCHED' || row.status === 'SUGGESTED') {
     match = (
       <>
-        <div className="acct-row__sub" style={{ color: 'var(--text-secondary)' }}>{providerName} contact “{suggestedName ?? '—'}”</div>
+        <div className="acct-row__sub acct-row__match">{providerName} contact “{suggestedName ?? '—'}”</div>
         <div className="acct-row__sub">{row.method ? `Matched on ${MATCH_METHOD_LABEL[row.method] ?? row.method}` : `In ${providerName}`}</div>
       </>
     );

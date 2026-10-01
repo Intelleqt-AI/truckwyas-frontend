@@ -60,7 +60,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
   const runButton = (
     <button type="button" className="tw-btn" onClick={run} disabled={!canWrite || running || connection.status !== 'ACTIVE'} title={writeTitle}>
       <RefreshCw size={14} aria-hidden="true" className={running ? 'animate-spin' : undefined} />
-      {running ? 'Checking…' : 'Run now'}
+      {running ? 'Checking…' : 'Check now'}
     </button>
   );
 
@@ -73,7 +73,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
     <>
       <AcctCard
         title="Reconciliation"
-        description={`Each night we compare invoices, customer balances and monthly sales and VAT with ${cfg.short}. Differences under ${formatCurrency(0.01)} are ignored.`}
+        description={`Each night we compare invoices, customer balances and monthly sales and VAT with ${cfg.short}. Rounding differences under 1 cent are ignored.`}
         actions={runButton}
       >
         {!last ? (
@@ -84,18 +84,18 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
             {last.status === 'FAILED' ? (
               <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />The last check didn't finish</p>
             ) : differences.length === 0 ? (
-              <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}</p>
+              <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}<span className="acct-lead-meta">· checked {formatDateTime(last.ran_at)}</span></p>
             ) : (
-              <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}</p>
+              <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}<span className="acct-lead-meta">· checked {formatDateTime(last.ran_at)}</span></p>
             )}
             <div className="acct-tiles acct-tiles--3">
-              <div><span>Invoices checked</span><strong>{(last.checked.invoices ?? 0).toLocaleString('en-ZA')}</strong></div>
-              <div><span>Customers checked</span><strong>{(last.checked.customers ?? 0).toLocaleString('en-ZA')}</strong></div>
-              <div><span>Months checked</span><strong>{(last.checked.months ?? 0).toLocaleString('en-ZA')}</strong></div>
+              <div><span>Invoices</span><strong>{(last.checked.invoices ?? 0).toLocaleString('en-ZA')}</strong></div>
+              <div><span>Customers</span><strong>{(last.checked.customers ?? 0).toLocaleString('en-ZA')}</strong></div>
+              <div><span>Months</span><strong>{(last.checked.months ?? 0).toLocaleString('en-ZA')}</strong></div>
             </div>
             {last.status === 'FAILED' && last.error && <p className="acct-error" role="status" style={{ marginTop: 12 }}>{last.error}</p>}
             <p className="acct-section-desc" style={{ margin: '12px 0 0' }}>
-              Last checked {formatDateTime(last.ran_at)}. Next check tonight, around {nextCheck(last.ran_at)}.
+              Next check at {nextCheck(last.ran_at)}.
             </p>
             {differences.length > 0 && SCOPES.filter(sc => !differences.some(d => d.scope === sc.scope)).map(sc => {
               const n = sc.scope === 'INVOICE' ? last.checked.invoices : sc.scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;

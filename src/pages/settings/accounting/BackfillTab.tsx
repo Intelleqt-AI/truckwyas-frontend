@@ -3,7 +3,7 @@ import { Lock } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DatePicker } from '@/components/ui/date-picker';
 import { StatusChip } from '@/components/ui/StatusChip';
-import { formatDate, formatDateTime } from '@/lib/formatters';
+import { formatDate, formatDateTime, formatRelativeTime } from '@/lib/formatters';
 import { fetchData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import {
@@ -17,9 +17,9 @@ import type { AccountingTab } from './tabs';
 const STEP_LABEL: Record<string, (p: string) => string> = {
   settings: p => `Read accounts and VAT from ${p}`,
   contacts: () => 'Link customers and suppliers',
-  invoices: p => `Send invoices and credit notes to ${p}`,
-  receipts: p => `Send recorded payments to ${p}`,
-  bills: p => `Send supplier bills to ${p}`,
+  invoices: () => 'Send invoices and credit notes',
+  receipts: () => 'Send recorded payments',
+  bills: () => 'Send supplier bills',
   payments: p => `Import payments from ${p}`,
 };
 
@@ -125,19 +125,18 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
 
   const cutoverCard = (
       <AcctCard
-        title="Cut-over"
+        title="Cut-over date"
         description={`From this date TruckWys sends every invoice, credit note and supplier bill to ${cfg.short}. Anything dated earlier is not sent: we assume it's already in your books.`}
       >
         <div className="acct-cutover">
           <div className="acct-cutover__date">
             {locked ? (
               <>
-                <div className="acct-field-label" style={{ fontWeight: 400, color: 'var(--text-tertiary)', marginBottom: 2 }}>Cut-over date</div>
                 <div className="acct-big-date"><Lock size={16} aria-hidden="true" />{formatDate(b.cutover_date)}</div>
               </>
             ) : (
               <>
-                <label htmlFor="acct-cutover" className="acct-field-label">Cut-over date</label>
+                <label htmlFor="acct-cutover" className="acct-sr">Cut-over date</label>
                 <DatePicker id="acct-cutover" value={date} onChange={setDate} />
               </>
             )}
@@ -193,7 +192,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
         <AcctCard
           title="Progress"
           description={running
-            ? <>{`${startedAt && startedTime ? `Started ${formatDate(b.started_at)}, ${startedTime}` : 'Started'}. Updated ${updatedTime}. You can leave this page; sending carries on.`}
+            ? <>{`${startedAt ? `Started ${formatRelativeTime(b.started_at!)}` : 'Started'} · updated ${formatRelativeTime(new Date(q.dataUpdatedAt || Date.now()))}. You can leave this page; sending carries on.`}
           <div className="acct-progress acct-progress--head" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pctDone)}
             aria-label={itemTotal ? `${itemsDone} of ${itemTotal} documents sent` : `${doneSteps} of ${b.steps.length} steps done`}>
             <div className="acct-progress__bar"><span style={{ width: `${pctDone}%` }} /></div>

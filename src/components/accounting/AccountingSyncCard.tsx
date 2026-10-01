@@ -74,7 +74,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
         <strong>{retrying ? `Last change didn't reach ${name}` : `This ${what} isn't up to date in ${name}`}</strong>
-        {retrying ? 'Retrying automatically. ' : ''}{sync.last_error || `${name} refused it.`}
+        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? "We'll keep retrying; it goes through once that's fixed." : 'Fix it, then retry from the sync page.'}
       </div>
       <Link to={`/settings/integrations/accounting?tab=${/account|tax|vat|tracking/i.test(sync.last_error) ? 'mapping' : 'sync'}`} className="tw-btn fl-notice__action">
         {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix in Accounts and VAT' : 'View sync issue'}
@@ -90,7 +90,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
  */
 export function PaymentSourceBadge({ source, managed = false }: { source?: string | null; managed?: boolean }) {
   const manual = !source || source === 'MANUAL';
-  if (managed) return manual ? <span className="acct-source-badge" title="Recorded in TruckWys before the accounting system was connected">Recorded in TruckWys</span> : null;
+  if (managed) return manual ? <span className="acct-source-note"> · recorded here before payments moved to the accounting system</span> : null;
   if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;
   return <span className="acct-source-badge">{label}</span>;

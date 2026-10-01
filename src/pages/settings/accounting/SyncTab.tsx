@@ -146,9 +146,9 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
               return (
                 <li key={e.id} className="acct-row acct-row--error">
                   <div style={{ minWidth: 0 }}>
-                    <div className="acct-row__title">{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} <DocLink url={e.local_url}>{e.label}</DocLink></div>
-                    <div className="acct-row__reason">{e.last_error || 'No reason given'}</div>
-                    <div className="acct-row__sub" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <div className="acct-row__title">{e.last_error || 'No reason given'}</div>
+                    <div className="acct-row__sub" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                      <span>{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} <DocLink url={e.local_url}>{e.label}</DocLink></span>
                       <StatusChip tone={meta.tone} label={meta.label} size="sm" />
                       Attempt {e.attempts}
                       {e.next_attempt_at && e.status === 'ERROR' ? ` · next try ${nextTry(e.next_attempt_at)}` : ''}
@@ -175,7 +175,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
         )}
       </AcctCard>
 
-      <AcctCard title="Recent activity" description="Newest first." flush>
+      <AcctCard title="Recent activity" flush>
         {s.recent.length === 0 ? (
           <div className="acct-empty">No activity yet.</div>
         ) : (
@@ -187,7 +187,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
                   <div className="acct-row__title" style={{ fontWeight: 400 }}>
                     {ev.label ? <><DocLink url={ev.local_id && /INVOICE/.test(ev.object_type) ? `/finance/invoices/${ev.local_id}` : null}>{ev.label}</DocLink> · </> : null}{ev.message || humanise(ev.action)}
                   </div>
-                  <div className="acct-row__sub">{formatDateTime(ev.created_at)}</div>
+                  <div className="acct-row__sub" title={formatDateTime(ev.created_at)}>{formatRelativeTime(ev.created_at)}</div>
                 </div>
               </li>
             ))}

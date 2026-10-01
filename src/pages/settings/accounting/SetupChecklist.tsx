@@ -15,9 +15,9 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const items: { key: string; look: StepLook; title: string; desc: string; tab?: AccountingTab; action?: string }[] = [
     {
       key: 'connect',
-      look: connection.status === 'ACTIVE' ? 'done' : 'bad',
-      title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
-      desc: connection.status === 'ACTIVE'
+      look: 'done',
+      title: `Connect ${cfg.short}`,
+      desc: true
         ? `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}.`
         : `Use Reconnect ${cfg.short} above.`,
     },
@@ -94,7 +94,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
               <StepMarker look={it.look} n={i + 1} auto={auto} />
               <div style={{ minWidth: 0 }}>
                 <div className="acct-check__title"><span className="acct-sr">Step {i + 1}: </span>{it.title}</div>
-                <div className="acct-check__desc">{it.key === 'connect' && blocked ? 'Reconnect using the button above.' : it.desc}</div>
+                <div className="acct-check__desc">{it.desc}</div>
               </div>
               {it.tab && it.action && !(blocked && it.look !== 'done') ? (
                 <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>

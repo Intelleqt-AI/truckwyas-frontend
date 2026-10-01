@@ -9,7 +9,7 @@ import { settingsBadgeStyle, settingsCardStyle, settingsInputStyle, settingsSeco
 import { formatDate, formatDateTime } from '@/lib/formatters';
 import RowActions from '@/components/ui/RowActions';
 import { StatusChip } from '@/components/ui/StatusChip';
-import { AccountingProviderCards, ComingSoonNote } from '@/components/accounting/AccountingProviderCards';
+import { AccountingProviderCards } from '@/components/accounting/AccountingProviderCards';
 
 const cardStyle: React.CSSProperties = { ...settingsCardStyle, padding: 'var(--card-pad, 20px)' };
 
@@ -371,7 +371,7 @@ export function IntegrationsSettings() {
 
       {/* Accounting: Xero, QuickBooks Online, Sage (one connected at a time). */}
       <h2 className="acct-section-title">Accounting</h2>
-      <p className="acct-section-desc">Send invoices and bills to your books; payments come back automatically.<ComingSoonNote /></p>
+      <p className="acct-section-desc">Send invoices and bills to your books; payments come back automatically.</p>
       <AccountingProviderCards />
 
       <h2 className="acct-section-title">Fleet tracking</h2>

@@ -344,7 +344,7 @@
 .acct-hint--stack > span { display: block; }
 .acct-hint--stack > .tw-btn { margin-top: 6px; }
 
-.acct-kind-filter { flex: 0 0 150px; min-width: 0; margin-left: auto; }
+.acct-kind-filter { flex: 0 0 210px; min-width: 0; margin-left: auto; }
 .acct-toolbar { flex-wrap: nowrap; }
 .acct-toolbar > .acct-only-wide { flex: 0 1 auto; min-width: 0; }
 @media (max-width: 640px) {
@@ -389,7 +389,7 @@
 .acct-step-num.is-auto { border-style: solid; color: var(--text-tertiary); }
 .acct-check--steps li { align-items: start; }
 .acct-check--steps li > .tw-btn { min-width: 140px; }
-@media (max-width: 640px) { .acct-savebar:not(.is-dirty):not(.has-error) { display: none; } }
+
 
 .acct-tab-count__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--status-warning-dot); }
 .acct-tiles--flat { border: 0; border-radius: 0; border-top: 1px solid var(--border-row); border-bottom: 1px solid var(--border-row); }
@@ -423,8 +423,9 @@
 .acct-check--plain li { padding-left: 0; padding-right: 0; border-top: 0; padding-top: 8px; padding-bottom: 8px; }
 .acct-step-num { color: var(--text-primary); border-color: var(--border-strong); }
 
-.acct-map-savebar { margin: 0 0 16px; border: 1px solid var(--border-subtle); border-radius: var(--radius-card); }
-@media (max-width: 640px) { .acct-map-savebar .cs-savebar__note { display: none; } .acct-map-savebar > .btn-action { flex: 1 1 auto; } .acct-card-actions > .tw-btn { flex: 0 1 auto; } }
+.acct-map-savebar { margin: 0 0 16px; }
+.acct-save-btn:disabled { opacity: 0.45 !important; background: var(--btn-primary-bg, var(--text-primary)) !important; color: var(--btn-primary-fg, var(--bg-surface)) !important; border-color: transparent !important; }
+@media (max-width: 640px) { .acct-map-savebar .cs-savebar__note { display: inline; } .acct-map-savebar > .btn-action { flex: 0 0 auto; } .acct-card-actions > .tw-btn { flex: 0 1 auto; } }
 
 .acct-tiles { border: 1px solid var(--border-subtle); border-radius: var(--radius-nested); }
 .acct-tiles--card { border: 0; border-radius: 0; border-top: 1px solid var(--border-row); }
@@ -442,8 +443,29 @@
 .acct-icon-link { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; margin: -6px 0; border-radius: var(--radius-control); color: var(--text-secondary); }
 .acct-icon-link:hover { background: var(--surface-tint-hover); color: var(--text-primary); }
 
-@media (max-width: 767px) { .acct-record-btn { width: 100%; } }
+
 .fl-notice + .fl-notice, .fl-notice + .fin-doc, .fl-notice + section { margin-top: 0; }
-.acct-card__desc-skel { display: block; }
-@media (max-width: 480px) { .acct-card__desc-skel { min-height: 40px; } }
+.acct-card__desc-skel { display: block; min-height: 40px; }
+@media (max-width: 480px) { .acct-card__desc-skel { min-height: 80px; } }
 .acct-tiles span.acct-dot { display: inline-block; margin-top: 0; }
+
+/* Active-tab count keeps its outline in every theme. */
+.acct-tabs .tw-seg__opt.is-active .acct-tab-count { border-color: var(--border-strong); }
+.acct-head__name { font-size: 16px; }
+.acct-row__match { color: var(--text-primary) !important; }
+.acct-tiles span { white-space: normal; overflow: visible; }
+
+.acct-lead-meta { font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); margin-left: 4px; }
+@media (max-width: 640px) { .acct-lead-meta { display: block; margin-left: 0; } .acct-ok-lead, .acct-diff-lead { flex-wrap: wrap; } }
+
+.acct-source-note { white-space: normal; }
+.fin-paylist__sub:has(.acct-source-note) { white-space: normal; }
+
+.acct-tabs .tw-seg__opt { font-size: 13px; height: 32px; }
+.acct-tabs .tw-seg__opt:disabled { color: var(--text-disabled); cursor: not-allowed; }
+.acct-tab-count { line-height: 16px; }
+.acct-notice--outline-danger { background: color-mix(in srgb, var(--status-danger) 8%, var(--bg-surface)) !important; border-color: color-mix(in srgb, var(--status-danger) 55%, transparent); }
+.acct-check--steps li > .tw-btn { min-width: 148px; }
+@media (max-width: 560px) { .acct-check--steps li > .tw-btn.tw-btn--primary { justify-self: stretch; } }
+.acct-org.is-selected { box-shadow: none !important; }
+.acct-ghost-flush { padding-left: 0; padding-right: 8px; }

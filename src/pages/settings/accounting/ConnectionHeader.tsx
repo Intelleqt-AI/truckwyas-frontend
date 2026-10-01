@@ -138,7 +138,7 @@ export function ConnectionDetails({ connection }: { connection: Connection }) {
         <div><dt>Connected by</dt><dd>{connection.connected_by || '—'}</dd></div>
         <div><dt>Connected on</dt><dd>{connection.connected_at ? formatDate(connection.connected_at) : '—'}</dd></div>
         <div><dt>Base currency</dt><dd>{connection.base_currency || '—'}</dd></div>
-        <div><dt>Cut-over date</dt><dd>{connection.cutover_date ? formatDate(connection.cutover_date) : 'Not chosen yet'}</dd></div>
+        {connection.cutover_date && <div><dt>Cut-over date</dt><dd>{formatDate(connection.cutover_date)}</dd></div>}
         {live && <div><dt>Payments last fetched</dt><dd>{connection.last_payment_sync_at ? formatDateTime(connection.last_payment_sync_at) : 'Not yet'}</dd></div>}
         {live && <div><dt>Last checked</dt><dd>{connection.last_reconciled_at ? formatDateTime(connection.last_reconciled_at) : 'Not yet'}</dd></div>}
       </dl>
@@ -230,7 +230,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
                   </span>
                   <span style={{ minWidth: 0 }}>
                     <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
-                    <span className="acct-row__sub">{notZar ? `Not available: TruckWys only supports books in ZAR, and these are in ${t.currency}` : `Books in ${t.currency || 'ZAR'}`}</span>
+                    <span className="acct-row__sub">{notZar ? `Books in ${t.currency}. TruckWys supports ZAR only.` : `Books in ${t.currency || 'ZAR'}`}</span>
                   </span>
                 </label>
               );

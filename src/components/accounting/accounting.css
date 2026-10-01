@@ -659,8 +659,9 @@
 /* Final pass: placeholders, selection, locked tabs, step labels, ink links. */
 .acct-select[data-empty] { color: var(--text-tertiary); }
 .acct-select[data-empty][aria-invalid="true"] { color: var(--text-secondary); }
-.acct-org--confirm.is-selected { background: var(--surface-tint-hover); box-shadow: inset 3px 0 0 var(--text-primary) !important; }
-.acct-org--confirm.is-disabled .acct-org__mark { filter: none !important; opacity: 0.45 !important; }
+.acct-org--confirm.is-selected { background: var(--surface-tint-hover); }
+.acct-org--confirm.is-selected .acct-row__title { font-weight: 600; }
+.acct-org--confirm.is-disabled .acct-org__mark { filter: none !important; opacity: 1 !important; }
 .acct-org--confirm.is-disabled .acct-org__mark .acct-logo { opacity: 1; }
 @media (max-width: 480px) {
   .acct-org--confirm.is-disabled > .tw-status { display: inline-flex !important; grid-column: 3; grid-row: 2; justify-self: start; margin-top: 2px; }

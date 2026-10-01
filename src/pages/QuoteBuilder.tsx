@@ -848,60 +848,13 @@ export default function QuoteBuilder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeData, billingBlocked, vehicleType]);
 
-  // ---- suggested price (main's, unchanged) ----
-  // Kept for every quote the market price check has no current result for:
-  // before a check, while the check isn't available (backend not deployed
-  // yet, paused, failed) and when the trip changed since the last check.
+  // The market price check (the panel below) is the one price suggestion now;
+  // the old win-model "suggested price (from platform quotes)" was removed so
+  // the bar never shows a second, different number. `opt` is still read for the
+  // win probability sent with the saved quote (buildPayload).
   const opt = analysis?.price_optimization;
-  // ai_prediction is the ONLY field that means "a real trained model (user's
-  // own, or the platform-wide fallback) produced this" -- price_optimization
-  // above may be heuristic-driven and stays populated either way, so the
-  // manual/learning flow below never breaks. model_scope === 'global' is a
-  // FULLY FUNCTIONAL AI recommendation, not a degraded state -- only
-  // available === false means "still learning, no AI yet".
-  const aiPrediction = analysis?.ai_prediction;
-  const aiAvailable = aiPrediction?.available === true;
-  const aiAwaitingData = analysis != null && !aiAvailable;
-  // Single source of truth for "the AI-recommended price" — used for the
-  // on-screen number AND the apply target, so clicking Apply always sets the
-  // total to the exact figure the user just saw. While still awaiting data
-  // this is "true cost + 25%" based on directCost (never on `total`, which
-  // may already include a previously-applied markup — using `total` here
-  // would make the suggestion compound upward on every apply).
-  const suggestedPrice = aiAwaitingData
-    ? Math.round(directCost * 1.25)
-    : (opt?.optimal_price || analysis?.suggested_price || null);
-  // Once the total already matches the suggestion (within a rand), there's
-  // nothing left to apply — hide the button instead of leaving a no-op
-  // control that looks like the recommendation "came back".
-  const alreadyApplied = suggestedPrice != null && Math.abs(total - suggestedPrice) < 1;
-  const applyOptimal = () => {
-    // Floored at 0: serviceCharge has no visible line item in the cost
-    // breakdown, so letting it go negative would silently apply a hidden
-    // discount below full cost with no on-screen explanation.
-    if (suggestedPrice && suggestedPrice > 0) { setServiceCharge(prev => Math.max(0, prev + (suggestedPrice - total))); toast.success("Applied the suggested price"); }
-  };
-  // serviceCharge is only ever written by applyOptimal (or the form reset) —
-  // there's no other manual markup control — so it's purely the AI delta.
-  // Zeroing it drops the total back to directCost, the real cost-based price.
-  const cancelAiPrice = () => { setServiceCharge(0); toast.success("Reverted to actual price"); };
-
-  // ---- one price (display only: no pricing maths changes here) ----
-  // `total` is the one price that is saved and sent (buildPayload's
-  // total_amount); the price bar next to Send always shows it as "Quote price".
-  // The suggestion is an option: "Use" runs applyOptimal, which moves `total`
-  // onto it. applyOptimal never takes the price below costs (the markup floors
-  // at 0), so a suggestion under the cost floor is explained, never offered.
-  const suggestionBelowCost = suggestedPrice != null && suggestedPrice > 0 && suggestedPrice < directCost - 0.5;
-  const suggestionState: "loading" | "unavailable" | "below-cost" | "applied" | "offer" =
-    optimizing ? "loading"
-      : !analysis || !suggestedPrice || suggestedPrice <= 0 ? "unavailable"
-      : suggestionBelowCost ? "below-cost"
-      : alreadyApplied ? "applied"
-      : "offer";
-  const suggestionBasis = aiAwaitingData ? "cost + 25%" : aiAvailable ? (aiPrediction?.model_scope === "user" ? "from your quotes" : "from platform quotes") : "for this lane";
-  // While the price check has a current result, the bar offers the market
-  // price instead; an applied market price has its own line and undo.
+  // No current market result (before a check, or the trip changed since the
+  // last one): the bar prompts to run the check instead of showing a number.
   const showSuggestion = !aiOffer && aiApplied === null;
   const offerDelta = aiOffer ? aiOffer.price - total : 0;
 
@@ -2118,25 +2071,11 @@ export default function QuoteBuilder() {
             {aiOffer && !aiOffer.needsApply && aiApplied === null && (
               <span className="qb-pricebar__muted">Market price check: nothing to change</span>
             )}
-            {/* main's suggestion, unchanged, whenever the price check has no current result */}
-            {showSuggestion && suggestionState === "loading" && <span className="qb-pricebar__muted">Working out a suggested price…</span>}
-            {showSuggestion && suggestionState === "unavailable" && <span className="qb-pricebar__muted">No suggested price for this quote</span>}
-            {showSuggestion && suggestionState === "below-cost" && suggestedPrice != null && (
-              <span className="qb-pricebar__warn">Suggested {formatCurrency(suggestedPrice)} is below your costs ({formatCurrency(directCost)}), so it isn't offered</span>
-            )}
-            {showSuggestion && suggestionState === "offer" && suggestedPrice != null && (
-              <>
-                <span>Suggested: <b className="qb-pricebar__num">{formatCurrency(suggestedPrice)}</b> <span className="qb-pricebar__muted">({suggestionBasis})</span></span>
-                <button type="button" className="tw-btn qb-pricebar__use" onClick={applyOptimal}>Use</button>
-              </>
-            )}
-            {showSuggestion && suggestionState === "applied" && (
-              <>
-                <span>Using the suggested price</span>
-                {serviceCharge > 0 && (
-                  <button type="button" className="tw-btn tw-btn--ghost qb-pricebar__use" onClick={cancelAiPrice}>Use cost price ({formatCurrency(directCost)})</button>
-                )}
-              </>
+            {/* The market price check is the only price suggestion. Until it
+                has run for this trip, prompt to run it instead of showing a
+                second, different number. */}
+            {showSuggestion && (
+              <span className="qb-pricebar__muted">Run the market price check to see the market price</span>
             )}
           </div>
           <div className="qb-pricebar__actions">

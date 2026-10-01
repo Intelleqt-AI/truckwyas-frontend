@@ -192,12 +192,23 @@
 .qb-pricebar__sub { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
 .qb-pricebar__suggest {
   display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; min-width: 0;
+  /* One button's height whatever the line holds, so swapping the suggestion
+     for the market price check's offer never moves the bar. */
+  min-height: 32px;
   font: 400 13px/20px var(--font-sans); color: var(--text-secondary);
 }
 .qb-pricebar__num { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); }
 .qb-pricebar__muted { color: var(--text-tertiary); }
 .qb-pricebar__warn { color: var(--status-warning-text); }
 .qb-pricebar__use { height: 32px; }
+/* Quiet text action beside a cost line ("Use company price"): 12px, sentence
+   case, link colour; the global touch floor gives it 44px on touch. */
+.qb-linkbtn {
+  display: inline; padding: 0; margin-left: 6px; border: 0; background: none; cursor: pointer;
+  font: 500 12px/16px var(--font-sans); color: var(--link);
+}
+.qb-linkbtn:hover { color: var(--accent-primary-hover); text-decoration: underline; text-underline-offset: 2px; }
+.qb-linkbtn:focus-visible { outline: 2px solid var(--focus-outline); outline-offset: 2px; border-radius: 4px; }
 .qb-pricebar__actions { display: flex; gap: 10px; justify-content: flex-end; }
 .qb-pricebar__actions .tw-btn { height: 40px; padding: 0 16px; font-size: 14px; }
 .qb-pricebar__actions .tw-btn:disabled { opacity: 0.6; cursor: progress; }

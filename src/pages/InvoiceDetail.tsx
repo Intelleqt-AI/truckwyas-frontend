@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { BellRing, Banknote, Send, FileSearch, Pencil, Lock, Ban } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BellRing, Banknote, Send, FileSearch, Pencil, Lock, Ban, ExternalLink } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
@@ -23,7 +23,9 @@ import "@/components/finance/finance-ledger.css";
 import { CreditNoteDialog } from "@/components/finance/CreditNoteDialog";
 import { FinDialog, ReasonDialog } from "@/components/finance/FinDialog";
 import { PaymentEditDialog } from "@/components/finance/PaymentEditDialog";
-import { isManualPayment, paymentSourceTag } from "@/lib/finance/payments";
+import { isManualPayment } from "@/lib/finance/payments";
+import { ACCT_KEYS, isPaymentsManagedError, paymentsManagedRecordUrl, usePaymentsManaged } from "@/lib/accounting";
+import { AccountingSyncCard, PaymentSourceBadge, PaymentsManagedPanel } from "@/components/accounting/AccountingSyncCard";
 import { TotalsBreakdown } from "@/components/finance/TotalsBreakdown";
 import RowActions from "@/components/ui/RowActions";
 import { ConfirmModal } from "@/components/ConfirmModal";
@@ -101,6 +103,19 @@ export default function InvoiceDetail() {
   const [deletingPayment, setDeletingPayment] = useState<Payment | null>(null);
   const flash = (msg: string, isError = false) => { setToast({ msg, isError }); setTimeout(() => setToast(null), isError ? 5000 : 3000); };
   const refreshLedger = () => invalidateInvoiceData(queryClient, id);
+  // While an accounting system (Xero, QuickBooks) is connected it owns
+  // payments: TruckWys shows them but never records or edits them.
+  const { managed: paymentsManaged, providerName: acctName, connection: acctConnection } = usePaymentsManaged();
+  const [managedRecordUrl, setManagedRecordUrl] = useState<string | null>(null);
+  useEffect(() => { if (paymentsManaged) setShowPaymentForm(false); }, [paymentsManaged]);
+  /** A payment write was refused because the accounting system owns payments (409). */
+  const onPaymentsManaged = (error: unknown) => {
+    setShowPaymentForm(false);
+    setEditingPayment(null);
+    setManagedRecordUrl(paymentsManagedRecordUrl(error));
+    queryClient.invalidateQueries({ queryKey: ACCT_KEYS.connection });
+    flash(errorText(error, 'Payments are recorded in your accounting system while it is connected.'), true);
+  };
 
   const invoiceQuery = useQuery({
     queryKey: ['invoice', id],
@@ -277,6 +292,7 @@ export default function InvoiceDetail() {
       setTimeout(() => setToast(null), 3000);
       refreshLedger();
     } catch (error) {
+      if (isPaymentsManagedError(error)) { onPaymentsManaged(error); return; }
       const msg = error instanceof Error ? error.message : 'Failed to record payment';
       setToast({ msg, isError: true });
       setTimeout(() => setToast(null), 5000);
@@ -308,6 +324,7 @@ export default function InvoiceDetail() {
       flash('Payment deleted');
       refreshLedger();
     } catch (error) {
+      if (isPaymentsManagedError(error)) { setDeletingPayment(null); onPaymentsManaged(error); return; }
       flash(errorText(error, "Couldn't delete the payment"), true);
     }
   };
@@ -376,7 +393,13 @@ export default function InvoiceDetail() {
   // part-paid ones (shared definition in lib/invoiceStatus).
   const canRemind = canSendReminder(invoice);
   // Never on drafts or void invoices (the API refuses both).
-  const canRecordPayment = !isDraft && (status === 'SENT' || status === 'VIEWED' || status === 'OVERDUE' || status === 'PARTIALLY_PAID') && !isVoid;
+  const isPayable = !isDraft && (status === 'SENT' || status === 'VIEWED' || status === 'OVERDUE' || status === 'PARTIALLY_PAID') && !isVoid;
+  // Managed elsewhere: "Record in Xero" opens this invoice there instead.
+  const managedHere = paymentsManaged || !!managedRecordUrl;
+  const canRecordPayment = isPayable && !managedHere;
+  const recordInProviderUrl = inv.accounting_sync?.url || managedRecordUrl || acctConnection?.web_url || null;
+  const canRecordInProvider = isPayable && managedHere;
+  const openRecordInProvider = () => { if (recordInProviderUrl) window.open(recordInProviderUrl, '_blank', 'noopener,noreferrer'); };
   const totalPaid = (payments || []).reduce((sum: number, p: any) => sum + num(p.amount), 0);
   const paidToDate = invoice.paid_amount != null ? num(invoice.paid_amount) : null;
   const vat = (invoice.vat_amount ?? invoice.tax_amount) != null ? num(invoice.vat_amount ?? invoice.tax_amount) : null;
@@ -447,7 +470,7 @@ export default function InvoiceDetail() {
     .sort((a, b) => (a.at == null ? 1 : 0) - (b.at == null ? 1 : 0) || (a.at != null && b.at != null ? a.at - b.at : 0) || a.i - b.i);
 
   // Past due: chasing is the job, so the reminder is the primary action.
-  const primary = canRemind ? 'remind' : canSend ? 'send' : canRecordPayment ? 'pay' : null;
+  const primary = canRemind ? 'remind' : canSend ? 'send' : canRecordPayment ? 'pay' : canRecordInProvider && recordInProviderUrl ? 'pay-external' : null;
   const moreActions = [
     ...(primary === 'remind' && canSend
       ? [{ label: sending ? 'Sending…' : 'Resend invoice', onSelect: () => setPreview('invoice'), disabled: sending }]
@@ -458,6 +481,14 @@ export default function InvoiceDetail() {
       : []),
     ...(primary !== 'pay' && canRecordPayment
       ? [{ label: 'Record payment', onSelect: () => setShowPaymentForm(true), disabled: showPaymentForm }]
+      : []),
+    ...(primary !== 'pay-external' && canRecordInProvider
+      ? [{
+          label: `Record payment in ${acctName}`,
+          hint: recordInProviderUrl ? `Payments sync from ${acctName} automatically.` : `This invoice hasn't reached ${acctName} yet.`,
+          onSelect: openRecordInProvider,
+          disabled: !recordInProviderUrl,
+        }]
       : []),
     ...(primary !== null
       ? [{ label: downloading ? 'Downloading…' : 'Download PDF', onSelect: handleDownloadPDF, disabled: downloading }]
@@ -604,6 +635,7 @@ export default function InvoiceDetail() {
           payment={editingPayment}
           onClose={() => setEditingPayment(null)}
           onSaved={() => { setEditingPayment(null); flash('Payment updated'); refreshLedger(); }}
+          onPaymentsManaged={onPaymentsManaged}
         />
       )}
       {deletingPayment && (
@@ -647,6 +679,9 @@ export default function InvoiceDetail() {
             <HeadAction icon={<Banknote size={16} strokeWidth={1.75} aria-hidden="true" />} label="Record payment" short="Record payment"
               onClick={() => setShowPaymentForm(true)} disabled={showPaymentForm}
               extra={{ 'aria-expanded': showPaymentForm, 'aria-controls': 'record-payment' }} />
+          ) : primary === 'pay-external' ? (
+            <HeadAction icon={<ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />} label={`Record in ${acctName}`} short={`Record in ${acctName}`}
+              onClick={openRecordInProvider} extra={{ title: `Opens this invoice in ${acctName}. Payments sync from ${acctName} automatically.` }} />
           ) : (
             <button type="button" className="tw-btn" onClick={handleDownloadPDF} disabled={downloading}>
               {downloading ? 'Downloading…' : 'Download PDF'}
@@ -821,7 +856,10 @@ export default function InvoiceDetail() {
           {!bal.inMain('facts') && (
             <section className="card fin-facts-card" aria-label="Invoice dates and terms">{facts(true)}</section>
           )}
-          {showPaymentForm && (
+          {canRecordInProvider && (
+            <PaymentsManagedPanel providerName={acctName} recordUrl={recordInProviderUrl} />
+          )}
+          {showPaymentForm && !managedHere && (
             <section className="card" id="record-payment" aria-labelledby="record-payment-title">
               <div className="fin-panel-head">
                 <div className="fin-panel-head__text">
@@ -908,7 +946,6 @@ export default function InvoiceDetail() {
               <ul className="fin-paylist">
                 {payments.map((payment: any, idx: number) => {
                   const ref = payment.reference_number || payment.reference || payment.payment_number;
-                  const synced = paymentSourceTag(payment);
                   return (
                     <li key={payment.id ?? idx} className="fin-paylist__row">
                       <span className="fin-paylist__main">
@@ -917,12 +954,12 @@ export default function InvoiceDetail() {
                           {methodLabel(payment.payment_method || payment.method || 'EFT')}
                           {ref && <> · <span className="fin-id">{ref}</span></>}
                         </span>
-                        {synced && <span className="fl-source">{synced}</span>}
+                        <PaymentSourceBadge source={payment.source} />
                       </span>
                       <span className="fl-pay-actions">
                         <span className="fin-paylist__amt">{formatCurrency(num(payment.amount))}</span>
                         {/* Only payments recorded here can change; synced ones belong to their source. */}
-                        {payment.id != null && isManualPayment(payment) && (
+                        {payment.id != null && isManualPayment(payment) && !managedHere && (
                           <RowActions
                             label={`Payment of ${formatCurrency(num(payment.amount))} on ${safeDate(payment.payment_date)}`}
                             items={[
@@ -989,6 +1026,8 @@ export default function InvoiceDetail() {
               </dl>
             </section>
           )}
+
+          <AccountingSyncCard sync={inv.accounting_sync} what="invoice" />
 
           <section className="card" aria-labelledby="activity-title">
             <div className="fin-panel-head" style={{ marginBottom: 4 }}>

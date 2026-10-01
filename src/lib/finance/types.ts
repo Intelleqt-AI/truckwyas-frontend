@@ -1,3 +1,5 @@
+import type { AccountingSync } from '@/lib/accounting';
+
 /**
  * Finance API types (Foundation phase): invoices with lines, credit notes,
  * payments, suppliers, expenses, customer tax fields and finance settings.
@@ -98,6 +100,8 @@ export interface Invoice {
   voided_at: string | null;
   void_reason: string;
   credit_notes: CreditNoteSummary[];
+  /** Where this invoice stands in the connected accounting system (null when none). */
+  accounting_sync?: AccountingSync | null;
   created_at?: string;
   updated_at?: string;
   sent_at?: string | null;
@@ -145,6 +149,8 @@ export interface CreditNote {
   total_amount: Decimal;
   created_at: string;
   voided_at: string | null;
+  /** Where this credit note stands in the connected accounting system (null when none). */
+  accounting_sync?: AccountingSync | null;
 }
 
 export interface CreditNoteLineInput {

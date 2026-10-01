@@ -15,6 +15,7 @@ import { formatCurrency, formatDate, formatDateTime } from '@/lib/formatters';
 import { FIN_URL, invalidateInvoiceData, useCreditNote } from '@/lib/finance/api';
 import { formatQuantity, sumLines, taxCodeShort, toNumber } from '@/lib/finance/tax';
 import { toast } from '@/lib/toast';
+import { AccountingSyncCard } from '@/components/accounting/AccountingSyncCard';
 
 const BACK = { to: '/finance/credit-notes', label: 'Credit notes' };
 const safeDate = (d?: string | null) => (d ? formatDate(d) : '—');
@@ -169,6 +170,7 @@ export default function CreditNoteDetail() {
         </div>
 
         <aside className="fin-rail" aria-label="Credit note activity">
+          <AccountingSyncCard sync={note.accounting_sync} what="credit note" />
           <section className="card" aria-labelledby="cn-activity-title">
             <div className="fin-panel-head" style={{ marginBottom: 4 }}>
               <div className="fin-panel-head__text"><h2 id="cn-activity-title" className="fin-panel-title">Activity</h2></div>

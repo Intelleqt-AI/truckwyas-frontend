@@ -7,11 +7,14 @@ import { normaliseDecimalInput, toNumber } from '@/lib/finance/tax';
 import { FIN_URL, errorText } from '@/lib/finance/api';
 import type { Payment, PaymentUpdateInput } from '@/lib/finance/types';
 import { PAYMENT_METHODS } from '@/lib/finance/payments';
+import { isPaymentsManagedError } from '@/lib/accounting';
 
-export function PaymentEditDialog({ payment, onClose, onSaved }: {
+export function PaymentEditDialog({ payment, onClose, onSaved, onPaymentsManaged }: {
   payment: Payment;
   onClose: () => void;
   onSaved: () => void;
+  /** The API refused because an accounting system owns payments (409). */
+  onPaymentsManaged?: (error: unknown) => void;
 }) {
   const [amount, setAmount] = useState(String(payment.amount ?? ''));
   const [date, setDate] = useState(String(payment.payment_date || '').slice(0, 10));
@@ -34,6 +37,7 @@ export function PaymentEditDialog({ payment, onClose, onSaved }: {
       await patchData({ url: FIN_URL.payment(payment.id), data });
       onSaved();
     } catch (err) {
+      if (onPaymentsManaged && isPaymentsManagedError(err)) { onPaymentsManaged(err); return; }
       setError(errorText(err, "Couldn't save the payment. Try again."));
       setBusy(false);
     }

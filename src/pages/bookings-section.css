@@ -399,15 +399,16 @@
 
 /* Quote pipeline board: one row of equal columns, however many there are
    (Draft, Sent, Accepted, Booked, Declined, Expired). Each column keeps a
-   readable width; when they don't fit, the board scrolls sideways inside
-   itself instead of wrapping a column onto a second row or crushing cards. */
+   readable 280px minimum; when they don't fit, the board scrolls sideways
+   inside itself (each column still scrolls its own cards up and down)
+   instead of wrapping a column onto a second row or crushing cards. */
 .bk-kanban {
-  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr);
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(280px, 1fr);
   grid-template-rows: minmax(0, 1fr); gap: 16px; flex: 1; min-height: 0;
   overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 8px;
 }
 @media (max-width: 900px) {
-  .bk-kanban { grid-auto-columns: minmax(260px, 1fr); }
+  .bk-kanban { grid-auto-columns: minmax(260px, 85vw); }
 }
 
 /* Order progress: scrolls locally on phones rather than overlapping labels. */
@@ -483,7 +484,9 @@
 .bk-qcard__foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; }
 .bk-qcard__amount { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .bk-qcard__meta { font-size: 13px; line-height: 20px; color: var(--text-secondary); white-space: nowrap; }
-.bk-qcard__action { margin-top: 12px; }
+.bk-qcard__action { margin-top: 12px; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Cards never push a column sideways: only the board scrolls horizontally. */
+.bk-kanban .kanban-col-scroll { overflow-x: hidden; }
 
 /* Detail pages: shared shells use the principles radius and no hover lift. */
 .bk-detail .card.card { border-radius: var(--radius-card, 12px); box-shadow: none; }

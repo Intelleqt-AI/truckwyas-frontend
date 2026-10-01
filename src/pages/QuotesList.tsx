@@ -765,8 +765,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                               onClick={() => navigate(`/bookings/quotes/${q.id}`)}
                               footer={load ? (
                                 <button type="button" className="bk-btn bk-btn--secondary bk-btn--block bk-qcard__action"
+                                  title={load.load_number ? `Open booking ${load.load_number}` : 'Open booking'}
                                   onClick={() => navigate(`/bookings/${load.id}`)}>
-                                  View booking{load.load_number ? ` ${load.load_number}` : ''}
+                                  View booking
                                 </button>
                               ) : null}
                             />

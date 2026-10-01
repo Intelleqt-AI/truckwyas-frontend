@@ -1,5 +1,7 @@
 import "./table-heading-roles.css";
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
+import { useFastPayInvoices } from '@/lib/capital/api';
+import type { Offer } from '@/lib/capital/types';
 import "./finance-brand.css";
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -156,7 +158,14 @@ export default function Invoices() {
   const { data: capitalData } = useQuery({
     queryKey: ["capital-eligible"],
     queryFn: () => fetchData("api/v1/capital/eligible/").catch(() => null),
+    // Launched, Fast Pay reads the server offers instead (below).
+    enabled: !CAPITAL_LAUNCHED,
   });
+  // Launched: each invoice's Fast Pay offer or live request, from the server.
+  const fastPay = useFastPayInvoices({ enabled: CAPITAL_LAUNCHED });
+  const offerById = new Map<string, Offer>(
+    [...(fastPay.data?.offers ?? []), ...(fastPay.data?.ineligible ?? [])].map((o) => [String(o.invoice_id), o]),
+  );
   const eligibleInvoices: any[] = capitalData?.invoices || [];
   const eligibleById = new Map(eligibleInvoices.map((e: any) => [String(e.id), e]));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -683,6 +692,7 @@ export default function Invoices() {
                             ...(ineligibleEntry
                               ? [{ label: "Not eligible for Fast Pay", hint: String(ineligibleEntry.reason ?? ""), onSelect: () => {}, disabled: true }]
                               : []),
+                            ...(CAPITAL_LAUNCHED ? fastPayMenu(offerById.get(String(inv.id)), navigate) : []),
                           ]}
                         />
                       </td>
@@ -723,4 +733,17 @@ export default function Invoices() {
       )}
     </div>
   );
+}
+
+/** Launched: the invoice row's Fast Pay menu item, from the server offer. */
+function fastPayMenu(offer: Offer | undefined, navigate: (to: string) => void) {
+  if (!offer) return [];
+  if (offer.advance) {
+    const advanceId = offer.advance.id;
+    return [{ label: `Fast Pay: ${offer.advance.status_label}`, onSelect: () => navigate(`/capital/advances/${advanceId}`) }];
+  }
+  if (offer.decision === "DECLINE" || !offer.eligible) {
+    return [{ label: "Not eligible for Fast Pay", hint: offer.reasons?.[0]?.text ?? offer.explanation, onSelect: () => {}, disabled: true }];
+  }
+  return [{ label: "Request Fast Pay", onSelect: () => navigate(`/capital?request=${offer.invoice_id}`) }];
 }

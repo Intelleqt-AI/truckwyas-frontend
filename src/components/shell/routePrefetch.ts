@@ -30,6 +30,7 @@ const ROUTES: Array<[prefix: string, load: Loader]> = [
   ['/fleet/drivers/', () => import('@/pages/DriverProfile')],
   ['/fleet/drivers', () => import('@/pages/Drivers')],
   ['/fleet/heatmap', () => import('@/pages/FleetHeatmap')],
+  ['/capital/desk/', () => import('@/pages/CapitalDesk')],
   ['/capital', () => import('@/pages/Capital')],
   ['/insurance', () => import('@/pages/Insurance')],
   ['/copilot', () => import('@/pages/Copilot')],

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import { fetchData } from '@/lib/Api';
+import { invalidateAllTopics, invalidateTopics, setLiveConnected } from '@/lib/liveData';
 
 /**
  * Global real-time event client. Mounted once (in OSLayout) for authenticated
@@ -68,7 +70,12 @@ const EVENT_TITLES: Record<string, string> = {
 };
 
 export function LiveEvents() {
+  const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
+  // data.changed topics collected over a short window: a burst of saves (an
+  // import, a batch) refreshes each affected cache once, not once per row.
+  const pendingTopicsRef = useRef<Set<string>>(new Set());
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryRef = useRef(0);
   const burstRef = useRef<Record<string, { id: string; count: number; at: number }>>({});
   // The user's push preferences: toasts for a category the user disabled are
@@ -114,6 +121,9 @@ export function LiveEvents() {
         // right after a real gap, not on a fixed schedule.
         if (retryRef.current > 0) {
           window.dispatchEvent(new CustomEvent('tw:live-reconnected'));
+          // Changes pushed while the socket was down were missed: refresh
+          // everything once, then live updates take over again.
+          invalidateAllTopics(queryClient);
         }
         retryRef.current = 0;
       };
@@ -121,7 +131,25 @@ export function LiveEvents() {
       ws.onmessage = (e) => {
         let msg: any;
         try { msg = JSON.parse(e.data); } catch { return; }
-        if (!msg || msg.type === 'connected' || msg.type === 'pong') return;
+        if (!msg || msg.type === 'pong') return;
+        // The server joined us to the company group: live updates are on, so
+        // screens stop polling (useAutoRefresh).
+        if (msg.type === 'connected') { setLiveConnected(true); return; }
+        // A record changed (any save or delete, by anyone in the company):
+        // refresh only the data it feeds. No toast, and not a tw:live-event,
+        // so the bell and other notification listeners aren't woken by it.
+        if (msg.type === 'event' && msg.event === 'data.changed') {
+          (msg.data?.topics || []).forEach((t: string) => pendingTopicsRef.current.add(t));
+          if (!flushTimerRef.current) {
+            flushTimerRef.current = setTimeout(() => {
+              flushTimerRef.current = null;
+              const topics = pendingTopicsRef.current;
+              pendingTopicsRef.current = new Set();
+              invalidateTopics(queryClient, topics);
+            }, 250);
+          }
+          return;
+        }
         if (msg.type === 'event') {
           window.dispatchEvent(new CustomEvent('tw:live-event', { detail: msg }));
           // The push goes to every connected browser in the company, including
@@ -160,6 +188,7 @@ export function LiveEvents() {
 
       ws.onclose = () => {
         wsRef.current = null;
+        setLiveConnected(false);
         if (stopped) return;
         const delay = Math.min(30000, 1000 * 2 ** retryRef.current);
         retryRef.current += 1;
@@ -175,8 +204,10 @@ export function LiveEvents() {
       stopped = true;
       try { wsRef.current?.close(); } catch { /* noop */ }
       wsRef.current = null;
+      setLiveConnected(false);
+      if (flushTimerRef.current) { clearTimeout(flushTimerRef.current); flushTimerRef.current = null; }
     };
-  }, []);
+  }, [queryClient]);
 
   return null;
 }

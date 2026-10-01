@@ -4,7 +4,7 @@ import '@/components/data/stale-data-notice.css';
 import './overview-typography.css';
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData } from "@/lib/Api";
 import { formatMoney, formatMoneyWhole, formatPercent } from "@/lib/formatters";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -15,7 +15,7 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { MicroBars, RevenueCostBars, PipelineBars, usePipeline, boardStage } from "@/components/overview/today";
 import { presentSignal, staleSignal, idleSignal, isInTransitSignal, isIdleVehiclesSignal, idleVehiclesUrl } from "@/components/overview/signals";
 import { isOpenLoad, staleWork } from "@/lib/staleWork";
-import { useAllQuotes, useAllVehicles, useHomeLedger } from "@/components/overview/ledger";
+import { HOME_LIVE, useAllQuotes, useAllVehicles, useHomeLedger } from "@/components/overview/ledger";
 
 // Fetches + derives all dashboard data. Lives in the queryFn so the result is
 // cached by TanStack Query (keyed below) and survives navigation — revisiting
@@ -204,10 +204,12 @@ export default function Overview() {
   const navigate = useNavigate();
   const [recentTab, setRecentTab] = useState<"quotes" | "loads">("quotes");
 
-  const { data, isLoading: loading, refetch, dataUpdatedAt, isRefetchError, isError } = useQuery({
+  const { data, isLoading: loading, refetch, dataUpdatedAt, isRefetchError, isError, isFetching } = useQuery({
     queryKey: ["overview-dashboard"],
     queryFn: loadOverview,
+    ...HOME_LIVE,
   });
+  const queryClient = useQueryClient();
 
   // Cached data drives the view; defaults keep the first render safe.
   const financeData = data?.financeData ?? null;
@@ -239,6 +241,26 @@ export default function Overview() {
   // The idle-vehicles row is computed here from every vehicle and load (the
   // Vehicles page's own sources and rule), never from the backend's plate list.
   const allVehicles = useAllVehicles();
+
+  // ---- freshness: every query on Home counts, not just the overview ----
+  // The notice reads the OLDEST figure on the page, and "Refresh now"
+  // refetches everything the page shows (overview, ledgers, quotes, fleet),
+  // so it can't clear while some tiles still show old numbers.
+  const [refreshing, setRefreshing] = useState(false);
+  const oldest = Math.min(...[dataUpdatedAt, ledger.oldestUpdatedAt, quotesAll.dataUpdatedAt, allVehicles.dataUpdatedAt]
+    .map((t) => t || Infinity));
+  const homeUpdatedAt = Number.isFinite(oldest) ? oldest : 0;
+  const homeRefreshFailed = isRefetchError || ledger.refreshFailed || quotesAll.isRefetchError || allVehicles.isRefetchError;
+  const homeFetching = isFetching || ledger.fetching || quotesAll.isFetching || allVehicles.isFetching;
+  const refreshHome = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await queryClient.refetchQueries({ type: 'active' });
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const vehiclesSettled = !!allVehicles.data || (allVehicles.isError && !allVehicles.isFetching);
   const needsLoading = loading || (!ledger.data && !ledger.error) || !vehiclesSettled;
   const stale = !needsLoading && allLoads.length ? staleSignal(allLoads) : null;
@@ -329,7 +351,10 @@ export default function Overview() {
       />
 
       <div className="ov-notices">
-        <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
+        {/* An automatic refresh in progress isn't news; only a manual one is shown. */}
+        {(refreshing || !homeFetching) && (
+          <StaleDataNotice updatedAt={homeUpdatedAt} refreshFailed={homeRefreshFailed} refreshing={refreshing} onRetry={refreshHome} />
+        )}
         {isError && !data && (
           <div className="stale-data-notice" role="alert">
             <span>The overview couldn't be loaded.</span>

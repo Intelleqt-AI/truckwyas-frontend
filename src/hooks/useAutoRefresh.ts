@@ -1,16 +1,20 @@
 import { useEffect, useRef } from 'react';
+import { isLiveConnected } from '@/lib/liveData';
 
 /**
- * Production-grade live-data refresh.
+ * Fallback refresh for a screen's data, used only while live updates are off.
  *
- * Re-runs `refetch` on a fixed interval, but ONLY while the tab is visible
- * (so background tabs don't hammer the API), and also immediately on window
- * focus and when the tab becomes visible again. The callback is held in a ref
- * so the interval is never torn down/recreated on every render — pass any
- * function, stable or not.
+ * Live updates come over the WebSocket (Django Channels): every save or
+ * delete in the company marks the affected caches stale and the screen
+ * refetches at once (components/LiveEvents.tsx, lib/liveData.ts). While that
+ * socket is connected this hook does nothing. When it isn't (Redis or the
+ * socket down, a network blip), it falls back to the old behaviour: re-run
+ * `refetch` on an interval while the tab is visible, and on focus or when the
+ * tab becomes visible again. A reconnect refreshes everything once, so the
+ * gap is caught up either way.
  *
- * This is the same pattern world-class SaaS dashboards use for "live" data
- * without a websocket: cheap, reliable, and correct under tab switching.
+ * The callback is held in a ref so the interval is never torn down/recreated
+ * on every render; pass any function, stable or not.
  */
 export function useAutoRefresh(refetch: () => void, intervalMs = 30000) {
   const cb = useRef(refetch);
@@ -18,21 +22,17 @@ export function useAutoRefresh(refetch: () => void, intervalMs = 30000) {
 
   useEffect(() => {
     const run = () => {
+      if (isLiveConnected()) return;
       if (typeof document === 'undefined' || document.visibilityState === 'visible') {
         cb.current();
       }
     };
     const timer = setInterval(run, intervalMs);
-    const onFocus = () => cb.current();
-    // Instant refresh when a real-time event is pushed over the WebSocket.
-    const onLiveEvent = () => cb.current();
-    window.addEventListener('focus', onFocus);
-    window.addEventListener('tw:live-event', onLiveEvent as EventListener);
+    window.addEventListener('focus', run);
     document.addEventListener('visibilitychange', run);
     return () => {
       clearInterval(timer);
-      window.removeEventListener('focus', onFocus);
-      window.removeEventListener('tw:live-event', onLiveEvent as EventListener);
+      window.removeEventListener('focus', run);
       document.removeEventListener('visibilitychange', run);
     };
   }, [intervalMs]);

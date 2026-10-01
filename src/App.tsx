@@ -80,6 +80,7 @@ const XeroIntegration = lazy(() => import('./pages/settings/XeroIntegration'));
 const FleetImport = lazy(() => import('./pages/settings/FleetImport'));
 const BillingHistoryPage = lazy(() => import('./pages/settings/BillingHistoryPage'));
 const Login = lazy(() => import('./pages/Login'));
+const Demo = lazy(() => import('./pages/Demo'));
 const LoginOtp = lazy(() => import('./pages/LoginOtp').then(m => ({ default: m.LoginOtp })));
 const Signup = lazy(() => import('./pages/Signup'));
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -185,6 +186,10 @@ const App = () => (
                   </PublicOnly>
                 }
               />
+              {/* Public deep link into the shared demo account (the marketing
+                  site's "Open the demo" button). Not PublicOnly: a signed-in
+                  visitor is asked before their account is switched. */}
+              <Route path="/demo" element={<Demo />} />
               <Route path="/password-reset" element={<PasswordReset />} />
               <Route
                 path="/forgot-password"

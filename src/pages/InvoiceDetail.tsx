@@ -943,7 +943,7 @@ export default function InvoiceDetail() {
                   <h2 id="payments-title" className="fin-panel-title">Payments</h2>
                   <p className="fin-panel-desc">
                     {managedHere
-                      ? (payments.length ? `Paid ${formatCurrency(totalPaid)}. Record new payments in ${acctName}; they appear here within a few minutes.` : `Record payments in ${acctName}; they appear here within a few minutes.`)
+                      ? `Record new payments in ${acctName}; they appear here within a few minutes.`
                       : `${payments.length} recorded, by payment date`}
                   </p>
                 </div>
@@ -959,8 +959,8 @@ export default function InvoiceDetail() {
                         <span className="fin-paylist__sub">
                           {methodLabel(payment.payment_method || payment.method || 'EFT')}
                           {ref && <> · <span className="fin-id">{ref}</span></>}
-                          <PaymentSourceBadge source={payment.source} managed={managedHere} />
                         </span>
+                        <PaymentSourceBadge source={payment.source} managed={managedHere} />
                       </span>
                       <span className="fl-pay-actions">
                         <span className="fin-paylist__amt">{formatCurrency(num(payment.amount))}</span>

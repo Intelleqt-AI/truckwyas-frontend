@@ -71,8 +71,6 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
   };
 
   const menu: RowActionItem[] = [];
-  // Phones hide the "Open in" button; the menu always offers it.
-  if (connection.web_url) menu.push({ label: `Open in ${cfg.short}`, onSelect: () => window.open(connection.web_url!, '_blank', 'noopener,noreferrer') });
   if (canWrite) menu.push({ label: dis.busy ? 'Disconnecting…' : `Disconnect ${cfg.short}`, onSelect: dis.ask, disabled: dis.busy, danger: true });
 
   return (
@@ -90,8 +88,8 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
         </div>
         <div className="acct-head__actions">
           {connection.web_url ? (
-            <a href={connection.web_url} target="_blank" rel="noopener noreferrer" className="tw-btn acct-hide-phone">
-              Open in {cfg.short}
+            <a href={connection.web_url} target="_blank" rel="noopener noreferrer" className="tw-btn acct-open-btn" aria-label={`Open in ${cfg.short}`} title={`Open in ${cfg.short}`}>
+              <span className="acct-open-btn__text">Open in {cfg.short}</span>
               <ExternalLink size={14} aria-hidden="true" />
             </a>
           ) : null}
@@ -104,7 +102,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
         <div className="acct-notice acct-notice--outline-danger acct-notice--action" role="status" style={{ margin: '16px 0 0' }}>
           <AlertTriangle size={16} aria-hidden="true" />
           <div>
-            <strong>{connection.status_reason || `Your ${cfg.short} sign-in has expired.`}</strong>
+            <strong style={{ fontWeight: 600 }}>{connection.status_reason || `Your ${cfg.short} sign-in has expired.`}</strong>
             An admin needs to sign in to {cfg.short} again. Nothing is sent or fetched until then.
           </div>
           <button type="button" className="tw-btn tw-btn--primary" onClick={reconnect} disabled={!canWrite || reconnecting} title={writeTitle}>
@@ -203,7 +201,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
   return (
     <>
       {dis.modal}
-      <h2 id="acct-org-title" className="acct-section-title acct-title-logo"><ProviderLogo provider={connection.provider} size="sm" />Choose your {cfg.short} organisation</h2>
+      <h2 id="acct-org-title" className="acct-section-title">Choose your {cfg.short} organisation</h2>
       <p className="acct-section-desc">Pick the {cfg.short} organisation that holds this company's books.</p>
       <section style={settingsCardStyle} className="acct-org-card" aria-labelledby="acct-org-title">
         {tenants.length === 0 ? (
@@ -232,7 +230,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
                   </span>
                   <span style={{ minWidth: 0 }}>
                     <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
-                    <span className="acct-row__sub">{notZar ? `Not available: books in ${t.currency}` : `Books in ${t.currency || 'ZAR'}`}</span>
+                    <span className="acct-row__sub">{notZar ? `Not available: TruckWys only supports books in ZAR, and these are in ${t.currency}` : `Books in ${t.currency || 'ZAR'}`}</span>
                   </span>
                 </label>
               );
@@ -243,11 +241,11 @@ export function OrgPicker({ connection }: { connection: Connection }) {
           {error && <p className="acct-error" role="alert" style={{ margin: 0, marginRight: 'auto' }}>{error}</p>}
           {!canWrite && <p className="acct-section-desc" style={{ margin: 0, marginRight: 'auto' }}>{writeTitle}.</p>}
           {canWrite && (
-            <button type="button" className="tw-btn" onClick={dis.ask} disabled={dis.busy || busy}>
+            <button type="button" className="tw-btn acct-card__btn" onClick={dis.ask} disabled={dis.busy || busy}>
               Use a different {cfg.short} login
             </button>
           )}
-          <button type="button" className="tw-btn tw-btn--primary acct-formfoot__primary" onClick={submit} disabled={!canWrite || !choice || busy}>
+          <button type="button" className="tw-btn tw-btn--primary acct-card__btn acct-formfoot__primary" onClick={submit} disabled={!canWrite || !choice || busy}>
             {busy ? 'Linking…' : 'Link organisation'}
           </button>
         </div>

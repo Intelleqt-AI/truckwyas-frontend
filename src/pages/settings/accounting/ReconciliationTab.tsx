@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, ExternalLink, Play } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, RefreshCw } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency, formatDateTime } from '@/lib/formatters';
@@ -59,7 +59,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
 
   const runButton = (
     <button type="button" className="tw-btn" onClick={run} disabled={!canWrite || running || connection.status !== 'ACTIVE'} title={writeTitle}>
-      <Play size={14} aria-hidden="true" />
+      <RefreshCw size={14} aria-hidden="true" className={running ? 'animate-spin' : undefined} />
       {running ? 'Checking…' : 'Run now'}
     </button>
   );
@@ -73,7 +73,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
     <>
       <AcctCard
         title="Reconciliation"
-        description={`Every night TruckWys checks each invoice, each customer's balance and each month's sales and VAT against ${cfg.short}. Differences of ${formatCurrency(0.01)} or less are ignored.`}
+        description={`Each night we compare invoices, customer balances and monthly sales and VAT with ${cfg.short}. Differences under ${formatCurrency(0.01)} are ignored.`}
         actions={runButton}
       >
         {!last ? (
@@ -82,37 +82,40 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
           <>
             {/* The result, said once, first. */}
             {last.status === 'FAILED' ? (
-              <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />The last check didn't finish.</p>
+              <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />The last check didn't finish</p>
             ) : differences.length === 0 ? (
-              <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}.</p>
+              <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}</p>
             ) : (
-              <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}.</p>
+              <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}</p>
             )}
-            <div className="acct-tiles">
+            <div className="acct-tiles acct-tiles--3">
               <div><span>Invoices checked</span><strong>{(last.checked.invoices ?? 0).toLocaleString('en-ZA')}</strong></div>
               <div><span>Customers checked</span><strong>{(last.checked.customers ?? 0).toLocaleString('en-ZA')}</strong></div>
               <div><span>Months checked</span><strong>{(last.checked.months ?? 0).toLocaleString('en-ZA')}</strong></div>
-              <div><span>Differences</span><strong>{last.difference_count.toLocaleString('en-ZA')}</strong></div>
             </div>
             {last.status === 'FAILED' && last.error && <p className="acct-error" role="status" style={{ marginTop: 12 }}>{last.error}</p>}
             <p className="acct-section-desc" style={{ margin: '12px 0 0' }}>
               Last checked {formatDateTime(last.ran_at)}. Next check tonight, around {nextCheck(last.ran_at)}.
             </p>
+            {differences.length > 0 && SCOPES.filter(sc => !differences.some(d => d.scope === sc.scope)).map(sc => {
+              const n = sc.scope === 'INVOICE' ? last.checked.invoices : sc.scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;
+              return (
+                <p key={sc.scope} className="acct-match-inline">
+                  <CheckCircle2 size={14} aria-hidden="true" />
+                  {n != null ? `All ${plural(n, sc.title.toLowerCase().replace(/s$/, ''))} match ${cfg.short}.` : `${sc.title}: no differences.`}
+                </p>
+              );
+            })}
           </>
         )}
       </AcctCard>
 
       {last && last.status !== 'FAILED' && differences.length > 0 && SCOPES.map(({ scope, title, first }, i) => {
         const rows = differences.filter(d => d.scope === scope);
-        const checked = scope === 'INVOICE' ? last.checked.invoices : scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;
-        if (!rows.length) {
-          return (
-            <AcctCard key={scope} title={title} description={checked != null ? `All ${plural(checked, title.toLowerCase().replace(/s$/, ''))} match ${cfg.short}.` : 'No differences.'} />
-          );
-        }
+                if (!rows.length) return null;
         const hasLinks = true; // same column template in every table, link or not
         return (
-          <AcctCard key={scope} title={title} description={i === SCOPES.findIndex(x => differences.some(d => d.scope === x.scope)) ? `${plural(rows.length, 'difference')}. Difference is TruckWys minus ${cfg.short}.` : plural(rows.length, 'difference')} flush>
+          <AcctCard key={scope} title={title} description={`${plural(rows.length, 'difference')}. Difference is TruckWys minus ${cfg.short}.`} flush>
             <div className="acct-table-wrap acct-only-wide" role="region" aria-label={`${title} differences`} tabIndex={0}>
               <table className="acct-table acct-table--recon">
                 <colgroup>
@@ -122,7 +125,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                 <thead>
                   <tr>
                     <th>{first}</th>
-                    <th>What</th>
+                    <th>Field</th>
                     <th className="num">TruckWys</th>
                     <th className="num">{cfg.short}</th>
                     <th className="num">Difference</th>
@@ -147,7 +150,8 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                       </span>
                       <strong className="acct-diff">{diffText(d)}</strong>
                     </div>
-                    <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)}: TruckWys {showValue(d.truckwys)}, {cfg.short} {showValue(d.provider)}</div>
+                    <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)}</div>
+                    <div className="acct-row__sub">TruckWys {showValue(d.truckwys)} · {cfg.short} {showValue(d.provider)}</div>
                     {d.provider_url && <a className="acct-link" style={{ fontSize: 13 }} href={d.provider_url} target="_blank" rel="noopener noreferrer">Open in {cfg.short} <ExternalLink size={12} aria-hidden="true" /></a>}
                   </li>
                 );
@@ -185,7 +189,7 @@ function DiffRow({ d, providerName, hasLinks }: { d: ReconDifference; providerNa
       {hasLinks && (
         <td>
           {d.provider_url && (
-            <a className="acct-link" href={d.provider_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${d.label || d.key} in ${providerName}`} title={`Open in ${providerName}`}>
+            <a className="acct-icon-link" href={d.provider_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${d.label || d.key} in ${providerName}`} title={`Open in ${providerName}`}>
               <ExternalLink size={14} aria-hidden="true" />
             </a>
           )}

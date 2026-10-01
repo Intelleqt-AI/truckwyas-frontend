@@ -35,7 +35,7 @@ export function AcctCard({ title, description, actions, children, id, flush = fa
       <div style={{ ...settingsCardHeaderStyle, justifyContent: 'space-between', alignItems: 'flex-start', ...(children == null || children === false ? { borderBottom: 0 } : null) }}>
         <div style={{ minWidth: 0, flex: '1 1 220px' }}>
           <h2 id={titleId} style={settingsCardTitleStyle}>{title}</h2>
-          {description && <p className="acct-section-desc" style={{ margin: '2px 0 0' }}>{description}</p>}
+          {description && <div className="acct-section-desc" style={{ margin: '2px 0 0' }}>{description}</div>}
           {actions && actionsBelow && <div className="acct-card-actions acct-card-actions--below">{actions}</div>}
         </div>
         {actions && !actionsBelow && <div className="acct-card-actions">{actions}</div>}

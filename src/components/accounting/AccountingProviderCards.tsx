@@ -12,6 +12,17 @@ import { connectionChip } from './connectionStatus';
 import './accounting.css';
 import '@/pages/ops-tiles.css';
 
+/** "QuickBooks Online and Sage Business Cloud Accounting are coming soon." (from the server's list). */
+export function ComingSoonNote() {
+  const q = useAccountingProviders();
+  // Until the server answers, assume the usual line-up so the text doesn't pop in.
+  const names = q.data
+    ? q.data.providers.filter(p => p.availability === 'coming_soon').map(p => providerConfig(p.provider).name)
+    : PROVIDER_ORDER.filter(c => c !== 'XERO').map(c => PROVIDERS[c].name);
+  if (!names.length) return null;
+  return <> {names.join(' and ')} {names.length === 1 ? 'is' : 'are'} coming soon.</>;
+}
+
 export const ACCOUNTING_PAGE = '/settings/integrations/accounting';
 
 /** Start the provider's OAuth flow: the server hands back the URL to send the browser to. */
@@ -78,9 +89,6 @@ export function AccountingProviderCards({ hideManage = false }: { hideManage?: b
           loading={q.isLoading}
         />
       ))}
-      {soon.length > 0 && (
-        <p className="acct-soon">{soon.map(p => providerConfig(p.provider).name).join(' and ')} coming soon.</p>
-      )}
     </div>
   );
 }
@@ -110,12 +118,12 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
 
   if (loading) {
     // Room for the usual connected state: org line, note line and chip.
-    desc = <span aria-hidden="true" style={{ display: 'block' }}><span className="acct-skel-line" style={{ height: 20 }}><span className="ops-skel" style={{ width: 200 }} /></span></span>;
+    desc = <span aria-hidden="true" className="acct-card__desc-skel"><span className="acct-skel-line" style={{ height: 20 }}><span className="ops-skel" style={{ width: 200, maxWidth: '100%' }} /></span></span>;
     actions = <span className={btn} style={{ visibility: 'hidden', width: 120 }} aria-hidden="true" />;
   } else if (mine) {
     desc = mine.status === 'PENDING_ORG'
       ? `Signed in to ${cfg.short}; no organisation chosen yet.`
-      : mine.tenant_name || `${cfg.short} organisation`;
+      : `Linked to ${mine.tenant_name || `your ${cfg.short} organisation`}`;
     if (mine.status === 'NEEDS_REAUTH') note = <span className="acct-card__note acct-card__note--danger">{mine.status_reason || `Your ${cfg.short} sign-in has expired.`} Nothing is sent until an admin reconnects.</span>;
     const needsYou = mine.status === 'PENDING_ORG' || (mine.status === 'ACTIVE' && !mine.readiness.sync_enabled);
     actions = (
@@ -150,15 +158,15 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
     <div className="acct-card">
       <div className="acct-card__top">
         <ProviderLogo provider={info.provider} />
+        {/* Same header as the Cartrack and CtrlFleet cards: status on the right. */}
         <div className="acct-card__text">
-          {/* The status always sits on the title row, at every width. */}
-          <div className="acct-card__titlerow">
-            <h3 className="acct-card__title" style={{ margin: 0 }}>{cfg.name}</h3>
-            {loading
-              ? <span className="tw-status" style={{ visibility: 'hidden' }} aria-hidden="true">Setup needed</span>
-              : chip ? <StatusChip tone={chip.tone} label={chip.label} /> : <StatusChip status="DISCONNECTED" />}
-          </div>
+          <h3 className="acct-card__title">{cfg.name}</h3>
           <p className="acct-card__desc">{desc}{note}</p>
+        </div>
+        <div className="acct-card__chip">
+          {loading
+            ? <span className="tw-status" style={{ visibility: 'hidden' }} aria-hidden="true">Setup needed</span>
+            : chip ? <StatusChip tone={chip.tone} label={chip.label} /> : <StatusChip status="DISCONNECTED" />}
         </div>
       </div>
       {actions && <div className="acct-card__actions">{actions}</div>}

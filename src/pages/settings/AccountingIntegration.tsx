@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, ChevronLeft, Info, X, XCircle } from 'lucide-react';
-import { AccountingProviderCards } from '@/components/accounting/AccountingProviderCards';
+import { AccountingProviderCards, ComingSoonNote } from '@/components/accounting/AccountingProviderCards';
 import {
   apiMessage, apiStatus, callbackMessage, invalidateAccounting, providerBySlug, providerConfig, useAccountingConnection,
 } from '@/lib/accounting';
@@ -63,11 +63,10 @@ export default function AccountingIntegration() {
   const title = 'Accounting';
   // A sub-page of Integrations: the subtitle line carries the way back, as on
   // every detail page (the settings nav keeps "Integrations" highlighted).
-  const stateLine = !live ? 'Connect your accounting system'
+  const stateLine = !live ? 'Not connected'
     : live.status === 'PENDING_ORG' ? 'Choose an organisation'
-      : live.status === 'NEEDS_REAUTH' ? `${cfg!.short} sign-in expired`
-        : live.readiness.sync_enabled ? `${cfg!.short} connection and sync`
-          : `Setting up ${cfg!.short}`;
+      : live.readiness.sync_enabled ? `${cfg!.short} connection and sync`
+        : `Setting up ${cfg!.short}`;
   const description = (
     <>
       <Link to="/settings/integrations" className="section-header__back">
@@ -96,7 +95,18 @@ export default function AccountingIntegration() {
   useEffect(() => {
     const strip = tabsRef.current;
     const el = strip?.querySelector<HTMLElement>('.is-active');
-    if (el && strip) strip.scrollLeft = Math.max(0, el.offsetLeft - (strip.clientWidth - el.offsetWidth) / 2);
+    // Scroll in whole tabs: the left edge always starts on a tab, never a fragment.
+    if (el && strip) {
+      const base = strip.getBoundingClientRect().left - strip.scrollLeft;
+      const pos = (n: HTMLElement) => n.getBoundingClientRect().left - base;
+      const tabsEls = Array.from(strip.querySelectorAll<HTMLElement>('.tw-seg__opt'));
+      const elRight = pos(el) + el.offsetWidth;
+      let left = 0;
+      for (const t of tabsEls) {
+        if (elRight - pos(t) <= strip.clientWidth - 40) { left = pos(t) - 2; break; }
+      }
+      strip.scrollLeft = Math.max(0, tabsEls[0] && left <= pos(tabsEls[0]) ? 0 : left);
+    }
     // Fade whichever edge hides more tabs, so it reads as a strip that scrolls.
     const edges = () => {
       if (!strip) return;
@@ -135,32 +145,29 @@ export default function AccountingIntegration() {
   } else if (!live) {
     body = (
       <>
-        <h2 className="acct-section-title">Connect your accounting system</h2>
-        <p className="acct-section-desc">One accounting system can be connected at a time.</p>
+        <h2 className="acct-section-title">Choose your accounting system</h2>
+        <p className="acct-section-desc">One can be connected at a time.<ComingSoonNote /></p>
         <AccountingProviderCards hideManage />
-        <section style={settingsCardStyle} aria-labelledby="acct-how-title">
-          <div style={{ padding: '16px var(--card-pad, 20px)', borderBottom: '1px solid var(--border-subtle)' }}>
-            <h2 id="acct-how-title" style={{ margin: 0, font: '600 16px/24px var(--font-sans)', color: 'var(--text-primary)' }}>After you connect</h2>
-            <p className="acct-section-desc" style={{ margin: '2px 0 0' }}>Takes about ten minutes, once, and needs a company admin. Afterwards, payments you record in your accounting system update TruckWys on their own.</p>
-          </div>
-          <ol className="acct-check">
-            {[
-              ['Map accounts and VAT', 'Pick the income account and VAT rate for each kind of charge, and where supplier bills go.'],
-              ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
-              ['Choose a cut-over date', 'Documents from that date on are sent; anything earlier is assumed to be in your books.'],
-            ].map(([t, d], i) => (
-              <li key={t}>
-                <span className="acct-step-num" aria-hidden="true">{i + 1}</span>
-                <div style={{ minWidth: 0, maxWidth: 560 }}>
-                  <div className="acct-check__title">{t}</div>
-                  <div className="acct-check__desc">{d}</div>
-                </div>
-                <span />
-              </li>
-            ))}
-          </ol>
-
-        </section>
+        <h3 className="acct-section-title" style={{ fontSize: 14, lineHeight: '20px' }}>After you connect</h3>
+        <p className="acct-section-desc">
+          Takes about 10 minutes and needs a company admin. You only do it once. After that, payments recorded in your accounting system mark TruckWys invoices as paid.
+        </p>
+        <ol className="acct-check acct-check--plain">
+          {[
+            ['Map accounts and VAT', 'Pick the income account and VAT rate for each kind of charge, and where supplier bills go.'],
+            ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
+            ['Choose a cut-over date', 'Documents from that date on are sent; anything earlier is assumed to be in your books.'],
+          ].map(([t, d], i) => (
+            <li key={t}>
+              <span className="acct-step-num" aria-hidden="true">{i + 1}</span>
+              <div style={{ minWidth: 0, maxWidth: 560 }}>
+                <div className="acct-check__title">{t}</div>
+                <div className="acct-check__desc">{d}</div>
+              </div>
+              <span />
+            </li>
+          ))}
+        </ol>
       </>
     );
   } else if (live.status === 'PENDING_ORG') {
@@ -189,7 +196,7 @@ export default function AccountingIntegration() {
                   onClick={() => openTab(t.id)}
                 >
                   {t.label}
-                  {n != null && <span className="acct-tab-count" title={tabCountTitle(t.id, n)} aria-label={tabCountTitle(t.id, n)}><span className="acct-tab-count__dot" aria-hidden="true" />{n}</span>}
+                  {n != null && <span className="acct-tab-count" title={tabCountTitle(t.id, n)} aria-label={tabCountTitle(t.id, n)}>{n}</span>}
                 </button>
               );
             })}

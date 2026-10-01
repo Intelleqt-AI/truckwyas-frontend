@@ -1,5 +1,6 @@
 import { Check, Loader2, X } from 'lucide-react';
 import { providerConfig, type Connection } from '@/lib/accounting';
+import { formatDate } from '@/lib/formatters';
 import { ConnectionDetails } from './ConnectionHeader';
 import { AcctCard, plural, type StepLook } from './shared';
 import type { AccountingTab } from './tabs';
@@ -14,10 +15,10 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const items: { key: string; look: StepLook; title: string; desc: string; tab?: AccountingTab; action?: string }[] = [
     {
       key: 'connect',
-      look: connection.status === 'ACTIVE' ? 'done' : 'warn',
+      look: connection.status === 'ACTIVE' ? 'done' : 'bad',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status === 'ACTIVE'
-        ? `Linked to ${connection.tenant_name}.`
+        ? `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}.`
         : `Use Reconnect ${cfg.short} above.`,
     },
     {
@@ -45,7 +46,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     {
       key: 'cutover',
       look: backfillLook,
-      title: 'Choose a cut-over date and send history',
+      title: 'Choose a cut-over date',
       desc: r.backfill_state === 'DONE'
         ? `Documents from ${connection.cutover_date ?? 'the cut-over date'} onwards are in ${cfg.short}.`
         : r.backfill_state === 'RUNNING'
@@ -76,7 +77,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const subtitle = r.sync_enabled
     ? `Done. ${cfg.short} and TruckWys now stay in step on their own.`
     : reauth
-      ? `Paused until ${cfg.short} is reconnected.`
+      ? 'Steps unlock after you reconnect.'
       : open.length
         ? `Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done. You only do this once.`
         : `Sending your history to ${cfg.short}.`;
@@ -89,11 +90,11 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
           const auto = it.key === 'live';
           const blocked = reauth;
           return (
-            <li key={it.key}>
+            <li key={it.key} className={blocked && it.key !== 'connect' ? 'is-blocked' : undefined}>
               <StepMarker look={it.look} n={i + 1} auto={auto} />
               <div style={{ minWidth: 0 }}>
                 <div className="acct-check__title"><span className="acct-sr">Step {i + 1}: </span>{it.title}</div>
-                <div className="acct-check__desc">{it.key === 'connect' && blocked ? 'Sign-in expired. Reconnect to continue.' : it.desc}</div>
+                <div className="acct-check__desc">{it.key === 'connect' && blocked ? 'Reconnect using the button above.' : it.desc}</div>
               </div>
               {it.tab && it.action && !(blocked && it.look !== 'done') ? (
                 <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>

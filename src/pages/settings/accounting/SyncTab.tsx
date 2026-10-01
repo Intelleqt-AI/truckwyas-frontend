@@ -15,14 +15,14 @@ import type { AccountingTab } from './tabs';
 
 // One vocabulary for failures, used in the list and the activity log.
 const ERROR_META: Record<string, { tone: StatusTone; label: string }> = {
-  ERROR: { tone: 'warning', label: 'Failed, retrying' },
-  DEAD: { tone: 'danger', label: 'Failed, stopped' },
+  ERROR: { tone: 'warning', label: 'Retrying' },
+  DEAD: { tone: 'danger', label: 'Stopped' },
   BLOCKED: { tone: 'neutral', label: 'Waiting on you' },
 };
 const LEVEL: Record<string, { tone: StatusTone; label: string }> = {
   INFO: { tone: 'success', label: 'Done' },
   WARNING: { tone: 'warning', label: 'Warning' },
-  ERROR: { tone: 'warning', label: 'Failed, retrying' },
+  ERROR: { tone: 'warning', label: 'Retrying' },
 };
 const OVERDUE_MS = 2 * 60 * 60 * 1000;
 
@@ -130,13 +130,13 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
           <div className="acct-tiles acct-tiles--card">
             <div><span>In {cfg.short}</span><strong>{c.synced.toLocaleString('en-ZA')}</strong></div>
             <div><span>Waiting to send</span><strong>{c.queued.toLocaleString('en-ZA')}</strong></div>
-            <div><span>Retrying</span><strong style={c.errors ? { color: 'var(--status-warning-text)' } : undefined}>{c.errors.toLocaleString('en-ZA')}</strong></div>
-            <div><span>Stopped</span><strong style={c.dead ? { color: 'var(--status-danger-text)' } : undefined}>{c.dead.toLocaleString('en-ZA')}</strong></div>
+            <div><span>{c.errors > 0 && <span className="acct-dot acct-dot--warning acct-dot--inline" aria-hidden="true" />}Retrying</span><strong>{c.errors.toLocaleString('en-ZA')}</strong></div>
+            <div><span>{c.dead > 0 && <span className="acct-dot acct-dot--danger acct-dot--inline" aria-hidden="true" />}Stopped</span><strong>{c.dead.toLocaleString('en-ZA')}</strong></div>
           </div>
         </div>
       </AcctCard>
 
-      <AcctCard title={s.errors.length ? `Needs attention · ${s.errors.length}` : 'Needs attention'} description={s.errors.length ? `Fix the cause (often a mapping or a contact), then retry.` : undefined} flush>
+      <AcctCard title={s.errors.length ? `Needs attention · ${s.errors.length}` : 'Needs attention'} description={s.errors.length ? "Fix the cause; we'll retry automatically, or retry now." : undefined} flush>
         {s.errors.length === 0 ? (
           <div className="acct-empty">Nothing is stuck. Every document reached {cfg.short}.</div>
         ) : (
@@ -148,8 +148,9 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
                   <div style={{ minWidth: 0 }}>
                     <div className="acct-row__title">{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} <DocLink url={e.local_url}>{e.label}</DocLink></div>
                     <div className="acct-row__reason">{e.last_error || 'No reason given'}</div>
-                    <div className="acct-row__sub">
-                      {meta.label} · {e.attempts} {e.attempts === 1 ? 'try' : 'tries'}
+                    <div className="acct-row__sub" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <StatusChip tone={meta.tone} label={meta.label} size="sm" />
+                      Attempt {e.attempts}
                       {e.next_attempt_at && e.status === 'ERROR' ? ` · next try ${nextTry(e.next_attempt_at)}` : ''}
                     </div>
                   </div>
@@ -174,7 +175,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
         )}
       </AcctCard>
 
-      <AcctCard title="Recent activity" description={`The last ${s.recent.length || ''} sends and fetches, newest first.`.replace('  ', ' ')} flush>
+      <AcctCard title="Recent activity" description="Newest first." flush>
         {s.recent.length === 0 ? (
           <div className="acct-empty">No activity yet.</div>
         ) : (
@@ -184,7 +185,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
                 <span className={`acct-dot acct-dot--${(LEVEL[ev.level] ?? LEVEL.INFO).tone}`} title={(LEVEL[ev.level] ?? LEVEL.INFO).label} aria-label={(LEVEL[ev.level] ?? LEVEL.INFO).label} role="img" />
                 <div style={{ minWidth: 0 }}>
                   <div className="acct-row__title" style={{ fontWeight: 400 }}>
-                    {ev.label ? <><strong style={{ fontWeight: 500 }}>{ev.label}</strong> · </> : null}{ev.message || humanise(ev.action)}
+                    {ev.label ? <><DocLink url={ev.local_id && /INVOICE/.test(ev.object_type) ? `/finance/invoices/${ev.local_id}` : null}>{ev.label}</DocLink> · </> : null}{ev.message || humanise(ev.action)}
                   </div>
                   <div className="acct-row__sub">{formatDateTime(ev.created_at)}</div>
                 </div>

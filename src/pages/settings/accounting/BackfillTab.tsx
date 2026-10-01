@@ -15,12 +15,12 @@ import type { AccountingTab } from './tabs';
 
 /** Plain-English step names (the server's labels are the fallback). */
 const STEP_LABEL: Record<string, (p: string) => string> = {
-  settings: p => `Read accounts, VAT rates and tracking from ${p}`,
+  settings: p => `Read accounts and VAT from ${p}`,
   contacts: () => 'Link customers and suppliers',
   invoices: p => `Send invoices and credit notes to ${p}`,
-  receipts: p => `Send payments already recorded to ${p}`,
+  receipts: p => `Send recorded payments to ${p}`,
   bills: p => `Send supplier bills to ${p}`,
-  payments: p => `Bring back payments from ${p}`,
+  payments: p => `Import payments from ${p}`,
 };
 
 const STEP_LOOK: Record<StepState, StepLook> = { PENDING: 'todo', RUNNING: 'busy', DONE: 'done', FAILED: 'bad', SKIPPED: 'skip' };
@@ -111,7 +111,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
     if (x.state === 'RUNNING') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : `${x.count.toLocaleString('en-ZA')} so far`;
     if (x.state === 'DONE') return x.count > 0 ? `${x.count.toLocaleString('en-ZA')} done` : 'Done';
     if (x.state === 'SKIPPED') return '';
-    return total ? `${total.toLocaleString('en-ZA')} to send` : 'Waiting';
+    return total ? `${total.toLocaleString('en-ZA')} queued` : 'Waiting';
   };
   // The bar follows the documents (where the preview knows them), not the steps.
   const itemTotal = Object.values(totals).reduce<number>((n, v) => n + (v ?? 0), 0);
@@ -131,9 +131,10 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
         <div className="acct-cutover">
           <div className="acct-cutover__date">
             {locked ? (
-              <dl className="acct-facts" style={{ margin: 0, gridTemplateColumns: 'minmax(0, 1fr)' }}>
-                <div><dt>Cut-over date</dt><dd style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Lock size={13} aria-hidden="true" style={{ color: 'var(--text-tertiary)' }} />{formatDate(b.cutover_date)}</dd></div>
-              </dl>
+              <>
+                <div className="acct-field-label" style={{ fontWeight: 400, color: 'var(--text-tertiary)', marginBottom: 2 }}>Cut-over date</div>
+                <div className="acct-big-date"><Lock size={16} aria-hidden="true" />{formatDate(b.cutover_date)}</div>
+              </>
             ) : (
               <>
                 <label htmlFor="acct-cutover" className="acct-field-label">Cut-over date</label>
@@ -149,7 +150,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
           </div>
         </div>
 
-        <div className="acct-field-label" style={{ marginTop: 20 }}>
+        <div className="acct-field-label" style={{ marginTop: 24 }}>
           {locked ? 'What is being sent' : previewDate ? `What will be sent, from ${formatDate(previewDate)}` : 'What will be sent'}
         </div>
         {p ? (
@@ -192,20 +193,21 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
         <AcctCard
           title="Progress"
           description={running
-            ? `${startedAt && startedTime ? `Started ${formatDate(b.started_at)}, ${startedTime}` : 'Started'}. Updated ${updatedTime}. You can leave this page; sending carries on.`
-            : done
-              ? `Finished ${b.finished_at ? formatDateTime(b.finished_at) : ''}.`
-              : b.state === 'FAILED' ? 'Stopped. Fix what the failed step says, then try again.' : undefined}
-          actions={done ? <StatusChip tone="success" label="Done" /> : b.state === 'FAILED' ? <StatusChip tone="danger" label="Stopped" /> : undefined}
-          flush
-        >
-          <div className="acct-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pctDone)}
+            ? <>{`${startedAt && startedTime ? `Started ${formatDate(b.started_at)}, ${startedTime}` : 'Started'}. Updated ${updatedTime}. You can leave this page; sending carries on.`}
+          <div className="acct-progress acct-progress--head" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pctDone)}
             aria-label={itemTotal ? `${itemsDone} of ${itemTotal} documents sent` : `${doneSteps} of ${b.steps.length} steps done`}>
             <div className="acct-progress__bar"><span style={{ width: `${pctDone}%` }} /></div>
             <span className="acct-progress__text">
               {itemTotal ? `${itemsDone.toLocaleString('en-ZA')} of ${itemTotal.toLocaleString('en-ZA')} sent` : `${doneSteps} of ${b.steps.length} steps`}
             </span>
           </div>
+            </>
+            : done
+              ? `Finished ${b.finished_at ? formatDateTime(b.finished_at) : ''}.`
+              : b.state === 'FAILED' ? 'Stopped. Fix what the failed step says, then try again.' : undefined}
+          actions={done ? <StatusChip tone="success" label="Done" /> : b.state === 'FAILED' ? <StatusChip tone="danger" label="Stopped" /> : undefined}
+          flush
+        >
           <ol className="acct-steps">
             {b.steps.map(x => (
               <li key={x.key} className={x.state === 'RUNNING' ? 'is-running' : undefined}>

@@ -55,7 +55,7 @@ export function PaymentsManagedNote({ providerName, recordUrl }: { providerName:
   return (
     <div className="acct-managed">
       {recordUrl && (
-        <a href={recordUrl} target="_blank" rel="noopener noreferrer" className="tw-btn" style={{ width: '100%' }}>
+        <a href={recordUrl} target="_blank" rel="noopener noreferrer" className="tw-btn acct-record-btn">
           Record in {providerName}
           <ExternalLink size={14} aria-hidden="true" />
         </a>
@@ -70,11 +70,11 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
   const name = providerConfig(sync.provider).short || sync.provider_name;
   const retrying = sync.status === 'ERROR';
   return (
-    <div className="fl-notice fl-notice--warning acct-sync-notice" role="status">
+    <div className="fl-notice fl-notice--warning" role="status">
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
-        <strong>{retrying ? `Latest change didn't reach ${name}. Retrying automatically.` : `This ${what} isn't up to date in ${name}`}</strong>
-        {sync.last_error || `${name} refused it.`}
+        <strong>{retrying ? `Last change didn't reach ${name}` : `This ${what} isn't up to date in ${name}`}</strong>
+        {retrying ? 'Retrying automatically. ' : ''}{sync.last_error || `${name} refused it.`}
       </div>
       <Link to={`/settings/integrations/accounting?tab=${/account|tax|vat|tracking/i.test(sync.last_error) ? 'mapping' : 'sync'}`} className="tw-btn fl-notice__action">
         {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix in Accounts and VAT' : 'View sync issue'}

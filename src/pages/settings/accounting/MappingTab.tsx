@@ -149,7 +149,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
       <>
         <AcctCard
           title={<SkelLine width={140} lineHeight={24} />}
-          description={<><SkelLine width="90%" /><SkelLine width="55%" /></>}
+          description={<><SkelLine width="90%" /><SkelLine width="70%" /><SkelLine width="40%" /></>}
           actionsBelow
           actions={<><span className="tw-btn" style={{ visibility: 'hidden', width: 160 }} aria-hidden="true" /><span className="tw-btn" style={{ visibility: 'hidden', width: 160 }} aria-hidden="true" /></>}
         />
@@ -179,9 +179,10 @@ export function MappingTab({ connection }: { connection: Connection }) {
     const empty = !sectionValue(section, key);
     if (s && sectionValue(section, key) !== s) {
       return (
-        <div className={`acct-hint acct-hint--stack${requiredGap(section, key) ? ' is-required' : ''}`}>
-          <span>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {describe(s)}</span>
-          {canWrite && <button type="button" className="tw-btn tw-btn--sm" onClick={() => setSection(section, key, s)}>Use suggestion</button>}
+        <div className={`acct-hint${requiredGap(section, key) ? ' is-required' : ''}`}>
+          <span>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {describe(s)}.{' '}
+            {canWrite && <button type="button" className="acct-linkbtn" onClick={() => setSection(section, key, s)}>Use it</button>}
+          </span>
         </div>
       );
     }
@@ -189,7 +190,14 @@ export function MappingTab({ connection }: { connection: Connection }) {
     return null;
   };
   const optionalTag = (section: MappingSection, key: string) =>
-    !sectionValue(section, key) && !requiredGap(section, key) ? <span className="acct-optional"> (optional)</span> : null;
+    !sectionValue(section, key) && !requiredGap(section, key) ? <span className="acct-optional"> · optional</span> : null;
+  // "revenue:FUEL_SURCHARGE" -> scroll to that row and focus its select.
+  const jumpTo = (k: string) => {
+    const [prefix, key] = k.split(':');
+    const section = (Object.keys(PREFIX) as MappingSection[]).find(sct => PREFIX[sct] === prefix);
+    const el = section ? document.getElementById(`lbl-${section}.${key}`) : null;
+    el?.closest('.acct-map-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
   const rowClass = (section: MappingSection, key: string) => `acct-map-row${requiredGap(section, key) ? ' is-required' : ''}`;
   const describeAccount = (code: string) => { const a = accounts.find(x => x.code === code); return a ? accountLabel(a) : code; };
   const describeTax = (code: string) => { const t = taxRates.find(x => x.code === code); return t ? taxLabel(t) : code; };
@@ -199,11 +207,17 @@ export function MappingTab({ connection }: { connection: Connection }) {
       <AcctCard
         title={m.complete && !dirty ? 'Everything required is mapped' : m.missing.length > 0 ? `${m.missing.length} still to map` : 'Unsaved changes'}
         description={<>
+          {m.missing.length > 0 && !(m.complete && !dirty) && (
+            <>{m.missing.map((k, i) => (
+              <span key={k}>{i > 0 ? ', ' : ''}<button type="button" className="acct-linkbtn" onClick={() => jumpTo(k)}>{missingMappingLabel(k)}</button></span>
+            ))}. </>
+          )}
           Nothing is sent to {cfg.short} until every required line is mapped.
+          {m.options.fetched_at && <> Accounts last read from {cfg.short} {formatRelativeTime(m.options.fetched_at)}.</>}
           {!canWrite && <> {writeTitle}; you can look but not change anything.</>}
         </>}
         actionsBelow
-        actions={<>
+        actions={(canWrite && pendingSuggestions.length > 0) || canWrite ? <>
           {canWrite && pendingSuggestions.length > 0 && (
             <button type="button" className="tw-btn tw-btn--primary" onClick={applyAllSuggestions}>
               Apply {pendingSuggestions.length === 1 ? 'suggestion' : `${pendingSuggestions.length} suggestions`}
@@ -213,8 +227,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
             <RefreshCw size={14} aria-hidden="true" className={refreshing ? 'animate-spin' : undefined} />
             {refreshing ? 'Reading…' : `Refresh from ${cfg.short}`}
           </button>
-          {m.options.fetched_at && <span className="acct-section-desc" style={{ margin: 0, alignSelf: 'center' }}>Read {formatRelativeTime(m.options.fetched_at)}</span>}
-        </>}
+        </> : undefined}
       />
 
       <AcctCard title="Income accounts" description="Which income account each kind of charge on your invoices goes to." flush>
@@ -302,7 +315,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         </div>
       </AcctCard>
 
-      <AcctCard title="Tracking (optional)" description={`Tag invoice and bill lines in ${cfg.short} with the vehicle and branch, so you can report profit per truck there.`} flush>
+      <AcctCard title="Tracking" description={`Optional. Tag invoice and bill lines in ${cfg.short} with the vehicle and branch, so you can report profit per truck there.`} flush>
         {cats.length === 0 ? (
           <div className="acct-empty" style={{ textAlign: 'left' }}>Your {cfg.short} organisation has no tracking categories. You can skip this.</div>
         ) : (
@@ -315,7 +328,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
                 <PlainSelect labelledBy="lbl-veh" value={tracking.vehicle_category_id} disabled={disabled} invalid={!!errors['tracking.vehicle_category_id']}
                   options={cats.map(c => ({ value: c.id, label: c.name }))} noneLabel="Don't tag vehicles"
                   onChange={v => setDraft(d => ({ ...d, tracking: { ...tracking, vehicle_category_id: v } }))} />
-                <div className="acct-hint">Lines are tagged with the vehicle's registration.</div>
+                <div className="acct-hint">{tracking.vehicle_category_id ? "Lines are tagged with the vehicle's registration." : 'Pick a category to tag lines by vehicle.'}</div>
                 {errors['tracking.vehicle_category_id'] && <div className="acct-error" role="alert">{errors['tracking.vehicle_category_id']}</div>}
               </div>
             </div>
@@ -336,7 +349,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
                 <PlainSelect labelledBy="lbl-branch-opt" value={tracking.branch_option || null} disabled={disabled || !branchCat} invalid={!!errors['tracking.branch_option']}
                   options={(branchCat?.options ?? []).map(o => ({ value: o.name, label: o.name }))} noneLabel={branchCat ? 'Choose a branch' : 'Choose a branch category first'}
                   onChange={v => setDraft(d => ({ ...d, tracking: { ...tracking, branch_option: v ?? '' } }))} />
-                <div className="acct-hint">Every line is tagged with this branch.</div>
+                {tracking.branch_option && <div className="acct-hint">Every line is tagged with this branch.</div>}
                 {errors['tracking.branch_option'] && <div className="acct-error" role="alert">{errors['tracking.branch_option']}</div>}
               </div>
             </div>
@@ -345,12 +358,16 @@ export function MappingTab({ connection }: { connection: Connection }) {
       </AcctCard>
 
       {canWrite && (
-        <div className={`acct-savebar${formError ? ' has-error' : ''}`}>
-          <span className={`acct-savebar__note${formError ? ' acct-savebar__error' : ''}`} role={formError ? 'alert' : undefined} style={formError ? { color: 'var(--status-danger-text)' } : undefined}>
+        // The same sticky save bar as Company details.
+        <div className="cs-savebar acct-map-savebar">
+          <span className="cs-savebar__note" role={formError ? 'alert' : undefined} style={formError ? { color: 'var(--status-danger-text)' } : undefined}>
             {formError || (dirty ? `${changeCount} unsaved ${changeCount === 1 ? 'change' : 'changes'}` : 'No unsaved changes')}
           </span>
-          <button type="button" className="tw-btn" onClick={() => { setDraft(EMPTY_DRAFT); setErrors({}); setFormError(''); }} disabled={!dirty || saving}>Discard</button>
-          <button type="button" className="tw-btn tw-btn--primary" onClick={save} disabled={!dirty || saving}>{saving ? 'Saving…' : 'Save mapping'}</button>
+          {dirty && <button type="button" className="tw-btn tw-btn--ghost" onClick={() => { setDraft(EMPTY_DRAFT); setErrors({}); setFormError(''); }} disabled={saving}>Discard</button>}
+          <button type="button" className="btn-action settings-control" onClick={save} disabled={!dirty || saving}
+            style={{ opacity: !dirty ? 0.5 : saving ? 0.6 : 1 }}>
+            {saving ? 'Saving…' : 'Save mapping'}
+          </button>
         </div>
       )}
     </>

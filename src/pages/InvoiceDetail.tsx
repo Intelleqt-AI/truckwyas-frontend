@@ -947,6 +947,7 @@ export default function InvoiceDetail() {
                       : `${payments.length} recorded, by payment date`}
                   </p>
                 </div>
+                {managedHere && canRecordInProvider && <PaymentsManagedNote providerName={acctName} recordUrl={recordInProviderUrl} />}
               </div>
 
               <ul className="fin-paylist">
@@ -987,9 +988,6 @@ export default function InvoiceDetail() {
                   </li>
                 )}
               </ul>
-              {managedHere && canRecordInProvider && (
-                <PaymentsManagedNote providerName={acctName} recordUrl={recordInProviderUrl} />
-              )}
             </section>
           )}
 

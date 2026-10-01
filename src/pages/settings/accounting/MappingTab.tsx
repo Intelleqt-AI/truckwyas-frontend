@@ -181,15 +181,15 @@ export function MappingTab({ connection }: { connection: Connection }) {
     if (s && sectionValue(section, key) !== s) {
       return (
         <div className={`acct-hint${requiredGap(section, key) ? ' is-required' : ''}`}>
-          <span>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {describe(s)}.{' '}
-            {canWrite && <button type="button" className="acct-linkbtn" onClick={() => setSection(section, key, s)}>Use it</button>}
-          </span>
+          <span style={{ display: 'block' }}>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {describe(s)}.</span>
+          {canWrite && <button type="button" className="tw-btn tw-btn--sm" style={{ marginTop: 6 }} onClick={() => setSection(section, key, s)}>Use suggestion</button>}
         </div>
       );
     }
-    if (requiredGap(section, key)) return <div className="acct-hint is-required">Required. No suggestion: pick where it should go.</div>;
+    if (requiredGap(section, key)) return <div className="acct-hint is-required">Required. Pick the {cfg.short} {section.startsWith('tax') ? 'tax rate' : 'account'} for {(m[section] as Array<{ key: string; label: string }>).find(r => r.key === key)?.label.toLowerCase() ?? 'this line'}.</div>;
     return null;
   };
+  const isOptional = (section: MappingSection, key: string) => !(m.missing ?? []).includes(`${PREFIX[section]}:${key}`);
   const optionalTag = (section: MappingSection, key: string) =>
     !sectionValue(section, key) && !requiredGap(section, key) ? <span className="acct-optional"> · optional</span> : null;
   // "revenue:FUEL_SURCHARGE" -> scroll to that row and focus its select.
@@ -206,15 +206,15 @@ export function MappingTab({ connection }: { connection: Connection }) {
   return (
     <>
       <AcctCard
-        title={m.complete && !dirty ? 'Everything required is mapped' : m.missing.length > 0 ? `${m.missing.length} still to map` : 'Unsaved changes'}
+        title={m.complete && !dirty ? 'Everything required is mapped' : m.missing.length > 0 ? `${m.missing.length} required ${m.missing.length === 1 ? 'line' : 'lines'} still to map` : 'Unsaved changes'}
         description={<>
+          Nothing is sent to {cfg.short} until every required line is mapped.
+          {m.options.fetched_at && <> Accounts last read from {cfg.short} {formatRelativeTime(m.options.fetched_at)}.</>}
           {m.missing.length > 0 && !(m.complete && !dirty) && (
             <ul className="acct-jump-list">{m.missing.map(k => (
               <li key={k}><button type="button" className="acct-jumpbtn" onClick={() => jumpTo(k)}>{missingMappingLabel(k)}</button></li>
             ))}</ul>
           )}
-          Nothing is sent to {cfg.short} until every required line is mapped.
-          {m.options.fetched_at && <> Accounts last read from {cfg.short} {formatRelativeTime(m.options.fetched_at)}.</>}
           {!canWrite && <> {writeTitle}; you can look but not change anything.</>}
         </>}
         actionsBelow
@@ -239,7 +239,8 @@ export function MappingTab({ connection }: { connection: Connection }) {
               <label className="acct-map-row__label" id={`lbl-${field}`}>{row.label}{optionalTag('revenue_types', row.key)}</label>
               <div className="acct-map-row__field">
                 <AccountSelect labelledBy={`lbl-${field}`} accounts={accounts} prefer={a => a.class === 'REVENUE'} preferLabel="Income accounts"
-                  value={sectionValue('revenue_types', row.key)} onChange={v => setSection('revenue_types', row.key, v)} disabled={disabled} invalid={!!errors[field]} />
+                  value={sectionValue('revenue_types', row.key)} onChange={v => setSection('revenue_types', row.key, v)} disabled={disabled} invalid={!!errors[field]}
+                  noneLabel={isOptional('revenue_types', row.key) ? "Don't map" : 'Not mapped'} />
                 {suggestionHint('revenue_types', row.key, describeAccount)}
                 {errors[field] && <div className="acct-error" role="alert">{errors[field]}</div>}
               </div>
@@ -256,7 +257,8 @@ export function MappingTab({ connection }: { connection: Connection }) {
               <label className="acct-map-row__label" id={`lbl-${field}`}>{row.label}{optionalTag('expense_categories', row.key)}</label>
               <div className="acct-map-row__field">
                 <AccountSelect labelledBy={`lbl-${field}`} accounts={accounts} prefer={a => a.class === 'EXPENSE'} preferLabel="Expense accounts"
-                  value={sectionValue('expense_categories', row.key)} onChange={v => setSection('expense_categories', row.key, v)} disabled={disabled} invalid={!!errors[field]} />
+                  value={sectionValue('expense_categories', row.key)} onChange={v => setSection('expense_categories', row.key, v)} disabled={disabled} invalid={!!errors[field]}
+                  noneLabel={isOptional('expense_categories', row.key) ? "Don't map" : 'Not mapped'} />
                 {suggestionHint('expense_categories', row.key, describeAccount)}
                 {errors[field] && <div className="acct-error" role="alert">{errors[field]}</div>}
               </div>
@@ -286,7 +288,8 @@ export function MappingTab({ connection }: { connection: Connection }) {
                 <div className="acct-map-row__field">
                   <TaxSelect labelledBy={`lbl-${field}`} rates={taxRates} prefer={t => (section === 'tax_sales' ? t.revenue : t.expenses)}
                     preferLabel={section === 'tax_sales' ? 'Sales rates' : 'Purchase rates'}
-                    value={sectionValue(section, row.key)} onChange={v => setSection(section, row.key, v)} disabled={disabled} invalid={!!errors[field]} />
+                    value={sectionValue(section, row.key)} onChange={v => setSection(section, row.key, v)} disabled={disabled} invalid={!!errors[field]}
+                    noneLabel={isOptional(section, row.key) ? "Don't map" : 'Not mapped'} />
                   {mismatch && !errors[field] && (
                     <div className="acct-error">This rate is {pct(chosen.rate)}; {row.label.replace(/\s*\(.*\)$/, '')} needs {pct(row.rate)}.</div>
                   )}
@@ -301,11 +304,11 @@ export function MappingTab({ connection }: { connection: Connection }) {
 
       <AcctCard
         title={<>Payments bank account<span className="acct-optional"> · optional</span></>}
-        description={`Payments you recorded in TruckWys after the cut-over date are sent to this ${cfg.short} bank account.`}
+        description={`Payments you record in TruckWys after the cut-over date are sent to this ${cfg.short} bank account.`}
         flush
       >
         <div className="acct-map-row">
-          <label className="acct-map-row__label" id="lbl-receipts">Bank account</label>
+          <label className="acct-map-row__label" id="lbl-receipts">{cfg.short} bank account</label>
           <div className="acct-map-row__field">
             <AccountSelect labelledBy="lbl-receipts" accounts={accounts.filter(a => a.is_bank)} prefer={() => true} preferLabel="Bank accounts"
               value={receipts} onChange={v => { setDraft(d => ({ ...d, receipts_account: v })); setErrors(e => { const n = { ...e }; delete n.receipts_account; return n; }); }}
@@ -316,7 +319,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         </div>
       </AcctCard>
 
-      <AcctCard title={<>Tracking<span className="acct-optional"> · optional</span></>} description={`Tag invoice and bill lines in ${cfg.short} with the vehicle and branch, so you can report profit per truck there.`} flush>
+      <AcctCard title={<>Tracking<span className="acct-optional"> · optional</span></>} description={`Tag invoice and bill lines in ${cfg.short} with the vehicle and branch, so you can report profit per truck in ${cfg.short}.`} flush>
         {cats.length === 0 ? (
           <div className="acct-empty" style={{ textAlign: 'left' }}>Your {cfg.short} organisation has no tracking categories. You can skip this.</div>
         ) : (
@@ -415,7 +418,7 @@ function AccountSelect({ accounts, prefer, preferLabel, value, onChange, disable
   );
 }
 
-function TaxSelect({ rates, prefer, preferLabel, value, onChange, disabled, invalid, labelledBy }: {
+function TaxSelect({ rates, prefer, preferLabel, value, onChange, disabled, invalid, labelledBy, noneLabel = 'Not mapped' }: {
   rates: ProviderTaxRate[];
   prefer: (t: ProviderTaxRate) => boolean;
   preferLabel: string;
@@ -424,6 +427,7 @@ function TaxSelect({ rates, prefer, preferLabel, value, onChange, disabled, inva
   disabled?: boolean;
   invalid?: boolean;
   labelledBy: string;
+  noneLabel?: string;
 }) {
   const first = rates.filter(prefer);
   const rest = rates.filter(t => !prefer(t));
@@ -432,7 +436,7 @@ function TaxSelect({ rates, prefer, preferLabel, value, onChange, disabled, inva
     <Select value={value ?? NONE} onValueChange={v => onChange(v === NONE ? null : v)} disabled={disabled}>
       <SelectTrigger className="acct-select" aria-labelledby={labelledBy} aria-invalid={invalid || undefined}><SelectValue /></SelectTrigger>
       <SelectContent>
-        <SelectItem value={NONE}>Not mapped</SelectItem>
+        <SelectItem value={NONE}>{noneLabel}</SelectItem>
         {unknown && <SelectItem value={value!}>{value} (no longer in the list)</SelectItem>}
         {first.length > 0 && (
           <SelectGroup>

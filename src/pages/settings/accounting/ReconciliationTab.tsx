@@ -14,7 +14,7 @@ import { AcctCard, ErrorBlock, LoadingBlock, plural, useAccountingPermissions } 
 const SCOPES: { scope: ReconScope; title: string; first: string }[] = [
   { scope: 'INVOICE', title: 'Invoices', first: 'Invoice' },
   { scope: 'CUSTOMER', title: 'Customers', first: 'Customer' },
-  { scope: 'MONTH', title: 'Months', first: 'Month' },
+  { scope: 'MONTH', title: 'Sales and VAT by month', first: 'Month' },
 ];
 
 const FIELD_LABEL: Record<string, string> = {
@@ -73,7 +73,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
     <>
       <AcctCard
         title="Reconciliation"
-        description={`Each night we compare invoices, customer balances and monthly sales and VAT with ${cfg.short}. Rounding differences under 1 cent are ignored.`}
+        description={`Each night we compare invoices, customer balances and monthly sales and VAT with ${cfg.short}. Differences under 1c are ignored.`}
         actions={runButton}
       >
         {!last ? (
@@ -88,22 +88,21 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
             ) : (
               <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}</p>
             )}
-            <p className="acct-section-desc" style={{ margin: '-10px 0 14px 26px' }}>Checked {formatDateTime(last.ran_at)} · next check tonight at {nextCheck(last.ran_at)}</p>
+            <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}>Checked {formatDateTime(last.ran_at)} · next check tomorrow at {nextCheck(last.ran_at)}</p>
             <div className="acct-tiles acct-tiles--3">
               {SCOPES.map(sc => {
                 const n = sc.scope === 'INVOICE' ? last.checked.invoices : sc.scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;
                 const bad = differences.filter(d => d.scope === sc.scope).length;
                 return (
                   <div key={sc.scope}>
-                    <span>{sc.scope === 'MONTH' ? 'VAT months' : sc.title} checked</span>
+                    <span>{sc.scope === 'MONTH' ? 'Months (sales and VAT)' : sc.scope === 'CUSTOMER' ? 'Customer balances' : 'Invoices'} checked</span>
                     <strong>{(n ?? 0).toLocaleString('en-ZA')}</strong>
-                    <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>
+                    {differences.length > 0 && <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>}
                   </div>
                 );
               })}
             </div>
             {last.status === 'FAILED' && last.error && <p className="acct-error" role="status" style={{ marginTop: 12 }}>{last.error}</p>}
-            {differences.length > 0 && <p className="acct-section-desc" style={{ margin: '12px 0 0' }}>Difference is TruckWys minus {cfg.short}. Correct it in {cfg.short} or TruckWys; it clears on the next check.</p>}
           </>
         )}
       </AcctCard>
@@ -134,6 +133,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                   {rows.map(d => <DiffRow key={d.id} d={d} providerName={cfg.short} hasLinks={hasLinks} />)}
                 </tbody>
               </table>
+              <p className="acct-table-note">Difference is TruckWys minus {cfg.short}. Correct it in {cfg.short} or TruckWys; it clears on the next check.</p>
             </div>
             {/* Phones: one block per difference instead of a squeezed table. */}
             <ul className="acct-list acct-only-phone">
@@ -163,7 +163,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
 
 /** Money differences as rand; a status mismatch has no amount. */
 const diffText = (d: ReconDifference) => {
-  if (!isMoney(d.difference) || d.difference === '') return '—';
+  if (!isMoney(d.difference) || d.difference === '') return 'Status';
   const n = parseFloat(d.difference);
   return n > 0 ? `+${formatCurrency(d.difference)}` : formatCurrency(d.difference);
 };
@@ -186,7 +186,7 @@ function DiffRow({ d, providerName, hasLinks }: { d: ReconDifference; providerNa
       <td>{FIELD_LABEL[d.field] ?? humanise(d.field)}</td>
       <td className="num">{showValue(d.truckwys)}</td>
       <td className="num">{showValue(d.provider)}</td>
-      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{diffText(d)}</td>
+      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : '—'}</td>
       {hasLinks && (
         <td>
           {d.provider_url && (

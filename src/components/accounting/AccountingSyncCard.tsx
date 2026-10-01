@@ -32,13 +32,19 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
             <dd>{sync.external_number}</dd>
           </div>
         )}
+        {(sync.status === 'ERROR' || sync.status === 'DEAD' || sync.status === 'BLOCKED') && (
+          <div className="fin-dl__row">
+            <dt>Waiting to send</dt>
+            <dd>Latest change</dd>
+          </div>
+        )}
         <div className="fin-dl__row">
           <dt>{sync.status === 'SYNCED' ? 'Last sent' : 'Last sent successfully'}</dt>
           <dd style={{ whiteSpace: 'nowrap' }}>{sync.last_synced_at ? formatDate(sync.last_synced_at) : sync.status === 'PENDING' ? 'Not sent yet' : 'Not yet'}</dd>
         </div>
       </dl>
       {sync.url && (
-        <a href={sync.url} target="_blank" rel="noopener noreferrer" className="acct-link" style={{ fontSize: 13, marginTop: 8 }}>
+        <a href={sync.url} target="_blank" rel="noopener noreferrer" className="tw-btn tw-btn--sm" style={{ marginTop: 12, alignSelf: 'flex-start' }}>
           Open {what} in {name}
           <ExternalLink size={12} aria-hidden="true" />
         </a>
@@ -55,7 +61,7 @@ export function PaymentsManagedNote({ providerName, recordUrl }: { providerName:
   return (
     <div className="acct-managed">
       {recordUrl && (
-        <a href={recordUrl} target="_blank" rel="noopener noreferrer" className="tw-btn acct-record-btn">
+        <a href={recordUrl} target="_blank" rel="noopener noreferrer" className="tw-btn tw-btn--sm acct-record-btn">
           Record in {providerName}
           <ExternalLink size={14} aria-hidden="true" />
         </a>
@@ -90,7 +96,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
  */
 export function PaymentSourceBadge({ source, managed = false }: { source?: string | null; managed?: boolean }) {
   const manual = !source || source === 'MANUAL';
-  if (managed) return manual ? <span className="acct-source-note">Recorded in TruckWys</span> : null;
+  if (managed) return <span className="acct-source-note">{manual ? 'Recorded in TruckWys' : `From ${source === 'BANK' ? 'bank feed' : providerConfig(source).short}`}</span>;
   if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;
   return <span className="acct-source-badge">{label}</span>;

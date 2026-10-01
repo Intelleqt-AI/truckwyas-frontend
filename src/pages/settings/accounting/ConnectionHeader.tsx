@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, Check, ExternalLink, Lock } from 'lucide-react';
+import { AlertTriangle, ExternalLink } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -71,8 +71,6 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
   };
 
   const menu: RowActionItem[] = [];
-  // On phones the header shows no "Open in" button; the menu always has it.
-  if (connection.web_url) menu.push({ label: `Open in ${cfg.short}`, onSelect: () => window.open(connection.web_url!, '_blank', 'noopener,noreferrer') });
   if (canWrite) menu.push({ label: dis.busy ? 'Disconnecting…' : `Disconnect ${cfg.short}`, onSelect: dis.ask, disabled: dis.busy, danger: true });
 
   return (
@@ -90,8 +88,8 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
         </div>
         <div className="acct-head__actions">
           {connection.web_url ? (
-            <a href={connection.web_url} target="_blank" rel="noopener noreferrer" className="tw-btn acct-hide-phone">
-              <span>Open in {cfg.short}</span>
+            <a href={connection.web_url} target="_blank" rel="noopener noreferrer" className="tw-btn acct-open-btn" aria-label={`Open in ${cfg.short}`} title={`Open in ${cfg.short}`}>
+              <span className="acct-open-btn__text">Open in {cfg.short}</span>
               <ExternalLink size={14} aria-hidden="true" />
             </a>
           ) : null}
@@ -205,7 +203,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
     <>
       {dis.modal}
       <h2 id="acct-org-title" className="acct-section-title">
-        {single ? `Link ${single.name}?` : `Choose your ${cfg.short} organisation`}
+        {single ? `Confirm your ${cfg.short} organisation` : `Choose your ${cfg.short} organisation`}
       </h2>
       <p className="acct-section-desc">
         {single
@@ -217,12 +215,12 @@ export function OrgPicker({ connection }: { connection: Connection }) {
           <div className="acct-empty">No organisations came back from {cfg.short}. Use a different login and try again.</div>
         ) : single ? (
           <div className="acct-row acct-org acct-org--confirm">
-            <span className="acct-org__mark"><ProviderLogo provider={connection.provider} size="sm" /></span>
+            <span className="acct-org__mark"><ProviderLogo provider={connection.provider} /></span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-row__title" style={{ display: 'block' }}>{single.name}</span>
               <span className="acct-row__sub">Books in {single.currency || 'ZAR'}</span>
             </span>
-            <span className="acct-will-link" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Check size={14} aria-hidden="true" style={{ color: 'var(--status-success-text)' }} />Will be linked</span>
+            <StatusChip tone="success" label="Will be linked" size="sm" />
           </div>
         ) : (
           <div role="radiogroup" aria-labelledby="acct-org-title">
@@ -243,22 +241,21 @@ export function OrgPicker({ connection }: { connection: Connection }) {
             })}
           </div>
         )}
-        {unavailable.length > 0 && (
-          <div className="acct-org-unavailable">
-            <div className="acct-tiles__label" style={{ margin: 0 }}>Can't be linked</div>
-            {unavailable.map(t => (
-              <div key={t.tenant_id} className="acct-org-unavailable__row">
-                <Lock size={13} aria-hidden="true" />
-                <span>{t.name} · books in {t.currency}. TruckWys supports ZAR only.</span>
-              </div>
-            ))}
+        {unavailable.map(t => (
+          <div key={t.tenant_id} className="acct-row acct-org acct-org--confirm is-disabled">
+            <span className="acct-org__mark" style={{ opacity: 0.5 }}><ProviderLogo provider={connection.provider} /></span>
+            <span style={{ minWidth: 0 }}>
+              <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
+              <span className="acct-row__sub">Books in {t.currency}. TruckWys supports ZAR only.</span>
+            </span>
+            <StatusChip tone="neutral" label="Can't be linked" size="sm" />
           </div>
-        )}
+        ))}
         <div className="acct-formfoot">
           {error && <p className="acct-error" role="alert" style={{ margin: 0, marginRight: 'auto' }}>{error}</p>}
           {!error && <p className="acct-section-desc acct-formfoot__note">{!canWrite ? `${writeTitle}.` : 'Nothing is sent until you finish setup.'}</p>}
           {canWrite && (
-            <button type="button" className="tw-btn tw-btn--ghost acct-formfoot__link" onClick={dis.ask} disabled={dis.busy || busy}>
+            <button type="button" className="tw-btn acct-formfoot__link" onClick={dis.ask} disabled={dis.busy || busy}>
               Use a different {cfg.short} login
             </button>
           )}

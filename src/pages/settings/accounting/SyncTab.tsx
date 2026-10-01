@@ -108,7 +108,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
   return (
     <>
       <AcctCard
-        title={`Sending to ${cfg.short}`}
+        title={`Sync with ${cfg.short}`}
         description={<>
           Documents go to {cfg.short} as you create them; payments come back every few minutes.
           {!overdue && s.last_payment_sync_at && <> Last fetched {formatRelativeTime(s.last_payment_sync_at)}.</>}
@@ -130,13 +130,13 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
           <div className="acct-tiles">
             <div><span>In {cfg.short}</span><strong>{c.synced.toLocaleString('en-ZA')}</strong></div>
             <div><span>Queued</span><strong>{c.queued.toLocaleString('en-ZA')}</strong></div>
-            <div><span>Retrying</span><strong className={c.errors ? undefined : 'is-zero'}>{c.errors.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Retrying</span><strong className={c.errors ? undefined : 'is-zero'}>{c.errors.toLocaleString('en-ZA')}</strong>{c.errors > 0 && <em className="acct-tile-status is-bad">Needs a fix</em>}</div>
             <div><span>Stopped</span><strong className={c.dead ? undefined : 'is-zero'}>{c.dead.toLocaleString('en-ZA')}</strong></div>
           </div>
         </div>
       </AcctCard>
 
-      <AcctCard title="Needs attention" description={s.errors.length ? "Fix the cause; we'll retry automatically, or retry now." : undefined} flush>
+      <AcctCard title="Needs attention" description={s.errors.length ? "These won't go through until the cause is fixed. Fix it, then retry now or wait for the next try." : undefined} flush>
         {s.errors.length === 0 ? (
           <div className="acct-empty">Nothing is stuck. Every document reached {cfg.short}.</div>
         ) : (
@@ -149,16 +149,16 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
                     <div className="acct-row__title">{e.last_error || 'No reason given'}</div>
                     <div className="acct-row__sub" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                       <span>{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} <DocLink url={e.local_url}>{e.label}</DocLink></span>
-                      <StatusChip tone={meta.tone} label={e.next_attempt_at && e.status === 'ERROR' ? `Failed · retry ${nextTry(e.next_attempt_at)}` : meta.label} size="sm" />
+                      <StatusChip tone={meta.tone} label={e.next_attempt_at && e.status === 'ERROR' ? `Retrying · next try ${nextTry(e.next_attempt_at)}` : meta.label} size="sm" />
                     </div>
                   </div>
                   <div className="acct-row__actions">
                     {/* The usual cause is a mapping or a contact: fix that first, then retry. */}
                     {onOpen && /account|tax|vat|tracking/i.test(e.last_error) && (
-                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => onOpen('mapping')}>Fix in Accounts and VAT</button>
+                      <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={() => onOpen('mapping')}>Fix in Accounts and VAT</button>
                     )}
                     {onOpen && /contact/i.test(e.last_error) && (
-                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => onOpen('contacts')}>Fix in Contacts</button>
+                      <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={() => onOpen('contacts')}>Fix in Contacts</button>
                     )}
                     {canWrite && (
                       <button type="button" className="tw-btn tw-btn--sm" onClick={() => retry(e)} disabled={retrying === e.id}>

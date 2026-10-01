@@ -16,10 +16,10 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     {
       key: 'connect',
       look: connection.status === 'ACTIVE' ? 'done' : 'warn',
-      title: `Connect ${cfg.short}`,
-      desc: connection.status === 'ACTIVE'
-        ? `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`
-        : `Use Reconnect ${cfg.short} above.`,
+      title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
+      desc: connection.status !== 'ACTIVE'
+        ? 'Your sign-in expired.'
+        : `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`,
     },
     {
       key: 'mapping',
@@ -77,9 +77,9 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const subtitle = r.sync_enabled
     ? `Done. ${cfg.short} and TruckWys now stay in step on their own.`
     : reauth
-      ? `Paused. ${open.length ? `${open.length} steps wait` : 'Sync waits'} until ${cfg.short} is reconnected.`
+      ? `Paused until ${cfg.short} is reconnected.`
       : open.length
-        ? `Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done. You only do this once.`
+        ? `Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done. This is a one-time setup.`
         : `Sending your history to ${cfg.short}.`;
 
   return (
@@ -100,7 +100,8 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
                 <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>
                   {it.action}
                 </button>
-              ) : <span />}
+              ) : blocked && it.tab && it.look !== 'done' ? <span className="acct-step-auto">Paused</span>
+                : auto && it.look !== 'done' ? <span className="acct-step-auto">Automatic</span> : <span />}
             </li>
           );
         })}

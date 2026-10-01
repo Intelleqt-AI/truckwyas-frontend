@@ -371,7 +371,7 @@ export function IntegrationsSettings() {
 
       {/* Accounting: Xero, QuickBooks Online, Sage (one connected at a time). */}
       <h2 className="acct-section-title">Accounting</h2>
-      <p className="acct-section-desc">Send invoices and bills to your books; payments come back automatically.</p>
+      <p className="acct-section-desc">Send invoices and bills to your books. Payments come back automatically.</p>
       <AccountingProviderCards />
 
       <h2 className="acct-section-title">Fleet tracking</h2>

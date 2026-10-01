@@ -20,7 +20,7 @@ type KindFilter = 'ALL' | ContactKind;
 
 const STATUS_META: Record<ContactStatus, { tone: StatusTone; label: string }> = {
   SUGGESTED: { tone: 'warning', label: 'To confirm' },
-  UNMATCHED: { tone: 'danger', label: 'Not found' },
+  UNMATCHED: { tone: 'warning', label: 'No match' },
   CREATE: { tone: 'info', label: 'New contact' },
   MATCHED: { tone: 'success', label: 'Matched' },
   SKIPPED: { tone: 'neutral', label: 'Skipped' },
@@ -119,9 +119,9 @@ export function ContactsTab({ connection }: { connection: Connection }) {
           </div>
           <div className="acct-kind-filter">
             <Select value={kind} onValueChange={v => setKind(v as KindFilter)}>
-              <SelectTrigger aria-label="Show customers, suppliers or both" style={{ minHeight: 36, height: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Show customers, suppliers or both" style={{ minHeight: 36, height: 36, fontSize: 13 }} className="acct-select"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">All contacts</SelectItem>
+                <SelectItem value="ALL">Customers and suppliers</SelectItem>
                 <SelectItem value="CUSTOMER">Customers</SelectItem>
                 <SelectItem value="SUPPLIER">Suppliers</SelectItem>
               </SelectContent>

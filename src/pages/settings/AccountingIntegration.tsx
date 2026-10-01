@@ -145,14 +145,15 @@ export default function AccountingIntegration() {
     body = (
       <>
         <h2 className="acct-section-title">Connect your accounting system</h2>
-        <p className="acct-section-desc">You can connect one accounting system.<ComingSoonNote /></p>
+        <p className="acct-section-desc acct-desc-cap">You can connect one accounting system.</p>
         <AccountingProviderCards hideManage />
-        <AcctCard title="After you connect" description="Takes about 10 minutes and needs a company admin. You only do it once. After that, payments recorded in your accounting system mark TruckWys invoices as paid." flush>
+        <p className="acct-section-desc acct-desc-cap" style={{ marginTop: -12, marginBottom: 24 }}><ComingSoonNote /></p>
+        <AcctCard title="After you connect" description="Takes about 10 minutes and needs a company admin." flush>
           <ol className="acct-check">
             {[
               ['Map accounts and VAT', 'Pick the income account and VAT rate for each kind of charge, and where supplier bills go.'],
               ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
-              ['Choose a cut-over date', 'Documents from that date on are sent; anything earlier is assumed to be in your books.'],
+              ['Choose a cut-over date', 'We send documents from that date. Anything earlier should already be in your books.'],
             ].map(([t, d], i) => (
               <li key={t}>
                 <span className="acct-step-num" aria-hidden="true">{i + 1}</span>

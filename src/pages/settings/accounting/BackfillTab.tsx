@@ -109,9 +109,9 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
   const stepCount = (x: Backfill['steps'][number]) => {
     const total = totals[x.key];
     if (x.state === 'RUNNING') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : `${x.count.toLocaleString('en-ZA')} so far`;
-    if (x.state === 'DONE') return x.count > 0 ? `${x.count.toLocaleString('en-ZA')} of ${x.count.toLocaleString('en-ZA')}` : 'Done';
+    if (x.state === 'DONE') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : 'Done';
     if (x.state === 'SKIPPED') return '';
-    return total ? `0 of ${total.toLocaleString('en-ZA')}` : 'Waiting';
+    return total ? `0 of ${total.toLocaleString('en-ZA')}` : 'After sending';
   };
   // The bar follows the documents (where the preview knows them), not the steps.
   const itemTotal = Object.values(totals).reduce<number>((n, v) => n + (v ?? 0), 0);
@@ -126,7 +126,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
   const cutoverCard = (
       <AcctCard
         title="Cut-over date"
-        description={`From this date TruckWys sends every invoice, credit note and supplier bill to ${cfg.short}. Anything dated earlier is not sent: we assume it's already in your books.`}
+        description={`From this date TruckWys sends every invoice, credit note, supplier bill and recorded payment to ${cfg.short}. Anything dated earlier is not sent: we assume it's already in your books.`}
       >
         <div className="acct-cutover">
           <div className="acct-cutover__date">
@@ -151,7 +151,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
 
         {locked && p ? (
           <p className="acct-section-desc" style={{ margin: '12px 0 0' }}>
-            {(p.invoices + p.credit_notes + p.bills + p.historic_receipts).toLocaleString('en-ZA')} documents from {formatDate(b.cutover_date)}: {p.invoices} invoices, {p.credit_notes} credit notes, {p.bills} supplier bills and {p.historic_receipts} recorded payments.
+            {(p.invoices + p.credit_notes + p.bills + p.historic_receipts).toLocaleString('en-ZA')} documents: {p.invoices} invoices, {p.credit_notes} credit notes, {p.bills} supplier bills and {p.historic_receipts} recorded payments.
           </p>
         ) : (
           <>

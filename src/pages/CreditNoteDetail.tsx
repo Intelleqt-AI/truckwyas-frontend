@@ -15,6 +15,7 @@ import { formatCurrency, formatDate, formatDateTime } from '@/lib/formatters';
 import { FIN_URL, invalidateInvoiceData, useCreditNote } from '@/lib/finance/api';
 import { formatQuantity, sumLines, taxCodeShort, toNumber } from '@/lib/finance/tax';
 import { toast } from '@/lib/toast';
+import { revenueTypeLabel } from '@/lib/finance/types';
 import { AccountingSyncCard } from '@/components/accounting/AccountingSyncCard';
 
 const BACK = { to: '/finance/credit-notes', label: 'Credit notes' };
@@ -146,6 +147,7 @@ export default function CreditNoteDetail() {
                       <tr key={l.id}>
                         <td className="fin-strong fin-cell-fill">
                           <div className="fin-doc__desc" title={l.description}>{l.description}</div>
+                          {l.revenue_type && l.revenue_type !== 'FREIGHT' && <span className="fl-line-type">{revenueTypeLabel(l.revenue_type)}</span>}
                           <span className="fin-cell-sub fin-mobile-only">{formatQuantity(l.quantity)} × {formatCurrency(l.unit_price)} · {taxCodeShort(l.tax_code)}, VAT {formatCurrency(l.vat_amount)}</span>
                         </td>
                         <td className="num m-hide">{formatQuantity(l.quantity)}</td>

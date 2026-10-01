@@ -36,6 +36,10 @@
 .fl-lines__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; flex-wrap: wrap; }
 .fl-label-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .fl-mobile-label { display: none; }
+/* Line type: a compact select under the description (all widths). */
+.fl-type { display: flex; align-items: center; gap: 8px; margin-top: 6px; min-width: 0; }
+.fl-type__label { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); flex: none; }
+.fl-line-type { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
 
 /* Cards narrower than the full table (the new-invoice main column beside
    the rail, tablets): each line is two rows, description and amount over

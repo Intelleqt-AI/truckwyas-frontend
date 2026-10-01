@@ -32,6 +32,7 @@ import { ConfirmModal } from "@/components/ConfirmModal";
 import { FIN_URL, errorText, invalidateInvoiceData } from "@/lib/finance/api";
 import { formatQuantity, sumLines, taxCodeShort, toNumber } from "@/lib/finance/tax";
 import type { Invoice, InvoiceLine, Payment } from "@/lib/finance/types";
+import { revenueTypeLabel } from "@/lib/finance/types";
 
 // External Fast Pay application link. The applied-state key is unchanged so
 // invoices already marked "Applied" stay marked.
@@ -760,6 +761,7 @@ export default function InvoiceDetail() {
                       <tr key={l.id}>
                         <td className="fin-strong fin-cell-fill">
                           <div className="fin-doc__desc" title={l.description}>{l.description}</div>
+                          {l.revenue_type && l.revenue_type !== 'FREIGHT' && <span className="fl-line-type">{revenueTypeLabel(l.revenue_type)}</span>}
                           {/* Phones: quantity, price, tax and VAT under the description. */}
                           <span className="fin-cell-sub fin-mobile-only">
                             {formatQuantity(l.quantity)} × {formatCurrency(l.unit_price)}

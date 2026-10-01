@@ -1,16 +1,16 @@
 import {
   computeLine, normaliseDecimalInput, toNumber, type DiscountMode, type LineDraft,
 } from './tax';
-import type { InvoiceLine, InvoiceLineInput, TaxCode } from './types';
+import type { InvoiceLine, InvoiceLineInput, RevenueType, TaxCode } from './types';
 
 /** A line in the editor: the draft plus a stable React key. */
-export interface EditorLine extends LineDraft { key: string; load?: number | null }
+export interface EditorLine extends LineDraft { key: string; load?: number | null; revenue_type: RevenueType }
 
 let seq = 0;
 const nextKey = () => `l${Date.now().toString(36)}${(seq++).toString(36)}`;
 
 export const blankLine = (tax_code: TaxCode): EditorLine => ({
-  key: nextKey(), description: '', quantity: '1', unit_price: '', discount: '', discount_mode: 'amount', tax_code,
+  key: nextKey(), description: '', quantity: '1', unit_price: '', discount: '', discount_mode: 'amount', tax_code, revenue_type: 'FREIGHT',
 });
 
 /** Editor lines from a saved invoice. A legacy invoice (no lines) becomes one
@@ -25,6 +25,7 @@ export function linesFromInvoice(lines: InvoiceLine[] | undefined, legacySubtota
       discount: toNumber(l.discount_amount) ? l.discount_amount : '',
       discount_mode: 'amount' as DiscountMode,
       tax_code: l.tax_code,
+      revenue_type: l.revenue_type ?? 'FREIGHT',
       load: l.load ?? null,
     }));
   }
@@ -45,6 +46,7 @@ export function linesForApi(lines: EditorLine[]): InvoiceLineInput[] {
         quantity: normaliseDecimalInput(l.quantity) || '0',
         unit_price: normaliseDecimalInput(l.unit_price) || '0',
         tax_code: l.tax_code,
+        revenue_type: l.revenue_type ?? 'FREIGHT',
       };
       if (l.load !== undefined) base.load = l.load;
       if (disc && toNumber(disc) !== 0) {

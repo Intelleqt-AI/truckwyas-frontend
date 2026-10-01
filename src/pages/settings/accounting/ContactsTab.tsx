@@ -20,7 +20,7 @@ type KindFilter = 'ALL' | ContactKind;
 
 const STATUS_META: Record<ContactStatus, { tone: StatusTone; label: string }> = {
   SUGGESTED: { tone: 'warning', label: 'To confirm' },
-  UNMATCHED: { tone: 'warning', label: 'No match' },
+  UNMATCHED: { tone: 'neutral', label: 'No match' },
   CREATE: { tone: 'info', label: 'New contact' },
   MATCHED: { tone: 'success', label: 'Matched' },
   SKIPPED: { tone: 'neutral', label: 'Skipped' },
@@ -114,7 +114,7 @@ export function ContactsTab({ connection }: { connection: Connection }) {
           <div className="acct-only-phone" style={{ flex: '1 1 160px', minWidth: 0 }}>
             <Select value={status} onValueChange={v => setStatus(v as StatusFilter)}>
               <SelectTrigger aria-label="Status" style={{ minHeight: 36, height: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
-              <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'All statuses' : o.label} · {o.count ?? 0}</SelectItem>)}</SelectContent>
+              <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'All statuses' : o.label} ({o.count ?? 0})</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="acct-kind-filter">
@@ -184,15 +184,12 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   if (row.status === 'MATCHED' || row.status === 'SUGGESTED') {
     match = (
       <>
-        <div className="acct-row__sub acct-row__match">{providerName} contact: {suggestedName ?? '—'}</div>
+        <div className="acct-row__sub">{providerName} contact: <span className="acct-row__match">{suggestedName ?? '—'}</span></div>
         <div className="acct-row__sub">{row.method ? `Matched on ${MATCH_METHOD_LABEL[row.method] ?? row.method}` : `In ${providerName}`}</div>
       </>
     );
   } else if (row.status === 'CREATE') {
-    match = <>
-      <div className="acct-row__sub acct-row__match">Will create “{row.local_name}”</div>
-      <div className="acct-row__sub">In {providerName}, when the first document is sent</div>
-    </>;
+    match = <div className="acct-row__sub">Will be created in {providerName} when the first document is sent.</div>;
   } else if (row.status === 'SKIPPED') {
     match = <div className="acct-row__sub">Not synced. Their documents stay in TruckWys only and show as sync errors.</div>;
   } else {

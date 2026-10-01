@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, ExternalLink, RefreshCw } from 'lucide-react';
+import { StatusChip } from '@/components/ui/StatusChip';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency, formatDateTime } from '@/lib/formatters';
@@ -95,14 +96,15 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                 const bad = differences.filter(d => d.scope === sc.scope).length;
                 return (
                   <div key={sc.scope}>
-                    <span>{sc.scope === 'MONTH' ? 'Months' : sc.scope === 'CUSTOMER' ? 'Customers' : 'Invoices'}</span>
+                    <span>{sc.scope === 'MONTH' ? 'Months' : sc.scope === 'CUSTOMER' ? 'Customers' : 'Invoices'} checked</span>
                     <strong>{(n ?? 0).toLocaleString('en-ZA')}</strong>
-                    <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>
+                    {differences.length > 0 && <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>}
                   </div>
                 );
               })}
             </div>
             {last.status === 'FAILED' && last.error && <p className="acct-error" role="status" style={{ marginTop: 12 }}>{last.error}</p>}
+            {differences.length > 0 && <p className="acct-section-desc" style={{ margin: '12px 0 0' }}>Difference is TruckWys minus {cfg.short}. Correct it in {cfg.short} or TruckWys; it clears on the next check.</p>}
           </>
         )}
       </AcctCard>
@@ -113,7 +115,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
         void i;
         const hasLinks = true; // same column template in every table, link or not
         return (
-          <AcctCard key={scope} title={<>{title}<span className="acct-optional"> · {plural(rows.length, 'difference')}</span></>} flush>
+          <AcctCard key={scope} id={`acct-recon-${scope.toLowerCase()}`} title={<>{title}<span className="acct-optional"> · {plural(rows.length, 'difference')}</span></>} flush>
             <div className="acct-table-wrap acct-only-wide" role="region" aria-label={`${title} differences`} tabIndex={0}>
               <table className="acct-table acct-table--recon">
                 <colgroup>
@@ -134,9 +136,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                   {rows.map(d => <DiffRow key={d.id} d={d} providerName={cfg.short} hasLinks={hasLinks} />)}
                 </tbody>
               </table>
-              {i === SCOPES.findIndex(x => differences.some(d => d.scope === x.scope)) && (
-                <p className="acct-table-note">Difference is TruckWys minus {cfg.short}. Correct it in {cfg.short} or TruckWys; it clears on the next check.</p>
-              )}
+
             </div>
             {/* Phones: one block per difference instead of a squeezed table. */}
             <ul className="acct-list acct-only-phone">
@@ -151,7 +151,9 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                       </span>
                       <strong className={`acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : 'Status differs'}</strong>
                     </div>
-                    <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)}: TruckWys{'\u00a0'}{showValue(d.truckwys)} · {cfg.short}{'\u00a0'}{showValue(d.provider)}</div>
+                    <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)}</div>
+                    <div className="acct-row__sub">TruckWys{'\u00a0'}{showValue(d.truckwys)}</div>
+                    <div className="acct-row__sub">{cfg.short}{'\u00a0'}{showValue(d.provider)}</div>
                     {d.provider_url && <a className="acct-link" style={{ fontSize: 13 }} href={d.provider_url} target="_blank" rel="noopener noreferrer">Open in {cfg.short} <ExternalLink size={12} aria-hidden="true" /></a>}
                   </li>
                 );
@@ -189,7 +191,7 @@ function DiffRow({ d, providerName, hasLinks }: { d: ReconDifference; providerNa
       <td>{FIELD_LABEL[d.field] ?? humanise(d.field)}</td>
       <td className="num">{showValue(d.truckwys)}</td>
       <td className="num">{showValue(d.provider)}</td>
-      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : 'Status differs'}</td>
+      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <StatusChip tone="warning" label="Status differs" size="sm" />}</td>
       {hasLinks && (
         <td>
           {d.provider_url && (

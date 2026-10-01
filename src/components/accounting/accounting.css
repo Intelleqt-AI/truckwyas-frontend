@@ -525,7 +525,7 @@
 .acct-org--confirm { grid-template-columns: 48px minmax(0, 1fr) auto; }
 .acct-org--confirm .acct-org__mark { width: 48px; height: 48px; }
 .acct-org--confirm .acct-org__mark > .acct-logo > .acct-logo { border: 0; }
-@media (max-width: 480px) { .acct-org--confirm { grid-template-columns: 48px minmax(0, 1fr); } .acct-org--confirm > .tw-status { grid-column: 2; justify-self: start; } }
+@media (max-width: 480px) { .acct-org--confirm .acct-org__radio .tw-status { display: none; } }
 .acct-org-unavailable__row svg { flex: none; width: 14px; height: 14px; align-self: flex-start; margin-top: 3px; }
 .acct-org-unavailable .acct-tiles__label, .acct-will-link { font: 500 12px/16px var(--font-sans); color: var(--text-secondary); }
 .acct-formfoot__link { margin-right: 4px; }
@@ -550,7 +550,7 @@
 .acct-org-unavailable { background: var(--surface-tint-hover); }
 
 .acct-tabs .tw-seg__opt .acct-tab-count.is-todo { border-color: var(--status-warning); }
-.acct-row--contact { grid-template-columns: minmax(200px, 0.9fr) minmax(0, 1.4fr) auto; }
+.acct-row--contact { grid-template-columns: minmax(200px, 0.9fr) minmax(0, 1.4fr) 172px; }
 @media (max-width: 720px) { .acct-row--contact { grid-template-columns: minmax(0, 1fr) 32px; } .acct-row--event { grid-template-columns: 8px minmax(0, 1fr); } .acct-event-time { grid-column: 2; } }
 @media (max-width: 640px) {
   .acct-toolbar { flex-direction: row !important; }
@@ -570,7 +570,7 @@
 
 @media (max-width: 640px) { .acct-formfoot > .acct-formfoot__link { width: 100% !important; } }
 .acct-jump-list { margin: 10px 0 2px; }
-@media (max-width: 640px) { .acct-card-actions--below { flex-wrap: nowrap; } .acct-card-actions--below > .tw-btn { flex: 1 1 0; } .acct-card-actions--below > .acct-section-desc { display: none; } }
+@media (max-width: 640px) { .acct-card-actions--below { flex-wrap: wrap; } .acct-card-actions--below > .tw-btn { flex: 1 1 100%; } }
 
 .acct-row--contact .acct-row__sub { overflow-wrap: normal; }
 .acct-table--recon td:nth-child(2) { white-space: nowrap; }
@@ -610,7 +610,34 @@
   .acct-check--steps li > .tw-btn { justify-self: stretch !important; }
 }
 .acct-hint .acct-linkbtn { font-weight: 500; }
-@media (min-width: 641px) { .acct-map-row__field .acct-select { max-width: 360px; } }
+
 .acct-org__radio { display: inline-flex; }
 .acct-paylist-top .fin-paylist__row { align-items: flex-start; }
 .acct-row--contact .acct-row__actions { align-items: center; align-self: center; }
+
+.acct-org--confirm:not(.is-disabled) { background: var(--surface-tint-hover); }
+.acct-save-btn:disabled { opacity: 0.4 !important; }
+.acct-step-auto.is-urgent { color: var(--status-danger-text); }
+@media (max-width: 560px) {
+  .acct-step-auto { display: none; }
+  .acct-check__desc .acct-step-inline { display: inline; }
+}
+.acct-step-inline { display: none; color: var(--text-tertiary); }
+.acct-step-inline.is-urgent { color: var(--status-danger-text); }
+@media (max-width: 560px) { .acct-check--steps li > .tw-btn:not(.tw-btn--primary) { justify-self: start !important; } }
+.acct-map-row.is-disabled-row .acct-map-row__label { color: var(--text-primary); }
+
+.acct-row--contact .acct-row__actions { justify-content: flex-end; }
+.acct-tiles { border-top: 0 !important; border-bottom: 0 !important; grid-auto-columns: minmax(0, 1fr); }
+.acct-tiles > div { padding-top: 4px; padding-bottom: 4px; }
+.acct-tiles--3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.acct-steps li:not(.is-running):not(:has(.is-done)) .acct-check__title { color: var(--text-secondary); }
+.acct-recon-sub .settings-card-title, .acct-recon-sub h2 { font-size: 15px !important; font-weight: 500 !important; }
+.acct-row--event { align-items: start !important; }
+.acct-row--event .acct-dot { margin-top: 6px; }
+@media (max-width: 640px) { .acct-tiles--3 > div { padding-left: 10px !important; } .acct-tiles--3 > div:first-child { padding-left: 0 !important; } }
+#acct-recon-invoice h2, #acct-recon-customer h2, #acct-recon-month h2 { font-size: 15px !important; font-weight: 500 !important; }
+.acct-paylist-top .fin-paylist__row { align-items: center; }
+
+@media (max-width: 640px) { .acct-card-actions > .tw-btn { flex: 1 1 100% !important; } }
+.acct-source-note { color: var(--text-secondary); }

@@ -110,7 +110,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
       <AcctCard
         title={`Sync with ${cfg.short}`}
         description={<>
-          Documents go to {cfg.short} as you create them; payments come back every few minutes.
+          Documents go to {cfg.short} as you create them; payments are fetched every few minutes.
           {!overdue && s.last_payment_sync_at && <> Last fetched {formatRelativeTime(s.last_payment_sync_at)}.</>}
           {overdue && (
             <span className="acct-hint is-required" style={{ display: 'flex', marginTop: 4 }}>

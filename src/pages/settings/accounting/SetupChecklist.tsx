@@ -94,16 +94,19 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
               <StepMarker look={it.look} n={i + 1} auto={auto} />
               <div style={{ minWidth: 0 }}>
                 <div className="acct-check__title"><span className="acct-sr">Step {i + 1}: </span>{it.title}</div>
-                <div className="acct-check__desc">{it.desc}</div>
+                <div className="acct-check__desc">{it.desc}{(() => {
+                  const st = blocked && it.key === 'connect' ? 'Action needed' : blocked && it.tab && it.look !== 'done' ? 'Paused' : auto && it.look !== 'done' ? 'Automatic' : null;
+                  return st ? <span className={`acct-step-inline${st === 'Action needed' ? ' is-urgent' : ''}`}> · {st}</span> : null;
+                })()}</div>
               </div>
               {it.tab && it.action && !(blocked && it.look !== 'done') ? (
                 <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>
                   {it.action}
                 </button>
-              ) : blocked && it.key === 'connect' ? <span className="acct-step-auto">Action needed</span>
+              ) : blocked && it.key === 'connect' ? <span className="acct-step-auto is-urgent">Action needed</span>
                 : blocked && it.tab && it.look !== 'done' ? <span className="acct-step-auto">Paused</span>
                 : auto && it.look !== 'done' ? <span className="acct-step-auto">Automatic</span>
-                : it.look === 'done' ? <span className="acct-step-auto">Done</span> : <span />}
+                : <span />}
             </li>
           );
         })}

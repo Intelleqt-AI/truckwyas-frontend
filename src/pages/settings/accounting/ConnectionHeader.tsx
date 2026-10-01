@@ -89,7 +89,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
           </p>
         </div>
         <div className="acct-head__actions">
-          {connection.web_url ? (
+          {connection.web_url && !reauth ? (
             <a href={connection.web_url} target="_blank" rel="noopener noreferrer" className="tw-btn acct-open-btn" aria-label={`Open in ${cfg.short}`} title={`Open in ${cfg.short}`}>
               <span className="acct-open-btn__text">Open in {cfg.short}</span>
               <ExternalLink size={14} aria-hidden="true" />
@@ -250,7 +250,10 @@ export function OrgPicker({ connection }: { connection: Connection }) {
               <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
               <span className="acct-row__sub">Books in {t.currency} · only ZAR books can be linked</span>
             </span>
-            <StatusChip tone="neutral" label="Not supported" size="sm" />
+            <span className="acct-org__radio" style={{ gap: 8, alignItems: 'center' }}>
+              <StatusChip tone="neutral" label="Not supported" size="sm" />
+              <input type="radio" className="acct-radio" disabled aria-label={`${t.name} can't be linked`} />
+            </span>
           </div>
         ))}
         <div className="acct-formfoot">

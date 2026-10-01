@@ -18,7 +18,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: 'done',
       title: `Connect ${cfg.short}`,
       desc: true
-        ? `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}.`
+        ? `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`
         : `Use Reconnect ${cfg.short} above.`,
     },
     {
@@ -39,7 +39,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       title: 'Confirm contacts',
       desc: r.contacts_to_confirm === 0
         ? `Customers and suppliers are linked to their ${cfg.short} contacts.`
-        : `${plural(r.contacts_to_confirm, 'contact')} matched on name only. Confirm or change them so invoices land on the right account.`,
+        : `${plural(r.contacts_to_confirm, 'contact')} to check.`,
       tab: 'contacts',
       action: r.contacts_to_confirm === 0 ? 'Review' : 'Confirm contacts',
     },
@@ -53,7 +53,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
           ? `Sending documents to ${cfg.short} now.`
           : r.backfill_state === 'FAILED'
             ? 'The first send stopped part-way. Open it to see what went wrong and try again.'
-            : `Documents dated on or after this date are sent to ${cfg.short}; anything earlier is assumed to be in your books already.`,
+            : `Earlier documents are assumed to be in ${cfg.short} already.`,
       tab: 'cutover',
       action: r.backfill_state === 'DONE' ? 'View' : r.backfill_state === 'RUNNING' ? 'Watch progress' : 'Choose date',
     },

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, ChevronLeft, Info, X, XCircle } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchData } from '@/lib/Api';
+import { AlertTriangle, CheckCircle2, ChevronLeft, Info, Lock, X, XCircle } from 'lucide-react';
 import { AccountingProviderCards, ComingSoonNote } from '@/components/accounting/AccountingProviderCards';
 import {
-  apiMessage, apiStatus, callbackMessage, invalidateAccounting, providerBySlug, providerConfig, useAccountingConnection,
+  ACCT_KEYS, ACCT_URL, apiMessage, apiStatus, callbackMessage, type Reconciliation, invalidateAccounting, providerBySlug, providerConfig, useAccountingConnection,
 } from '@/lib/accounting';
 import { SettingsShell } from './SettingsShell';
 import { SettingsPageHeader, settingsCardStyle } from './settingsUi';
@@ -15,7 +16,7 @@ import { ContactsTab } from './accounting/ContactsTab';
 import { BackfillTab } from './accounting/BackfillTab';
 import { SyncTab } from './accounting/SyncTab';
 import { ReconciliationTab } from './accounting/ReconciliationTab';
-import { ErrorBlock, LoadingBlock, useAccountingPermissions } from './accounting/shared';
+import { AcctCard, ErrorBlock, LoadingBlock, useAccountingPermissions } from './accounting/shared';
 import { ACCOUNTING_TABS, isAccountingTab, type AccountingTab } from './accounting/tabs';
 import '@/components/accounting/accounting.css';
 
@@ -63,27 +64,27 @@ export default function AccountingIntegration() {
   const title = 'Accounting';
   // A sub-page of Integrations: the subtitle line carries the way back, as on
   // every detail page (the settings nav keeps "Integrations" highlighted).
-  // The subtitle names the system; the chip carries the state.
-  const stateLine = !live ? 'Accounting system' : `${cfg!.name} connection`;
   const description = (
-    <>
-      <Link to="/settings/integrations" className="section-header__back">
-        <ChevronLeft size={14} strokeWidth={1.75} aria-hidden="true" />
-        Integrations
-      </Link>
-      <span aria-hidden="true" className="section-header__sep">·</span>
-      {conn.isLoading ? 'Accounting system' : stateLine}
-    </>
+    <Link to="/settings/integrations" className="section-header__back">
+      <ChevronLeft size={14} strokeWidth={1.75} aria-hidden="true" />
+      Integrations
+    </Link>
   );
 
   const bannerIcon = banner?.tone === 'success' ? <CheckCircle2 size={16} aria-hidden="true" />
     : banner?.tone === 'warning' ? <Info size={16} aria-hidden="true" /> : <XCircle size={16} aria-hidden="true" />;
 
   const r = live?.readiness;
+  // Differences badge the Reconciliation tab, like counts on the others.
+  const recon = useQuery<Reconciliation>({
+    queryKey: ACCT_KEYS.reconciliation, queryFn: () => fetchData(ACCT_URL.reconciliation),
+    enabled: !!live && live.status === 'ACTIVE' && !!live.readiness?.sync_enabled, retry: 0, staleTime: 60_000,
+  });
   const tabBadge = (t: AccountingTab): number | undefined => {
     if (!live || !r || live.status !== 'ACTIVE') return undefined;
     if (t === 'contacts' && r.contacts_to_confirm > 0) return r.contacts_to_confirm;
     if (t === 'mapping' && !r.mapping_complete && r.missing_mappings.length) return r.missing_mappings.length;
+    if (t === 'reconciliation' && r.sync_enabled && (recon.data?.run?.difference_count ?? 0) > 0) return recon.data!.run!.difference_count;
     if (t === 'sync' && r.sync_enabled && (live.counts.errors + live.counts.dead) > 0) return live.counts.errors + live.counts.dead;
     return undefined;
   };
@@ -118,7 +119,7 @@ export default function AccountingIntegration() {
   }, [tab, live?.id]);
 
   const tabCountTitle = (t: AccountingTab, n: number) =>
-    t === 'contacts' ? `${n} need action` : t === 'mapping' ? `${n} still to map` : `${n} failed to send`;
+    t === 'contacts' ? `${n} need action` : t === 'mapping' ? `${n} still to map` : t === 'reconciliation' ? `${n} differences` : `${n} failed to send`;
 
   let body: React.ReactNode;
   if (conn.isLoading) {
@@ -144,28 +145,26 @@ export default function AccountingIntegration() {
     body = (
       <>
         <h2 className="acct-section-title">Connect your accounting system</h2>
-        <p className="acct-section-desc">One can be connected at a time.<ComingSoonNote /></p>
+        <p className="acct-section-desc">You can connect one accounting system.<ComingSoonNote /></p>
         <AccountingProviderCards hideManage />
-        <h3 className="acct-section-title" style={{ fontSize: 14, lineHeight: '20px' }}>After you connect</h3>
-        <p className="acct-section-desc" style={{ maxWidth: 560 }}>
-          Takes about 10 minutes and needs a company admin. You only do it once. After that, payments recorded in your accounting system mark TruckWys invoices as paid.
-        </p>
-        <ol className="acct-check acct-check--plain">
-          {[
-            ['Map accounts and VAT', 'Pick the income account and VAT rate for each kind of charge, and where supplier bills go.'],
-            ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
-            ['Choose a cut-over date', 'Documents from that date on are sent; anything earlier is assumed to be in your books.'],
-          ].map(([t, d], i) => (
-            <li key={t}>
-              <span className="acct-step-num" aria-hidden="true">{i + 1}</span>
-              <div style={{ minWidth: 0, maxWidth: 560 }}>
-                <div className="acct-check__title">{t}</div>
-                <div className="acct-check__desc">{d}</div>
-              </div>
-              <span />
-            </li>
-          ))}
-        </ol>
+        <AcctCard title="After you connect" description="Takes about 10 minutes and needs a company admin. You only do it once. After that, payments recorded in your accounting system mark TruckWys invoices as paid." flush>
+          <ol className="acct-check">
+            {[
+              ['Map accounts and VAT', 'Pick the income account and VAT rate for each kind of charge, and where supplier bills go.'],
+              ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
+              ['Choose a cut-over date', 'Documents from that date on are sent; anything earlier is assumed to be in your books.'],
+            ].map(([t, d], i) => (
+              <li key={t}>
+                <span className="acct-step-num" aria-hidden="true">{i + 1}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div className="acct-check__title">{t}</div>
+                  <div className="acct-check__desc">{d}</div>
+                </div>
+                <span />
+              </li>
+            ))}
+          </ol>
+        </AcctCard>
       </>
     );
   } else if (live.status === 'PENDING_ORG') {
@@ -195,6 +194,7 @@ export default function AccountingIntegration() {
                   disabled={live.status === 'NEEDS_REAUTH' && t.id !== 'setup'}
                   title={live.status === 'NEEDS_REAUTH' && t.id !== 'setup' ? `Reconnect ${cfg!.short} first` : undefined}
                 >
+                  {live.status === 'NEEDS_REAUTH' && t.id !== 'setup' && <Lock size={11} aria-hidden="true" />}
                   {t.label}
                   {n != null && <span className="acct-tab-count" title={tabCountTitle(t.id, n)} aria-label={tabCountTitle(t.id, n)}>{n}</span>}
                 </button>

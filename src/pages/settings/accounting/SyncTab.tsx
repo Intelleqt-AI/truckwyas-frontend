@@ -129,9 +129,9 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
         <div>
           <div className="acct-tiles acct-tiles--card">
             <div><span>In {cfg.short}</span><strong>{c.synced.toLocaleString('en-ZA')}</strong></div>
-            <div><span>Waiting to send</span><strong>{c.queued.toLocaleString('en-ZA')}</strong></div>
-            <div><span>{c.errors > 0 && <span className="acct-dot acct-dot--warning acct-dot--inline" aria-hidden="true" />}Retrying</span><strong>{c.errors.toLocaleString('en-ZA')}</strong></div>
-            <div><span>{c.dead > 0 && <span className="acct-dot acct-dot--danger acct-dot--inline" aria-hidden="true" />}Stopped</span><strong>{c.dead.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Queued</span><strong>{c.queued.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Retrying</span><strong>{c.errors.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Stopped</span><strong>{c.dead.toLocaleString('en-ZA')}</strong></div>
           </div>
         </div>
       </AcctCard>
@@ -149,21 +149,19 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
                     <div className="acct-row__title">{e.last_error || 'No reason given'}</div>
                     <div className="acct-row__sub" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                       <span>{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} <DocLink url={e.local_url}>{e.label}</DocLink></span>
-                      <StatusChip tone={meta.tone} label={meta.label} size="sm" />
-                      Attempt {e.attempts}
-                      {e.next_attempt_at && e.status === 'ERROR' ? ` · next try ${nextTry(e.next_attempt_at)}` : ''}
+                      <StatusChip tone={meta.tone} label={e.next_attempt_at && e.status === 'ERROR' ? `Retrying ${nextTry(e.next_attempt_at)}` : meta.label} size="sm" />
                     </div>
                   </div>
                   <div className="acct-row__actions">
                     {/* The usual cause is a mapping or a contact: fix that first, then retry. */}
                     {onOpen && /account|tax|vat|tracking/i.test(e.last_error) && (
-                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => onOpen('mapping')}>Fix in Accounts and VAT</button>
+                      <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={() => onOpen('mapping')}>Fix in Accounts and VAT</button>
                     )}
                     {onOpen && /contact/i.test(e.last_error) && (
-                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => onOpen('contacts')}>Fix in Contacts</button>
+                      <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={() => onOpen('contacts')}>Fix in Contacts</button>
                     )}
                     {canWrite && (
-                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => retry(e)} disabled={retrying === e.id}>
+                      <button type="button" className="tw-btn tw-btn--sm tw-btn--ghost" onClick={() => retry(e)} disabled={retrying === e.id}>
                         {retrying === e.id ? 'Retrying…' : 'Retry now'}
                       </button>
                     )}
@@ -175,7 +173,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
         )}
       </AcctCard>
 
-      <AcctCard title="Recent activity" flush>
+      <AcctCard title="Recent activity" description="Latest sends and fetches." flush>
         {s.recent.length === 0 ? (
           <div className="acct-empty">No activity yet.</div>
         ) : (

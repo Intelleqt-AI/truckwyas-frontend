@@ -100,7 +100,7 @@ export function ContactsTab({ connection }: { connection: Connection }) {
     <>
       <AcctCard
         title="Match contacts"
-        description="We match contacts automatically on VAT number, registration number or email. Name-only matches need your confirmation."
+        description={<span className="acct-desc-measure" style={{ display: 'block' }}>We match contacts automatically on VAT number, registration number or email. Name-only matches need your confirmation.</span>}
         actions={<>
           <button type="button" className="tw-btn" onClick={runMatching} disabled={!canWrite || matching} title={writeTitle}>
             <RefreshCw size={14} aria-hidden="true" className={matching ? 'animate-spin' : undefined} />

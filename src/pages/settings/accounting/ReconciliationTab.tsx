@@ -84,19 +84,17 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
             {last.status === 'FAILED' ? (
               <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />The last check didn't finish</p>
             ) : differences.length === 0 ? (
-              <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}<span className="acct-lead-meta">· checked {formatDateTime(last.ran_at)}</span></p>
+              <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}<span className="acct-lead-meta">checked {formatDateTime(last.ran_at)}</span></p>
             ) : (
-              <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}<span className="acct-lead-meta">· checked {formatDateTime(last.ran_at)}</span></p>
+              <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}<span className="acct-lead-meta">checked {formatDateTime(last.ran_at)}</span></p>
             )}
+            <div className="acct-tiles__label">Checked</div>
             <div className="acct-tiles acct-tiles--3">
               <div><span>Invoices</span><strong>{(last.checked.invoices ?? 0).toLocaleString('en-ZA')}</strong></div>
               <div><span>Customers</span><strong>{(last.checked.customers ?? 0).toLocaleString('en-ZA')}</strong></div>
               <div><span>Months</span><strong>{(last.checked.months ?? 0).toLocaleString('en-ZA')}</strong></div>
             </div>
             {last.status === 'FAILED' && last.error && <p className="acct-error" role="status" style={{ marginTop: 12 }}>{last.error}</p>}
-            <p className="acct-section-desc" style={{ margin: '12px 0 0' }}>
-              Next check at {nextCheck(last.ran_at)}.
-            </p>
             {differences.length > 0 && SCOPES.filter(sc => !differences.some(d => d.scope === sc.scope)).map(sc => {
               const n = sc.scope === 'INVOICE' ? last.checked.invoices : sc.scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;
               return (
@@ -106,6 +104,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                 </p>
               );
             })}
+            <p className="acct-section-desc" style={{ margin: '12px 0 0' }}>Next check tonight at {nextCheck(last.ran_at)}.</p>
           </>
         )}
       </AcctCard>
@@ -115,7 +114,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                 if (!rows.length) return null;
         const hasLinks = true; // same column template in every table, link or not
         return (
-          <AcctCard key={scope} title={title} description={`${plural(rows.length, 'difference')}. Difference is TruckWys minus ${cfg.short}.`} flush>
+          <AcctCard key={scope} title={title} description={`${plural(rows.length, 'difference')}. Difference is TruckWys minus ${cfg.short}. Correct it in ${cfg.short} or TruckWys; it clears on the next check.`} flush>
             <div className="acct-table-wrap acct-only-wide" role="region" aria-label={`${title} differences`} tabIndex={0}>
               <table className="acct-table acct-table--recon">
                 <colgroup>
@@ -165,7 +164,11 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
 }
 
 /** Money differences as rand; a status mismatch has no amount. */
-const diffText = (d: ReconDifference) => (isMoney(d.difference) && d.difference !== '' ? formatCurrency(d.difference) : 'Mismatch');
+const diffText = (d: ReconDifference) => {
+  if (!isMoney(d.difference) || d.difference === '') return 'Status differs';
+  const n = parseFloat(d.difference);
+  return n > 0 ? `+${formatCurrency(d.difference)}` : formatCurrency(d.difference);
+};
 
 /** The hour of the last run, as "03:00". */
 function nextCheck(iso: string): string {
@@ -185,7 +188,7 @@ function DiffRow({ d, providerName, hasLinks }: { d: ReconDifference; providerNa
       <td>{FIELD_LABEL[d.field] ?? humanise(d.field)}</td>
       <td className="num">{showValue(d.truckwys)}</td>
       <td className="num">{showValue(d.provider)}</td>
-      <td className="num acct-diff">{diffText(d)}</td>
+      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{diffText(d)}</td>
       {hasLinks && (
         <td>
           {d.provider_url && (

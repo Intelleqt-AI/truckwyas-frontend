@@ -208,9 +208,9 @@ export function MappingTab({ connection }: { connection: Connection }) {
         title={m.complete && !dirty ? 'Everything required is mapped' : m.missing.length > 0 ? `${m.missing.length} still to map` : 'Unsaved changes'}
         description={<>
           {m.missing.length > 0 && !(m.complete && !dirty) && (
-            <>{m.missing.map((k, i) => (
-              <span key={k}>{i > 0 ? ', ' : ''}<button type="button" className="acct-linkbtn" onClick={() => jumpTo(k)}>{missingMappingLabel(k)}</button></span>
-            ))}. </>
+            <ul className="acct-jump-list">{m.missing.map(k => (
+              <li key={k}><button type="button" className="acct-jumpbtn" onClick={() => jumpTo(k)}>{missingMappingLabel(k)}</button></li>
+            ))}</ul>
           )}
           Nothing is sent to {cfg.short} until every required line is mapped.
           {m.options.fetched_at && <> Accounts last read from {cfg.short} {formatRelativeTime(m.options.fetched_at)}.</>}
@@ -223,7 +223,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
               Apply {pendingSuggestions.length === 1 ? 'suggestion' : `${pendingSuggestions.length} suggestions`}
             </button>
           )}
-          <button type="button" className="tw-btn tw-btn--ghost acct-ghost-flush" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
+          <button type="button" className="tw-btn" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
             <RefreshCw size={14} aria-hidden="true" className={refreshing ? 'animate-spin' : undefined} />
             {refreshing ? 'Reading…' : `Refresh from ${cfg.short}`}
           </button>
@@ -299,7 +299,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
       ))}
 
       <AcctCard
-        title="Bank account for past payments"
+        title={<>Payments bank account<span className="acct-optional"> · optional</span></>}
         description={`Payments you recorded in TruckWys after the cut-over date are sent to this ${cfg.short} bank account.`}
         flush
       >
@@ -315,7 +315,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         </div>
       </AcctCard>
 
-      <AcctCard title="Tracking" description={`Optional. Tag invoice and bill lines in ${cfg.short} with the vehicle and branch, so you can report profit per truck there.`} flush>
+      <AcctCard title={<>Tracking<span className="acct-optional"> · optional</span></>} description={`Tag invoice and bill lines in ${cfg.short} with the vehicle and branch, so you can report profit per truck there.`} flush>
         {cats.length === 0 ? (
           <div className="acct-empty" style={{ textAlign: 'left' }}>Your {cfg.short} organisation has no tracking categories. You can skip this.</div>
         ) : (

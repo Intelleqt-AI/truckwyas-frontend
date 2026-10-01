@@ -132,12 +132,11 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
 /** Who connected it and when: a short card at the end of the Setup tab. */
 export function ConnectionDetails({ connection }: { connection: Connection }) {
   const live = connection.readiness?.sync_enabled ?? false;
+  // Only what the steps above don't already say.
+  if (!live && !connection.cutover_date) return null;
   return (
     <section style={{ ...settingsCardStyle, padding: 'var(--card-pad, 20px)' }} aria-label="Connection details">
       <dl className="acct-facts acct-facts--4" style={{ margin: 0 }}>
-        <div><dt>Connected by</dt><dd>{connection.connected_by || '—'}</dd></div>
-        <div><dt>Connected on</dt><dd>{connection.connected_at ? formatDate(connection.connected_at) : '—'}</dd></div>
-        <div><dt>Base currency</dt><dd>{connection.base_currency || '—'}</dd></div>
         {connection.cutover_date && <div><dt>Cut-over date</dt><dd>{formatDate(connection.cutover_date)}</dd></div>}
         {live && <div><dt>Payments last fetched</dt><dd>{connection.last_payment_sync_at ? formatDateTime(connection.last_payment_sync_at) : 'Not yet'}</dd></div>}
         {live && <div><dt>Last checked</dt><dd>{connection.last_reconciled_at ? formatDateTime(connection.last_reconciled_at) : 'Not yet'}</dd></div>}
@@ -198,50 +197,65 @@ export function OrgPicker({ connection }: { connection: Connection }) {
     }
   };
 
+  const single = eligible.length === 1 ? eligible[0] : null;
+  const unavailable = tenants.filter(t => !isZar(t.currency));
   return (
     <>
       {dis.modal}
-      <h2 id="acct-org-title" className="acct-section-title">Choose your {cfg.short} organisation</h2>
-      <p className="acct-section-desc">Pick the {cfg.short} organisation that holds this company's books.</p>
+      <h2 id="acct-org-title" className="acct-section-title">
+        {single ? `Link ${single.name}?` : `Choose your ${cfg.short} organisation`}
+      </h2>
+      <p className="acct-section-desc">
+        {single
+          ? `This is the ${cfg.short} organisation TruckWys will send this company's invoices and bills to.`
+          : `Pick the ${cfg.short} organisation that holds this company's books.`}
+      </p>
       <section style={settingsCardStyle} className="acct-org-card" aria-labelledby="acct-org-title">
         {tenants.length === 0 ? (
           <div className="acct-empty">No organisations came back from {cfg.short}. Use a different login and try again.</div>
+        ) : single ? (
+          <div className="acct-row acct-org acct-org--confirm">
+            <span className="acct-org__mark"><ProviderLogo provider={connection.provider} size="sm" /></span>
+            <span style={{ minWidth: 0 }}>
+              <span className="acct-row__title" style={{ display: 'block' }}>{single.name}</span>
+              <span className="acct-row__sub">Books in {single.currency || 'ZAR'}</span>
+            </span>
+          </div>
         ) : (
           <div role="radiogroup" aria-labelledby="acct-org-title">
-            {tenants.map(t => {
-              const notZar = !isZar(t.currency);
+            {eligible.map(t => {
               const selected = choice === t.tenant_id;
               return (
-                <label key={t.tenant_id} className={`acct-row acct-org${selected ? ' is-selected' : ''}${notZar ? ' is-disabled' : ''}`}>
+                <label key={t.tenant_id} className={`acct-row acct-org${selected ? ' is-selected' : ''}`}>
                   <span className="acct-org__mark">
-                    {notZar ? (
-                      <Lock size={14} aria-hidden="true" style={{ color: 'var(--text-tertiary)' }} />
-                    ) : (
-                      <input
-                        type="radio"
-                        name="acct-org"
-                        className="acct-radio"
-                        value={t.tenant_id}
-                        checked={selected}
-                        onChange={() => setChoice(t.tenant_id)}
-                        disabled={!canWrite}
-                      />
-                    )}
+                    <input type="radio" name="acct-org" className="acct-radio" value={t.tenant_id} checked={selected}
+                      onChange={() => setChoice(t.tenant_id)} disabled={!canWrite} />
                   </span>
                   <span style={{ minWidth: 0 }}>
                     <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
-                    <span className="acct-row__sub">{notZar ? `Books in ${t.currency}. TruckWys supports ZAR only.` : `Books in ${t.currency || 'ZAR'}`}</span>
+                    <span className="acct-row__sub">Books in {t.currency || 'ZAR'}</span>
                   </span>
                 </label>
               );
             })}
           </div>
         )}
+        {unavailable.length > 0 && (
+          <div className="acct-org-unavailable">
+            <div className="acct-tiles__label" style={{ margin: 0 }}>Can't be linked</div>
+            {unavailable.map(t => (
+              <div key={t.tenant_id} className="acct-org-unavailable__row">
+                <Lock size={13} aria-hidden="true" />
+                <span>{t.name} · books in {t.currency}. TruckWys supports ZAR only.</span>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="acct-formfoot">
           {error && <p className="acct-error" role="alert" style={{ margin: 0, marginRight: 'auto' }}>{error}</p>}
-          {!canWrite && <p className="acct-section-desc" style={{ margin: 0, marginRight: 'auto' }}>{writeTitle}.</p>}
+          {!error && <p className="acct-section-desc acct-formfoot__note">{!canWrite ? `${writeTitle}.` : 'Nothing is sent until you finish setup.'}</p>}
           {canWrite && (
-            <button type="button" className="tw-btn acct-card__btn" onClick={dis.ask} disabled={dis.busy || busy}>
+            <button type="button" className="tw-btn tw-btn--ghost acct-formfoot__link" onClick={dis.ask} disabled={dis.busy || busy}>
               Use a different {cfg.short} login
             </button>
           )}

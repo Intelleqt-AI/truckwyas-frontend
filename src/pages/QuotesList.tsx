@@ -383,6 +383,11 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
 
   const { data: loadsData } = useQuery(loadsQuery);
   const loadByQuoteId = mapLoadsByQuoteId(loadsData);
+  // The quote API names its load (booked_load); the loads list is only page
+  // 1, so it is the fallback, never the source.
+  type BookedLoad = { id: number | string; load_number?: string; status?: string };
+  const bookedLoadOf = (q: { id?: number | string; booked_load?: BookedLoad | null } | null | undefined): BookedLoad | undefined =>
+    q?.booked_load ?? loadByQuoteId.get(String(q?.id));
 
   // Each pipeline column is its own backend-paginated query (10 at a time,
   // "load more" — see useQuoteColumn) rather than one big "fetch every
@@ -754,7 +759,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                             onClick={() => navigate(`/bookings/quotes/${q.id}`)}
                             onConvertToLoad={handleConvertToLoad}
                             onViewBooking={(e, load) => { e.stopPropagation(); navigate(`/bookings/${load.id}`); }}
-                            convertedLoad={loadByQuoteId.get(String(q.id))}
+                            convertedLoad={bookedLoadOf(q)}
                             dragDisabled={billingBlocked}
                           />
                         ))}
@@ -806,7 +811,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           (() => {
           // Columns with nothing in them on any row step aside (R9).
           const anyOutcome = listItems.some((q: any) => q.outcome === 'accepted' || q.outcome === 'rejected');
-          const anyAction = listItems.some((q: any) => q.status === 'ACCEPTED' || loadByQuoteId.has(String(q.id)));
+          const anyAction = listItems.some((q: any) => q.status === 'ACCEPTED' || !!bookedLoadOf(q));
           return (
           <div className="bk-table-wrap bk-qlist-fill" style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
             <table className="table-heading-roles bk-table">
@@ -845,6 +850,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                     <td>
                       {/* The board's stage: a sent quote marked lost reads Declined here too. */}
                       {(() => {
+                        // Converted into a load: "Booked", as on the quote page (its tone follows the load).
+                        const booked = bookedLoadOf(quote);
+                        if (booked || quote.converted) return <StatusChip status={booked?.status || 'BOOKED'} label="Booked" size="sm" />;
                         const stage = boardStage(quote);
                         return stage
                           ? <StatusChip status={stage} label={COLUMN_LABELS[stage]} size="sm" />
@@ -864,16 +872,16 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       {formatMoneyWhole(parseFloat(quote.total_amount || '0'))}
                     </td>
                     {anyAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
-                      {loadByQuoteId.has(String(quote.id)) && (
+                      {!!bookedLoadOf(quote) && (
                         <button
                           type="button"
                           className="bk-btn bk-btn--secondary bk-btn--sm"
-                          onClick={(e) => { e.stopPropagation(); navigate(`/bookings/${loadByQuoteId.get(String(quote.id)).id}`); }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/bookings/${bookedLoadOf(quote)!.id}`); }}
                         >
                           View booking
                         </button>
                       )}
-                      {quote.status === 'ACCEPTED' && !loadByQuoteId.has(String(quote.id)) && (
+                      {quote.status === 'ACCEPTED' && !bookedLoadOf(quote) && (
                         <button
                           type="button"
                           className="bk-btn bk-btn--secondary bk-btn--sm"

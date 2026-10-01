@@ -70,6 +70,7 @@ export function CompanySettings() {
     phone: '', email: '', support_email: '',
     default_quote_validity_days: '7',
     allow_cross_border: 'yes',
+    auto_email_invoices: 'no',
     default_base_rate_per_km: '', default_toll_rate_per_km: '', default_sla_hours: '',
     cross_border_crossings_per_year: '',
     fuel_zone: 'INLAND',
@@ -152,6 +153,7 @@ export function CompanySettings() {
           default_quote_validity_days:
             d.default_quote_validity_days != null ? String(d.default_quote_validity_days) : '7',
           allow_cross_border: d.allow_cross_border === false ? 'no' : 'yes',
+          auto_email_invoices: d.auto_email_invoices === true ? 'yes' : 'no',
           default_base_rate_per_km:
             d.default_base_rate_per_km != null ? String(d.default_base_rate_per_km) : '',
           default_toll_rate_per_km:
@@ -272,6 +274,7 @@ export function CompanySettings() {
         contact: { phone: form.phone, email: form.email, support_email: form.support_email },
         default_quote_validity_days: validityDays,
         allow_cross_border: form.allow_cross_border === 'yes',
+        auto_email_invoices: form.auto_email_invoices === 'yes',
         default_base_rate_per_km: form.default_base_rate_per_km
           ? parseFloat(form.default_base_rate_per_km) : 10.00,
         default_toll_rate_per_km: form.default_toll_rate_per_km
@@ -508,6 +511,31 @@ export function CompanySettings() {
             <label htmlFor="company-bank-ref" style={labelStyle}>Payment reference wording (optional)</label>
             <input id="company-bank-ref" className="settings-control" style={inputStyle} value={form.payment_reference_hint} onChange={e => set('payment_reference_hint', e.target.value)} placeholder="Please use the invoice number as your payment reference." maxLength={200} />
             <div style={helpTextStyle}>Replaces the default wording on invoices.</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Invoicing */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Invoicing</h2></div>
+        <div style={bodyStyle}>
+          <div className="cs-grid cs-grid--2">
+            <div>
+              <label htmlFor="company-auto-email-invoices" style={labelTipStyle}>
+                Email invoices on delivery
+                <InfoTip label="About emailing invoices on delivery">An invoice is raised automatically when a load is delivered. With No, it waits as a draft for you to check and send. With Yes, it is emailed to the customer straight away and marked sent. A customer with no email address always gets a draft.</InfoTip>
+              </label>
+              <Select value={form.auto_email_invoices} onValueChange={val => set('auto_email_invoices', val)}>
+                <SelectTrigger style={inputStyle} className="cs-select" id="company-auto-email-invoices">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no">No, keep as a draft</SelectItem>
+                  <SelectItem value="yes">Yes, email the customer</SelectItem>
+                </SelectContent>
+              </Select>
+              <div style={helpTextStyle}>Choose No to check each invoice first.</div>
+            </div>
           </div>
         </div>
       </div>

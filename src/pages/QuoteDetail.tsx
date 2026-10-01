@@ -265,7 +265,8 @@ export default function QuoteDetail() {
 
   // A won quote waits for the loads lookup too, so its actions don't flip
   // from "Convert to booking" to "View booking" after the first paint.
-  const awaitingBooking = !!quote && ['ACCEPTED', 'IT', 'COMPLETED'].includes(quote.status) && loadsQ.isPending;
+  // booked_load comes with the quote itself; only an API without it waits on the loads list.
+  const awaitingBooking = !!quote && !('booked_load' in quote) && ['ACCEPTED', 'IT', 'COMPLETED'].includes(quote.status) && loadsQ.isPending;
 
   // Loading: the back link and page frame stay; only the content waits.
   if (isLoading || awaitingBooking) {
@@ -389,7 +390,7 @@ export default function QuoteDetail() {
   // and nothing that sends or converts it again. Legacy quotes carrying a
   // load status (In transit, Completed) with no load found offer no Send
   // either: the chip says where the job stands.
-  const booking = mapLoadsByQuoteId(loadsQ.data).get(String(quote.id)) as { id: number | string; load_number?: string; status?: string } | undefined;
+  const booking = (quote.booked_load ?? mapLoadsByQuoteId(loadsQ.data).get(String(quote.id))) as { id: number | string; load_number?: string; status?: string } | undefined;
   const booked = !!booking;
   const loadStateOnly = !booked && (quote.status === 'IT' || quote.status === 'COMPLETED');
   const needsEdit = !booked && openStatus && (lapsed || (quote.status === 'DRAFT' && !!fuelAlert?.has_alert));

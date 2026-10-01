@@ -299,6 +299,10 @@
 .bk-kv__label { font-size: 13px; line-height: 20px; color: var(--text-secondary); flex-shrink: 0; }
 .bk-kv__value { font-size: 14px; line-height: 20px; color: var(--text-primary); text-align: right; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
 .bk-kv--total { border-bottom: none; padding-top: 12px; }
+/* Fuel cost: estimated vs actual, under the order total. */
+.bk-fuel { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-row); }
+.bk-fuel__title { display: flex; align-items: center; gap: 6px; font: 500 13px/20px var(--font-sans); color: var(--text-primary); }
+.bk-fuel__over { color: var(--status-danger-text); }
 /* A rate shown under its line (Base rate → R x/km): not a summand (R10). */
 .bk-kv__note { display: block; font-size: 12px; line-height: 16px; color: var(--text-secondary); }
 .bk-kv--total .bk-kv__label { font-weight: 500; color: var(--text-primary); }

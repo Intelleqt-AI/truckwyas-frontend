@@ -493,7 +493,7 @@ export default function CustomerDetail() {
                     </td>
                     <td>
                       {/* A quote that became a load reads as booked, not as the load's own state. */}
-                      {String(q.status).toUpperCase() === "IT"
+                      {String(q.status).toUpperCase() === "IT" || q.converted
                         ? <StatusChip tone="success" label="Booked" size="sm" />
                         : q.outcome === 'rejected' && String(q.status).toUpperCase() === 'SENT'
                           // Same reading as the Quotes board: a lost answer sits with the declined ones.

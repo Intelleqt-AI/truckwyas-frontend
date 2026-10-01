@@ -634,6 +634,38 @@ export default function Bookings() {
               <span className="bk-kv__label">Total</span>
               <span className="bk-kv__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</span>
             </div>
+            {/* What fuel was expected to cost vs what was spent (expenses on
+                this order's trips). Hidden when there's neither figure. */}
+            {(() => {
+              const est: number | null = load.fuel_cost_estimated ?? null;
+              const act: number | null = load.fuel_cost_actual ?? null;
+              if (est == null && act == null) return null;
+              const diff = est != null && act != null ? Math.round((act - est) * 100) / 100 : null;
+              return (
+                <div className="bk-fuel">
+                  <div className="bk-fuel__title">
+                    Fuel cost
+                    <InfoTip label="About fuel cost">Estimated is the fuel line of the quote this order came from. Actual is the approved fuel expenses logged against this order's trips. Fuel bought without a trip on the expense isn't counted here.</InfoTip>
+                  </div>
+                  <div className="bk-kv">
+                    <span className="bk-kv__label">Estimated</span>
+                    <span className={`bk-kv__value${est == null ? ' bk-muted' : ''}`}>{est != null ? formatCurrency(est) : 'Not recorded'}</span>
+                  </div>
+                  <div className="bk-kv">
+                    <span className="bk-kv__label">Actual</span>
+                    <span className={`bk-kv__value${act == null ? ' bk-muted' : ''}`}>{act != null ? formatCurrency(act) : 'Not recorded'}</span>
+                  </div>
+                  {diff != null && Math.abs(diff) >= 0.5 && (
+                    <div className="bk-kv">
+                      <span className="bk-kv__label">Difference</span>
+                      <span className={`bk-kv__value${diff > 0 ? ' bk-fuel__over' : ''}`}>
+                        {diff > 0 ? `${formatCurrency(diff)} over` : `${formatCurrency(-diff)} under`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </section>
 
           {/* Job figures join the rail when the main column would otherwise

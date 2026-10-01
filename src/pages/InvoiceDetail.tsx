@@ -3,7 +3,7 @@ import { BellRing, Banknote, Send, FileSearch } from "lucide-react";
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchData, postData } from "@/lib/Api";
+import { fetchData, patchData, postData } from "@/lib/Api";
 
 import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import "./finance-brand.css";
@@ -72,6 +72,10 @@ export default function InvoiceDetail() {
   const [paymentMethod, setPaymentMethod] = useState('EFT');
   const [paymentReference, setPaymentReference] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
+  // Due date edit (Draft to Overdue; locked once paid or cancelled).
+  const [editingDue, setEditingDue] = useState(false);
+  const [dueDraft, setDueDraft] = useState('');
+  const [savingDue, setSavingDue] = useState(false);
   // Outgoing messages are previewed and confirmed before they are sent.
   const [preview, setPreview] = useState<InvoiceMessageKind | null>(null);
 
@@ -117,6 +121,24 @@ export default function InvoiceDetail() {
     { toSide: ['facts'] },
     `${id}-${invoice ? invoice.updated_at ?? 'ok' : 'none'}-${payments.length}-${showPaymentForm}-${capitalData ? 'c' : ''}`,
   );
+
+  const handleSaveDueDate = async () => {
+    if (!id || !dueDraft) return;
+    setSavingDue(true);
+    try {
+      await patchData({ url: `api/v1/invoices/${id}/`, data: { due_date: dueDraft } });
+      setEditingDue(false);
+      setToast({ msg: 'Due date changed' });
+      setTimeout(() => setToast(null), 3000);
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    } catch (error) {
+      setToast({ msg: error instanceof Error ? error.message : "Couldn't change the due date", isError: true });
+      setTimeout(() => setToast(null), 4000);
+    } finally {
+      setSavingDue(false);
+    }
+  };
 
   const handleSendInvoice = async () => {
     if (!id) return;
@@ -297,6 +319,8 @@ export default function InvoiceDetail() {
   const daysLate = showBalance ? daysPastDue : null;
   // A draft whose due date has already passed: said once, calmly, before it is sent.
   const draftPastDue = status === 'DRAFT' && daysPastDue != null && daysPastDue > 0;
+  const canEditDue = status !== 'PAID' && status !== 'CANCELLED';
+  const startDueEdit = () => { setDueDraft(String(invoice.due_date || '').slice(0, 10)); setEditingDue(true); };
   // Part-paid: the document ends with "Paid to date" and "Balance due".
   const partPaid = showBalance && Math.abs(balance - total) > 0.005;
   const paidInDoc = partPaid ? (paidToDate ?? total - balance) : null;
@@ -385,12 +409,27 @@ export default function InvoiceDetail() {
         </div>
         <div>
           <dt>Due</dt>
-          <dd>
-            {safeDate(invoice.due_date)}
-            {daysLate != null && daysLate > 0 && (
-              <span className="fin-doc__late fin-text-danger">{daysLate} {daysLate === 1 ? 'day' : 'days'} late</span>
-            )}
-          </dd>
+          {editingDue ? (
+            <dd className="fin-due-edit">
+              <DatePicker id="invoice-due-date" value={dueDraft} onChange={setDueDraft} />
+              <span className="fin-due-edit__actions">
+                <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={handleSaveDueDate} disabled={savingDue || !dueDraft}>
+                  {savingDue ? 'Saving…' : 'Save'}
+                </button>
+                <button type="button" className="tw-btn tw-btn--sm tw-btn--ghost" onClick={() => setEditingDue(false)} disabled={savingDue}>Cancel</button>
+              </span>
+            </dd>
+          ) : (
+            <dd>
+              {safeDate(invoice.due_date)}
+              {daysLate != null && daysLate > 0 && (
+                <span className="fin-doc__late fin-text-danger">{daysLate} {daysLate === 1 ? 'day' : 'days'} late</span>
+              )}
+              {canEditDue && (
+                <button type="button" className="fin-link fin-due-change" onClick={startDueEdit} aria-label="Change due date">Change</button>
+              )}
+            </dd>
+          )}
         </div>
         {terms && (
           <div>
@@ -402,6 +441,7 @@ export default function InvoiceDetail() {
       {draftPastDue && (
         <p className="fin-docfacts__note">
           Draft · due date {safeDate(invoice.due_date)} has passed. Sent as it is, it arrives {daysPastDue} {daysPastDue === 1 ? 'day' : 'days'} overdue.
+          {!editingDue && <>{' '}<button type="button" className="fin-link" onClick={startDueEdit}>Change due date</button></>}
         </p>
       )}
     </div>

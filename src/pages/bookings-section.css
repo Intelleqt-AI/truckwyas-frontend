@@ -397,11 +397,17 @@
   .bk-facts { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Quote pipeline board: four equal columns on desktop; on narrow screens the
-   board scrolls sideways instead of crushing the cards. */
-.bk-kanban { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: 1fr; gap: 16px; flex: 1; min-height: 0; }
+/* Quote pipeline board: one row of equal columns, however many there are
+   (Draft, Sent, Accepted, Booked, Declined, Expired). Each column keeps a
+   readable width; when they don't fit, the board scrolls sideways inside
+   itself instead of wrapping a column onto a second row or crushing cards. */
+.bk-kanban {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr);
+  grid-template-rows: minmax(0, 1fr); gap: 16px; flex: 1; min-height: 0;
+  overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 8px;
+}
 @media (max-width: 900px) {
-  .bk-kanban { grid-template-columns: repeat(5, minmax(260px, 1fr)); overflow-x: auto; padding-bottom: 8px; }
+  .bk-kanban { grid-auto-columns: minmax(260px, 1fr); }
 }
 
 /* Order progress: scrolls locally on phones rather than overlapping labels. */

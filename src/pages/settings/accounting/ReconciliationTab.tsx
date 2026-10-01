@@ -87,21 +87,21 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
           <p className="acct-section-desc" style={{ margin: 0 }}>No check has run yet. Run one now, or wait for tonight's.</p>
         ) : (
           <>
-            <dl className="acct-facts" style={{ margin: 0 }}>
+            <dl className="acct-facts acct-facts--4" style={{ margin: 0 }}>
               <div><dt>Last checked</dt><dd>{formatDateTime(last.ran_at)}</dd></div>
               <div><dt>Result</dt><dd>{statusChip}</dd></div>
-              <div className="acct-facts__wide"><dt>Checked</dt><dd>{[
+              <div><dt>Differences</dt><dd>{last.difference_count.toLocaleString('en-ZA')}</dd></div>
+              <div><dt>Checked</dt><dd>{[
                 last.checked.invoices != null && plural(last.checked.invoices, 'invoice'),
                 last.checked.customers != null && plural(last.checked.customers, 'customer'),
                 last.checked.months != null && plural(last.checked.months, 'month'),
               ].filter(Boolean).join(' · ') || '—'}</dd></div>
-              <div><dt>Differences</dt><dd>{last.difference_count.toLocaleString('en-ZA')}</dd></div>
             </dl>
             {last.status === 'FAILED' && last.error && <p className="acct-error" role="status" style={{ marginTop: 12 }}>{last.error}</p>}
             {last.status !== 'FAILED' && differences.length === 0 && (
               <p className="acct-ok-line" role="status">
                 <CheckCircle2 size={16} aria-hidden="true" />
-                Everything matches {cfg.short}: every invoice, customer balance and month's sales and VAT. Next check tonight.
+                Everything matches {cfg.short}. Next check tonight.
               </p>
             )}
           </>
@@ -119,29 +119,49 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
             </section>
           );
         }
+        const hasLinks = rows.some(d => d.provider_url);
         return (
-          <AcctCard key={scope} title={title} description={plural(rows.length, 'difference')} flush>
-            <div className="acct-table-wrap" role="region" aria-label={`${title} differences`} tabIndex={0}>
+          <AcctCard key={scope} title={title} description={`${plural(rows.length, 'difference')}. Difference = TruckWys minus ${cfg.short}.`} flush>
+            <div className="acct-table-wrap acct-only-wide" role="region" aria-label={`${title} differences`} tabIndex={0}>
               <table className="acct-table acct-table--recon">
                 <colgroup>
-                  <col style={{ width: '34%' }} /><col style={{ width: '16%' }} /><col className="m-hide" style={{ width: '16%' }} />
-                  <col className="m-hide" style={{ width: '16%' }} /><col style={{ width: '18%' }} /><col style={{ width: 44 }} />
+                  <col style={{ width: '34%' }} /><col style={{ width: '16%' }} /><col style={{ width: '16%' }} />
+                  <col style={{ width: '16%' }} /><col style={{ width: '18%' }} />{hasLinks && <col style={{ width: 44 }} />}
                 </colgroup>
                 <thead>
                   <tr>
                     <th>{first}</th>
                     <th>What</th>
-                    <th className="num m-hide">TruckWys</th>
-                    <th className="num m-hide">{cfg.short}</th>
+                    <th className="num">TruckWys</th>
+                    <th className="num">{cfg.short}</th>
                     <th className="num">Difference</th>
-                    <th><span className="acct-sr">Open in {cfg.short}</span></th>
+                    {hasLinks && <th><span className="acct-sr">Open in {cfg.short}</span></th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(d => <DiffRow key={d.id} d={d} providerName={cfg.short} />)}
+                  {rows.map(d => <DiffRow key={d.id} d={d} providerName={cfg.short} hasLinks={hasLinks} />)}
                 </tbody>
               </table>
             </div>
+            {/* Phones: one block per difference instead of a squeezed table. */}
+            <ul className="acct-list acct-only-phone">
+              {rows.map(d => {
+                const [head, ...rest] = (d.label || d.key).split(' · ');
+                return (
+                  <li key={d.id} className="acct-diff-card">
+                    <div className="acct-diff-card__top">
+                      <span style={{ minWidth: 0 }}>
+                        {d.local_url ? <Link className="acct-link" to={d.local_url}>{head}</Link> : <span className="acct-row__title">{head}</span>}
+                        {rest.length > 0 && <span className="acct-row__sub"> · {rest.join(' · ')}</span>}
+                      </span>
+                      <strong className="acct-diff">{diffText(d)}</strong>
+                    </div>
+                    <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)}: TruckWys {showValue(d.truckwys)}, {cfg.short} {showValue(d.provider)}</div>
+                    {d.provider_url && <a className="acct-link" style={{ fontSize: 13 }} href={d.provider_url} target="_blank" rel="noopener noreferrer">Open in {cfg.short} <ExternalLink size={12} aria-hidden="true" /></a>}
+                  </li>
+                );
+              })}
+            </ul>
           </AcctCard>
         );
       })}
@@ -149,8 +169,10 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
   );
 }
 
-function DiffRow({ d, providerName }: { d: ReconDifference; providerName: string }) {
-  const money = isMoney(d.difference);
+/** Money differences as rand; a status mismatch has no amount. */
+const diffText = (d: ReconDifference) => (isMoney(d.difference) && d.difference !== '' ? formatCurrency(d.difference) : '—');
+
+function DiffRow({ d, providerName, hasLinks }: { d: ReconDifference; providerName: string; hasLinks: boolean }) {
   // "INV-00008 · Eagle Retail Group": the number links, the customer sits under it.
   const [head, ...rest] = (d.label || d.key).split(' · ');
   return (
@@ -158,20 +180,20 @@ function DiffRow({ d, providerName }: { d: ReconDifference; providerName: string
       <td>
         {d.local_url ? <Link className="acct-link" to={d.local_url}>{head}</Link> : head}
         {rest.length > 0 && <div className="acct-row__sub">{rest.join(' · ')}</div>}
-        {/* Phones: both sides under the label. */}
-        <div className="acct-row__sub acct-mobile-only">TruckWys {showValue(d.truckwys)} · {providerName} {showValue(d.provider)}</div>
       </td>
       <td>{FIELD_LABEL[d.field] ?? humanise(d.field)}</td>
-      <td className="num m-hide">{showValue(d.truckwys)}</td>
-      <td className="num m-hide">{showValue(d.provider)}</td>
-      <td className="num acct-diff">{money ? formatCurrency(d.difference) : 'Differs'}</td>
-      <td>
-        {d.provider_url && (
-          <a className="acct-link" href={d.provider_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${d.label || d.key} in ${providerName}`}>
-            <ExternalLink size={14} aria-hidden="true" />
-          </a>
-        )}
-      </td>
+      <td className="num">{showValue(d.truckwys)}</td>
+      <td className="num">{showValue(d.provider)}</td>
+      <td className="num acct-diff">{diffText(d)}</td>
+      {hasLinks && (
+        <td>
+          {d.provider_url && (
+            <a className="acct-link" href={d.provider_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${d.label || d.key} in ${providerName}`} title={`Open in ${providerName}`}>
+              <ExternalLink size={14} aria-hidden="true" />
+            </a>
+          )}
+        </td>
+      )}
     </tr>
   );
 }

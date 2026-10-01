@@ -93,7 +93,7 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
   const comingSoon = info.availability === 'coming_soon';
   const mine = live && live.provider === info.provider ? live : null;
   const other = live && live.provider !== info.provider ? providerConfig(live.provider) : null;
-  const chip = mine ? connectionChip(mine.status, mine.readiness?.sync_enabled ?? true) : null;
+  const chip = mine ? connectionChip(mine.status, mine.readiness) : null;
 
   // Same layout as the other integration cards on this page (Cartrack,
   // CtrlFleet): logo, name and one line, status on the right; details in a
@@ -103,7 +103,7 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
   const chipEl = loading && !comingSoon
     ? <span className="ops-skel" style={{ width: 96, height: 12 }} aria-hidden="true" />
     : comingSoon
-      ? <StatusChip tone="neutral" label="Coming soon" />
+      ? <span className="acct-badge">Coming soon</span>
       : chip ? <StatusChip tone={chip.tone} label={chip.label} /> : <StatusChip status="DISCONNECTED" />;
 
   if (loading && !comingSoon) {
@@ -154,7 +154,8 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
         <ProviderLogo provider={info.provider} />
         <div className="acct-card__text">
           <h3 className="acct-card__title">{cfg.name}</h3>
-          <p className="acct-card__desc">{cfg.blurb}</p>
+          {/* The blurb only where it helps: an available system not yet connected. */}
+          {!comingSoon && !mine && <p className="acct-card__desc">{cfg.blurb}</p>}
         </div>
         <div className="acct-card__chip">{chipEl}</div>
       </div>

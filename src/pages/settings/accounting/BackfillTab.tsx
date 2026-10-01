@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Lock } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DatePicker } from '@/components/ui/date-picker';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -91,6 +92,16 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
   };
 
   const previewDate = b.cutover_date ?? date;
+  // "31 of 52" where the preview knows the total for that step.
+  const totals: Record<string, number | undefined> = p ? {
+    invoices: p.invoices + p.credit_notes, receipts: p.historic_receipts, bills: p.bills,
+  } : {};
+  const stepCount = (x: Backfill['steps'][number]) => {
+    const total = totals[x.key];
+    if (x.state === 'RUNNING') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : `${x.count.toLocaleString('en-ZA')} so far`;
+    if (x.state === 'DONE') return x.count > 0 ? `${x.count.toLocaleString('en-ZA')} done` : 'Done';
+    return total ? `${total.toLocaleString('en-ZA')} to send` : '';
+  };
   const doneSteps = b.steps.filter(x => x.state === 'DONE' || x.state === 'SKIPPED').length;
   const startedAt = b.started_at ? new Date(b.started_at) : null;
   const startedTime = startedAt && !isNaN(startedAt.getTime())
@@ -106,7 +117,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
           <div className="acct-cutover__date">
             {locked ? (
               <dl className="acct-facts" style={{ margin: 0, gridTemplateColumns: 'minmax(0, 1fr)' }}>
-                <div><dt>Cut-over date</dt><dd>{formatDate(b.cutover_date)}</dd></div>
+                <div><dt>Cut-over date</dt><dd style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Lock size={13} aria-hidden="true" style={{ color: 'var(--text-tertiary)' }} />{formatDate(b.cutover_date)}</dd></div>
               </dl>
             ) : (
               <>
@@ -124,21 +135,21 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
         </div>
 
         <div className="acct-field-label" style={{ marginTop: 20 }}>
-          {previewDate ? `What will be sent, from ${formatDate(previewDate)}` : 'What will be sent'}
+          {locked ? 'What is being sent' : previewDate ? `What will be sent, from ${formatDate(previewDate)}` : 'What will be sent'}
         </div>
         {p ? (
           <div className="acct-tiles">
             <div><span>Invoices</span><strong>{p.invoices.toLocaleString('en-ZA')}</strong></div>
             <div><span>Credit notes</span><strong>{p.credit_notes.toLocaleString('en-ZA')}</strong></div>
             <div><span>Supplier bills</span><strong>{p.bills.toLocaleString('en-ZA')}</strong></div>
-            <div><span>Earlier payments</span><strong>{p.historic_receipts.toLocaleString('en-ZA')}</strong></div>
+            <div><span>Recorded payments</span><strong>{p.historic_receipts.toLocaleString('en-ZA')}</strong></div>
           </div>
         ) : (
           <p className="acct-section-desc" style={{ margin: 0 }}>Choose a date to see the counts.</p>
         )}
         {p && p.historic_receipts > 0 && (
           <p className="acct-section-desc" style={{ margin: '8px 0 0' }}>
-            Earlier payments are payments already recorded in TruckWys. They go into the bank account chosen under{' '}
+            Payments already recorded in TruckWys go into the bank account chosen under{' '}
             <button type="button" className="acct-linkbtn" onClick={() => onOpen('mapping')}>Accounts and VAT</button>.
           </p>
         )}
@@ -189,7 +200,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
                   {x.state === 'SKIPPED' && <div className="acct-check__desc">Nothing to do</div>}
                 </div>
                 <span className="acct-steps__count">
-                  {x.count > 0 ? `${x.count.toLocaleString('en-ZA')} ${x.state === 'RUNNING' ? 'so far' : 'done'}` : ''}
+                  {stepCount(x)}
                 </span>
               </li>
             ))}

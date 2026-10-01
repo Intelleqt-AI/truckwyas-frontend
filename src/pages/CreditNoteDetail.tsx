@@ -173,7 +173,7 @@ export default function CreditNoteDetail() {
         </div>
 
         <aside className="fin-rail" aria-label="Credit note activity">
-          <AccountingSyncCard sync={note.accounting_sync} what="credit note" />
+          <AccountingSyncCard sync={note.accounting_sync} what="credit note" localNumber={note.credit_note_number} />
           <section className="card" aria-labelledby="cn-activity-title">
             <div className="fin-panel-head" style={{ marginBottom: 4 }}>
               <div className="fin-panel-head__text"><h2 id="cn-activity-title" className="fin-panel-title">Activity</h2></div>

@@ -941,7 +941,7 @@ export default function InvoiceDetail() {
                 <div className="fin-panel-head__text">
                   <h2 id="payments-title" className="fin-panel-title">Payments</h2>
                   <p className="fin-panel-desc">
-                    {managedHere ? `Managed in ${acctName}` : `${payments.length} recorded, by payment date`}
+                    {`${payments.length} recorded, by payment date`}
                   </p>
                 </div>
               </div>
@@ -959,7 +959,7 @@ export default function InvoiceDetail() {
                           {methodLabel(payment.payment_method || payment.method || 'EFT')}
                           {ref && <> · <span className="fin-id">{ref}</span></>}
                         </span>
-                        <PaymentSourceBadge source={payment.source} />
+                        <PaymentSourceBadge source={payment.source} managed={managedHere} />
                       </span>
                       <span className="fl-pay-actions">
                         <span className="fin-paylist__amt">{formatCurrency(num(payment.amount))}</span>
@@ -1032,7 +1032,7 @@ export default function InvoiceDetail() {
             </section>
           )}
 
-          <AccountingSyncCard sync={inv.accounting_sync} what="invoice" />
+          <AccountingSyncCard sync={inv.accounting_sync} what="invoice" localNumber={inv.invoice_number} />
 
           <section className="card" aria-labelledby="activity-title">
             <div className="fin-panel-head" style={{ marginBottom: 4 }}>

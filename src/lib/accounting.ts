@@ -324,8 +324,9 @@ export const accountingApi = {
   refreshOptions: (): Promise<Mapping> => postData({ url: ACCT_URL.refreshOptions, data: {} }),
   runMatching: (): Promise<{ summary: ContactSummary }> => postData({ url: ACCT_URL.runMatching, data: {} }),
   confirmContact: (id: number, body: ContactConfirmBody): Promise<ContactMatch> => postData({ url: ACCT_URL.confirmContact(id), data: body }),
-  searchContacts: (q: string): Promise<{ results: ProviderContact[] }> =>
-    fetchData(`${ACCT_URL.searchContacts}?q=${encodeURIComponent(q)}`),
+  /** `kind` keeps QuickBooks' separate customer and vendor lists apart. */
+  searchContacts: (q: string, kind?: ContactKind): Promise<{ results: ProviderContact[] }> =>
+    fetchData(`${ACCT_URL.searchContacts}?q=${encodeURIComponent(q)}${kind ? `&kind=${kind}` : ''}`),
   startBackfill: (cutoverDate: string): Promise<Backfill> => postData({ url: ACCT_URL.backfill, data: { cutover_date: cutoverDate } }),
   retry: (linkId: number): Promise<LinkError> => postData({ url: ACCT_URL.retry(linkId), data: {} }),
   syncNow: (): Promise<{ queued: boolean }> => postData({ url: ACCT_URL.syncNow, data: {} }),
@@ -428,6 +429,9 @@ export function callbackMessage(result: string | null, reason: string | null, pr
     org_already_linked: `That ${providerName} organisation is already linked to another TruckWys company. An organisation can only be linked to one company.`,
     already_connected: 'This company already has an accounting system connected. Disconnect it first, then connect the new one.',
     not_configured: `${providerName} isn't set up on this server yet.`,
+    browser_mismatch: 'Finish connecting in the same browser you started from. Start again from TruckWys.',
+    org_mismatch: `You reconnected without the organisation TruckWys was syncing with. Reconnect and tick that organisation.`,
+    invalid_org: `That ${providerName} organisation can't be used. Start again and choose the organisation that holds this company's books.`,
   };
   return {
     tone: 'danger',
@@ -449,7 +453,8 @@ const SECTION_LABEL: Record<string, string> = {
 export function missingMappingLabel(key: string): string {
   const [section, item] = key.split(':');
   const head = SECTION_LABEL[section] ?? humanise(section);
-  return item ? `${humanise(item)} (${head.charAt(0).toLowerCase()}${head.slice(1)})` : head;
+  const lower = /^[A-Z][a-z]/.test(head) ? `${head.charAt(0).toLowerCase()}${head.slice(1)}` : head;
+  return item ? `${humanise(item)} (${lower})` : head;
 }
 
 /** "FUEL_SURCHARGE" -> "Fuel surcharge". */

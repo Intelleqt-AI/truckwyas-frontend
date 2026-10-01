@@ -1,9 +1,11 @@
 import type { StatusTone } from '@/components/ui/StatusChip';
-import type { ConnectionStatus, DocumentSyncStatus } from '@/lib/accounting';
+import type { ConnectionStatus, DocumentSyncStatus, Readiness } from '@/lib/accounting';
 
 /** Chip tone + label for a connection's status. */
-export function connectionChip(status: ConnectionStatus, syncEnabled = true): { tone: StatusTone; label: string } {
-  if (status === 'ACTIVE' && !syncEnabled) return { tone: 'warning', label: 'Setup needed' };
+export function connectionChip(status: ConnectionStatus, readiness?: Readiness | null): { tone: StatusTone; label: string } {
+  if (status === 'ACTIVE' && readiness && !readiness.sync_enabled) {
+    return readiness.backfill_state === 'RUNNING' ? { tone: 'info', label: 'Sending history' } : { tone: 'warning', label: 'Setup needed' };
+  }
   switch (status) {
     case 'ACTIVE': return { tone: 'success', label: 'Connected' };
     case 'NEEDS_REAUTH': return { tone: 'danger', label: 'Sign-in expired' };
@@ -17,7 +19,7 @@ export function documentSyncChip(status: DocumentSyncStatus | string): { tone: S
   switch (status) {
     case 'SYNCED': return { tone: 'success', label: 'In sync' };
     case 'PENDING': return { tone: 'info', label: 'Waiting to send' };
-    case 'ERROR': return { tone: 'danger', label: 'Failed, will retry' };
+    case 'ERROR': return { tone: 'warning', label: 'Failed, retrying' };
     case 'DEAD': return { tone: 'danger', label: 'Failed' };
     case 'BLOCKED': return { tone: 'warning', label: 'Blocked' };
     case 'VOIDED': return { tone: 'neutral', label: 'Voided' };

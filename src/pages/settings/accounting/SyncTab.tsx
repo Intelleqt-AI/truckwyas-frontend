@@ -11,6 +11,7 @@ import {
   type Connection, type LinkError, type SyncStatus,
 } from '@/lib/accounting';
 import { AcctCard, ErrorBlock, LoadingBlock, useAccountingPermissions } from './shared';
+import type { AccountingTab } from './tabs';
 
 // One vocabulary for failures, used in the list and the activity log.
 const ERROR_META: Record<string, { tone: StatusTone; label: string }> = {
@@ -34,7 +35,7 @@ function DocLink({ url, children }: { url: string | null; children: React.ReactN
 }
 
 /** Counts, what failed (with retry), and the recent activity log. */
-export function SyncTab({ connection }: { connection: Connection }) {
+export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen?: (tab: AccountingTab) => void }) {
   const qc = useQueryClient();
   const cfg = providerConfig(connection.provider);
   const { canWrite, writeTitle } = useAccountingPermissions();
@@ -103,7 +104,7 @@ export function SyncTab({ connection }: { connection: Connection }) {
         actions={
           <button type="button" className="tw-btn" onClick={syncNow} disabled={!canWrite || syncing || connection.status !== 'ACTIVE'} title={writeTitle}>
             <RefreshCw size={14} aria-hidden="true" className={syncing ? 'animate-spin' : undefined} />
-            {syncing ? 'Asking…' : 'Sync payments now'}
+            {syncing ? 'Asking…' : 'Fetch payments now'}
           </button>
         }
         flush
@@ -128,12 +129,21 @@ export function SyncTab({ connection }: { connection: Connection }) {
               return (
                 <li key={e.id} className="acct-row acct-row--error">
                   <div style={{ minWidth: 0 }}>
-                    <div className="acct-row__title"><DocLink url={e.local_url}>{e.label}</DocLink></div>
-                    <div className="acct-row__sub">{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} · {e.attempts} {e.attempts === 1 ? 'try' : 'tries'}{e.next_attempt_at && e.status === 'ERROR' ? ` · next try ${formatDateTime(e.next_attempt_at)}` : ''}</div>
+                    <div className="acct-row__title"><DocLink url={e.local_url}>{e.label}</DocLink> <span className="acct-row__sub">{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)}</span></div>
+                    <div className="acct-row__reason">{e.last_error || 'No reason given'}</div>
+                    <div className="acct-row__sub">
+                      {meta.label} · {e.attempts} {e.attempts === 1 ? 'try' : 'tries'}
+                      {e.next_attempt_at && e.status === 'ERROR' ? ` · next try ${formatDateTime(e.next_attempt_at)}` : ''}
+                    </div>
                   </div>
-                  <div className="acct-row__sub" style={{ color: 'var(--text-secondary)' }}>{e.last_error || 'No reason given'}</div>
-                  <div className="acct-row__chip"><StatusChip tone={meta.tone} label={meta.label} size="sm" /></div>
                   <div className="acct-row__actions">
+                    {/* The usual cause is a mapping or a contact: fix that first, then retry. */}
+                    {onOpen && /account|tax|vat|tracking/i.test(e.last_error) && (
+                      <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={() => onOpen('mapping')}>Fix in Accounts and VAT</button>
+                    )}
+                    {onOpen && /contact/i.test(e.last_error) && (
+                      <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={() => onOpen('contacts')}>Fix in Contacts</button>
+                    )}
                     {canWrite && (
                       <button type="button" className="tw-btn tw-btn--sm" onClick={() => retry(e)} disabled={retrying === e.id}>
                         {retrying === e.id ? 'Retrying…' : 'Retry now'}

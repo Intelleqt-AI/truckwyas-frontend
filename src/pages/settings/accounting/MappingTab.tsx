@@ -149,12 +149,10 @@ export function MappingTab({ connection }: { connection: Connection }) {
       <>
         <AcctCard
           title="Accounts and VAT"
-          description={<>Where each kind of charge and cost goes in {cfg.short}. Nothing is sent until every required line is mapped.</>}
+          description={<><SkelLine width="90%" /><SkelLine width="55%" /></>}
           actionsBelow
           actions={<><span className="tw-btn" style={{ visibility: 'hidden', width: 160 }} aria-hidden="true" /><span className="tw-btn" style={{ visibility: 'hidden', width: 160 }} aria-hidden="true" /></>}
-        >
-          <SkelLine width="60%" />
-        </AcctCard>
+        />
         <AcctCard title="Income accounts" description="Which income account each kind of charge on your invoices goes to." flush>
           <LoadingBlock label="Loading mapping" rows={6} />
         </AcctCard>
@@ -181,16 +179,18 @@ export function MappingTab({ connection }: { connection: Connection }) {
     const empty = !sectionValue(section, key);
     if (s && sectionValue(section, key) !== s) {
       return (
-        <div className={`acct-hint${requiredGap(section, key) ? ' is-required' : ''}`}>
+        <div className={`acct-hint acct-hint--stack${requiredGap(section, key) ? ' is-required' : ''}`}>
           <span>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {describe(s)}</span>
           {canWrite && <button type="button" className="acct-linkbtn" onClick={() => setSection(section, key, s)}>Use suggestion</button>}
         </div>
       );
     }
     if (requiredGap(section, key)) return <div className="acct-hint is-required">Required. No suggestion: pick where it should go.</div>;
-    if (empty) return <div className="acct-hint">Optional. Lines of this kind are rare; map it if you use it.</div>;
+    if (empty) return <div className="acct-hint">Only needed if you use it.</div>;
     return null;
   };
+  const optionalTag = (section: MappingSection, key: string) =>
+    !sectionValue(section, key) && !requiredGap(section, key) ? <span className="acct-badge" style={{ marginLeft: 8 }}>Optional</span> : null;
   const rowClass = (section: MappingSection, key: string) => `acct-map-row${requiredGap(section, key) ? ' is-required' : ''}`;
   const describeAccount = (code: string) => { const a = accounts.find(x => x.code === code); return a ? accountLabel(a) : code; };
   const describeTax = (code: string) => { const t = taxRates.find(x => x.code === code); return t ? taxLabel(t) : code; };
@@ -200,8 +200,13 @@ export function MappingTab({ connection }: { connection: Connection }) {
       <AcctCard
         title="Accounts and VAT"
         description={<>
-          Where each kind of charge and cost goes in {cfg.short}. Nothing is sent until every required line is mapped.
-          {m.options.fetched_at && <> Read from {cfg.short} {formatRelativeTime(m.options.fetched_at)}.</>}
+          {m.complete && !dirty
+            ? <span style={{ color: 'var(--status-success-text)' }}>Everything required is mapped.</span>
+            : m.missing.length > 0
+              ? <><strong style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{m.missing.length} still to map:</strong> {m.missing.map(missingMappingLabel).join(', ')}.</>
+              : 'Review your changes, then save.'}
+          {' '}Accounts and VAT rates read from {cfg.short}{m.options.fetched_at ? ` ${formatRelativeTime(m.options.fetched_at)}` : ''}.
+          {!canWrite && <> {writeTitle}; you can look but not change anything.</>}
         </>}
         actionsBelow
         actions={<>
@@ -214,14 +219,6 @@ export function MappingTab({ connection }: { connection: Connection }) {
           </button>
         </>}
       >
-        {m.complete && !dirty ? (
-          <p className="acct-section-desc" style={{ margin: 0, color: 'var(--status-success-text)' }}>Everything is mapped.</p>
-        ) : (
-          <p className="acct-section-desc" style={{ margin: 0 }}>
-            {m.missing.length > 0 ? `Still to map: ${m.missing.map(missingMappingLabel).join(', ')}.` : 'Review your changes, then save.'}
-          </p>
-        )}
-        {!canWrite && <p className="acct-section-desc" style={{ margin: '8px 0 0' }}>{writeTitle}. You can look, but not change anything.</p>}
       </AcctCard>
 
       <AcctCard title="Income accounts" description="Which income account each kind of charge on your invoices goes to." flush>
@@ -229,7 +226,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
           const field = `revenue_types.${row.key}`;
           return (
             <div className={rowClass('revenue_types', row.key)} key={row.key}>
-              <label className="acct-map-row__label" id={`lbl-${field}`}>{row.label}</label>
+              <label className="acct-map-row__label" id={`lbl-${field}`}>{row.label}{optionalTag('revenue_types', row.key)}</label>
               <div className="acct-map-row__field">
                 <AccountSelect labelledBy={`lbl-${field}`} accounts={accounts} prefer={a => a.class === 'REVENUE'} preferLabel="Income accounts"
                   value={sectionValue('revenue_types', row.key)} onChange={v => setSection('revenue_types', row.key, v)} disabled={disabled} invalid={!!errors[field]} />
@@ -246,7 +243,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
           const field = `expense_categories.${row.key}`;
           return (
             <div className={rowClass('expense_categories', row.key)} key={row.key}>
-              <label className="acct-map-row__label" id={`lbl-${field}`}>{row.label}</label>
+              <label className="acct-map-row__label" id={`lbl-${field}`}>{row.label}{optionalTag('expense_categories', row.key)}</label>
               <div className="acct-map-row__field">
                 <AccountSelect labelledBy={`lbl-${field}`} accounts={accounts} prefer={a => a.class === 'EXPENSE'} preferLabel="Expense accounts"
                   value={sectionValue('expense_categories', row.key)} onChange={v => setSection('expense_categories', row.key, v)} disabled={disabled} invalid={!!errors[field]} />
@@ -274,7 +271,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
             return (
               <div className={rowClass(section, row.key)} key={row.key}>
                 <label className="acct-map-row__label" id={`lbl-${field}`}>
-                  {row.label}
+                  {row.label}{optionalTag(section, row.key)}
                 </label>
                 <div className="acct-map-row__field">
                   <TaxSelect labelledBy={`lbl-${field}`} rates={taxRates} prefer={t => (section === 'tax_sales' ? t.revenue : t.expenses)}
@@ -317,12 +314,12 @@ export function MappingTab({ connection }: { connection: Connection }) {
             <div className="acct-map-row">
               <label className="acct-map-row__label" id="lbl-veh">
                 Vehicle category
-                <small>Each line is tagged with its vehicle's registration</small>
               </label>
               <div className="acct-map-row__field">
                 <PlainSelect labelledBy="lbl-veh" value={tracking.vehicle_category_id} disabled={disabled} invalid={!!errors['tracking.vehicle_category_id']}
                   options={cats.map(c => ({ value: c.id, label: c.name }))} noneLabel="Don't tag vehicles"
                   onChange={v => setDraft(d => ({ ...d, tracking: { ...tracking, vehicle_category_id: v } }))} />
+                <div className="acct-hint">Lines are tagged with the vehicle's registration.</div>
                 {errors['tracking.vehicle_category_id'] && <div className="acct-error" role="alert">{errors['tracking.vehicle_category_id']}</div>}
               </div>
             </div>
@@ -338,12 +335,12 @@ export function MappingTab({ connection }: { connection: Connection }) {
             <div className="acct-map-row">
               <label className="acct-map-row__label" id="lbl-branch-opt">
                 Branch
-                <small>Every line is tagged with this branch</small>
               </label>
               <div className="acct-map-row__field">
                 <PlainSelect labelledBy="lbl-branch-opt" value={tracking.branch_option || null} disabled={disabled || !branchCat} invalid={!!errors['tracking.branch_option']}
                   options={(branchCat?.options ?? []).map(o => ({ value: o.name, label: o.name }))} noneLabel={branchCat ? 'Choose a branch' : 'Choose a branch category first'}
                   onChange={v => setDraft(d => ({ ...d, tracking: { ...tracking, branch_option: v ?? '' } }))} />
+                <div className="acct-hint">Every line is tagged with this branch.</div>
                 {errors['tracking.branch_option'] && <div className="acct-error" role="alert">{errors['tracking.branch_option']}</div>}
               </div>
             </div>

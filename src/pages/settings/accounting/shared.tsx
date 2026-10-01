@@ -24,7 +24,7 @@ export function AcctCard({ title, description, actions, children, id, flush = fa
   actions?: ReactNode;
   /** Put the actions under the description (long descriptions, several buttons). */
   actionsBelow?: boolean;
-  children: ReactNode;
+  children?: ReactNode;
   id?: string;
   /** No body padding: the children draw their own rows. */
   flush?: boolean;
@@ -32,7 +32,7 @@ export function AcctCard({ title, description, actions, children, id, flush = fa
   const titleId = id ? `${id}-title` : undefined;
   return (
     <section style={settingsCardStyle} aria-labelledby={titleId} id={id}>
-      <div style={{ ...settingsCardHeaderStyle, justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ ...settingsCardHeaderStyle, justifyContent: 'space-between', alignItems: 'flex-start', ...(children == null || children === false ? { borderBottom: 0 } : null) }}>
         <div style={{ minWidth: 0, flex: '1 1 220px' }}>
           <h2 id={titleId} style={settingsCardTitleStyle}>{title}</h2>
           {description && <p className="acct-section-desc" style={{ margin: '2px 0 0' }}>{description}</p>}
@@ -40,7 +40,7 @@ export function AcctCard({ title, description, actions, children, id, flush = fa
         </div>
         {actions && !actionsBelow && <div className="acct-card-actions">{actions}</div>}
       </div>
-      <div style={flush ? undefined : { padding: 'var(--card-pad, 20px)' }}>{children}</div>
+      {children != null && children !== false && <div style={flush ? undefined : { padding: 'var(--card-pad, 20px)' }}>{children}</div>}
     </section>
   );
 }

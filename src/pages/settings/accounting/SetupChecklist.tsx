@@ -1,6 +1,6 @@
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Check, Loader2, X } from 'lucide-react';
 import { missingMappingLabel, providerConfig, type Connection } from '@/lib/accounting';
-import { AcctCard, StepIcon, plural, type StepLook } from './shared';
+import { AcctCard, plural, type StepLook } from './shared';
 import type { AccountingTab } from './tabs';
 
 /** What still has to happen before documents start flowing, in order. */
@@ -17,7 +17,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       title: `Connect ${cfg.short}`,
       desc: connection.status === 'ACTIVE'
         ? `Linked to ${connection.tenant_name}.`
-        : `${cfg.short} needs an admin to reconnect before anything else can happen.`,
+        : `Use Reconnect ${cfg.short} above.`,
     },
     {
       key: 'mapping',
@@ -68,48 +68,52 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   ];
 
   // Only the next step to do gets the primary button; while the sign-in has
-  // expired, Reconnect (in the header) is the only one.
+  // expired, Reconnect (in the header) is the only one and the rest wait.
   const reauth = connection.status !== 'ACTIVE';
   const nextKey = reauth ? undefined : items.find(it => it.look !== 'done' && it.tab && it.action)?.key;
-  const todo = items.filter(it => it.look !== 'done' && it.key !== 'live').length;
+  const open = items.filter(it => it.look !== 'done' && it.key !== 'live' && it.key !== 'connect').map(it => items.indexOf(it) + 1);
+  const subtitle = r.sync_enabled
+    ? `Done. ${cfg.short} and TruckWys now stay in step on their own.`
+    : reauth
+      ? `Reconnect ${cfg.short} first; the other steps wait for it.`
+      : open.length
+        ? `Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done. One-off; after this it all runs on its own.`
+        : `Sending your history to ${cfg.short}.`;
 
   return (
-    <>
-      {reauth ? null : !r.sync_enabled && todo > 0 ? (
-        <div className="acct-notice acct-notice--warning" role="status">
-          <AlertTriangle size={16} aria-hidden="true" />
-          <div>
-            <strong>Nothing is sent to {cfg.short} yet</strong>
-            Finish the {todo === 1 ? 'step' : `${todo} steps`} below and sync turns on by itself.
-          </div>
-        </div>
-      ) : r.sync_enabled ? (
-        <div className="acct-notice acct-notice--success" role="status">
-          <CheckCircle2 size={16} aria-hidden="true" />
-          <div>
-            <strong>Sync is on</strong>
-            {cfg.short} now keeps the books; record customer payments there and they show up here.
-          </div>
-        </div>
-      ) : null}
-      <AcctCard title="Steps" description={`Once only. After that ${cfg.short} and TruckWys stay in step on their own.`} flush>
-        <ol className="acct-check acct-check--steps">
-          {items.map((it, i) => (
+    <AcctCard title={r.sync_enabled ? `${cfg.short} is set up` : `Finish setting up ${cfg.short}`} description={subtitle} flush>
+      <ol className="acct-check acct-check--steps">
+        {items.map((it, i) => {
+          const auto = it.key === 'live';
+          const blocked = reauth && it.key !== 'connect';
+          return (
             <li key={it.key}>
-              {it.look === 'todo' ? <span className="acct-step-num" aria-hidden="true">{i + 1}</span> : <StepIcon look={it.look} />}
+              <StepMarker look={it.look} n={i + 1} auto={auto} />
               <div style={{ minWidth: 0 }}>
-                <div className="acct-check__title"><span className="acct-sr">Step {i + 1}: </span>{it.title}</div>
-                <div className="acct-check__desc">{it.desc}</div>
+                <div className="acct-check__title">
+                  {!auto && <span className="acct-sr">Step {i + 1}: </span>}{it.title}
+                  {auto && <span className="acct-badge" style={{ marginLeft: 8 }}>Automatic</span>}
+                </div>
+                <div className="acct-check__desc">{blocked && it.look !== 'done' ? `Waits until ${cfg.short} is reconnected.` : it.desc}</div>
               </div>
               {it.tab && it.action ? (
-                <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>
+                <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}
+                  disabled={blocked && it.look !== 'done'} title={blocked ? `Reconnect ${cfg.short} first` : undefined}>
                   {it.action}
                 </button>
               ) : <span />}
             </li>
-          ))}
-        </ol>
-      </AcctCard>
-    </>
+          );
+        })}
+      </ol>
+    </AcctCard>
   );
+}
+
+/** One 20px marker for every state, so the list reads as one component. */
+function StepMarker({ look, n, auto }: { look: StepLook; n: number; auto: boolean }) {
+  if (look === 'done') return <span className="acct-step-num is-done" aria-hidden="true"><Check size={12} strokeWidth={2.5} /></span>;
+  if (look === 'bad') return <span className="acct-step-num is-bad" aria-hidden="true"><X size={12} strokeWidth={2.5} /></span>;
+  if (look === 'busy') return <span className="acct-step-num is-busy" aria-hidden="true"><Loader2 size={12} className="animate-spin" /></span>;
+  return <span className={`acct-step-num${auto ? ' is-auto' : ''}`} aria-hidden="true">{auto ? '' : n}</span>;
 }

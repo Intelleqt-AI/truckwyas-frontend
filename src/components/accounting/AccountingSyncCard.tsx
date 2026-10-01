@@ -1,7 +1,7 @@
 import { AlertTriangle, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { StatusChip } from '@/components/ui/StatusChip';
-import { formatDateTime } from '@/lib/formatters';
+import { formatDate } from '@/lib/formatters';
 import { providerConfig, type AccountingSync } from '@/lib/accounting';
 import { documentSyncChip } from './connectionStatus';
 import './accounting.css';
@@ -10,7 +10,7 @@ import './accounting.css';
  * Rail card on invoice and credit note detail: where this document stands in
  * the accounting system (status, its number there, a link, the last error).
  */
-export function AccountingSyncCard({ sync, what }: { sync: AccountingSync | null | undefined; what: 'invoice' | 'credit note' }) {
+export function AccountingSyncCard({ sync, what, localNumber }: { sync: AccountingSync | null | undefined; what: 'invoice' | 'credit note'; localNumber?: string }) {
   if (!sync) return null;
   const cfg = providerConfig(sync.provider);
   const name = cfg.short || sync.provider_name;
@@ -25,17 +25,21 @@ export function AccountingSyncCard({ sync, what }: { sync: AccountingSync | null
         <StatusChip tone={chip.tone} label={chip.label} size="sm" />
       </div>
       <dl className="fin-dl">
+        {/* Only when it differs from ours (it usually doesn't). */}
+        {sync.external_number && sync.external_number !== localNumber && (
+          <div className="fin-dl__row">
+            <dt>Number in {name}</dt>
+            <dd>{sync.external_number}</dd>
+          </div>
+        )}
         <div className="fin-dl__row">
-          <dt>Number in {name}</dt>
-          <dd>{sync.external_number || (sync.status === 'PENDING' ? 'Not sent yet' : '—')}</dd>
-        </div>
-        <div className="fin-dl__row">
-          <dt>Last sent successfully</dt>
-          <dd>{sync.last_synced_at ? formatDateTime(sync.last_synced_at) : 'Not yet'}</dd>
+          <dt>Last sent</dt>
+          <dd style={{ whiteSpace: 'nowrap' }}>{sync.last_synced_at ? formatDate(sync.last_synced_at) : sync.status === 'PENDING' ? 'Not sent yet' : 'Not yet'}</dd>
         </div>
       </dl>
-      {sync.last_error && (sync.status === 'ERROR' || sync.status === 'DEAD' || sync.status === 'BLOCKED') && (
-        <p className="acct-sync-err" role="status">Latest attempt failed: {sync.last_error}</p>
+      {/* The reason is in the notice above the document; here, just the way to fix it. */}
+      {(sync.status === 'ERROR' || sync.status === 'DEAD' || sync.status === 'BLOCKED') && (
+        <Link to="/settings/integrations/accounting?tab=sync" className="acct-link" style={{ fontSize: 13, marginTop: 8 }}>Fix in accounting settings</Link>
       )}
       {sync.url && (
         <a href={sync.url} target="_blank" rel="noopener noreferrer" className="tw-btn" style={{ width: '100%', marginTop: 12 }}>
@@ -54,7 +58,7 @@ export function AccountingSyncCard({ sync, what }: { sync: AccountingSync | null
 export function PaymentsManagedNote({ providerName, recordUrl }: { providerName: string; recordUrl: string | null }) {
   return (
     <div className="acct-managed">
-      <p>Record payments in {providerName}. They show here, with the balance updated, after the next sync.</p>
+      <p>Recorded in {providerName}; they show here after the next sync.</p>
       {recordUrl && (
         <a href={recordUrl} target="_blank" rel="noopener noreferrer" className="tw-btn" style={{ width: '100%' }}>
           Record in {providerName}
@@ -77,14 +81,22 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
         <strong>{retrying ? `The latest update didn't reach ${name}; retrying` : `This ${what} isn't up to date in ${name}`}</strong>
         {sync.last_error || `${name} refused it.`}
       </div>
-      <Link to="/settings/integrations/accounting?tab=sync" className="tw-btn fl-notice__action">Sync status</Link>
+      <Link to={`/settings/integrations/accounting?tab=${/account|tax|vat|tracking/i.test(sync.last_error) ? 'mapping' : 'sync'}`} className="tw-btn fl-notice__action">
+        {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix mapping' : 'View sync issue'}
+      </Link>
     </div>
   );
 }
 
-/** "From Xero" badge for a payment that came from the accounting system. */
-export function PaymentSourceBadge({ source }: { source?: string | null }) {
-  if (!source || source === 'MANUAL') return null;
+/**
+ * Where a payment came from, tagged only when it's the exception: while an
+ * accounting system owns payments, the ones entered in TruckWys before; else
+ * the ones that came from the accounting system.
+ */
+export function PaymentSourceBadge({ source, managed = false }: { source?: string | null; managed?: boolean }) {
+  const manual = !source || source === 'MANUAL';
+  if (managed) return manual ? <span className="acct-source-badge">Recorded in TruckWys</span> : null;
+  if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;
   return <span className="acct-source-badge">{label}</span>;
 }

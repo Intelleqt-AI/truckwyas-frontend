@@ -113,27 +113,22 @@ export function ContactsTab({ connection }: { connection: Connection }) {
           <div className="acct-only-wide"><Segmented label="Status" value={status} onChange={setStatus} options={statusOptions} size="sm" /></div>
           <div className="acct-only-phone" style={{ flex: '1 1 160px', minWidth: 0 }}>
             <Select value={status} onValueChange={v => setStatus(v as StatusFilter)}>
-              <SelectTrigger aria-label="Status"><SelectValue /></SelectTrigger>
-              <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label} ({o.count ?? 0})</SelectItem>)}</SelectContent>
+              <SelectTrigger aria-label="Status" style={{ minHeight: 36 }}><SelectValue /></SelectTrigger>
+              <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'All statuses' : o.label} ({o.count ?? 0})</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <span className="acct-toolbar__spacer" />
-          <div style={{ flex: '0 1 170px', minWidth: 0 }}>
+          <div className="acct-kind-filter">
             <Select value={kind} onValueChange={v => setKind(v as KindFilter)}>
-              <SelectTrigger aria-label="Customers or suppliers" style={{ minHeight: 32 }}><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Show customers, suppliers or both" style={{ minHeight: 36 }}><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">All contacts</SelectItem>
+                <SelectItem value="ALL">Customers and suppliers</SelectItem>
                 <SelectItem value="CUSTOMER">Customers</SelectItem>
                 <SelectItem value="SUPPLIER">Suppliers</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
-        {(summary.SUGGESTED ?? 0) > 0 && status === 'ALL' && (
-          <p className="acct-section-desc" style={{ margin: 0, padding: '12px var(--card-pad, 20px)', borderBottom: '1px solid var(--border-row)' }}>
-            {plural(summary.SUGGESTED ?? 0, 'contact')} matched on name only. Their invoices wait until you confirm or change the match.
-          </p>
-        )}
         {q.isLoading ? (
           <LoadingBlock label="Loading contacts" />
         ) : q.isError ? (
@@ -190,7 +185,7 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   if (row.status === 'MATCHED' || row.status === 'SUGGESTED') {
     match = (
       <>
-        <div className="acct-row__title"><span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>{providerName}: </span>{suggestedName ?? '—'}</div>
+        <div className="acct-row__sub" style={{ color: 'var(--text-secondary)' }}>{providerName} contact “{suggestedName ?? '—'}”</div>
         <div className="acct-row__sub">{row.method ? `Matched on ${MATCH_METHOD_LABEL[row.method] ?? row.method}` : `In ${providerName}`}</div>
       </>
     );
@@ -256,8 +251,8 @@ function PickContactDialog({ row, providerName, busy, onClose, onPick }: {
   }, [term]);
 
   const search = useQuery({
-    queryKey: ['accounting', 'contact-search', debounced],
-    queryFn: () => accountingApi.searchContacts(debounced),
+    queryKey: ['accounting', 'contact-search', row.kind, debounced],
+    queryFn: () => accountingApi.searchContacts(debounced, row.kind),
     enabled: debounced.length >= 2,
     retry: 0,
     staleTime: 60_000,

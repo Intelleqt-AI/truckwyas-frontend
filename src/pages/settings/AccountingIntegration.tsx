@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, ChevronLeft, Info, X, XCircle } from 'lucide-react';
 import { AccountingProviderCards } from '@/components/accounting/AccountingProviderCards';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   apiMessage, apiStatus, callbackMessage, invalidateAccounting, providerBySlug, providerConfig, useAccountingConnection,
 } from '@/lib/accounting';
@@ -71,7 +70,7 @@ export default function AccountingIntegration() {
         Integrations
       </Link>
       <span aria-hidden="true" className="section-header__sep">·</span>
-      Xero, QuickBooks and Sage
+      Connect your accounting system
     </>
   );
 
@@ -87,16 +86,22 @@ export default function AccountingIntegration() {
     return undefined;
   };
 
+  // Phones: the tab strip scrolls sideways; keep the open tab in view.
+  const tabsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = tabsRef.current?.querySelector<HTMLElement>('.is-active');
+    if (el && tabsRef.current) tabsRef.current.scrollLeft = Math.max(0, el.offsetLeft - 16);
+  }, [tab, live?.id]);
+
   const tabCountTitle = (t: AccountingTab, n: number) =>
-    t === 'contacts' ? `${n} to confirm` : t === 'mapping' ? `${n} still to map` : `${n} failed to send`;
+    t === 'contacts' ? `${n} need action` : t === 'mapping' ? `${n} still to map` : `${n} failed to send`;
 
   let body: React.ReactNode;
   if (conn.isLoading) {
     body = (
       <>
-        <ConnectionHeaderSkeleton />
+        <ConnectionHeaderSkeleton compact={tab !== 'setup'} />
         <div className="acct-tabs" aria-hidden="true"><span className="ops-skel" style={{ width: 'min(100%, 520px)', height: 32, borderRadius: 8 }} /></div>
-        <div className="acct-tabs-phone" aria-hidden="true"><span className="ops-skel" style={{ width: '100%', height: 48, borderRadius: 8 }} /></div>
         <section style={settingsCardStyle}><LoadingBlock label="Loading setup" rows={5} /></section>
       </>
     );
@@ -145,28 +150,15 @@ export default function AccountingIntegration() {
   } else if (live.status === 'PENDING_ORG') {
     body = (
       <>
-        <ConnectionHeader connection={live} />
         <OrgPicker connection={live} />
       </>
     );
   } else {
     body = (
       <>
-        <ConnectionHeader connection={live} />
-        {/* Phones: one picker, like the settings section picker above it. */}
-        <div className="acct-tabs-phone">
-          <Select value={tab} onValueChange={v => openTab(v as AccountingTab)}>
-            <SelectTrigger aria-label={`${cfg!.short} section`}><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {ACCOUNTING_TABS.map(t => {
-                const n = tabBadge(t.id);
-                return <SelectItem key={t.id} value={t.id}>{t.label}{n != null ? ` · ${tabCountTitle(t.id, n)}` : ''}</SelectItem>;
-              })}
-            </SelectContent>
-          </Select>
-        </div>
+        <ConnectionHeader connection={live} compact={tab !== 'setup'} />
         <div className="acct-tabs">
-          <div className="tw-seg" role="tablist" aria-label={`${cfg!.short} settings`}>
+          <div className="tw-seg" role="tablist" ref={tabsRef} aria-label={`${cfg!.short} settings`}>
             {ACCOUNTING_TABS.map(t => {
               const n = tabBadge(t.id);
               return (
@@ -192,7 +184,7 @@ export default function AccountingIntegration() {
           {tab === 'mapping' && <MappingTab connection={live} />}
           {tab === 'contacts' && <ContactsTab connection={live} />}
           {tab === 'cutover' && <BackfillTab connection={live} onOpen={openTab} />}
-          {tab === 'sync' && <SyncTab connection={live} />}
+          {tab === 'sync' && <SyncTab connection={live} onOpen={openTab} />}
           {tab === 'reconciliation' && <ReconciliationTab connection={live} />}
         </div>
       </>

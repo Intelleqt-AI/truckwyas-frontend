@@ -892,3 +892,8 @@
 .acct-org.is-disabled .acct-row__title { color: var(--text-primary); }
 .acct-org.is-selected { background: color-mix(in srgb, var(--text-primary) 9%, var(--bg-surface)) !important; }
 .acct-org.is-disabled .acct-radio { border-color: var(--text-tertiary) !important; }
+.acct-hint--inline > span, .acct-hint.is-required.acct-hint--inline > span { display: inline !important; }
+.acct-use-link { margin-left: 2px; vertical-align: baseline; }
+@container (min-width: 560px) {
+  .acct-map-grid > .acct-map-row:last-child:nth-child(odd) { column-gap: 40px; }
+}

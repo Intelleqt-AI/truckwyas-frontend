@@ -127,7 +127,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   if (liveItem && !r.sync_enabled && stillOpen.length && stillOpen.every(it => it.provider)) {
     const nums = stillOpen.map(it => items.indexOf(it) + 1);
     liveItem.desc = r.backfill_state === 'DONE'
-      ? "Sync paused until this is fixed. Nothing is lost; documents send once it's on."
+      ? "Until this is fixed. Nothing is lost; documents send once it's on."
       : `Waiting on ${nums.length === 1 ? `step ${nums[0]}` : `steps ${nums.join(' and ')}`}.`;
     if (r.backfill_state === 'DONE') liveItem.title = 'Sync paused';
   }

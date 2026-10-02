@@ -58,7 +58,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
   const { canWrite, writeTitle } = useAccountingPermissions();
   const cfg = providerConfig(connection.provider);
   const r = connection.readiness;
-  const chip = connectionChip(connection.status, r, connection.counts);
+  const chip = connectionChip(connection.status, r, connection.counts, cfg.short);
   const dis = useDisconnect(connection);
   const [reconnecting, setReconnecting] = useState(false);
   const reauth = connection.status === 'NEEDS_REAUTH';

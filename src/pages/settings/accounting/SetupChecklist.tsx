@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, Check, Loader2, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, Check, Loader2, RefreshCw, X, ExternalLink } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/lib/toast';
 import { ACCT_KEYS, accountingApi, apiMessage, invalidateAccounting, providerBlockers, providerConfig, type Connection } from '@/lib/accounting';
@@ -88,7 +88,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     : reauth
       ? `Steps 2–${items.length} wait until ${cfg.short} is reconnected.`
       : open.length
-        ? `One-time setup. Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done${blockers.length ? ` and the ${cfg.short} setting below is changed` : ''}.`
+        ? `One-time setup. Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done${blockers.length ? ' and the setting below is changed' : ''}.`
         : `Sending your history to ${cfg.short}.`;
 
   return (
@@ -170,6 +170,12 @@ function ProviderBlockers({ connection, blockers }: { connection: Connection; bl
           <RefreshCw size={14} aria-hidden="true" className={busy ? 'animate-spin' : undefined} />
           {busy ? 'Reading…' : `Refresh from ${cfg.short}`}
         </button>
+        {connection.web_url && (
+          <a className="tw-btn tw-btn--ghost" href={connection.web_url} target="_blank" rel="noopener noreferrer">
+            Open {cfg.short}
+            <ExternalLink size={14} aria-hidden="true" />
+          </a>
+        )}
       </div>
     </div>
   );

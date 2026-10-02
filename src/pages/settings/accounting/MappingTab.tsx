@@ -257,7 +257,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
       <AcctCard
         title={itemsForRevenue ? 'Products and services' : 'Income accounts'}
         description={itemsForRevenue
-          ? `Which ${cfg.short} product/service each kind of charge on your invoices uses. Its income account decides where the money lands.`
+          ? `Pick the ${cfg.short} product or service for each kind of charge. Its income account decides where the money goes.`
           : 'Which income account each kind of charge on your invoices goes to.'}
         flush
       >
@@ -416,7 +416,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         <AcctCard
           title="Bank account and tracking"
           description={`Optional. Where past payments go in ${cfg.short}, and vehicle or branch tags on each line.`}
-          actions={<button type="button" className="tw-btn" onClick={() => setOptionalOpen(true)} aria-expanded={false}>Show</button>}
+          actions={<button type="button" className="tw-btn" onClick={() => setOptionalOpen(true)} aria-expanded={false}>Show options</button>}
         />
       )}
 

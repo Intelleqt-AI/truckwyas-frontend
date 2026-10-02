@@ -108,7 +108,7 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
   const cfg = providerConfig(info.provider);
   const mine = live && live.provider === info.provider ? live : null;
   const other = live && live.provider !== info.provider ? providerConfig(live.provider) : null;
-  const chip = mine ? connectionChip(mine.status, mine.readiness, mine.counts) : null;
+  const chip = mine ? connectionChip(mine.status, mine.readiness, mine.counts, cfg.short) : null;
 
   // Same layout as the other integration cards on this page (Cartrack,
   // CtrlFleet): logo, name and one grey line, status on the right, the

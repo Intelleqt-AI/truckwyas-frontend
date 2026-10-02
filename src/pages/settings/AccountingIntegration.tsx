@@ -158,7 +158,7 @@ export default function AccountingIntegration() {
           <ol className="acct-check">
             {[
               ['Connect your accounting system', 'Sign in to it and choose which books to link.'],
-              ['Map charges, expenses and VAT', 'Tell TruckWys where each kind of charge and supplier bill goes in your books, and which VAT rates to use.'],
+              ['Map accounts and VAT', 'Pick where each kind of charge and supplier bill goes in your books, and the VAT rate for each.'],
               ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
               ['Choose a start date', 'We send documents from that date. Anything earlier should already be in your books.'],
             ].map(([t, d], i) => (

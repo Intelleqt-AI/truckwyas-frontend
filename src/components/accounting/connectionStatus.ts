@@ -1,9 +1,11 @@
 import type { StatusTone } from '@/components/ui/StatusChip';
-import type { ConnectionStatus, DocumentSyncStatus, Readiness, SyncCounts } from '@/lib/accounting';
+import { providerBlockers, type ConnectionStatus, type DocumentSyncStatus, type Readiness, type SyncCounts } from '@/lib/accounting';
 
 /** Chip tone + label for a connection's status. */
-export function connectionChip(status: ConnectionStatus, readiness?: Readiness | null, counts?: SyncCounts | null): { tone: StatusTone; label: string } {
+export function connectionChip(status: ConnectionStatus, readiness?: Readiness | null, counts?: SyncCounts | null, providerShort?: string): { tone: StatusTone; label: string } {
   if (status === 'ACTIVE' && readiness && !readiness.sync_enabled) {
+    const ownStepsDone = readiness.mapping_complete && readiness.contacts_to_confirm === 0 && readiness.backfill_state === 'DONE';
+    if (ownStepsDone && providerBlockers(readiness).length) return { tone: 'warning', label: `Change needed in ${providerShort ?? 'your books'}` };
     return readiness.backfill_state === 'RUNNING' ? { tone: 'info', label: 'Sending history' } : { tone: 'warning', label: 'Setup needed' };
   }
   const failing = (counts?.errors ?? 0) + (counts?.dead ?? 0);

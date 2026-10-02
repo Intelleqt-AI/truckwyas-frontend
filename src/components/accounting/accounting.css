@@ -845,3 +845,10 @@
 /* Finished steps: a quiet link-weight action, never a full-width button. */
 .acct-check--steps li > .acct-step-done-btn { min-width: 0 !important; color: var(--text-secondary); }
 @media (max-width: 560px) { .acct-check--steps li > .acct-step-done-btn { justify-self: start !important; width: auto !important; padding-left: 0; } }
+/* QuickBooks settings callout: one 8px rhythm; the menu path reads as a path. */
+.acct-blockers { gap: 12px; }
+.acct-blockers__items { margin-top: 6px; gap: 8px; }
+.acct-blocker__where { font-weight: 500; color: var(--text-primary); }
+.acct-blockers__after { margin-top: 6px; }
+.acct-blockers__actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+@media (max-width: 560px) { .acct-blockers__actions .tw-btn--ghost { width: auto !important; } }

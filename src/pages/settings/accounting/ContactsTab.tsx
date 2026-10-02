@@ -146,7 +146,7 @@ export function ContactsTab({ connection }: { connection: Connection }) {
             {term.trim() ? `No contacts match "${term.trim()}".` : status === 'ALL' ? 'No customers or suppliers with documents to send yet.' : `No contacts are "${STATUS_META[status as ContactStatus].label.toLowerCase()}".`}
           </div>
         ) : (
-          <ul className="acct-list" aria-busy={q.isFetching}>
+          <ul className="acct-list acct-contacts-list" aria-busy={q.isFetching}>
             {rows.map(row => (
               <ContactRow
                 key={row.id}

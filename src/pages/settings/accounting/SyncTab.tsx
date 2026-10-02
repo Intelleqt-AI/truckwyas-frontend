@@ -133,7 +133,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
                       <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={() => onOpen('contacts')}>Fix in Contacts</button>
                     )}
                     {canWrite && (
-                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => retry(e)} disabled={retrying === e.id}>
+                      <button type="button" className="tw-btn tw-btn--sm tw-btn--ghost" onClick={() => retry(e)} disabled={retrying === e.id}>
                         {retrying === e.id ? 'Retrying…' : 'Retry now'}
                       </button>
                     )}

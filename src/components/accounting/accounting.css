@@ -963,3 +963,13 @@
 .acct-hint--one .acct-use-link { flex: none; }
 .acct-map-more { padding: 10px var(--card-pad, 20px) 14px; border-top: 1px solid var(--border-row); font: 400 13px/20px var(--font-sans); }
 .acct-map-more .acct-linkbtn { min-height: 32px; color: var(--text-secondary); }
+/* Post-F4 */
+.acct-check--steps li:last-child .acct-step-num { color: var(--text-secondary); border-color: var(--border-strong); }
+.acct-save-btn:disabled { color: var(--text-secondary) !important; opacity: 1 !important; }
+.acct-contacts-list { container-type: inline-size; }
+@container (max-width: 760px) {
+  .acct-contacts-list > .acct-row--contact { grid-template-columns: minmax(0, 190px) minmax(0, 1fr) !important; }
+  .acct-contacts-list > .acct-row--contact > .acct-row__actions { grid-column: 2; grid-row: 2; justify-self: stretch; justify-content: space-between !important; }
+}
+.acct-table--recon td.num, .acct-table--recon th.num { padding-left: 24px; }
+.acct-dot-note .acct-dot { margin-right: 6px; }

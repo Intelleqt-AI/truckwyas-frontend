@@ -90,7 +90,7 @@ export function ReconciliationTab({ connection, onOpen }: { connection: Connecti
               <>
                 <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}</p>
                 {(connection.counts.errors + connection.counts.dead) > 0 && (
-                  <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}>{plural(connection.counts.errors + connection.counts.dead, 'document')} {connection.counts.errors + connection.counts.dead === 1 ? "hasn't" : "haven't"} reached {cfg.short} yet, so {connection.counts.errors + connection.counts.dead === 1 ? "it isn't" : "they aren't"} compared.{onOpen && <>{' '}<button type="button" className="acct-linkbtn" onClick={() => onOpen('sync')}>View in Sync</button></>}</p>
+                  <p className="acct-section-desc acct-dot-note" style={{ margin: '-10px 0 14px' }}><span className="acct-dot acct-dot--warning acct-dot--inline" aria-hidden="true" />{plural(connection.counts.errors + connection.counts.dead, 'document')} {connection.counts.errors + connection.counts.dead === 1 ? "hasn't" : "haven't"} reached {cfg.short} yet, so {connection.counts.errors + connection.counts.dead === 1 ? "it isn't" : "they aren't"} compared.{onOpen && <>{' '}<button type="button" className="acct-linkbtn" onClick={() => onOpen('sync')}>View in Sync</button></>}</p>
                 )}
               </>
             ) : (

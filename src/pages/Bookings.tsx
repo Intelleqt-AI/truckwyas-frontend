@@ -378,7 +378,8 @@ export default function Bookings() {
     );
   };
 
-  const hasPOD = !!(load.pod_signature || load.pod_received_by);
+  // A plain upload sets only pod_document; signature and "received by" may stay empty.
+  const hasPOD = !!(load.pod_document || load.pod_signature);
   const invoiceId = load.invoice_id;
   // Driver/vehicle are locked in once the load has moved past Assigned —
   // editing them mid-transit (or after delivery/invoicing/cancellation)

@@ -1,185 +1,272 @@
 import './quote-invoice-roles.css';
 import './finance-brand.css';
-import { formatCurrency } from '@/lib/formatters';
+import '@/components/finance/finance-ledger.css';
 import SectionHeader from '@/components/layout/SectionHeader';
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { postData, fetchData } from "@/lib/Api";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Lock } from 'lucide-react';
+import { postData, patchData, fetchData } from "@/lib/Api";
+import { localDateISO } from '@/lib/dates';
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { formatCurrency } from '@/lib/formatters';
+import LoadError, { loadFailed } from '@/components/data/LoadError';
+import '@/components/data/load-error.css';
+import { InvoiceLineEditor } from '@/components/finance/InvoiceLineEditor';
+import { blankLine, linesForApi, linesFromInvoice, lineProblems, type EditorLine } from '@/lib/finance/lines';
+import { TotalsBreakdown } from '@/components/finance/TotalsBreakdown';
+import { computeTotals } from '@/lib/finance/tax';
+import { errorCode, errorText, rowsOf, useFinanceSettings, useInvalidateInvoice, useInvoice, useTaxCodes, FIN_URL } from '@/lib/finance/api';
+import type { Invoice, InvoiceWriteInput } from '@/lib/finance/types';
 
-/** "INV-20260929-4821": the INV-YYYYMMDD-n format the rest of TruckWys
- *  uses (INV-20260405-1029), dated today. Only a suggestion; editable. */
-function suggestNumber(now = new Date()) {
-  const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-  return `INV-${ymd}-${(now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) % 9000 + 1000}`;
+interface CustomerOption { id: number; name: string; company_name?: string; payment_terms_default?: string }
+
+/** "NET30" → 30; anything else → null. */
+const termsDays = (t?: string) => { const m = /^NET\s*(\d+)$/i.exec(t || ''); return m ? parseInt(m[1], 10) : null; };
+const addDays = (iso: string, days: number) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return localDateISO(new Date(y, m - 1, d + days));
+};
+
+/**
+ * New invoice, and editing a draft (/finance/invoices/:id/edit). Lines carry
+ * the money; the server computes every total, the rail previews them with
+ * the same rounding. Sent invoices are locked: they open read-only here with
+ * the reason and a way back to issue a credit note.
+ */
+export default function CreateInvoice() {
+  const { id } = useParams();
+  const editing = !!id;
+  const invoiceQuery = useInvoice(id);
+  const invoice = invoiceQuery.data;
+  if (editing) {
+    if (loadFailed(invoiceQuery)) {
+      return (
+        <div className="fin-page">
+          <SectionHeader title="Edit invoice" back={{ to: `/finance/invoices/${id}`, label: 'Invoice' }} />
+          <LoadError what="this invoice" error={invoiceQuery.error ?? invoiceQuery.failureReason} busy={invoiceQuery.isFetching} onRetry={() => invoiceQuery.refetch()} />
+        </div>
+      );
+    }
+    if (!invoice) {
+      return (
+        <div className="fin-page" aria-busy="true" aria-label="Loading invoice">
+          <SectionHeader title="Edit invoice" back={{ to: `/finance/invoices/${id}`, label: 'Invoice' }} />
+          <div className="fin-skel fin-skel--card" aria-hidden="true" />
+        </div>
+      );
+    }
+    if (invoice.is_locked || String(invoice.status).toUpperCase() !== 'DRAFT') {
+      return <LockedInvoice invoice={invoice} />;
+    }
+  }
+  return <InvoiceForm key={invoice?.id ?? 'new'} invoice={invoice} />;
 }
 
-export default function CreateInvoice() {
+function LockedInvoice({ invoice }: { invoice: Invoice }) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [form, setForm] = useState({
-    customer: '',
-    // Same shape as every other invoice number: INV-<issue date>-<n>.
-    invoice_number: suggestNumber(),
-    amount: '',
-    due_date: '',
-    description: '',
-    status: 'DRAFT',
-  });
+  return (
+    <div className="fin-page">
+      <SectionHeader title={`Edit ${invoice.invoice_number}`} back={{ to: `/finance/invoices/${invoice.id}`, label: invoice.invoice_number }} />
+      <div className="fl-notice" role="status">
+        <Lock size={16} aria-hidden="true" />
+        <div>
+          <strong>This invoice can't be edited</strong>
+          {invoice.lock_reason || "Sent invoices can't be edited — issue a credit note to correct one."}
+        </div>
+        <button type="button" className="tw-btn fl-notice__action" onClick={() => navigate(`/finance/invoices/${invoice.id}`)}>Open invoice</button>
+      </div>
+    </div>
+  );
+}
+
+function InvoiceForm({ invoice }: { invoice?: Invoice }) {
+  const navigate = useNavigate();
+  const invalidate = useInvalidateInvoice();
+  const editing = !!invoice;
+  const { codes, defaultCode, isLoading: codesLoading } = useTaxCodes();
+  const settings = useFinanceSettings();
+
+  const [customer, setCustomer] = useState(invoice?.customer != null ? String(invoice.customer) : '');
+  const [issueDate, setIssueDate] = useState(String(invoice?.issue_date || localDateISO()).slice(0, 10));
+  const [dueDate, setDueDate] = useState(String(invoice?.due_date || '').slice(0, 10));
+  const [dueTouched, setDueTouched] = useState(!!invoice?.due_date);
+  const [notes, setNotes] = useState(invoice?.notes || '');
+  const [status, setStatus] = useState<'DRAFT' | 'SENT'>('DRAFT');
+  const [lines, setLines] = useState<EditorLine[]>(() =>
+    invoice ? linesFromInvoice(invoice.lines, invoice.subtotal, defaultCode) : [blankLine(defaultCode)]);
+  const [linesTouched, setLinesTouched] = useState(false);
   const [error, setError] = useState('');
 
+  // The tenant default arrives after the first render: apply it to untouched new lines.
+  useEffect(() => {
+    if (editing || linesTouched || codesLoading) return;
+    setLines(ls => ls.map(l => ({ ...l, tax_code: defaultCode })));
+  }, [defaultCode, codesLoading, editing, linesTouched]);
+
   const { data: customersData } = useQuery({ queryKey: ['customers'], queryFn: () => fetchData('api/v1/customers/') });
-  const customers = customersData?.results || customersData || [];
+  const customers: CustomerOption[] = rowsOf(customersData);
+  const selectedCustomer = customers.find(c => String(c.id) === customer);
+
+  // Due date follows the customer's terms until the user picks one.
+  useEffect(() => {
+    if (dueTouched || !issueDate) return;
+    const days = termsDays(selectedCustomer?.payment_terms_default);
+    setDueDate(days != null ? addDays(issueDate, days) : '');
+  }, [selectedCustomer?.payment_terms_default, issueDate, dueTouched]);
+
+  const totals = useMemo(() => computeTotals(lines, codes), [lines, codes]);
+  const problems = lineProblems(lines);
+  const apiLines = linesForApi(lines);
+  const canSubmit = !!customer && !!issueDate && apiLines.length > 0 && problems.length === 0;
 
   const mutation = useMutation({
-    mutationFn: (data: any) => postData({ url: 'api/v1/invoices/', data }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices-page'] });
-      navigate('/finance/invoices');
+    mutationFn: (data: InvoiceWriteInput) => editing
+      ? patchData({ url: FIN_URL.invoice(invoice!.id), data })
+      : postData({ url: FIN_URL.invoices, data }),
+    onSuccess: (saved: Invoice | undefined) => {
+      invalidate(invoice?.id ?? saved?.id);
+      const target = saved?.id ?? invoice?.id;
+      navigate(target ? `/finance/invoices/${target}` : '/finance/invoices');
     },
-    onError: (e: any) => setError(e?.message || 'Failed to create invoice'),
+    onError: (e: unknown) => setError(errorCode(e) === 'invoice_locked'
+      ? "This invoice was sent in the meantime, so it can't be edited. Issue a credit note instead."
+      : errorText(e, editing ? "Couldn't save the invoice" : "Couldn't create the invoice")),
   });
-
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setForm(f => ({ ...f, [k]: e.target.value }));
-
-  // A due date is normally in the future (payment terms). It used to be capped
-  // at today, which made every hand-made invoice overdue on creation.
-  const dueDateValid = (() => {
-    if (!form.due_date) return false;
-    const d = new Date(form.due_date);
-    return !isNaN(d.getTime());
-  })();
-
-  const canSubmit = !!form.customer && !!form.amount && parseFloat(form.amount) > 0 && dueDateValid;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    const subtotal = parseFloat(form.amount) || 0;
-    mutation.mutate({
-      ...form,
-      subtotal: subtotal.toFixed(2),
-      total_amount: subtotal.toFixed(2),
-      balance: subtotal.toFixed(2),
-    });
+    setError('');
+    const data: InvoiceWriteInput = {
+      customer: Number(customer),
+      issue_date: issueDate,
+      due_date: dueDate || null,
+      notes,
+      lines: apiLines,
+    };
+    if (!editing) data.status = status;
+    mutation.mutate(data);
   };
 
-  // The API stores the amount as the subtotal and adds VAT at 15% when it
-  // saves (Invoice.calculate_vat), so the preview shows the same split.
-  const subtotalPreview = parseFloat(form.amount || '0') || 0;
-  const vatPreview = Math.round(subtotalPreview * 0.15 * 100) / 100;
-  const totalPreview = subtotalPreview + vatPreview;
-  const selectedCustomer = customers.find((c: any) => String(c.id) === form.customer);
+  const changeLines = (ls: EditorLine[]) => { setLines(ls); setLinesTouched(true); };
+  const backTo = editing ? `/finance/invoices/${invoice!.id}` : '/finance/invoices';
+  const submitLabel = mutation.isPending
+    ? (editing ? 'Saving…' : 'Creating…')
+    : editing ? 'Save draft' : status === 'SENT' ? 'Create as sent' : 'Create draft';
+  const numberHint = editing
+    ? invoice!.has_provisional_number ? 'Provisional. The invoice number is assigned when it is sent.' : null
+    : settings.data?.next_invoice_number_preview
+      ? `Assigned when sent. Next number: ${settings.data.next_invoice_number_preview}`
+      : 'Assigned when the invoice is sent.';
+  const missing = [!customer && 'a customer', apiLines.length === 0 && 'at least one line'].filter(Boolean).join(' and ');
 
   return (
     <div className="fin-page">
       <SectionHeader
-        title="New invoice"
-        back={{ to: '/finance/invoices', label: 'Invoices' }}
-        description="One-off charges. Loads bill themselves."
+        title={editing ? `Edit ${invoice!.invoice_number}` : 'New invoice'}
+        back={{ to: backTo, label: editing ? invoice!.invoice_number : 'Invoices' }}
+        description={editing ? 'Draft. Lines and dates can change until it is sent.' : 'One-off charges. Loads bill themselves.'}
         actions={
-          // Phones: the rail (and its button) is below the form, so the one
-          // primary also sits on the title row. Wider screens use the rail.
           <button type="submit" form="create-invoice-form" className="tw-btn tw-btn--primary fin-phone-only" disabled={!canSubmit || mutation.isPending}>
-            {mutation.isPending ? 'Creating…' : 'Create invoice'}
+            {submitLabel}
           </button>
         }
       />
 
       <form id="create-invoice-form" onSubmit={handleSubmit}>
         <div className="fin-create-grid">
-          <section className="card" aria-labelledby="create-invoice-details">
-            <div className="fin-panel-head">
-              <div className="fin-panel-head__text">
-                <h2 id="create-invoice-details" className="fin-panel-title">Details</h2>
-              </div>
-            </div>
-            {/* Paired rows keep the form short, so it ends near the summary rail. */}
-            <div className="fin-form">
-              <div className="fin-form__row">
-                <div>
-                  <label id="create-invoice-customer-label" htmlFor="create-invoice-customer" className="fin-label">Customer</label>
-                  <Select value={form.customer} onValueChange={val => setForm(f => ({ ...f, customer: val }))}>
-                    <SelectTrigger id="create-invoice-customer" aria-labelledby="create-invoice-customer-label">
-                      <SelectValue placeholder="Select a customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label htmlFor="create-invoice-invoice_number" className="fin-label">
-                    Invoice number <span className="fin-label__hint">Suggested, you can change it</span>
-                  </label>
-                  <input id="create-invoice-invoice_number" className="fin-control qi-input" type="text" value={form.invoice_number} onChange={set('invoice_number')} />
+          <div className="fin-main-col">
+            <section className="card" aria-labelledby="create-invoice-details">
+              <div className="fin-panel-head">
+                <div className="fin-panel-head__text">
+                  <h2 id="create-invoice-details" className="fin-panel-title">Details</h2>
+                  {numberHint && <p className="fin-panel-desc">{numberHint}</p>}
                 </div>
               </div>
-              {/* Amount, due date, "Save as" and the description: three across
-                  with the description below when the card is wide, else two
-                  across ("Save as" beside the description), so the form ends
-                  level with the summary rail at every two-column width. */}
-              <div className="fin-form__row fin-form__row--3">
-                <div>
-                  <label htmlFor="create-invoice-amount" className="fin-label">Amount excl. VAT (ZAR)</label>
-                  <input id="create-invoice-amount" className="fin-control qi-input" type="number" inputMode="decimal" step="0.01" placeholder="0,00" value={form.amount} onChange={set('amount')} style={{ fontVariantNumeric: 'tabular-nums' }} />
-                </div>
-                <div className="fin-date-field">
-                  {/* Bound to the picker's text input, as every other field here is. */}
-                  <label htmlFor="create-invoice-due-date" className="fin-label">Due date</label>
-                  <DatePicker id="create-invoice-due-date" value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} />
-                </div>
-                <div>
-                  <label id="create-invoice-status-label" htmlFor="create-invoice-status" className="fin-label">Save as</label>
-                  <Select value={form.status} onValueChange={val => setForm(f => ({ ...f, status: val }))}>
-                    <SelectTrigger id="create-invoice-status" aria-labelledby="create-invoice-status-label">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="DRAFT">Draft, to send later</SelectItem>
-                      <SelectItem value="SENT">Sent, already with the customer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="fin-form__wide">
-                  <label htmlFor="create-invoice-description" className="fin-label">Description</label>
-                  <textarea id="create-invoice-description" className="fin-control qi-input" value={form.description} onChange={set('description')} rows={2} placeholder="e.g. Standby charge, 2 days at Durban port" />
+              <div className="fin-form">
+                <div className="fin-form__row fin-form__row--3">
+                  <div>
+                    <label id="create-invoice-customer-label" htmlFor="create-invoice-customer" className="fin-label">Customer</label>
+                    <Select value={customer} onValueChange={setCustomer}>
+                      <SelectTrigger id="create-invoice-customer" aria-labelledby="create-invoice-customer-label">
+                        <SelectValue placeholder="Select a customer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {customers.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.company_name || c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="fin-date-field">
+                    <label htmlFor="create-invoice-issue-date" className="fin-label">Issue date</label>
+                    <DatePicker id="create-invoice-issue-date" value={issueDate} onChange={setIssueDate} />
+                  </div>
+                  <div className="fin-date-field">
+                    <label htmlFor="create-invoice-due-date" className="fin-label">
+                      Due date {!dueTouched && selectedCustomer && termsDays(selectedCustomer.payment_terms_default) != null && <span className="fin-label__hint">From terms</span>}
+                    </label>
+                    <DatePicker id="create-invoice-due-date" value={dueDate} onChange={v => { setDueDate(v); setDueTouched(true); }} />
+                  </div>
+                  {!editing && (
+                    <div>
+                      <label id="create-invoice-status-label" htmlFor="create-invoice-status" className="fin-label">Save as</label>
+                      <Select value={status} onValueChange={v => setStatus(v as 'DRAFT' | 'SENT')}>
+                        <SelectTrigger id="create-invoice-status" aria-labelledby="create-invoice-status-label"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="DRAFT">Draft, to send later</SelectItem>
+                          <SelectItem value="SENT">Sent, already with the customer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="fin-form__wide">
+                    <label htmlFor="create-invoice-notes" className="fin-label">Notes <span className="fin-label__hint">Printed on the invoice</span></label>
+                    <textarea id="create-invoice-notes" className="fin-control qi-input" value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="e.g. PO 4500123, standby at Durban port" />
+                  </div>
                 </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          {/* Summary rail: sticky, one card with the total and the actions. */}
+            <section className="card fl-lines-card" aria-labelledby="create-invoice-lines">
+              <div className="fin-panel-head">
+                <div className="fin-panel-head__text">
+                  <h2 id="create-invoice-lines" className="fin-panel-title">Lines</h2>
+                  <p className="fin-panel-desc">{apiLines.length} {apiLines.length === 1 ? 'line' : 'lines'}, amounts excl. VAT</p>
+                </div>
+              </div>
+              <InvoiceLineEditor lines={lines} onChange={changeLines} codes={codes} defaultCode={defaultCode} />
+              {problems.length > 0 && (
+                <ul className="fin-help fin-text-danger" style={{ paddingLeft: 18, marginTop: 12 }}>
+                  {problems.map(p => <li key={p}>{p}</li>)}
+                </ul>
+              )}
+            </section>
+          </div>
+
           <aside className="fin-rail" aria-label="Invoice summary">
             <section className="card" aria-labelledby="create-invoice-total">
               <p id="create-invoice-total" className="fin-summary-card__label">
                 Total incl. VAT
-                <InfoTip>The amount is saved as the subtotal and VAT at 15% is added when the invoice is saved.</InfoTip>
+                <InfoTip>Worked out per line the way the server does it: discount first, then VAT on what is left, each rounded to the cent. The saved invoice shows the same figures.</InfoTip>
               </p>
-              <p className="fin-summary-card__figure">{formatCurrency(totalPreview)}</p>
+              <p className="fin-summary-card__figure">{formatCurrency(totals.total)}</p>
+              <TotalsBreakdown totals={totals} totalLabel="Total" />
               <dl className="fin-dl fin-summary-card__split">
-                <div className="fin-dl__row"><dt>Amount excl. VAT</dt><dd>{formatCurrency(subtotalPreview)}</dd></div>
-                <div className="fin-dl__row"><dt>VAT at 15%</dt><dd>{formatCurrency(vatPreview)}</dd></div>
-                <div className="fin-dl__row"><dt>Customer</dt><dd>{selectedCustomer ? selectedCustomer.name : 'Not selected'}</dd></div>
+                <div className="fin-dl__row"><dt>Customer</dt><dd>{selectedCustomer ? (selectedCustomer.company_name || selectedCustomer.name) : 'Not selected'}</dd></div>
               </dl>
 
               {error && <div className="fin-inset fin-text-danger" role="alert" style={{ fontSize: 13, lineHeight: '20px', marginTop: 12 }}>{error}</div>}
 
               <div className="fin-summary-card__actions">
-                {/* Phones: the head carries "Create invoice", so it shows once. */}
                 <button type="submit" className="tw-btn tw-btn--primary fin-rail-btn fin-hide-phone-create" style={{ width: '100%' }} disabled={!canSubmit || mutation.isPending}>
-                  {mutation.isPending ? 'Creating…' : 'Create invoice'}
+                  {submitLabel}
                 </button>
-                <button type="button" className="tw-btn tw-btn--ghost fin-rail-btn" style={{ width: '100%' }} onClick={() => navigate('/finance/invoices')}>
+                <button type="button" className="tw-btn tw-btn--ghost fin-rail-btn" style={{ width: '100%' }} onClick={() => navigate(backTo)}>
                   Cancel
                 </button>
-                {!canSubmit && (
-                  <p className="fin-help" style={{ margin: 0 }}>Needs a customer, an amount and a due date.</p>
-                )}
+                {!canSubmit && missing && <p className="fin-help" style={{ margin: 0 }}>Needs {missing}.</p>}
               </div>
             </section>
           </aside>

@@ -12,6 +12,7 @@ import DebtorsAge from '@/components/reports/DebtorsAge';
 import CustomerStatement from '@/components/reports/CustomerStatement';
 import { RevenueByCustomer, RevenueByLane, SalesByMonth } from '@/components/reports/RevenueReports';
 import { ExpenseReport, VatReport } from '@/components/reports/CostAndTax';
+import LaneMargin from '@/components/reports/LaneMargin';
 
 /* Finance > Reports: a library of accountant-grade statements built from the
    records TruckWys holds (invoices, payments, expenses, loads). Reports say
@@ -61,7 +62,7 @@ export default function FinanceReports() {
 }
 
 function Library() {
-  const { data } = useLedger(['invoices', 'payments', 'expenses', 'loads']);
+  const { data } = useLedger(['invoices', 'payments', 'expenses', 'loads', 'creditNotes']);
   return <ReportLibrary d={data} />;
 }
 
@@ -81,6 +82,7 @@ function Report({ id }: { id: ReportId }) {
       {id === 'statement' && <CustomerStatement d={data} company={company.data} />}
       {id === 'customers' && <RevenueByCustomer d={data} companyName={name} />}
       {id === 'lanes' && <RevenueByLane d={data} companyName={name} />}
+      {id === 'margin' && <LaneMargin companyName={name} />}
       {id === 'expenses' && <ExpenseReport d={data} companyName={name} />}
       {id === 'vat' && <VatReport d={data} companyName={name} vatNumber={company.data?.vat_number} />}
     </>

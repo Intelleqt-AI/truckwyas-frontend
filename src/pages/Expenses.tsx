@@ -23,8 +23,14 @@ import { Segmented } from '@/components/ui/Segmented';
 import { StatusChip } from '@/components/ui/StatusChip';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import '@/components/finance/finance-ledger.css';
+import { SupplierPicker } from '@/components/finance/SupplierPicker';
+import { CATEGORY_FILTERS, EXPENSE_CATEGORIES, categoryLabel } from '@/lib/finance/categories';
+import { useTaxCodes } from '@/lib/finance/api';
+import { normaliseDecimalInput, subtractDecimals, taxCodeShort, toNumber, vatFromGross } from '@/lib/finance/tax';
+import type { ExpenseTaxFields, TaxCode } from '@/lib/finance/types';
 
-interface Expense {
+interface Expense extends ExpenseTaxFields {
   id: number;
   expense_number?: string;
   category: string;
@@ -58,22 +64,14 @@ const amountOf = (e: Pick<Expense, 'amount'>) => {
 const formatStatus = (s?: string) =>
   s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
 
-// Filter / display categories. DRIVER is a legacy value still present in
-// stored data; new expenses use the API's DRIVER_COST choice.
-const CATS = [
-  { value: 'All', label: 'All categories' },
-  { value: 'FUEL', label: 'Fuel' },
-  { value: 'TOLLS', label: 'Tolls' },
-  { value: 'MAINTENANCE', label: 'Maintenance' },
-  { value: 'DRIVER_COST', label: 'Driver cost' },
-  { value: 'DRIVER', label: 'Driver' },
-  { value: 'INSURANCE', label: 'Insurance' },
-  { value: 'OVERHEAD', label: 'Overhead' },
-  { value: 'OTHER', label: 'Other' },
-];
+// Filter / display categories (lib/finance/categories). DRIVER is a legacy
+// value still present in stored data; new expenses use DRIVER_COST.
+const CATS = CATEGORY_FILTERS;
 // Choices accepted by POST/PUT /api/v1/expenses/.
-const FORM_CATS = CATS.filter(c => c.value !== 'All' && c.value !== 'DRIVER');
-const catLabel = (v: string) => CATS.find(c => c.value === v)?.label ?? formatStatus(v);
+const FORM_CATS = EXPENSE_CATEGORIES;
+const catLabel = (v: string) => categoryLabel(v);
+/** The supplier record's name, else the old free-text vendor. */
+const supplierOf = (e: Expense) => e.supplier_name || e.vendor || '';
 
 const DATE_FILTERS = [
   { value: 'all', label: 'All dates' },
@@ -190,6 +188,7 @@ export default function Expenses() {
     const srchOk = !q
       || e.description?.toLowerCase().includes(q)
       || e.vendor?.toLowerCase().includes(q)
+      || e.supplier_name?.toLowerCase().includes(q)
       || e.expense_number?.toLowerCase().includes(q);
     const statOk = statusFilter === 'ALL' || (e.status || 'PENDING').toUpperCase() === statusFilter;
 
@@ -244,15 +243,18 @@ export default function Expenses() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Date', 'Category', 'Description', 'Vehicle', 'Amount', 'Status'];
+    const headers = ['Date', 'Category', 'Description', 'Supplier', 'Vehicle', 'Tax code', 'Amount incl. VAT', 'VAT', 'Status'];
     const csvRows = [
       headers.join(','),
       ...sorted.map(e => [
         formatDate(e.expense_date || e.date),
         e.category,
-        `"${e.description}"`,
+        `"${(e.description || '').replace(/"/g, '""')}"`,
+        `"${supplierOf(e).replace(/"/g, '""')}"`,
         e.vehicle_registration || '',
+        e.tax_code || '',
         e.amount,
+        e.vat_amount ?? '',
         e.status || 'PENDING',
       ].join(','))
     ];
@@ -302,7 +304,7 @@ export default function Expenses() {
       <SearchInput
         wrapClassName="exp-search"
         placeholder="Search expenses"
-        aria-label="Search expenses by description, vendor or reference"
+        aria-label="Search expenses by description, supplier or reference"
         value={search}
         onChange={e => { setSearch(e.target.value); resetPage(); }}
       />
@@ -546,6 +548,7 @@ export default function Expenses() {
                 <th>Date</th>
                 <th className="fin-cell-fill">Expense</th>
                 <th>Category</th>
+                <th className="fin-col-mid">Supplier</th>
                 <th className="fin-col-mid">Vehicle</th>
                 <th>Status</th>
                 <th className="num">Amount</th>
@@ -555,7 +558,7 @@ export default function Expenses() {
             <tbody>
               {rows.length === 0 ? (
                 <tr className="is-empty">
-                  <td colSpan={7} style={{ padding: 0 }}>
+                  <td colSpan={8} style={{ padding: 0 }}>
                     {isError ? (
                       <div className="fin-empty">
                         <p className="fin-empty__title">Couldn’t load expenses</p>
@@ -582,14 +585,19 @@ export default function Expenses() {
                     <td className="fin-strong m-party m-span2 fin-cell-2 fin-cell-fill">
                       <div className="fin-truncate fin-truncate--fill" title={exp.description}>{exp.description}</div>
                       <span className="fin-cell-sub">
-                        <span className="fin-mobile-only">{formatDate(exp.expense_date || exp.date)} · {catLabel(exp.category)}</span>
+                        <span className="fin-mobile-only">{formatDate(exp.expense_date || exp.date)} · {catLabel(exp.category)}{supplierOf(exp) ? ` · ${supplierOf(exp)}` : ''}</span>
                         <span className="m-hide-inline">{exp.expense_number ? <span className="fin-id">{exp.expense_number}</span> : 'No reference'}</span>
                       </span>
                     </td>
                     <td className="m-hide" style={{ whiteSpace: 'nowrap' }}>{catLabel(exp.category)}</td>
+                    <td className="m-hide fin-col-mid"><div className="fin-truncate" title={supplierOf(exp)}>{supplierOf(exp) || '—'}</div></td>
                     <td className="m-hide fin-col-mid fin-nowrap">{vehicleLabel(exp)}</td>
                     <td className="m-status"><StatusChip status={status} size="sm" /></td>
-                    <td className="num m-amount" title={formatCurrency(amountOf(exp))}>{wholeRand(amountOf(exp))}</td>
+                    <td className={`num m-amount${toNumber(exp.vat_amount) > 0 ? ' fin-cell-2' : ''}`} title={`${formatCurrency(amountOf(exp))} incl. VAT`}>
+                      {wholeRand(amountOf(exp))}
+                      {/* Input VAT inside the amount, when there is any to claim. */}
+                      {toNumber(exp.vat_amount) > 0 && <span className="fin-cell-sub" title={`${taxCodeShort(exp.tax_code)}: ${formatCurrency(exp.vat_amount)} VAT`}>VAT {formatCurrency(exp.vat_amount)}</span>}
+                    </td>
                     <td className="actions">
                       <RowActions
                         label={`Expense ${exp.expense_number || exp.description || exp.id}`}
@@ -653,7 +661,17 @@ function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expen
   const [date, setDate] = useState(expense?.expense_date || expense?.date || localDateISO());
   const [description, setDescription] = useState(expense?.description || '');
   const [vehicleId, setVehicleId] = useState(expense?.vehicle ? String(expense.vehicle) : '');
-  const [vendor, setVendor] = useState(expense?.vendor || '');
+  const vendor = expense?.vendor || '';
+  const [supplierId, setSupplierId] = useState<number | null>(expense?.supplier ?? null);
+  const [categoryTouched, setCategoryTouched] = useState(!!expense);
+  const { codes, defaultCode } = useTaxCodes();
+  const [taxCode, setTaxCode] = useState<TaxCode>(expense?.tax_code ?? defaultCode);
+  // VAT follows the amount (gross × 15 ÷ 115 for standard rate) until the
+  // user types their own figure. A saved figure that differs from the
+  // calculation was typed, so it stays typed.
+  const savedVatTyped = !!expense && (expense.tax_code ?? 'STANDARD') === 'STANDARD' && expense.vat_amount != null && expense.vat_amount !== ''
+    && Math.abs(toNumber(expense.vat_amount) - toNumber(vatFromGross(String(expense.amount ?? 0), expense.tax_code ?? 'STANDARD'))) > 0.004;
+  const [vatOverride, setVatOverride] = useState<string | null>(savedVatTyped ? String(expense!.vat_amount) : null);
   const [receiptNumber, setReceiptNumber] = useState(expense?.receipt_number || '');
   const [notes, setNotes] = useState(expense?.notes ? expense.notes.replace(FUEL_NOTE, '') : '');
   const [litres, setLitres] = useState(fuelMatch ? parseLocaleNumber(fuelMatch[1]) : '');
@@ -691,9 +709,12 @@ function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expen
       expense_date: date,
       description,
       vehicle: vehicleId ? parseInt(vehicleId) : null,
+      supplier: supplierId,
+      tax_code: taxCode,
     };
-    // Optional text fields: send when filled, or when clearing a stored value.
-    if (vendor || expense?.vendor) data.vendor = vendor;
+    // Omitted, the server works VAT out from the amount; a typed figure is sent.
+    // Only standard-rated expenses carry input VAT (the server refuses VAT on other codes).
+    if (vatOverride != null && taxCode === 'STANDARD') data.vat_amount = normaliseDecimalInput(vatOverride) || '0';
     if (receiptNumber || expense?.receipt_number) data.receipt_number = receiptNumber;
     let fullNotes = notes;
     if (fuelComputed) {
@@ -711,8 +732,10 @@ function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expen
         toast.success('Expense added');
       }
       onSaved();
-    } catch {
-      toast.error('Could not save the expense. Check the fields and try again.');
+    } catch (err) {
+      toast.error(err instanceof Error && err.message && !/^HTTP error/.test(err.message)
+        ? err.message
+        : 'Could not save the expense. Check the fields and try again.');
       setSubmitting(false);
     }
   };
@@ -729,7 +752,7 @@ function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expen
         <form onSubmit={handleSubmit} className="fin-form">
           <div>
             <label className="fin-label" id="exp-cat-label">Category</label>
-            <Select value={category} onValueChange={setCategory}>
+            <Select value={category} onValueChange={v => { setCategory(v); setCategoryTouched(true); }}>
               <SelectTrigger aria-labelledby="exp-cat-label">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
@@ -758,7 +781,7 @@ function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expen
           )}
           <div className="fin-form__row">
             <div>
-              <label className="fin-label" htmlFor="exp-amount">Amount (ZAR)</label>
+              <label className="fin-label" htmlFor="exp-amount">Amount incl. VAT (ZAR)</label>
               <input id="exp-amount" className="fin-control" type="number" step="0.01" inputMode="decimal" placeholder="0.00" value={amount}
                 onChange={e => setAmount(e.target.value)} readOnly={fuelComputed} required aria-describedby={fuelComputed ? 'exp-amount-help' : undefined}
                 style={{ fontVariantNumeric: 'tabular-nums' }} />
@@ -789,8 +812,46 @@ function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expen
               </Select>
             </div>
             <div>
-              <label className="fin-label" htmlFor="exp-vendor">Vendor (optional)</label>
-              <input id="exp-vendor" className="fin-control" type="text" value={vendor} onChange={e => setVendor(e.target.value)} placeholder="e.g. Shell, Engen" />
+              <label className="fin-label" id="exp-supplier-label">Supplier (optional)</label>
+              <SupplierPicker
+                labelId="exp-supplier-label"
+                value={supplierId}
+                fallbackName={vendor}
+                category={category}
+                onChange={sup => {
+                  setSupplierId(sup?.id ?? null);
+                  // A new expense starts in the supplier's usual category.
+                  if (sup?.category && !categoryTouched) setCategory(sup.category);
+                }}
+              />
+            </div>
+          </div>
+          <div className="fin-form__row">
+            <div>
+              <label className="fin-label" id="exp-tax-label">Tax code</label>
+              <Select value={taxCode} onValueChange={v => { setTaxCode(v as TaxCode); if (v !== 'STANDARD') setVatOverride(null); }}>
+                <SelectTrigger aria-labelledby="exp-tax-label"><SelectValue /></SelectTrigger>
+                <SelectContent>{codes.map(c => <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="fin-label" htmlFor="exp-vat">
+                VAT included (ZAR) {vatOverride == null && <span className="fin-label__hint">Calculated</span>}
+              </label>
+              <input id="exp-vat" className="fin-control" type="text" inputMode="decimal"
+                value={vatOverride ?? vatFromGross(normaliseDecimalInput(amount) || '0', taxCode, codes)}
+                onChange={e => setVatOverride(e.target.value)} aria-describedby="exp-vat-help"
+                readOnly={taxCode !== 'STANDARD'}
+                style={{ fontVariantNumeric: 'tabular-nums' }} />
+              <p id="exp-vat-help" className="fin-help">
+                {(() => {
+                  const vat = vatOverride != null ? (normaliseDecimalInput(vatOverride) || '0') : vatFromGross(normaliseDecimalInput(amount) || '0', taxCode, codes);
+                  const net = subtractDecimals(normaliseDecimalInput(amount) || '0', vat);
+                  return <>Excl. VAT {formatCurrency(net)}. {vatOverride != null
+                    ? <button type="button" className="exp-stat-link" onClick={() => setVatOverride(null)}>Use the calculated VAT</button>
+                    : taxCode === 'STANDARD' ? 'Amount × 15 ÷ 115; type to change it.' : 'No VAT on this code.'}</>;
+                })()}
+              </p>
             </div>
           </div>
           <div>

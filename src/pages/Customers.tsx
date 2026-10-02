@@ -26,8 +26,11 @@ import { useAuth } from '@/lib/AuthContext';
 import RowActions from '@/components/ui/RowActions';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import { CustomerTaxFields } from '@/components/finance/CustomerTaxFields';
+import { customerTaxFrom, customerTaxPayload, customerTaxProblem } from '@/lib/finance/customerTax';
+import type { CustomerTaxFields as CustomerTaxApiFields } from '@/lib/finance/types';
 
-interface Customer {
+interface Customer extends CustomerTaxApiFields {
   id: number;
   name: string;
   company_name?: string;
@@ -87,6 +90,7 @@ const EMPTY_FORM = {
   city: "", state: "", address: "", zip_code: "",
   billing_address: "", payment_terms_default: "NET30",
   credit_limit: "" as string | number, status: "ACTIVE",
+  vat_number: "", registration_number: "", country: "ZA",
 };
 
 export default function Customers() {
@@ -247,6 +251,7 @@ export default function Customers() {
       payment_terms_default: c.payment_terms_default || "NET30",
       credit_limit: c.credit_limit ?? "",
       status: customerStatus(c),
+      ...customerTaxFrom(c),
     });
   }
 
@@ -519,6 +524,14 @@ export default function Customers() {
               </div>
             ))}
 
+            <CustomerTaxFields
+              idPrefix="cu-add"
+              value={customerTaxFrom(addForm)}
+              onChange={v => setAddForm(prev => ({ ...prev, ...v }))}
+              fieldStyle={fieldStyle}
+              labelStyle={labelStyle}
+            />
+
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle}>Payment terms</label>
               <Select value={addForm.payment_terms_default} onValueChange={val => setAddForm(prev => ({ ...prev, payment_terms_default: val }))}>
@@ -552,9 +565,11 @@ export default function Customers() {
                     toast.warning("Name and email are required");
                     return;
                   }
+                  const taxProblem = customerTaxProblem(customerTaxFrom(addForm));
+                  if (taxProblem) { toast.warning(taxProblem); return; }
                   setSaving(true);
                   try {
-                    const payload: any = { ...addForm };
+                    const payload: any = { ...addForm, ...customerTaxPayload(customerTaxFrom(addForm)) };
                     if (payload.credit_limit === "") delete payload.credit_limit;
                     else if (payload.credit_limit) payload.credit_limit = parseFloat(String(payload.credit_limit));
                     await postData({ url: "api/v1/customers/", data: payload });
@@ -620,6 +635,14 @@ export default function Customers() {
               </div>
             ))}
 
+            <CustomerTaxFields
+              idPrefix="cu-edit"
+              value={customerTaxFrom(editForm)}
+              onChange={v => setEditForm((prev: Record<string, unknown>) => ({ ...prev, ...v }))}
+              fieldStyle={fieldStyle}
+              labelStyle={labelStyle}
+            />
+
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle}>Payment terms</label>
               <Select value={editForm.payment_terms_default ?? "NET30"} onValueChange={val => setEditForm((prev: any) => ({ ...prev, payment_terms_default: val }))}>
@@ -662,9 +685,11 @@ export default function Customers() {
               <button
                 disabled={saving}
                 onClick={async () => {
+                  const taxProblem = customerTaxProblem(customerTaxFrom(editForm));
+                  if (taxProblem) { toast.warning(taxProblem); return; }
                   setSaving(true);
                   try {
-                    const payload: any = { ...editForm };
+                    const payload: any = { ...editForm, ...customerTaxPayload(customerTaxFrom(editForm)) };
                     if (payload.credit_limit === "") payload.credit_limit = null;
                     else if (payload.credit_limit) payload.credit_limit = parseFloat(String(payload.credit_limit));
                     payload.is_active = payload.status !== "INACTIVE";

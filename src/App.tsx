@@ -64,6 +64,9 @@ const CustomerDetail = lazy(() => import('./pages/CustomerDetail'));
 const Invoices = lazy(() => import('./pages/Invoices'));
 const InvoiceDetail = lazy(() => import('./pages/InvoiceDetail'));
 const CreateInvoice = lazy(() => import('./pages/CreateInvoice'));
+const CreditNotes = lazy(() => import('./pages/CreditNotes'));
+const CreditNoteDetail = lazy(() => import('./pages/CreditNoteDetail'));
+const Suppliers = lazy(() => import('./pages/Suppliers'));
 const Expenses = lazy(() => import('./pages/Expenses'));
 const FinanceReports = lazy(() => import('./pages/FinanceReports'));
 const Capital = lazy(() => import('./pages/Capital'));
@@ -297,7 +300,11 @@ const App = () => (
                 <Route path="/finance/invoices" element={<Invoices />} />
                 <Route path="/finance/invoices/new" element={<CreateInvoice />} />
                 <Route path="/finance/invoices/:id" element={<InvoiceDetail />} />
+                <Route path="/finance/invoices/:id/edit" element={<CreateInvoice />} />
+                <Route path="/finance/credit-notes" element={<CreditNotes />} />
+                <Route path="/finance/credit-notes/:id" element={<CreditNoteDetail />} />
                 <Route path="/finance/expenses" element={<Expenses />} />
+                <Route path="/finance/suppliers" element={<Suppliers />} />
                 <Route path="/finance/reports" element={<FinanceReports />} />
 
                 {/* Customers */}

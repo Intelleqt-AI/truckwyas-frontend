@@ -25,6 +25,9 @@ import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import { fetchAllPages } from '@/components/insights/findings';
 import { staleWork, staleLabel } from './bookings-stale';
 import { RecordId } from './recordNo';
+import { CustomerTaxFields } from '@/components/finance/CustomerTaxFields';
+import { customerTaxFrom, customerTaxPayload, customerTaxProblem } from '@/lib/finance/customerTax';
+import { countryLabel } from '@/lib/finance/validation';
 
 type OpenLoad = {
   id: number; customer?: number | null; status: string; load_number: string; total_amount?: string;
@@ -211,6 +214,7 @@ export default function CustomerDetail() {
       payment_terms_default: customer.payment_terms_default || "NET30",
       credit_limit: customer.credit_limit ?? "",
       status: isActive ? "ACTIVE" : "INACTIVE",
+      ...customerTaxFrom(customer),
     });
     setShowEdit(true);
   }
@@ -229,9 +233,11 @@ export default function CustomerDetail() {
   }
 
   async function handleSave() {
+    const taxProblem = customerTaxProblem(customerTaxFrom(editForm));
+    if (taxProblem) { toast.warning(taxProblem); return; }
     setSaving(true);
     try {
-      const payload: any = { ...editForm };
+      const payload: any = { ...editForm, ...customerTaxPayload(customerTaxFrom(editForm)) };
       if (payload.credit_limit === "") payload.credit_limit = null;
       else if (payload.credit_limit) payload.credit_limit = parseFloat(String(payload.credit_limit));
       payload.is_active = payload.status !== "INACTIVE";
@@ -345,6 +351,9 @@ export default function CustomerDetail() {
                 { label: "Postal code", value: customer.zip_code },
                 { label: "Address", value: customer.address, wide: true },
                 { label: "Billing address", value: customer.billing_address || customer.address, wide: true },
+                { label: "Country", value: customer.country ? countryLabel(customer.country) : undefined },
+                { label: "VAT number", value: customer.vat_number },
+                { label: "Registration number", value: customer.registration_number },
               ].map((r: { label: string; value?: string; wide?: boolean }) => (
                 <div key={r.label} className={r.wide ? 'bk-fact--wide' : undefined}>
                   <dt className="bk-fact__label">{r.label}</dt>
@@ -608,6 +617,14 @@ export default function CustomerDetail() {
                 />
               </div>
             ))}
+
+            <CustomerTaxFields
+              idPrefix="cd-edit"
+              value={customerTaxFrom(editForm)}
+              onChange={v => setEditForm((p: Record<string, unknown>) => ({ ...p, ...v }))}
+              fieldStyle={fieldStyle}
+              labelStyle={labelStyle}
+            />
 
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle} id="cd-edit-terms">Payment terms</label>

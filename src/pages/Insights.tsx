@@ -161,7 +161,7 @@ function MarginTab({ period, setPeriod, customFrom, setCustomFrom, customTo, set
             <input type="month" className="tw-input insights-month" aria-label="To month" value={p.to} min={p.from} onChange={e => e.target.value && setCustomTo(e.target.value)} />
           </span>
         )}
-        <span className="tw-toolbar__meta">Excl. VAT, cash basis, as in the P&amp;L</span>
+        <span className="tw-toolbar__meta">Excl. VAT, cash basis (received), as in the P&amp;L</span>
       </div>
       {(ledger.loading || ledger.error || !ledger.data) ? (
         ledger.loading || !ledger.error
@@ -171,7 +171,6 @@ function MarginTab({ period, setPeriod, customFrom, setCustomFrom, customTo, set
         const r = marginFromLedger(ledger.data, p);
         const { shown, before, after } = chartMonths(r.months);
         const span = periodText(p);
-        const withPending = r.net - r.pending;
         const partial = ledger.data.partial.length ? ` Based on the ${ledger.data.partial.join(', ')}.` : '';
         const crossYear = shown.length > 0 && shown[0].ym.slice(0, 4) !== shown[shown.length - 1].ym.slice(0, 4);
         const label = (ym: string, k: number) => (crossYear && (k === 0 || ym.endsWith('-01')) ? monthYear(ym) : monthName(ym));
@@ -187,24 +186,22 @@ function MarginTab({ period, setPeriod, customFrom, setCustomFrom, customTo, set
           <>
             <InsightCard
               title="Profit this period"
-              description={`${span} · excl. VAT, cash basis`}
-              info={`The Profit and loss report's default basis, from the same ledgers. Revenue: money received from customers by payment date, less the VAT share of each invoice. Costs: approved expenses by expense date. Pending costs are expenses dated in the period still waiting for approval; the P&L lists them below the result and does not deduct them.${partial}`}
+              description={`${span} · excl. VAT, cash (received)`}
+              info={`The Profit and loss report's default basis, from the same ledgers. Revenue: money received from customers by payment date, less the VAT share of each invoice (overpayments are not revenue). Costs: every expense that is not rejected, approved or still awaiting approval, by expense date, excl. its input VAT; the part awaiting approval is shown separately for information.${partial}`}
               action={<Link className="ic-text-button" to={plHref}>Open the P&amp;L</Link>}
             >
               {r.revenue === 0 && r.costs === 0 && r.pending === 0 ? (
                 <div className="insights-empty">
-                  <p>Nothing received or approved in {span}.</p>
+                  <p>Nothing received or spent in {span}.</p>
                   {period !== 'last-12' && <button type="button" className="ic-text-button" onClick={() => setPeriod('last-12')}>Show the last 12 months</button>}
                 </div>
               ) : (
                 <>
                   <dl className="ic-kpis ic-kpis--4 insights-kpis">
                     <KpiTile label="Revenue" value={rand(r.revenue, 0)} note={plural(r.paymentCount, 'payment')} />
-                    <KpiTile label="Approved costs" value={rand(r.costs, 0)} />
+                    <KpiTile label="Costs excl. VAT" value={rand(r.costs, 0)} note={r.pending > 0 ? `Includes ${rand(r.pending, 0)} awaiting approval` : undefined} />
                     <KpiTile label="Net margin" value={r.pct != null ? formatPercent(r.pct) : rand(r.net, 0)} tone={r.net < 0 ? 'danger' : undefined} note={r.pct != null ? rand(r.net, 0) : undefined} />
-                    {r.pending > 0
-                      ? <KpiTile label="With pending costs" value={rand(withPending, 0)} tone={withPending < 0 ? 'danger' : undefined} note={`${rand(r.pending, 0)} not approved (${r.pendingCount})`} />
-                      : <KpiTile label="Pending costs" value={rand(0, 0)} note="Every cost is approved" />}
+                    <KpiTile label="Awaiting approval" value={rand(r.pending, 0)} note={r.pending > 0 ? `${plural(r.pendingCount, 'expense')}, already in costs` : 'Every cost is approved'} />
                   </dl>
                   {/* The tiles above carry every figure; the bridge shows the shape, values live in the tooltip and table. */}
                   <Waterfall
@@ -212,15 +209,11 @@ function MarginTab({ period, setPeriod, customFrom, setCustomFrom, customTo, set
                     values="none"
                     valueHeader="Amount"
                     caption={`Revenue, costs and net margin, ${span}, excl. VAT, cash basis`}
-                    ariaLabel={`Revenue ${rand(r.revenue)}, minus approved costs ${rand(r.costs)}, leaves ${rand(r.net)}.${r.pending > 0 ? ` Pending costs of ${rand(r.pending)} would leave ${rand(withPending)}.` : ''}`}
+                    ariaLabel={`Revenue ${rand(r.revenue)}, minus costs ${rand(r.costs)}, leaves ${rand(r.net)}.${r.pending > 0 ? ` Costs include ${rand(r.pending)} awaiting approval.` : ''}`}
                     steps={[
                       { label: 'Revenue', value: r.revenue, kind: 'total' },
-                      { label: 'Approved costs', value: -r.costs, kind: 'delta', tone: 'cost' },
+                      { label: 'Costs', value: -r.costs, kind: 'delta', tone: 'cost' },
                       { label: 'Net margin', value: r.net, kind: 'total' },
-                      ...(r.pending > 0 ? [
-                        { label: 'Pending costs', value: -r.pending, kind: 'delta' as const, tone: 'cost' as const },
-                        { label: 'If approved', value: withPending, kind: 'total' as const },
-                      ] : []),
                     ]}
                   />
                 </>
@@ -230,8 +223,8 @@ function MarginTab({ period, setPeriod, customFrom, setCustomFrom, customTo, set
             {shown.length > 1 && (
               <InsightCard
                 title="Net margin by month"
-                description="Each month's revenue less approved costs"
-                info={`Each month's revenue (money received, excl. VAT) less approved expenses, added to the months before. The bars add up to the period's net margin above and to the Net profit line of the P&L.${partial}`}
+                description="Each month's revenue less costs"
+                info={`Each month's revenue (money received, excl. VAT) less expenses that are not rejected (excl. VAT), added to the months before. The bars add up to the period's net margin above and to the Net profit line of the P&L.${partial}`}
               >
                 <Waterfall
                   height={260}

@@ -5,7 +5,7 @@ import { fetchData } from '@/lib/Api';
 import { AlertTriangle, CheckCircle2, ChevronLeft, Info, X, XCircle } from 'lucide-react';
 import { AccountingProviderCards, ComingSoonNote } from '@/components/accounting/AccountingProviderCards';
 import {
-  ACCT_KEYS, ACCT_URL, apiMessage, apiStatus, callbackMessage, type Reconciliation, invalidateAccounting, providerBySlug, providerConfig, useAccountingConnection,
+  ACCT_KEYS, ACCT_URL, apiMessage, providerBlockers, apiStatus, callbackMessage, type Reconciliation, invalidateAccounting, providerBySlug, providerConfig, useAccountingConnection,
 } from '@/lib/accounting';
 import { SettingsShell } from './SettingsShell';
 import { SettingsPageHeader, settingsCardStyle } from './settingsUi';
@@ -43,7 +43,7 @@ export default function AccountingIntegration() {
     const result = params.get('result') ?? (params.get('xero') === 'connected' ? 'connected' : params.get('xero') === 'error' ? 'error' : null);
     if (!result) return;
     const provider = providerBySlug(params.get('provider')) ?? providerConfig('XERO');
-    setBanner(callbackMessage(result, params.get('reason'), provider.short));
+    setBanner(callbackMessage(result, params.get('reason'), provider.short, provider.orgWord));
     invalidateAccounting(qc);
     const next = new URLSearchParams(params);
     ['provider', 'result', 'reason', 'xero'].forEach(k => next.delete(k));
@@ -158,7 +158,7 @@ export default function AccountingIntegration() {
           <ol className="acct-check">
             {[
               ['Sign in', 'Allow TruckWys access to your books.'],
-              ['Map accounts and VAT', 'Pick the income account and VAT rate for each kind of charge, and where supplier bills go.'],
+              ['Map accounts and VAT', 'Pick where each kind of charge and supplier bill goes in your books, and the VAT rate for each.'],
               ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
               ['Choose a start date', 'We send documents from that date. Anything earlier should already be in your books.'],
             ].map(([t, d], i) => (
@@ -184,7 +184,7 @@ export default function AccountingIntegration() {
   } else {
     body = (
       <>
-        <ConnectionHeader connection={live} compact onOpenTab={openTab} />
+        <ConnectionHeader connection={live} compact onOpenTab={openTab} hideOpen={tab === 'setup' && providerBlockers(live.readiness).length > 0} />
         <div className="acct-tabs">
           <div className="section-header__tabs acct-utabs" role="tablist" ref={tabsRef} aria-label={`${cfg!.short} settings`}>
             {ACCOUNTING_TABS.map(t => {

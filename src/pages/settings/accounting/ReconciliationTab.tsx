@@ -88,7 +88,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
             ) : (
               <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}</p>
             )}
-            <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}>Checked {formatDateTime(last.ran_at)} · <span style={{ whiteSpace: 'nowrap' }}>next check tomorrow at {nextCheck(last.ran_at)}</span></p>
+            <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}><span className="acct-nowrap">Checked {formatDateTime(last.ran_at)}</span><span className="acct-dotsep" aria-hidden="true"> · </span><span className="acct-nowrap acct-block-phone">Checks again nightly at {nextCheck(last.ran_at)}</span></p>
             <div className="acct-tiles acct-tiles--3">
               {SCOPES.map(sc => {
                 const n = sc.scope === 'INVOICE' ? last.checked.invoices : sc.scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;
@@ -147,9 +147,9 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                         {d.local_url ? <Link className="acct-link" to={d.local_url}>{head}</Link> : <span className="acct-row__title">{head}</span>}
                         {rest.length > 0 && <span className="acct-row__sub"> · {rest.join(' · ')}</span>}
                       </span>
-                      <strong className={`acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <span className="acct-diff-word">Differs</span>}</strong>
+                      <strong className={`acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <span className="acct-diff-word">Status differs</span>}</strong>
                     </div>
-                    <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)}</div>
+                    <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)} differs</div>
                     <dl className="acct-diff-kv"><dt>TruckWys</dt><dd>{showValue(d.truckwys)}</dd><dt>{cfg.short}</dt><dd>{showValue(d.provider)}</dd></dl>
                     {d.provider_url && <a className="acct-link" style={{ fontSize: 13 }} href={d.provider_url} target="_blank" rel="noopener noreferrer">Open in {cfg.short} <ExternalLink size={12} aria-hidden="true" /></a>}
                   </li>
@@ -187,7 +187,7 @@ function DiffRow({ d, providerName, hasLinks }: { d: ReconDifference; providerNa
       </td>
       <td className="num">{showValue(d.truckwys)}</td>
       <td className="num">{showValue(d.provider)}</td>
-      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <span className="acct-diff-word">Differs</span>}</td>
+      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <span className="acct-diff-word">Status differs</span>}</td>
       {hasLinks && (
         <td>
           {d.provider_url && (

@@ -823,3 +823,14 @@
 /* Finished steps: a quiet link-weight action, never a full-width button. */
 .acct-check--steps li > .acct-step-done-btn { min-width: 0 !important; color: var(--text-secondary); }
 @media (max-width: 560px) { .acct-check--steps li > .acct-step-done-btn { justify-self: start !important; width: auto !important; padding-left: 0; } }
+/* Last QBO-round shared fixes */
+.acct-nowrap { white-space: nowrap; }
+@media (max-width: 640px) { .acct-dotsep { display: none; } .acct-block-phone { display: block; } }
+.acct-source-note--line { display: block !important; }
+.acct-optional { color: var(--text-secondary) !important; }
+.acct-check--steps li > .acct-step-done-btn { height: 32px; min-height: 32px; color: var(--text-primary); }
+@media (max-width: 560px) { .acct-check--steps li > .acct-step-done-btn { padding-left: 12px; margin-top: 4px; } }
+@media (max-width: 640px) {
+  .acct-tiles:not(.acct-tiles--3) > div { border: 0 !important; }
+  .acct-tiles:not(.acct-tiles--3) { row-gap: 8px; }
+}

@@ -200,7 +200,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         </div>
       );
     }
-    if (requiredGap(section, key)) return <div className="acct-hint is-required">Required. No suggestion for this one.</div>;
+    if (requiredGap(section, key)) return <div className="acct-hint is-required">Required.</div>;
     return null;
   };
   const isOptional = (section: MappingSection, key: string) => !(m.missing ?? []).includes(`${PREFIX[section]}:${key}`);

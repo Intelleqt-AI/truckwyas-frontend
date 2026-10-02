@@ -198,7 +198,14 @@ export const settingsDangerButtonStyle: React.CSSProperties = {
 /** Standard settings section title block (one h1 + supporting line). Same
  * geometry and type as the shared SectionHeader (28/34 title, one grey line,
  * actions on the title row), so every page head in the product matches. */
-export function SettingsPageHeader({ title, description, actions }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode }) {
+export function SettingsPageHeader({ title, description, actions, subPage = false }: {
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  actions?: React.ReactNode;
+  /** A sub-page whose subtitle is a back link: on phones the back link is the
+   *  way out, so the section picker is left off (no two navs stacked). */
+  subPage?: boolean;
+}) {
   // Inside the settings shell the head is portalled into the shell's head
   // slot, above the sub-nav, so the H1 sits where it does on every page.
   const shell = useSettingsShell();
@@ -217,5 +224,5 @@ export function SettingsPageHeader({ title, description, actions }: { title: Rea
   );
   if (!shell) return head;
   if (!shell.slot) return null;
-  return createPortal(<>{head}{shell.phoneNav}</>, shell.slot);
+  return createPortal(<>{head}{subPage ? null : shell.phoneNav}</>, shell.slot);
 }

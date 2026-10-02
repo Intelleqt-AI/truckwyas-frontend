@@ -169,7 +169,7 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
         <div className="acct-card__chip">
           {loading
             ? <span className="tw-status" style={{ visibility: 'hidden' }} aria-hidden="true">Setup needed</span>
-            : chip ? <StatusChip tone={chip.tone} label={chip.label} /> : <StatusChip status="DISCONNECTED" />}
+            : chip ? <StatusChip tone={chip.tone} label={chip.label} /> : hideManage ? null : <StatusChip status="DISCONNECTED" />}
         </div>
       </div>
       {actions && <div className="acct-card__actions">{actions}</div>}

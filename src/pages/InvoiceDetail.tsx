@@ -1020,7 +1020,7 @@ export default function InvoiceDetail() {
           )}
 
           {/* Where the balance comes from, once anything has been paid or credited. */}
-          {!isDraft && !isVoid && (credited > 0.005 || num(invoice.paid_amount) > 0.005) && (
+          {!isDraft && !isVoid && !partPaid && (credited > 0.005 || num(invoice.paid_amount) > 0.005) && (
             <section className="card" aria-labelledby="balance-title">
               <div className="fin-panel-head" style={{ marginBottom: 4 }}>
                 <div className="fin-panel-head__text">

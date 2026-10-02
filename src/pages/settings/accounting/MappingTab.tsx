@@ -171,7 +171,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
     );
   }
   if (q.isError || !m) {
-    return <AcctCard title="Accounts and VAT"><ErrorBlock message={apiMessage(q.error, "Couldn't load the mapping.")} onRetry={() => q.refetch()} /></AcctCard>;
+    return <AcctCard title="Mapping"><ErrorBlock message={apiMessage(q.error, "Couldn't load the mapping.")} onRetry={() => q.refetch()} /></AcctCard>;
   }
 
   const accounts = m.options.accounts ?? [];
@@ -192,7 +192,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
       return (
         <div className={`acct-hint${requiredGap(section, key) ? ' is-required' : ''}`}>
           <span>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {describe(s)}.{' '}
-            {canWrite && <button type="button" className="acct-linkbtn" onClick={() => setSection(section, key, s)}>Use it</button>}
+            {canWrite && <button type="button" className="tw-btn tw-btn--sm acct-use-btn" onClick={() => setSection(section, key, s)}>Use it</button>}
           </span>
         </div>
       );
@@ -231,7 +231,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         actionsBelow
         actions={(canWrite && pendingSuggestions.length > 0) || canWrite ? <>
           {canWrite && pendingSuggestions.length > 0 && (
-            <button type="button" className="tw-btn tw-btn--primary" onClick={applyAllSuggestions}>
+            <button type="button" className="tw-btn" onClick={applyAllSuggestions} title="Fills in the fields; nothing is saved until you press Save mapping">
               {`Apply ${pendingSuggestions.length === 1 ? 'suggestion' : `${pendingSuggestions.length} suggestions`}`}
             </button>
           )}

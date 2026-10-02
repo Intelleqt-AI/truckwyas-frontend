@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 import { fetchData } from '@/lib/Api';
@@ -16,7 +16,7 @@ import type { AccountingTab } from './tabs';
 // One vocabulary for failures, used in the list and the activity log.
 const ERROR_META: Record<string, { tone: StatusTone; label: string }> = {
   ERROR: { tone: 'warning', label: 'Needs a fix' },
-  DEAD: { tone: 'danger', label: 'Stopped' },
+  DEAD: { tone: 'danger', label: 'Gave up' },
   BLOCKED: { tone: 'neutral', label: 'Waiting on you' },
 };
 const LEVEL: Record<string, { tone: StatusTone; label: string }> = {
@@ -105,8 +105,52 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
   const lastFetch = s.last_payment_sync_at ? new Date(s.last_payment_sync_at).getTime() : null;
   const overdue = connection.status === 'ACTIVE' && connection.readiness.sync_enabled && (lastFetch == null || Date.now() - lastFetch > OVERDUE_MS);
 
+  const attention = (
+    <>
+      <AcctCard title={s.errors.length ? <span className="acct-title-warn"><AlertTriangle size={16} aria-hidden="true" />Needs attention</span> : 'Needs attention'} description={s.errors.length ? "Fix the cause, then retry. We also retry on our own for a while." : undefined} flush>
+        {s.errors.length === 0 ? (
+          <div className="acct-empty">Nothing is stuck. Every document reached {cfg.short}.</div>
+        ) : (
+          <ul className="acct-list">
+            {s.errors.map(e => {
+              const meta = ERROR_META[e.status] ?? { tone: 'neutral' as StatusTone, label: humanise(e.status) };
+              return (
+                <li key={e.id} className="acct-row acct-row--error">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="acct-row__title">{e.last_error || 'No reason given'}</div>
+                    <div className="acct-row__sub" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                      <span>{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} <DocLink url={e.local_url}>{e.label}</DocLink></span>
+                      {e.status !== 'ERROR' && <StatusChip tone={meta.tone} label={meta.label} size="sm" />}
+                      {e.status === 'ERROR' && e.next_attempt_at && <span>· Next automatic try {nextTry(e.next_attempt_at)}</span>}
+                    </div>
+                  </div>
+                  <div className="acct-row__actions">
+                    {/* The usual cause is a mapping or a contact: fix that first, then retry. */}
+                    {onOpen && /account|tax|vat|tracking/i.test(e.last_error) && (
+                      <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={() => onOpen('mapping')}>Fix account mapping</button>
+                    )}
+                    {onOpen && /contact/i.test(e.last_error) && (
+                      <button type="button" className="tw-btn tw-btn--sm tw-btn--primary" onClick={() => onOpen('contacts')}>Fix in Contacts</button>
+                    )}
+                    {canWrite && (
+                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => retry(e)} disabled={retrying === e.id}>
+                        {retrying === e.id ? 'Retrying…' : 'Retry now'}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </AcctCard>
+
+    </>
+  );
+
   return (
     <>
+      {s.errors.length > 0 && attention}
       <AcctCard
         title={`Sync with ${cfg.short}`}
         description={<>
@@ -131,49 +175,12 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
             <div><span>In {cfg.short}</span><strong>{c.synced.toLocaleString('en-ZA')}</strong></div>
             <div><span>Queued</span><strong className={c.queued ? undefined : 'is-zero'}>{c.queued.toLocaleString('en-ZA')}</strong></div>
             <div><span>{c.errors > 0 && <span className="acct-dot acct-dot--warning acct-dot--inline" aria-hidden="true" />}Needs a fix</span><strong className={c.errors ? undefined : 'is-zero'}>{c.errors.toLocaleString('en-ZA')}</strong></div>
-            <div title="Gave up after repeated failures; retry from the list below"><span>Stopped</span><strong className={c.dead ? undefined : 'is-zero'}>{c.dead.toLocaleString('en-ZA')}</strong></div>
+            <div title="Stopped retrying after repeated failures; retry from the list below"><span>Gave up</span><strong className={c.dead ? undefined : 'is-zero'}>{c.dead.toLocaleString('en-ZA')}</strong></div>
           </div>
         </div>
       </AcctCard>
 
-      <AcctCard title="Needs attention" description={s.errors.length ? "We keep retrying; each goes through once the cause is fixed." : undefined} flush>
-        {s.errors.length === 0 ? (
-          <div className="acct-empty">Nothing is stuck. Every document reached {cfg.short}.</div>
-        ) : (
-          <ul className="acct-list">
-            {s.errors.map(e => {
-              const meta = ERROR_META[e.status] ?? { tone: 'neutral' as StatusTone, label: humanise(e.status) };
-              return (
-                <li key={e.id} className="acct-row acct-row--error">
-                  <div style={{ minWidth: 0 }}>
-                    <div className="acct-row__title">{e.last_error || 'No reason given'}</div>
-                    <div className="acct-row__sub" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-                      <span>{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} <DocLink url={e.local_url}>{e.label}</DocLink></span>
-                      <StatusChip tone={meta.tone} label={meta.label} size="sm" />
-                      {e.status === 'ERROR' && e.next_attempt_at && <span>Next try {nextTry(e.next_attempt_at)}</span>}
-                    </div>
-                  </div>
-                  <div className="acct-row__actions">
-                    {/* The usual cause is a mapping or a contact: fix that first, then retry. */}
-                    {onOpen && /account|tax|vat|tracking/i.test(e.last_error) && (
-                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => onOpen('mapping')}>Fix account mapping</button>
-                    )}
-                    {onOpen && /contact/i.test(e.last_error) && (
-                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => onOpen('contacts')}>Fix in Contacts</button>
-                    )}
-                    {canWrite && (
-                      <button type="button" className="tw-btn tw-btn--sm" onClick={() => retry(e)} disabled={retrying === e.id}>
-                        {retrying === e.id ? 'Retrying…' : 'Retry now'}
-                      </button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </AcctCard>
-
+      {s.errors.length === 0 && attention}
       <AcctCard title="Recent activity" flush>
         {s.recent.length === 0 ? (
           <div className="acct-empty">No activity yet.</div>

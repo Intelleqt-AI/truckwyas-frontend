@@ -379,7 +379,7 @@ export function IntegrationsSettings() {
 
       {/* Cartrack Card */}
       <div style={cardStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <div className="tw-int-head" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <div style={{
             width: 48, height: 48, borderRadius: 'var(--radius-nested)',
             background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
@@ -396,7 +396,7 @@ export function IntegrationsSettings() {
               Live vehicle location, speed and ignition status
             </div>
           </div>
-          <ConnectionPill connected={!!cartrackStatus?.connected} />
+          <span className="tw-int-head__chip"><ConnectionPill connected={!!cartrackStatus?.connected} /></span>
         </div>
 
         {loadingCartrack ? (
@@ -469,7 +469,7 @@ export function IntegrationsSettings() {
 
       {/* CtrlFleet Card */}
       <div style={cardStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <div className="tw-int-head" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <div style={{
             width: 48, height: 48, borderRadius: 'var(--radius-nested)',
             background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
@@ -486,7 +486,7 @@ export function IntegrationsSettings() {
               Live vehicle location and points of interest
             </div>
           </div>
-          <ConnectionPill connected={!!ctrlfleetStatus?.connected} />
+          <span className="tw-int-head__chip"><ConnectionPill connected={!!ctrlfleetStatus?.connected} /></span>
         </div>
 
         {loadingCtrlfleet ? (
@@ -734,7 +734,7 @@ export function IntegrationsSettings() {
           <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : apiKeys.length === 0 ? (
           <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-            No API keys yet. Generate one to enable programmatic access.
+            No keys yet. Create one to connect your own software to TruckWys.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -834,7 +834,7 @@ export function IntegrationsSettings() {
           <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : webhooks.length === 0 ? (
           <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-            No webhooks configured. Add one to receive real-time event notifications.
+            No webhooks yet. Add one and TruckWys will notify your system when something changes.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

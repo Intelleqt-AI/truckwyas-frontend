@@ -37,6 +37,7 @@ export function ContactsTab({ connection }: { connection: Connection }) {
   const [busyRow, setBusyRow] = useState<number | null>(null);
   const [picking, setPicking] = useState<ContactMatch | null>(null);
   const [matching, setMatching] = useState(false);
+  const [term, setTerm] = useState('');
 
   const q = useQuery<ContactsResponse>({
     queryKey: ACCT_KEYS.contacts(status, kind),
@@ -56,8 +57,9 @@ export function ContactsTab({ connection }: { connection: Connection }) {
   const rows = useMemo(() => {
     const list = [...(q.data?.results ?? [])];
     list.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status) || a.local_name.localeCompare(b.local_name));
-    return list;
-  }, [q.data]);
+    const t = term.trim().toLowerCase();
+    return t ? list.filter(r => [r.local_name, r.external_name, r.local_vat, r.local_email].some(v => (v ?? '').toLowerCase().includes(t))) : list;
+  }, [q.data, term]);
 
   const confirm = async (row: ContactMatch, body: ContactConfirmBody, done: string) => {
     setBusyRow(row.id);
@@ -110,8 +112,8 @@ export function ContactsTab({ connection }: { connection: Connection }) {
         flush
       >
         <div className="acct-toolbar">
-          <div className="acct-only-wide"><Segmented label="Status" value={status} onChange={setStatus} options={statusOptions} size="sm" /></div>
-          <div className="acct-only-phone" style={{ flex: '1 1 160px', minWidth: 0 }}>
+          <div className="acct-status-wide"><Segmented label="Status" value={status} onChange={setStatus} options={statusOptions} size="sm" /></div>
+          <div className="acct-status-narrow">
             <Select value={status} onValueChange={v => setStatus(v as StatusFilter)}>
               <SelectTrigger aria-label="Status" style={{ minHeight: 36, height: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
               <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'Status: all' : o.label} ({o.count ?? 0})</SelectItem>)}</SelectContent>
@@ -128,13 +130,18 @@ export function ContactsTab({ connection }: { connection: Connection }) {
             </Select>
           </div>
         </div>
+        <div className="acct-contact-search">
+          <Search size={14} aria-hidden="true" />
+          <input type="search" className="settings-control" style={{ ...settingsInputStyle, paddingLeft: 32, minHeight: 36, height: 36, fontSize: 13 }}
+            value={term} onChange={e => setTerm(e.target.value)} placeholder="Search by name, VAT number or email" aria-label="Search contacts" />
+        </div>
         {q.isLoading ? (
           <LoadingBlock label="Loading contacts" />
         ) : q.isError ? (
           <ErrorBlock message={apiMessage(q.error, "Couldn't load contacts.")} onRetry={() => q.refetch()} />
         ) : rows.length === 0 ? (
           <div className="acct-empty">
-            {status === 'ALL' ? 'No customers or suppliers with documents to send yet.' : `No contacts are "${STATUS_META[status as ContactStatus].label.toLowerCase()}".`}
+            {term.trim() ? `No contacts match "${term.trim()}".` : status === 'ALL' ? 'No customers or suppliers with documents to send yet.' : `No contacts are "${STATUS_META[status as ContactStatus].label.toLowerCase()}".`}
           </div>
         ) : (
           <ul className="acct-list" aria-busy={q.isFetching}>
@@ -193,7 +200,7 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   } else if (row.status === 'SKIPPED') {
     match = <div className="acct-row__sub">Not synced. Their documents stay in TruckWys only and show as sync errors.</div>;
   } else {
-    match = <div className="acct-row__sub">Pick a {providerName} contact, or we'll create one.</div>;
+    match = <div className="acct-row__sub">Pick a {providerName} contact, or we'll create one in {providerName} when the first document is sent.</div>;
   }
 
   const menu: RowActionItem[] = [];

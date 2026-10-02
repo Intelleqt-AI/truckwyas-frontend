@@ -105,7 +105,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
           <AlertTriangle size={16} aria-hidden="true" />
           <div>
             <strong style={{ fontWeight: 600 }}>{connection.status_reason || `Your ${cfg.short} sign-in has expired.`}</strong>
-            An admin needs to sign in to {cfg.short} again. Nothing is sent or fetched until then.
+            {canWrite ? `Sign in to ${cfg.short} again to carry on.` : `Ask your company admin to reconnect ${cfg.short}.`} Nothing is sent or fetched until then.
           </div>
           <button type="button" className="tw-btn tw-btn--primary" onClick={reconnect} disabled={!canWrite || reconnecting} title={writeTitle}>
             {reconnecting ? 'Opening…' : `Reconnect ${cfg.short}`}
@@ -250,9 +250,9 @@ export function OrgPicker({ connection }: { connection: Connection }) {
             <span className="acct-org__mark"><ProviderLogo provider={connection.provider} /></span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
-              <span className="acct-row__sub">Books in {t.currency} · only ZAR books can be linked</span>
+              <span className="acct-row__sub">Books in {t.currency}. Only ZAR books can be linked.</span>
             </span>
-            <StatusChip tone="neutral" label="Not supported" size="sm" />
+            <span />
           </div>
         ))}
         <div className="acct-formfoot">

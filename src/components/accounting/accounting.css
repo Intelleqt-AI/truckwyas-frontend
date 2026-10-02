@@ -677,3 +677,54 @@
 .acct-check li.is-blocked:not(:first-child) .acct-check__title, .acct-check li.is-blocked:not(:first-child) .acct-check__desc { color: var(--text-tertiary); }
 .acct-check li.is-blocked:not(:first-child) .acct-step-num { opacity: 0.5; }
 .acct-select[data-empty], .acct-select[data-empty] > span { color: var(--text-tertiary) !important; }
+
+/* Design pass (Oct 2026): phone tab picker, neutral tab counts, readable locked tabs. */
+.acct-tabs-phone { display: none; margin: 0 0 16px; }
+.acct-tabs-phone__trigger { width: 100%; }
+@media (max-width: 640px) {
+  .acct-tabs { display: none; }
+  .acct-tabs-phone { display: block; }
+}
+.acct-tab-num { margin-left: 6px; }
+.tw-seg__opt[data-locked] { color: var(--text-tertiary) !important; opacity: 1; }
+.tw-seg__opt[data-locked] svg { margin-right: 4px; }
+.acct-title-warn { display: inline-flex; align-items: center; gap: 8px; }
+.acct-title-warn svg { color: var(--status-warning-text); flex: none; }
+/* Contacts toolbar: the status strip only where it fits whole; else the picker. */
+.acct-toolbar { container-type: inline-size; }
+.acct-status-wide { flex: 0 1 auto; min-width: 0; }
+.acct-status-narrow { display: none; flex: 1 1 160px; min-width: 0; }
+@container (max-width: 700px) {
+  .acct-status-wide { display: none; }
+  .acct-status-narrow { display: block; }
+}
+.acct-kind-filter { flex: 0 0 160px !important; }
+@media (max-width: 640px) { .acct-kind-filter { flex: 1 1 0 !important; } }
+.acct-contact-search { position: relative; padding: 12px var(--card-pad, 20px); border-bottom: 1px solid var(--border-subtle); }
+.acct-contact-search > svg { position: absolute; left: calc(var(--card-pad, 20px) + 12px); top: 50%; transform: translateY(-50%); color: var(--text-tertiary); }
+.acct-row--contact .acct-row__actions { align-self: start !important; }
+.acct-jumpbtn { height: 32px; padding: 0 12px; font-size: 13px; }
+.acct-use-btn { height: 28px; margin-left: 4px; vertical-align: middle; }
+.acct-hint.is-required > span { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 0; }
+@media (max-width: 640px) { .acct-use-btn { height: 36px; } .acct-jumpbtn { height: 36px; } }
+.acct-diff-word { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--status-warning-text); white-space: nowrap; }
+.acct-diff-word::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--status-warning-dot); }
+.acct-table--recon td:last-child { text-align: center; }
+.acct-table--recon td:first-child { overflow-wrap: anywhere; }
+/* Org picker: a radio that can't be picked is a faint empty ring in both themes. */
+.acct-org.is-disabled .acct-radio { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-default); background: transparent; opacity: 0.6; }
+/* Setup on phones: only the next step's button is full width; the step text already says it's automatic. */
+@media (max-width: 560px) {
+  .acct-check--steps li > .tw-btn { justify-self: start !important; width: auto; min-width: 0; }
+  .acct-check--steps li > .tw-btn.tw-btn--primary { justify-self: stretch !important; width: 100%; }
+  .acct-check--steps .acct-step-inline { display: none !important; }
+}
+.acct-step-num.is-plain { border-color: transparent; background: var(--status-neutral-bg); color: var(--text-secondary); }
+/* Integrations page on phones: every card puts its status under the name, like the accounting cards. */
+.tw-int-head__chip { flex: none; display: inline-flex; }
+@media (max-width: 480px) {
+  .tw-int-head { flex-wrap: wrap; row-gap: 4px !important; }
+  .tw-int-head > div:nth-child(2) { flex: 1 1 0 !important; min-width: 0; }
+  .tw-int-head__chip { flex-basis: 100%; padding-left: 60px; }
+}
+.fl-notice.acct-sync-notice { background: color-mix(in srgb, var(--status-warning) 7%, var(--bg-surface)); border-color: color-mix(in srgb, var(--status-warning) 45%, transparent); }

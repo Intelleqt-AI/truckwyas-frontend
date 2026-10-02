@@ -110,7 +110,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
     if (x.state === 'RUNNING') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : `${x.count.toLocaleString('en-ZA')} so far`;
     if (x.state === 'DONE') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : 'Done';
     if (x.state === 'SKIPPED') return '';
-    return total ? `0 of ${total.toLocaleString('en-ZA')}` : 'Not started';
+    return total ? `0 of ${total.toLocaleString('en-ZA')}` : 'Waiting';
   };
   // The bar follows the documents (where the preview knows them), not the steps.
   const itemTotal = Object.values(totals).reduce<number>((n, v) => n + (v ?? 0), 0);
@@ -168,7 +168,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
         {!locked && p && p.historic_receipts > 0 && (
           <p className="acct-section-desc" style={{ margin: '8px 0 0' }}>
             Payments already recorded in TruckWys go into the bank account chosen under{' '}
-            <button type="button" className="acct-linkbtn" onClick={() => onOpen('mapping')}>Accounts and VAT</button>.
+            <button type="button" className="acct-linkbtn" onClick={() => onOpen('mapping')}>Mapping</button>.
           </p>
         )}
 
@@ -195,7 +195,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
         <AcctCard
           title={running ? `Sending history to ${cfg.short}` : 'Progress'}
           description={running
-            ? <>{`${startedAt ? `Started ${formatRelativeTime(b.started_at!).toLowerCase()}` : 'Started'} · updated ${formatRelativeTime(new Date(q.dataUpdatedAt || Date.now())).toLowerCase()}. You can leave this page; sending carries on.`}
+            ? <>{`${b.cutover_date ? `Everything from ${formatDate(b.cutover_date)}. ` : ''}${startedAt ? `Started ${formatRelativeTime(b.started_at!).toLowerCase()}` : 'Started'} · updated ${formatRelativeTime(new Date(q.dataUpdatedAt || Date.now())).toLowerCase()}. You can leave this page; sending carries on.`}
           <div className="acct-progress acct-progress--head" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pctDone)}
             aria-label={itemTotal ? `${itemsDone} of ${itemTotal} documents sent` : `${doneSteps} of ${b.steps.length} steps done`}>
             <div className="acct-progress__bar"><span style={{ width: `${pctDone}%` }} /></div>

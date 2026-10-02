@@ -17,6 +17,7 @@ import { BackfillTab } from './accounting/BackfillTab';
 import { SyncTab } from './accounting/SyncTab';
 import { ReconciliationTab } from './accounting/ReconciliationTab';
 import { AcctCard, ErrorBlock, LoadingBlock, useAccountingPermissions } from './accounting/shared';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ACCOUNTING_TABS, isAccountingTab, type AccountingTab } from './accounting/tabs';
 import '@/components/accounting/accounting.css';
 
@@ -154,9 +155,10 @@ export default function AccountingIntegration() {
               ['Map accounts and VAT', 'Pick the income account and VAT rate for each kind of charge, and where supplier bills go.'],
               ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
               ['Choose a cut-over date', 'We send documents from that date. Anything earlier should already be in your books.'],
+              ['Sync turns on', 'By itself, once the steps above are done.'],
             ].map(([t, d], i) => (
               <li key={t}>
-                <span className="acct-step-num is-auto" aria-hidden="true">{i + 1}</span>
+                <span className="acct-step-num is-plain" aria-hidden="true">{i + 1}</span>
                 <div style={{ minWidth: 0 }}>
                   <div className="acct-check__title">{t}</div>
                   <div className="acct-check__desc">{d}</div>
@@ -193,16 +195,33 @@ export default function AccountingIntegration() {
                   className={`tw-seg__opt${tab === t.id ? ' is-active' : ''}`}
                   onClick={() => openTab(t.id)}
                   disabled={live.status === 'NEEDS_REAUTH' && t.id !== 'setup'}
-                  title={live.status === 'NEEDS_REAUTH' && t.id !== 'setup' ? `Locked until you reconnect ${cfg!.short}` : undefined}
+                  title={live.status === 'NEEDS_REAUTH' && t.id !== 'setup' ? `Available after you reconnect ${cfg!.short}` : undefined}
                   data-locked={live.status === 'NEEDS_REAUTH' && t.id !== 'setup' ? '' : undefined}
                 >
                   {live.status === 'NEEDS_REAUTH' && t.id !== 'setup' && <Lock size={11} aria-hidden="true" />}
                   {t.label}
-                  {n != null && <span className={`acct-tab-count${t.id === 'mapping' || t.id === 'contacts' || t.id === 'sync' || t.id === 'reconciliation' ? ' is-todo' : ''}`} title={tabCountTitle(t.id, n)} aria-label={tabCountTitle(t.id, n)}>{n}</span>}
+                  {n != null && <span className="tw-seg__count acct-tab-num" title={tabCountTitle(t.id, n)} aria-label={tabCountTitle(t.id, n)}>{n}</span>}
                 </button>
               );
             })}
           </div>
+        </div>
+        {/* Phones: one picker instead of a strip that clips, as the settings nav does. */}
+        <div className="acct-tabs-phone">
+          <Select value={tab} onValueChange={v => openTab(v as AccountingTab)}>
+            <SelectTrigger aria-label={`${cfg!.short} settings page`} className="acct-tabs-phone__trigger"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {ACCOUNTING_TABS.map(t => {
+                const n = tabBadge(t.id);
+                const locked = live.status === 'NEEDS_REAUTH' && t.id !== 'setup';
+                return (
+                  <SelectItem key={t.id} value={t.id} disabled={locked}>
+                    {t.label}{n != null ? ` · ${tabCountTitle(t.id, n)}` : ''}{locked ? ' · after you reconnect' : ''}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
         </div>
         <div id="acct-tabpanel" role="tabpanel" aria-labelledby={`acct-tab-${tab}`}>
           {tab === 'setup' && <SetupChecklist connection={live} onOpen={openTab} />}
@@ -219,7 +238,7 @@ export default function AccountingIntegration() {
   return (
     <SettingsShell activeId="integrations">
       <div style={{ maxWidth: 'var(--form-max, 720px)', minWidth: 0 }}>
-        <SettingsPageHeader title={title} description={description} />
+        <SettingsPageHeader title={title} description={description} subPage />
 
         {banner && (
           <div className={`acct-notice acct-notice--${banner.tone}`} role={banner.tone === 'danger' ? 'alert' : 'status'}>

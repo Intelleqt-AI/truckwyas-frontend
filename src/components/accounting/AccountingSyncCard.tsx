@@ -34,8 +34,8 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         )}
         {(sync.status === 'ERROR' || sync.status === 'DEAD' || sync.status === 'BLOCKED') && (
           <div className="fin-dl__row">
-            <dt>Latest change</dt>
-            <dd>{sync.status === 'BLOCKED' ? 'Waiting on you' : 'Not sent yet'}</dd>
+            <dt>Latest edit</dt>
+            <dd>{sync.status === 'BLOCKED' ? 'Waiting on you' : sync.status === 'DEAD' ? 'Not sent' : 'Waiting to send'}</dd>
           </div>
         )}
         <div className="fin-dl__row">
@@ -76,7 +76,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
   const name = providerConfig(sync.provider).short || sync.provider_name;
   const retrying = sync.status === 'ERROR';
   return (
-    <div className="fl-notice fl-notice--warning" role="status">
+    <div className="fl-notice fl-notice--warning acct-sync-notice" role="status">
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
         <strong>{retrying ? `Last change didn't reach ${name}` : `This ${what} isn't up to date in ${name}`}</strong>

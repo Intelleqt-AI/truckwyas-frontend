@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, ExternalLink, RefreshCw } from 'lucide-react';
-import { StatusChip } from '@/components/ui/StatusChip';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency, formatDateTime } from '@/lib/formatters';
@@ -96,9 +95,9 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                 const bad = differences.filter(d => d.scope === sc.scope).length;
                 return (
                   <div key={sc.scope}>
-                    <span>{sc.scope === 'MONTH' ? 'Months checked' : sc.scope === 'CUSTOMER' ? 'Customers checked' : 'Invoices checked'}</span>
+                    <span>{sc.title === 'Sales and VAT by month' ? 'Months' : sc.title}</span>
                     <strong>{(n ?? 0).toLocaleString('en-ZA')}</strong>
-                    {differences.length > 0 && <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>}
+                    <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>
                   </div>
                 );
               })}
@@ -120,7 +119,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
               <table className="acct-table acct-table--recon">
                 <colgroup>
                   <col style={{ width: '25%' }} /><col style={{ width: '17%' }} /><col style={{ width: '19%' }} />
-                  <col style={{ width: '19%' }} /><col style={{ width: '20%' }} />{hasLinks && <col style={{ width: 44 }} />}
+                  <col style={{ width: '19%' }} /><col style={{ width: '20%' }} />{hasLinks && <col style={{ width: 64 }} />}
                 </colgroup>
                 <thead>
                   <tr>
@@ -149,7 +148,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                         {d.local_url ? <Link className="acct-link" to={d.local_url}>{head}</Link> : <span className="acct-row__title">{head}</span>}
                         {rest.length > 0 && <span className="acct-row__sub"> · {rest.join(' · ')}</span>}
                       </span>
-                      <strong className={`acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <StatusChip tone="warning" label="Status differs" size="sm" />}</strong>
+                      <strong className={`acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <span className="acct-diff-word">Differs</span>}</strong>
                     </div>
                     <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)}</div>
                     <dl className="acct-diff-kv"><dt>TruckWys</dt><dd>{showValue(d.truckwys)}</dd><dt>{cfg.short}</dt><dd>{showValue(d.provider)}</dd></dl>
@@ -190,7 +189,7 @@ function DiffRow({ d, providerName, hasLinks }: { d: ReconDifference; providerNa
       <td>{FIELD_LABEL[d.field] ?? humanise(d.field)}</td>
       <td className="num">{showValue(d.truckwys)}</td>
       <td className="num">{showValue(d.provider)}</td>
-      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <StatusChip tone="warning" label="Status differs" size="sm" />}</td>
+      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <span className="acct-diff-word">Differs</span>}</td>
       {hasLinks && (
         <td>
           {d.provider_url && (

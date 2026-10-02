@@ -75,7 +75,7 @@ export function ReconciliationTab({ connection, onOpen }: { connection: Connecti
   return (
     <>
       <AcctCard
-        title="Reconciliation"
+        title={`Checked against ${cfg.short}`}
         description={`We compare invoices, customer balances and monthly sales and VAT with ${cfg.short}.`}
         actions={runButton}
       >

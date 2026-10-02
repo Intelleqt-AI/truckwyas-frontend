@@ -820,3 +820,6 @@
   .acct-map-savebar .cs-savebar__note { display: block !important; flex: 1 1 100%; }
   .acct-map-savebar > .btn-action { flex: 1 1 100% !important; }
 }
+/* Finished steps: a quiet link-weight action, never a full-width button. */
+.acct-check--steps li > .acct-step-done-btn { min-width: 0 !important; color: var(--text-secondary); }
+@media (max-width: 560px) { .acct-check--steps li > .acct-step-done-btn { justify-self: start !important; width: auto !important; padding-left: 0; } }

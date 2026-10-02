@@ -82,7 +82,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const open = items.filter(it => it.look !== 'done' && it.key !== 'live' && it.key !== 'connect').map(it => items.indexOf(it) + 1);
   const blockers = reauth ? [] : providerBlockers(r);
   const subtitle = blockers.length && !open.length
-    ? `Everything in TruckWys is done. Nothing is sent until the ${cfg.short} ${blockers.length === 1 ? 'setting' : 'settings'} below ${blockers.length === 1 ? 'is' : 'are'} changed.`
+    ? `Everything in TruckWys is done. Nothing new is sent until the ${cfg.short} ${blockers.length === 1 ? 'setting' : 'settings'} below ${blockers.length === 1 ? 'is' : 'are'} changed.`
     : r.sync_enabled
     ? `Done. ${cfg.short} and TruckWys now stay in step on their own.`
     : reauth
@@ -158,11 +158,35 @@ function ProviderBlockers({ connection, blockers }: { connection: Connection; bl
       <div className="acct-blockers__head">
         <AlertTriangle size={16} aria-hidden="true" />
         <div style={{ minWidth: 0 }}>
-          <p className="acct-blockers__title">Change {blockers.length === 1 ? 'this setting' : `these ${blockers.length} settings`} in {cfg.short}</p>
-          <ul className={`acct-blockers__items${blockers.length === 1 ? ' is-one' : ''}`}>
-            {blockers.map(b => <BlockerItem key={b} text={b} />)}
-          </ul>
-          <p className="acct-blockers__after">When it's changed, press Refresh.</p>
+          {blockers.length === 1 ? (() => {
+            const one = parseBlocker(blockers[0]);
+            return one ? (
+              <>
+                <p className="acct-blockers__title">{one.what} in {cfg.short}</p>
+                <p className="acct-blockers__body">In {one.where}. {one.why}</p>
+              </>
+            ) : (
+              <>
+                <p className="acct-blockers__title">Change this setting in {cfg.short}</p>
+                <p className="acct-blockers__body">{blockers[0]}</p>
+              </>
+            );
+          })() : (
+            <>
+              <p className="acct-blockers__title">Change these {blockers.length} settings in {cfg.short}</p>
+              <ul className="acct-blockers__items">
+                {blockers.map(text => {
+                  const x = parseBlocker(text);
+                  return (
+                    <li key={text} className="acct-blocker">
+                      {x ? <><span className="acct-blocker__what">{x.what}</span><span className="acct-blockers__body">In {x.where}. {x.why}</span></>
+                        : <span className="acct-blockers__body">{text}</span>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
         </div>
       </div>
       <div className="acct-blockers__actions">
@@ -172,7 +196,7 @@ function ProviderBlockers({ connection, blockers }: { connection: Connection; bl
         </button>
         {connection.web_url && (
           <a className="tw-btn tw-btn--ghost" href={connection.web_url} target="_blank" rel="noopener noreferrer">
-            Open {cfg.short}
+            Open in {cfg.short}
             <ExternalLink size={14} aria-hidden="true" />
           </a>
         )}
@@ -182,21 +206,14 @@ function ProviderBlockers({ connection, blockers }: { connection: Connection; bl
 }
 
 /**
- * One provider setting, split into what to change, where, and why when the
- * server's sentence has the usual shape ('Turn on "X" in QuickBooks (path),
- * then press Refresh: reason'); any other sentence shows as it came.
+ * The server's provider-setting sentence, split into what to change, where
+ * and why when it has the usual shape ('Turn on "X" in QuickBooks (path),
+ * then press Refresh: reason'); null for any other sentence (shown as is).
  */
-function BlockerItem({ text }: { text: string }) {
+function parseBlocker(text: string): { what: string; where: string; why: string } | null {
   const m = text.match(/^(Turn (?:on|off) "[^"]+") in [^(]+\(([^)]+)\),? then press Refresh:\s*(.+)$/);
-  if (!m) return <li className="acct-blocker"><span className="acct-blocker__what">{text}</span></li>;
-  const why = m[3].charAt(0).toUpperCase() + m[3].slice(1);
-  return (
-    <li className="acct-blocker">
-      <span className="acct-blocker__what">{m[1].replace(/"([^"]+)"/, '\u201c$1\u201d')}</span>
-      <span className="acct-blocker__where">Where: {m[2]}</span>
-      <span className="acct-blocker__why">{why}</span>
-    </li>
-  );
+  if (!m) return null;
+  return { what: m[1].replace(/"([^"]+)"/, '\u201c$1\u201d'), where: m[2], why: m[3].charAt(0).toUpperCase() + m[3].slice(1) };
 }
 
 /** True while a TruckWys-side setup step is still open. */

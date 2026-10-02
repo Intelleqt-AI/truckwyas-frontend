@@ -1146,3 +1146,14 @@
 .acct-source-note .acct-dot { margin-right: 6px; }
 .acct-tiles--3 { margin-left: -16px; width: calc(100% + 16px); }
 @media (max-width: 640px) { .acct-tiles--3 { margin-left: -10px; width: calc(100% + 10px); } }
+/* Final: recon link column inset and readable; payment states as one dot+label system; compact sync card. */
+.acct-table--recon td:last-child, .acct-table--recon th:last-child { padding-right: var(--card-pad, 20px) !important; text-align: right !important; }
+.acct-open-link { color: var(--text-primary); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px; padding: 0; min-width: 0; white-space: nowrap; }
+.acct-open-link:hover { background: none; text-decoration-color: currentColor; }
+.acct-diff-none { color: var(--text-tertiary); }
+.acct-paystate { display: block; margin-top: 4px; color: var(--text-secondary) !important; }
+.acct-paystate.is-local { color: var(--text-primary) !important; }
+.acct-paystate .acct-dot { margin: 0 6px 1px 0; }
+.acct-paystate__hint { display: block; padding-left: 14px; color: var(--text-secondary); font-weight: 400; }
+.acct-sync-line { margin-bottom: 0; }
+.acct-sync-card .acct-sync-open { margin-top: 8px; }

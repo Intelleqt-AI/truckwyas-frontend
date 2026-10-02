@@ -38,7 +38,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: connection.status === 'ACTIVE' ? 'done' : 'todo',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status !== 'ACTIVE'
-        ? (canWrite ? `Sign in to ${cfg.short} again.` : 'Needs a company admin.')
+        ? (canWrite ? 'Use Reconnect above. Your mapping and contacts are kept.' : 'Needs a company admin. Your mapping and contacts are kept.')
         : `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`,
     },
     {
@@ -68,7 +68,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: backfillLook,
       title: r.backfill_state === 'DONE' && connection.cutover_date ? `Start date: ${formatDate(connection.cutover_date)}` : 'Choose a start date',
       desc: r.backfill_state === 'DONE'
-        ? `History from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'} was sent to ${cfg.short}.${connection.status === 'ACTIVE' && providerBlockers(r).length ? ' New documents wait for the setting above.' : ''}`
+        ? `History from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'} was sent to ${cfg.short}.${connection.status === 'ACTIVE' && providerBlockers(r).length ? ' New documents wait for step 2.' : ''}`
         : r.backfill_state === 'RUNNING'
           ? `Sending documents to ${cfg.short} now.`
           : r.backfill_state === 'FAILED'
@@ -122,6 +122,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   if (liveItem && !r.sync_enabled && stillOpen.length && stillOpen.every(it => it.provider)) {
     const nums = stillOpen.map(it => items.indexOf(it) + 1);
     liveItem.desc = `Waiting on ${nums.length === 1 ? `step ${nums[0]}` : `steps ${nums.join(' and ')}`}.`;
+    if (r.backfill_state === 'DONE') liveItem.title = 'Sync paused';
   }
 
   // Only the next step to do gets the primary button; while the sign-in has

@@ -240,10 +240,8 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
         <div className="acct-row__chip" style={{ marginBottom: 4 }}><StatusChip tone={meta.tone} label={meta.label} size="sm" /></div>
         {match}
       </div>
-      <div className="acct-row__actions">
-        {primary}
-        <span className="acct-row__menu">{menu.length > 0 && <RowActions label={row.local_name} items={menu} />}</span>
-      </div>
+      <div className="acct-row__actions">{primary}</div>
+      <span className="acct-row__menu acct-row__menu--cell">{menu.length > 0 && <RowActions label={row.local_name} items={menu} />}</span>
     </li>
   );
 }

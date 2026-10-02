@@ -76,7 +76,7 @@ export function ReconciliationTab({ connection, onOpen }: { connection: Connecti
     <>
       <AcctCard
         title={`Checked against ${cfg.short}`}
-        description={`We compare invoices, customer balances and monthly sales and VAT with ${cfg.short}.`}
+        description="We compare invoices, customer balances and monthly sales and VAT."
         actions={runButton}
       >
         {!last ? (
@@ -89,14 +89,14 @@ export function ReconciliationTab({ connection, onOpen }: { connection: Connecti
             ) : differences.length === 0 ? (
               <>
                 <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}</p>
-                {(connection.counts.errors + connection.counts.dead) > 0 && (
-                  <p className="acct-section-desc acct-dot-note" style={{ margin: '-10px 0 14px' }}><span className="acct-dot acct-dot--warning acct-dot--inline" aria-hidden="true" />{plural(connection.counts.errors + connection.counts.dead, 'document')} {connection.counts.errors + connection.counts.dead === 1 ? "hasn't" : "haven't"} reached {cfg.short} yet, so {connection.counts.errors + connection.counts.dead === 1 ? "it isn't" : "they aren't"} compared.{onOpen && <>{' '}<button type="button" className="acct-linkbtn" onClick={() => onOpen('sync')}>View in Sync</button></>}</p>
-                )}
               </>
             ) : (
               <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}</p>
             )}
             <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}><span className="acct-nowrap">Checked {formatDateTime(last.ran_at)}</span><span className="acct-dotsep" aria-hidden="true"> · </span><span className="acct-nowrap acct-block-phone">Checks again nightly at {nextCheck(last.ran_at)}</span></p>
+            {differences.length === 0 && last.status !== 'FAILED' && (connection.counts.errors + connection.counts.dead) > 0 && (
+                  <p className="acct-section-desc acct-dot-note" style={{ margin: '-8px 0 14px' }}><span className="acct-dot acct-dot--warning acct-dot--inline" aria-hidden="true" />{plural(connection.counts.errors + connection.counts.dead, 'document')} {connection.counts.errors + connection.counts.dead === 1 ? "hasn't" : "haven't"} reached {cfg.short} yet, so {connection.counts.errors + connection.counts.dead === 1 ? "it isn't" : "they aren't"} compared.{onOpen && <>{' '}<button type="button" className="acct-linkbtn" onClick={() => onOpen('sync')}>View in Sync</button></>}</p>
+                )}
             <div className="acct-tiles acct-tiles--3">
               {SCOPES.map(sc => {
                 const n = sc.scope === 'INVOICE' ? last.checked.invoices : sc.scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;

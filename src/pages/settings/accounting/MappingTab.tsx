@@ -240,7 +240,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
     const rows = m[section] as Array<{ key: string }>;
     const mapped = rows.filter(r => !!sectionValue(section, r.key)).length;
     const unused = rows.length - mapped;
-    return `All set: ${mapped} mapped${unused ? `, ${unused} not used` : ''}.`;
+    return `All set: ${mapped} mapped${unused ? `, ${unused} not needed` : ''}.`;
   };
   /** A section with nothing to do: one line, and Edit to open it. */
   const folded = (section: MappingSection, title: string) => (
@@ -284,7 +284,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         description={<>
           Nothing is sent to {cfg.short} until every required line is mapped.
           <span className="acct-refresh-meta acct-refresh-meta--line">
-            {m.options.fetched_at && <span>Account list from {hoursAgo(m.options.fetched_at)}</span>}
+            {m.options.fetched_at && <span>Accounts fetched from {cfg.short} {formatRelativeTime(m.options.fetched_at).toLowerCase()}</span>}
             <button type="button" className="acct-linkbtn acct-refresh-link" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
               <RefreshCw size={13} aria-hidden="true" className={refreshing ? 'animate-spin' : undefined} />
               {refreshing ? 'Reading…' : `Refresh from ${cfg.short}`}
@@ -490,7 +490,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
 
       {canWrite && (
         // The same sticky save bar as Company details.
-        <div className="cs-savebar acct-map-savebar">
+        <div className={`cs-savebar acct-map-savebar${dirty ? ' is-dirty' : ''}`}>
           <span className="cs-savebar__note" role={formError ? 'alert' : undefined} style={formError ? { color: 'var(--status-danger-text)' } : undefined}>
             {formError || (dirty ? `${changeCount} unsaved ${changeCount === 1 ? 'change' : 'changes'}` : 'No unsaved changes')}
           </span>

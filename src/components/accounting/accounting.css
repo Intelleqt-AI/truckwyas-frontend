@@ -1036,3 +1036,44 @@
 .acct-step-num.is-warn { background: transparent !important; border: 1px solid var(--status-warning) !important; color: var(--status-warning-text) !important; }
 .acct-check--steps li > .acct-step-done-btn { border-color: var(--border-default) !important; background: var(--bg-surface) !important; justify-self: end; }
 @media (max-width: 560px) { .acct-check--steps li > .acct-step-done-btn { justify-self: start !important; padding-left: 12px !important; } }
+
+/* Final round */
+/* Contacts: the ⋯ menu has its own cell, top right of every row, at every width. */
+.acct-contacts-list > .acct-row--contact { grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto 32px !important; align-items: start !important; }
+.acct-contacts-list > .acct-row--contact > .acct-row__actions { grid-column: 3; grid-row: 1; display: flex !important; justify-self: end; align-self: start !important; }
+.acct-contacts-list > .acct-row--contact > .acct-row__menu--cell { grid-column: 4; grid-row: 1; justify-self: end; align-self: start; width: 32px; display: inline-flex; justify-content: center; margin-top: -4px; }
+.acct-contacts-list > .acct-row--contact > .acct-row__actions:empty { display: none !important; }
+@container (max-width: 760px) {
+  .acct-contacts-list > .acct-row--contact { grid-template-columns: minmax(0, 190px) minmax(0, 1fr) 32px !important; }
+  .acct-contacts-list > .acct-row--contact > .acct-row__actions { grid-column: 2; grid-row: 2; justify-self: start; }
+  .acct-contacts-list > .acct-row--contact > .acct-row__menu--cell { grid-column: 3; }
+}
+@container (max-width: 560px) {
+  .acct-contacts-list > .acct-row--contact { grid-template-columns: minmax(0, 1fr) 40px !important; }
+  .acct-contacts-list > .acct-row--contact > :nth-child(1) { grid-column: 1; grid-row: 1; }
+  .acct-contacts-list > .acct-row--contact > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  .acct-contacts-list > .acct-row--contact > .acct-row__actions { grid-column: 1 / -1; grid-row: 3; justify-self: start; }
+  .acct-contacts-list > .acct-row--contact > .acct-row__menu--cell { grid-column: 2; grid-row: 1; width: 40px; height: 40px; align-items: center; margin-top: -8px; }
+}
+/* Mapping: a lone field's hint uses the full row; "Show all" is a quiet link, not a band. */
+@container (min-width: 560px) {
+  .acct-map-grid > .acct-map-row:last-child:nth-child(odd) > .acct-map-row__field { grid-column: 1 / -1 !important; }
+  .acct-map-grid > .acct-map-row:last-child:nth-child(odd) > .acct-map-row__field > .acct-select { width: calc(50% - 20px) !important; }
+}
+.acct-map-more { border-top: 0 !important; padding: 0 var(--card-pad, 20px) 12px !important; }
+/* Phone save bar: compact until there is something to save. */
+@media (max-width: 640px) { .acct-map-savebar:not(.is-dirty) > .btn-action { flex: 0 0 auto !important; } }
+.acct-map-savebar.is-dirty > .acct-save-btn { background: var(--btn-primary-bg, var(--text-primary)) !important; color: var(--btn-primary-fg, var(--bg-surface)) !important; border-color: transparent !important; }
+/* Signed-out tabs: muted but legible. */
+.acct-utabs .section-header__tab[data-locked] { opacity: 1 !important; color: var(--text-tertiary) !important; }
+/* Status text in a money column reads as a note, not a figure. */
+.acct-diff-word { color: var(--text-secondary) !important; font-weight: 400 !important; }
+/* Sync tiles on phones: no row rule. */
+@media (max-width: 640px) { .acct-tiles:not(.acct-tiles--3) > div:nth-child(n+3) { border-top: 0 !important; } }
+/* Org picker in dark: the chosen row needs a stronger tint. */
+:root[data-theme="dark"] .acct-org.is-selected { background: color-mix(in srgb, var(--text-primary) 10%, var(--bg-surface)) !important; }
+.acct-progress__bar { background: var(--border-strong); }
+
+/* QuickBooks setting step: path muted under the title; a little more air between the phone buttons. */
+.acct-path { font-weight: 400 !important; color: var(--text-secondary) !important; }
+@media (max-width: 560px) { .acct-step-actions--below { gap: 12px; } }

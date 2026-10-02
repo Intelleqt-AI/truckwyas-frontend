@@ -4,7 +4,7 @@ import { Segmented } from '@/components/ui/Segmented';
 import { formatCurrency } from '@/lib/formatters';
 import { computeLine, toNumber, taxCodeShort, type DiscountMode, type LineDraft } from '@/lib/finance/tax';
 import { blankLine, type EditorLine } from '@/lib/finance/lines';
-import type { TaxCode, TaxCodeOption } from '@/lib/finance/types';
+import { REVENUE_TYPES, revenueTypeLabel, type RevenueType, type TaxCode, type TaxCodeOption } from '@/lib/finance/types';
 import './finance-ledger.css';
 
 export function InvoiceLineEditor({ lines, onChange, codes, defaultCode, disabled }: {
@@ -14,7 +14,7 @@ export function InvoiceLineEditor({ lines, onChange, codes, defaultCode, disable
   defaultCode: TaxCode;
   disabled?: boolean;
 }) {
-  const update = (key: string, patch: Partial<LineDraft>) =>
+  const update = (key: string, patch: Partial<LineDraft> & { revenue_type?: RevenueType }) =>
     onChange(lines.map(l => (l.key === key ? { ...l, ...patch } : l)));
   const remove = (key: string) => onChange(lines.length > 1 ? lines.filter(l => l.key !== key) : [blankLine(defaultCode)]);
   // A new line takes the tax code of the line above it (most invoices use one code).
@@ -45,6 +45,18 @@ export function InvoiceLineEditor({ lines, onChange, codes, defaultCode, disable
                   <input id={`line-${l.key}-desc`} className="fin-control qi-input" type="text" value={l.description} disabled={disabled}
                     aria-label={`Line ${n} description`} placeholder="e.g. Durban to Johannesburg, 34 t"
                     onChange={e => update(l.key, { description: e.target.value })} />
+                  {/* What the line charges for: picks the income account in Xero / QuickBooks. */}
+                  <div className="fl-type">
+                    <span className="fl-type__label" aria-hidden="true">Type</span>
+                    <Select value={l.revenue_type} onValueChange={(v) => update(l.key, { revenue_type: v as RevenueType })} disabled={disabled}>
+                      <SelectTrigger aria-label={`Line ${n} type`} style={{ flex: '1 1 auto', width: 'auto', minWidth: 0, maxWidth: 220, minHeight: 32, fontSize: 13 }}>
+                        <SelectValue>{revenueTypeLabel(l.revenue_type)}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REVENUE_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </td>
                 <td>
                   <span className="fl-mobile-label" aria-hidden="true">Qty</span>

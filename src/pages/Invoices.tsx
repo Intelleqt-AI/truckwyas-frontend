@@ -11,6 +11,7 @@ import { fetchData, postData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import SectionHeader, { FINANCE_TABS } from "@/components/layout/SectionHeader";
 import RowActions from "@/components/ui/RowActions";
+import { providerConfig, usePaymentsManaged } from "@/lib/accounting";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { wholeRand } from "@/components/finance/FinTile";
 import { KpiRow, KpiTile } from "@/components/ui/KpiTile";
@@ -123,6 +124,8 @@ async function loadInvoicesPage() {
 
 export default function Invoices() {
   const navigate = useNavigate();
+  // While an accounting system owns payments, the row menu sends people there.
+  const { managed: paymentsManaged } = usePaymentsManaged();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -658,6 +661,15 @@ export default function Invoices() {
                           label={`Invoice ${invNumber}`}
                           items={[
                             { label: "Open invoice", onSelect: () => navigate(`/finance/invoices/${inv.id}`) },
+                            ...(inv.accounting_sync?.url
+                              ? [{
+                                  label: paymentsManaged && ["SENT", "VIEWED", "OVERDUE", "PARTIALLY_PAID"].includes(invStatus)
+                                    ? `Record payment in ${providerConfig(inv.accounting_sync.provider).short}`
+                                    : `Open in ${providerConfig(inv.accounting_sync.provider).short}`,
+                                  hint: paymentsManaged ? `Payments sync from ${providerConfig(inv.accounting_sync.provider).short} automatically.` : undefined,
+                                  onSelect: () => { window.open(inv.accounting_sync.url, "_blank", "noopener,noreferrer"); },
+                                }]
+                              : []),
                             ...(invStatus === "DRAFT"
                               ? [{ label: "Edit draft", onSelect: () => navigate(`/finance/invoices/${inv.id}/edit`) }]
                               : []),

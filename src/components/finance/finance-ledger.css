@@ -36,6 +36,10 @@
 .fl-lines__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; flex-wrap: wrap; }
 .fl-label-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .fl-mobile-label { display: none; }
+/* Line type: a compact select under the description (all widths). */
+.fl-type { display: flex; align-items: center; gap: 8px; margin-top: 6px; min-width: 0; }
+.fl-type__label { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); flex: none; }
+.fl-line-type { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
 
 /* Cards narrower than the full table (the new-invoice main column beside
    the rail, tablets): each line is two rows, description and amount over
@@ -63,6 +67,10 @@
   .fl-lines__table td.fl-cell-del { grid-column: 3; }
   .fl-lines__table td.fl-cell-amt { grid-column: 1 / -1; grid-row: auto; }
   .fl-cell-amt .fl-amt { padding-top: 0; }
+  /* Qty / price, then discount / tax, two to a row: never the 40px delete
+     column (the discount used to land there and was cut off). */
+  .fl-lines__table td:nth-child(2), .fl-lines__table td:nth-child(4) { grid-column: 1; }
+  .fl-lines__table td:nth-child(3), .fl-lines__table td:nth-child(5) { grid-column: 2 / 4; }
 }
 .fl-lines-card { container-type: inline-size; }
 /* The new-invoice details card keeps its three-across container rule inside the main column. */

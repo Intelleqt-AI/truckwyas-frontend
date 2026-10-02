@@ -15,6 +15,8 @@ import { formatCurrency, formatDate, formatDateTime } from '@/lib/formatters';
 import { FIN_URL, invalidateInvoiceData, useCreditNote } from '@/lib/finance/api';
 import { formatQuantity, sumLines, taxCodeShort, toNumber } from '@/lib/finance/tax';
 import { toast } from '@/lib/toast';
+import { revenueTypeLabel } from '@/lib/finance/types';
+import { AccountingSyncCard, AccountingSyncNotice } from '@/components/accounting/AccountingSyncCard';
 
 const BACK = { to: '/finance/credit-notes', label: 'Credit notes' };
 const safeDate = (d?: string | null) => (d ? formatDate(d) : '—');
@@ -103,6 +105,7 @@ export default function CreditNoteDetail() {
 
       <div className="fin-detail-grid">
         <div className="fin-main-col">
+          <AccountingSyncNotice sync={note.accounting_sync} what="credit note" />
           {isVoid && (
             <div className="fl-notice fl-notice--danger" role="status">
               <Ban size={16} aria-hidden="true" />
@@ -145,6 +148,7 @@ export default function CreditNoteDetail() {
                       <tr key={l.id}>
                         <td className="fin-strong fin-cell-fill">
                           <div className="fin-doc__desc" title={l.description}>{l.description}</div>
+                          {l.revenue_type && l.revenue_type !== 'FREIGHT' && <span className="fl-line-type">{revenueTypeLabel(l.revenue_type)}</span>}
                           <span className="fin-cell-sub fin-mobile-only">{formatQuantity(l.quantity)} × {formatCurrency(l.unit_price)} · {taxCodeShort(l.tax_code)}, VAT {formatCurrency(l.vat_amount)}</span>
                         </td>
                         <td className="num m-hide">{formatQuantity(l.quantity)}</td>
@@ -169,6 +173,7 @@ export default function CreditNoteDetail() {
         </div>
 
         <aside className="fin-rail" aria-label="Credit note activity">
+          <AccountingSyncCard sync={note.accounting_sync} what="credit note" localNumber={note.credit_note_number} />
           <section className="card" aria-labelledby="cn-activity-title">
             <div className="fin-panel-head" style={{ marginBottom: 4 }}>
               <div className="fin-panel-head__text"><h2 id="cn-activity-title" className="fin-panel-title">Activity</h2></div>

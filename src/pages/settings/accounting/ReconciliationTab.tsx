@@ -9,6 +9,7 @@ import {
   ACCT_KEYS, ACCT_URL, accountingApi, apiMessage, humanise, providerConfig,
   type Connection, type ReconDifference, type ReconScope, type Reconciliation,
 } from '@/lib/accounting';
+import type { AccountingTab } from './tabs';
 import { AcctCard, ErrorBlock, LoadingBlock, plural, useAccountingPermissions } from './shared';
 
 const SCOPES: { scope: ReconScope; title: string; first: string }[] = [
@@ -31,10 +32,12 @@ const FIELD_LABEL: Record<string, string> = {
 };
 
 const isMoney = (v: string) => /^-?\d+(\.\d+)?$/.test(String(v).trim());
-const showValue = (v: string) => (isMoney(v) ? formatCurrency(v) : humanise(v) || '—');
+/** Provider status codes in plain words (Xero's AUTHORISED is an unpaid, approved invoice). */
+const STATUS_WORD: Record<string, string> = { AUTHORISED: 'Awaiting payment', SUBMITTED: 'Awaiting approval', OPEN: 'Open', OVERDUE: 'Overdue', VOIDED: 'Void' };
+const showValue = (v: string) => (isMoney(v) ? formatCurrency(v) : STATUS_WORD[String(v).toUpperCase()] ?? (humanise(v) || '—'));
 
 /** Does TruckWys agree with the books? Per invoice, per customer, per month. */
-export function ReconciliationTab({ connection }: { connection: Connection }) {
+export function ReconciliationTab({ connection, onOpen }: { connection: Connection; onOpen?: (tab: AccountingTab) => void }) {
   const qc = useQueryClient();
   const cfg = providerConfig(connection.provider);
   const { canWrite, writeTitle } = useAccountingPermissions();
@@ -73,7 +76,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
     <>
       <AcctCard
         title="Reconciliation"
-        description={`Each night we compare invoices, customer balances and monthly sales and VAT with ${cfg.short}. Differences under 1 cent are ignored.`}
+        description={`We compare invoices, customer balances and monthly sales and VAT with ${cfg.short}.`}
         actions={runButton}
       >
         {!last ? (
@@ -87,7 +90,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
               <>
                 <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}</p>
                 {(connection.counts.errors + connection.counts.dead) > 0 && (
-                  <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}>{plural(connection.counts.errors + connection.counts.dead, 'document')} not in {cfg.short} yet {connection.counts.errors + connection.counts.dead === 1 ? "isn't" : "aren't"} compared. See Sync.</p>
+                  <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}>{plural(connection.counts.errors + connection.counts.dead, 'document')} {connection.counts.errors + connection.counts.dead === 1 ? "hasn't" : "haven't"} reached {cfg.short} yet, so {connection.counts.errors + connection.counts.dead === 1 ? "it isn't" : "they aren't"} compared.{onOpen && <>{' '}<button type="button" className="acct-linkbtn" onClick={() => onOpen('sync')}>View in Sync</button></>}</p>
                 )}
               </>
             ) : (

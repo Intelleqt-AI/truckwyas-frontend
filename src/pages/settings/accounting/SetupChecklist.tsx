@@ -68,7 +68,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: backfillLook,
       title: r.backfill_state === 'DONE' && connection.cutover_date ? `Start date: ${formatDate(connection.cutover_date)}` : 'Choose a start date',
       desc: r.backfill_state === 'DONE'
-        ? `Sent everything dated from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'}.`
+        ? `Everything dated from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'} is already in ${cfg.short}.`
         : r.backfill_state === 'RUNNING'
           ? `Sending documents to ${cfg.short} now.`
           : r.backfill_state === 'FAILED'
@@ -95,10 +95,24 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const blockers = connection.status !== 'ACTIVE' ? [] : providerBlockers(r);
   items.splice(1, 0, ...blockers.map((text, i): Item => {
     const x = parseBlocker(text);
+    const isNext = i === 0;
     return {
       key: `provider-${i}`, look: 'warn', provider: true,
       title: x ? `${x.what} in ${cfg.short}` : `Change a ${cfg.short} setting`,
-      desc: x ? <><span className="acct-path">{x.where}</span>{x.why}</> : text,
+      desc: <>
+        {x ? <><span className="acct-path">{x.where}</span>{x.why}</> : text}
+        <span className="acct-step-actions--below">
+          {connection.web_url && (
+            <a className={`tw-btn${isNext ? ' tw-btn--primary' : ''}`} href={connection.web_url} target="_blank" rel="noopener noreferrer">
+              Open in {cfg.short}<ExternalLink size={14} aria-hidden="true" />
+            </a>
+          )}
+          <button type="button" className="tw-btn" onClick={checkAgain} disabled={!canWrite || checking} title={writeTitle}>
+            <RefreshCw size={14} aria-hidden="true" className={checking ? 'animate-spin' : undefined} />
+            {checking ? 'Checking…' : 'Check again'}
+          </button>
+        </span>
+      </>,
       action: 'Check again',
     };
   }));
@@ -107,7 +121,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const stillOpen = items.filter(it => it.look !== 'done' && it.key !== 'live');
   if (liveItem && !r.sync_enabled && stillOpen.length && stillOpen.every(it => it.provider)) {
     const nums = stillOpen.map(it => items.indexOf(it) + 1);
-    liveItem.desc = `Starts once ${nums.length === 1 ? `step ${nums[0]} is` : `steps ${nums.join(' and ')} are`} done.`;
+    liveItem.desc = `Waiting on ${nums.length === 1 ? `step ${nums[0]}` : `steps ${nums.join(' and ')}`}.`;
   }
 
   // Only the next step to do gets the primary button; while the sign-in has
@@ -141,17 +155,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
                 <div className="acct-check__desc">{it.desc}</div>
               </div>
               {it.provider ? (
-                <span className="acct-step-actions">
-                  {connection.web_url && (
-                    <a className="tw-btn" href={connection.web_url} target="_blank" rel="noopener noreferrer">
-                      Open in {cfg.short}<ExternalLink size={14} aria-hidden="true" />
-                    </a>
-                  )}
-                  <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={checkAgain} disabled={!canWrite || checking} title={writeTitle}>
-                    <RefreshCw size={14} aria-hidden="true" className={checking ? 'animate-spin' : undefined} />
-                    {checking ? 'Checking…' : 'Check again'}
-                  </button>
-                </span>
+                <span />
               ) : it.tab && it.action && !(blocked && it.look !== 'done') ? (
                 <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : it.look === 'done' ? ' tw-btn--sm acct-step-done-btn' : ''}`} onClick={() => onOpen(it.tab!)}>
                   {it.action}

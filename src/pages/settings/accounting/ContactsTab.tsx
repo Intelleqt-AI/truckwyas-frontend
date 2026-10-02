@@ -123,7 +123,7 @@ export function ContactsTab({ connection }: { connection: Connection }) {
           <div className="acct-contact-filter">
             <Select value={status} onValueChange={v => setStatus(v as StatusFilter)}>
               <SelectTrigger aria-label="Status" className="acct-select" style={{ minHeight: 36, height: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
-              <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'All statuses' : o.label} ({o.count ?? 0})</SelectItem>)}</SelectContent>
+              <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'All statuses' : `${o.label} (${o.count ?? 0})`}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="acct-contact-filter">
@@ -202,7 +202,7 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   } else if (row.status === 'SKIPPED') {
     match = <div className="acct-row__sub">Not synced. Their documents stay in TruckWys only and show as sync errors.</div>;
   } else {
-    match = <div className="acct-row__sub">No {providerName} contact found. Pick one, or create one from the ⋯ menu.</div>;
+    match = <div className="acct-row__sub">No {providerName} contact found.</div>;
   }
 
   const menu: RowActionItem[] = [];
@@ -217,11 +217,14 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
       );
       menu.push({ label: 'Pick another', onSelect: onPick });
     } else if (row.status === 'UNMATCHED') {
-      primary = <button type="button" className="tw-btn tw-btn--sm" disabled={busy} onClick={onPick}>Pick a contact</button>;
+      primary = <>
+        <button type="button" className="tw-btn tw-btn--sm" disabled={busy} onClick={onPick}>Pick a contact</button>
+        <button type="button" className="tw-btn tw-btn--sm tw-btn--ghost" disabled={busy} onClick={() => onConfirm({ action: 'create' }, `${row.local_name} will be created in ${providerName}`)}>Create new</button>
+      </>;
     } else {
       menu.push({ label: row.status === 'MATCHED' ? 'Change contact' : 'Pick a contact', onSelect: onPick });
     }
-    if (row.status !== 'CREATE') menu.push({ label: `Create new in ${providerName}`, onSelect: () => onConfirm({ action: 'create' }, `${row.local_name} will be created in ${providerName}`), disabled: busy });
+    if (row.status !== 'CREATE' && row.status !== 'UNMATCHED') menu.push({ label: `Create new in ${providerName}`, onSelect: () => onConfirm({ action: 'create' }, `${row.local_name} will be created in ${providerName}`), disabled: busy });
     if (row.status !== 'SKIPPED') menu.push({ label: "Skip, don't sync", onSelect: () => onConfirm({ action: 'skip' }, `${row.local_name} skipped`), disabled: busy, danger: true });
   }
 

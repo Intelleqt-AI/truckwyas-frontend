@@ -30,7 +30,7 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         <p className="acct-sync-line">
           {sync.status === 'BLOCKED'
             ? `Waiting on you before it can go to ${name}.`
-            : `${name} has the version from ${sync.last_synced_at ? formatDate(sync.last_synced_at) : 'before the latest change'}. ${sync.status === 'DEAD' ? 'Newer changes were not sent; retry from the Sync tab.' : `Newer changes go once the ${/account|tax|vat|tracking/i.test(sync.last_error) ? 'account mapping' : 'sync problem'} is fixed.`}`}
+            : `Last sent ${sync.last_synced_at ? formatDate(sync.last_synced_at) : 'never'}. ${sync.status === 'DEAD' ? 'Retry from the Sync tab once it is fixed.' : 'The latest change follows once it is fixed.'}`}
         </p>
       ) : (
         <dl className="fin-dl">
@@ -83,7 +83,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
         <strong>{`Not up to date in ${name}`}</strong>
-        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? `Fix that and ${name} gets the latest version on the next automatic try.` : 'Fix it, then retry from the Sync tab.'}
+        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? "Fix the mapping and we'll send the latest version on the next try." : 'Fix it, then retry from the Sync tab.'}
       </div>
       <Link to={`/settings/integrations/accounting?tab=${/account|tax|vat|tracking/i.test(sync.last_error) ? 'mapping' : 'sync'}`} className="tw-btn fl-notice__action">
         {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix account mapping' : 'View sync issue'}
@@ -99,7 +99,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
  */
 export function PaymentSourceBadge({ source, managed = false }: { source?: string | null; managed?: boolean }) {
   const manual = !source || source === 'MANUAL';
-  if (managed) return <span className="acct-source-note acct-source-note--line">{manual ? 'Entered in TruckWys' : `From ${source === 'BANK' ? 'bank feed' : providerConfig(source).short}`}</span>;
+  if (managed) return <span className="acct-source-note"> · Recorded in {manual ? 'TruckWys' : source === 'BANK' ? 'bank feed' : providerConfig(source).short}</span>;
   if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;
   return <span className="acct-source-badge">{label}</span>;

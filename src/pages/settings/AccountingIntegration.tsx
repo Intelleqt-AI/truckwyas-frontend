@@ -125,7 +125,7 @@ export default function AccountingIntegration() {
   }, [tab, live?.id, recon.data?.run?.difference_count]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tabCountTitle = (t: AccountingTab, n: number) =>
-    t === 'contacts' ? `${n} need action` : t === 'mapping' ? `${n} still to map` : t === 'reconciliation' ? `${n} differences` : `${n} failed to send`;
+    t === 'contacts' ? `${n} need action` : t === 'mapping' ? `${n} still to map` : t === 'reconciliation' ? `${n} differences` : `${n} ${n === 1 ? 'needs' : 'need'} a fix`;
 
   let body: React.ReactNode;
   if (conn.isLoading) {
@@ -154,10 +154,10 @@ export default function AccountingIntegration() {
         <p className="acct-section-desc">Send invoices and bills to your books. Payments recorded there come back automatically.</p>
         <AccountingProviderCards hideManage />
         <p className="acct-section-desc" style={{ margin: '0 0 24px' }}><ComingSoonNote /></p>
-        <AcctCard title="How setup works" description="About 10 minutes. Needs a company admin. Sync then starts automatically." flush>
+        <AcctCard title="How setup works" description="About 10 minutes. Needs a company admin. After that, sync runs on its own." flush>
           <ol className="acct-check">
             {[
-              ['Sign in', 'Sign in to your accounting system and allow TruckWys access.'],
+              ['Sign in', 'Allow TruckWys access to your books.'],
               ['Map accounts and VAT', 'Pick where each kind of charge and supplier bill goes in your books, and the VAT rate for each.'],
               ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
               ['Choose a start date', 'We send documents from that date. Anything earlier should already be in your books.'],
@@ -237,7 +237,7 @@ export default function AccountingIntegration() {
           {tab === 'contacts' && <ContactsTab connection={live} />}
           {tab === 'cutover' && <BackfillTab connection={live} onOpen={openTab} />}
           {tab === 'sync' && <SyncTab connection={live} onOpen={openTab} />}
-          {tab === 'reconciliation' && <ReconciliationTab connection={live} />}
+          {tab === 'reconciliation' && <ReconciliationTab connection={live} onOpen={openTab} />}
         </div>
       </>
     );

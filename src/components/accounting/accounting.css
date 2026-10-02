@@ -942,3 +942,36 @@
 }
 .acct-check--steps li.is-provider { align-items: start; }
 .acct-check--steps li.is-provider > .acct-step-actions { align-self: start; }
+
+/* Round F2 */
+.acct-tiles span span, .acct-tiles span .acct-hide-phone { display: inline !important; }
+@media (max-width: 640px) { .acct-tiles span .acct-hide-phone { display: none !important; } }
+.acct-tiles--3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+/* Mapping grid: spacing, not rules, between field pairs (as on Company details). */
+@container (min-width: 560px) {
+  .acct-map-grid { padding: 8px 0; }
+  .acct-map-grid > .acct-map-row { border-top: 0 !important; padding-top: 10px; padding-bottom: 10px; }
+}
+.acct-refresh-meta--line { display: flex; margin-top: 4px; }
+.acct-use-link { white-space: nowrap; }
+/* Contacts: room for Pick + Create new. */
+@media (min-width: 721px) {
+  .acct-row--contact { grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.4fr) max-content !important; }
+  .acct-row--contact .acct-row__actions { flex-wrap: nowrap; }
+}
+@media (max-width: 720px) { .acct-row--contact .acct-row__actions > .tw-btn + .tw-btn { grid-row: 4 !important; } }
+/* Org picker: dim the unavailable row's content, not its reason; selection shows a left bar. */
+.acct-org.is-disabled { opacity: 1 !important; }
+.acct-org.is-disabled .acct-row__title, .acct-org.is-disabled .acct-org-initials { opacity: 0.55; }
+.acct-org.is-disabled .acct-row__sub { color: var(--text-secondary); }
+.acct-org.is-disabled .acct-radio { visibility: hidden; }
+.acct-org.is-selected { box-shadow: inset 2px 0 0 var(--text-primary) !important; }
+@media (max-width: 640px) { .acct-formfoot__link { min-height: 44px; } }
+
+/* QuickBooks setting step: actions sit under the text, so the row keeps the list's rhythm. */
+.acct-step-actions--below { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+@media (max-width: 560px) { .acct-step-actions--below > * { flex: 1 1 100%; justify-content: center; } }
+/* Phones: only the next step's button is full width; the rest are compact. */
+@media (max-width: 560px) {
+  .acct-check--steps li > .tw-btn:not(.tw-btn--primary) { justify-self: start !important; width: auto !important; min-width: 0 !important; min-height: 44px; }
+}

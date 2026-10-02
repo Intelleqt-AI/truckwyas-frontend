@@ -16,7 +16,7 @@ import type { AccountingTab } from './tabs';
 // One vocabulary for failures, used in the list and the activity log.
 const ERROR_META: Record<string, { tone: StatusTone; label: string }> = {
   ERROR: { tone: 'warning', label: 'Needs a fix' },
-  DEAD: { tone: 'danger', label: 'Stopped retrying' },
+  DEAD: { tone: 'danger', label: 'Gave up' },
   BLOCKED: { tone: 'neutral', label: 'Waiting on you' },
 };
 const LEVEL: Record<string, { tone: StatusTone; label: string }> = {
@@ -175,7 +175,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
             <div><span>Sent to {cfg.short}</span><strong>{c.synced.toLocaleString('en-ZA')}</strong></div>
             <div title="Waiting to send"><span>Waiting to send</span><strong className={c.queued ? undefined : 'is-zero'}>{c.queued.toLocaleString('en-ZA')}</strong></div>
             <div><span>{c.errors > 0 && <span className="acct-dot acct-dot--warning acct-dot--inline" aria-hidden="true" />}Needs a fix</span><strong className={c.errors ? undefined : 'is-zero'}>{c.errors.toLocaleString('en-ZA')}</strong></div>
-            <div title="Stopped retrying after 8 tries; retry from the list above"><span>Stopped retrying</span><strong className={c.dead ? undefined : 'is-zero'}>{c.dead.toLocaleString('en-ZA')}</strong></div>
+            <div title="Stopped retrying after 8 tries; retry from the list above"><span>Gave up after 8 tries</span><strong className={c.dead ? undefined : 'is-zero'}>{c.dead.toLocaleString('en-ZA')}</strong></div>
           </div>
         </div>
       </AcctCard>

@@ -21,7 +21,7 @@ export function documentSyncChip(status: DocumentSyncStatus | string): { tone: S
   switch (status) {
     case 'SYNCED': return { tone: 'success', label: 'In sync' };
     case 'PENDING': return { tone: 'info', label: 'Waiting to send' };
-    case 'ERROR': return { tone: 'warning', label: 'Needs a fix' };
+    case 'ERROR': return { tone: 'warning', label: 'Not up to date' };
     case 'DEAD': return { tone: 'danger', label: 'Failed' };
     case 'BLOCKED': return { tone: 'warning', label: 'Blocked' };
     case 'VOIDED': return { tone: 'neutral', label: 'Voided' };

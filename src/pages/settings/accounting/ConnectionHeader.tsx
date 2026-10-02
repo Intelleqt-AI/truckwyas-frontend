@@ -105,7 +105,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
           <AlertTriangle size={16} aria-hidden="true" />
           <div>
             <strong style={{ fontWeight: 600 }}>{connection.status_reason || `Your ${cfg.short} sign-in has expired.`}</strong>
-            {canWrite ? 'Sign in again to carry on.' : `Ask your company admin to reconnect ${cfg.short}.`} Nothing syncs until then; your mapping and contacts are kept.
+            {canWrite ? 'Sign in again to carry on.' : `Ask your company admin to reconnect ${cfg.short}.`} Your mapping and contacts are kept.
           </div>
           <button type="button" className="tw-btn tw-btn--primary" onClick={reconnect} disabled={!canWrite || reconnecting} title={writeTitle}>
             {reconnecting ? 'Opening…' : `Reconnect ${cfg.short}`}

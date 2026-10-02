@@ -206,9 +206,8 @@ export function MappingTab({ connection }: { connection: Connection }) {
     const empty = !sectionValue(section, key);
     if (s && sectionValue(section, key) !== s) {
       return (
-        <div className={`acct-hint acct-hint--stack${requiredGap(section, key) ? ' is-required' : ''}`}>
-          <span>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {describe(s)}.</span>
-          {canWrite && <button type="button" className="tw-btn tw-btn--sm acct-use-btn" onClick={() => setSection(section, key, s)}>Use suggestion</button>}
+        <div className={`acct-hint acct-hint--inline${requiredGap(section, key) ? ' is-required' : ''}`}>
+          <span>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {describe(s)}.{canWrite && <>{' '}<button type="button" className="acct-linkbtn acct-use-link" onClick={() => setSection(section, key, s)}>Use it</button></>}</span>
         </div>
       );
     }
@@ -262,7 +261,6 @@ export function MappingTab({ connection }: { connection: Connection }) {
         title={m.complete && !dirty ? 'Everything required is mapped' : m.missing.length > 0 ? `${m.missing.length} required ${m.missing.length === 1 ? 'line' : 'lines'} still to map` : 'Unsaved changes'}
         description={<>
           Nothing is sent to {cfg.short} until every required line is mapped.
-          {m.options.fetched_at && <> Accounts updated from {cfg.short} {hoursAgo(m.options.fetched_at)}.</>}
           {m.missing.length > 0 && !(m.complete && !dirty) && (
             <ul className="acct-jump-list">{m.missing.map(k => (
               <li key={k}><button type="button" className="acct-jumpbtn" onClick={() => jumpTo(k)}>{missingMappingLabel(k)}</button></li>
@@ -273,14 +271,17 @@ export function MappingTab({ connection }: { connection: Connection }) {
         actionsBelow
         actions={(canWrite && pendingSuggestions.length > 0) || canWrite ? <>
           {canWrite && pendingSuggestions.length > 0 && (
-            <button type="button" className="tw-btn" onClick={applyAllSuggestions} title="Fills in the fields; nothing is saved until you press Save mapping">
+            <button type="button" className="tw-btn tw-btn--primary" onClick={applyAllSuggestions} title="Fills in the fields; nothing is saved until you press Save mapping">
               {`Use ${pendingSuggestions.length === 1 ? 'suggestion' : `${pendingSuggestions.length} suggestions`}`}
             </button>
           )}
-          <button type="button" className="tw-btn" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
-            <RefreshCw size={14} aria-hidden="true" className={refreshing ? 'animate-spin' : undefined} />
-            {refreshing ? 'Reading…' : `Refresh from ${cfg.short}`}
-          </button>
+          <span className="acct-refresh-meta">
+            {m.options.fetched_at && <span>Account list from {hoursAgo(m.options.fetched_at)}</span>}
+            <button type="button" className="acct-linkbtn acct-refresh-link" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
+              <RefreshCw size={13} aria-hidden="true" className={refreshing ? 'animate-spin' : undefined} />
+              {refreshing ? 'Reading…' : `Refresh from ${cfg.short}`}
+            </button>
+          </span>
         </> : undefined}
       />
 
@@ -457,7 +458,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
       ) : (
         <AcctCard
           title="Bank account and tracking"
-          description={`Optional. Where past payments go in ${cfg.short}, and vehicle or branch tags on each line.`}
+          description={`Optional. The ${cfg.short} bank account for payments already recorded in TruckWys, and vehicle or branch tags on each line.`}
           actions={<button type="button" className="tw-btn" onClick={() => setOptionalOpen(true)} aria-expanded={false}>Show options</button>}
         />
       )}
@@ -466,7 +467,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         // The same sticky save bar as Company details.
         <div className="cs-savebar acct-map-savebar">
           <span className="cs-savebar__note" role={formError ? 'alert' : undefined} style={formError ? { color: 'var(--status-danger-text)' } : undefined}>
-            {formError || (dirty ? `${changeCount} unsaved ${changeCount === 1 ? 'change' : 'changes'}` : m.missing.length > 0 ? `${m.missing.length} required ${m.missing.length === 1 ? 'line' : 'lines'} still to map` : 'All changes saved')}
+            {formError || (dirty ? `${changeCount} unsaved ${changeCount === 1 ? 'change' : 'changes'}` : 'No unsaved changes')}
           </span>
           {dirty && <button type="button" className="tw-btn tw-btn--ghost" onClick={() => { setDraft(EMPTY_DRAFT); setErrors({}); setFormError(''); }} disabled={saving}>Discard</button>}
           <button type="button" className="btn-action settings-control acct-save-btn" onClick={save} disabled={!dirty || saving}

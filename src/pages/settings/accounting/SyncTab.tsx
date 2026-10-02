@@ -32,7 +32,7 @@ function nextTry(iso: string): string {
   if (isNaN(d.getTime())) return iso;
   const mins = Math.round((d.getTime() - Date.now()) / 60000);
   if (mins <= 0) return 'due now';
-  if (mins < 60) return `in ${mins} min`;
+  if (mins < 60) return `in ${mins}m`;
   const time = d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
   const day = (x: Date) => x.toLocaleDateString('en-CA');
   const now = new Date();
@@ -121,7 +121,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
                     <div className="acct-row__sub" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                       <span>{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} <DocLink url={e.local_url}>{e.label}</DocLink></span>
                       {e.status !== 'ERROR' && <StatusChip tone={meta.tone} label={meta.label} size="sm" />}
-                      {e.status === 'ERROR' && e.next_attempt_at && <><span aria-hidden="true">·</span><span>{e.attempts} of 8 tries used, next {nextTry(e.next_attempt_at)}</span></>}
+                      {e.status === 'ERROR' && e.next_attempt_at && <><span aria-hidden="true">·</span><span>Try {e.attempts} of 8, next {nextTry(e.next_attempt_at)}</span></>}
                     </div>
                   </div>
                   <div className="acct-row__actions">

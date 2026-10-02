@@ -9,7 +9,7 @@ export function connectionChip(status: ConnectionStatus, readiness?: Readiness |
     return readiness.backfill_state === 'RUNNING' ? { tone: 'info', label: 'Sending history' } : { tone: 'warning', label: 'Setup needed' };
   }
   const failing = (counts?.errors ?? 0) + (counts?.dead ?? 0);
-  if (status === 'ACTIVE' && failing > 0) return { tone: 'warning', label: `${failing} failed to send` };
+  if (status === 'ACTIVE' && failing > 0) return { tone: 'warning', label: `${failing} ${failing === 1 ? 'needs' : 'need'} a fix` };
   switch (status) {
     case 'ACTIVE': return { tone: 'success', label: 'Connected' };
     case 'NEEDS_REAUTH': return { tone: 'danger', label: 'Sign-in expired' };

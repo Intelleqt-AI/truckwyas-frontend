@@ -84,7 +84,12 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
             {last.status === 'FAILED' ? (
               <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />The last check didn't finish</p>
             ) : differences.length === 0 ? (
-              <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}</p>
+              <>
+                <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}</p>
+                {(connection.counts.errors + connection.counts.dead) > 0 && (
+                  <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}>{plural(connection.counts.errors + connection.counts.dead, 'document')} not in {cfg.short} yet {connection.counts.errors + connection.counts.dead === 1 ? "isn't" : "aren't"} compared. See Sync.</p>
+                )}
+              </>
             ) : (
               <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}</p>
             )}
@@ -95,7 +100,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                 const bad = differences.filter(d => d.scope === sc.scope).length;
                 return (
                   <div key={sc.scope}>
-                    <span>{sc.scope === 'MONTH' ? 'Months' : sc.title} checked</span>
+                    <span>{sc.scope === 'MONTH' ? 'Months' : sc.title}<span className="acct-hide-phone"> checked</span></span>
                     <strong>{(n ?? 0).toLocaleString('en-ZA')}</strong>
                     <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} ${bad === 1 ? 'differs' : 'differ'}` : 'All match'}</em>
                   </div>
@@ -147,7 +152,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                         {d.local_url ? <Link className="acct-link" to={d.local_url}>{head}</Link> : <span className="acct-row__title">{head}</span>}
                         {rest.length > 0 && <span className="acct-row__sub"> · {rest.join(' · ')}</span>}
                       </span>
-                      <strong className={`acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <span className="acct-diff-word">Status differs</span>}</strong>
+                      {isMoney(d.difference) && d.difference !== '' && <strong className="acct-diff">{diffText(d)}</strong>}
                     </div>
                     <div className="acct-row__sub">{FIELD_LABEL[d.field] ?? humanise(d.field)} differs</div>
                     <dl className="acct-diff-kv"><dt>TruckWys</dt><dd>{showValue(d.truckwys)}</dd><dt>{cfg.short}</dt><dd>{showValue(d.provider)}</dd></dl>

@@ -151,19 +151,19 @@ export default function AccountingIntegration() {
     body = (
       <>
         <h2 className="acct-section-title">Connect your accounting system</h2>
-        <p className="acct-section-desc acct-desc-cap">Send invoices and bills to your books. Payments come back automatically. <ComingSoonNote /></p>
+        <p className="acct-section-desc">Send invoices and bills to your books. Payments recorded there come back automatically.</p>
         <AccountingProviderCards hideManage />
-        <div style={{ height: 12 }} />
-        <AcctCard title="How setup works" description="About 10 minutes, done by a company admin. Sync then starts automatically." flush>
+        <p className="acct-section-desc" style={{ margin: '0 0 24px' }}><ComingSoonNote /></p>
+        <AcctCard title="How setup works" description="About 10 minutes. Needs a company admin. Sync then starts automatically." flush>
           <ol className="acct-check">
             {[
-              ['Connect your accounting system', 'Sign in and allow TruckWys access.'],
+              ['Sign in', 'Sign in to your accounting system and allow TruckWys access.'],
               ['Map accounts and VAT', 'Pick where each kind of charge and supplier bill goes in your books, and the VAT rate for each.'],
               ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
               ['Choose a start date', 'We send documents from that date. Anything earlier should already be in your books.'],
             ].map(([t, d], i) => (
               <li key={t}>
-                <span className="acct-step-num" aria-hidden="true">{i + 1}</span>
+                <span className="acct-step-num is-plain" aria-hidden="true">{i + 1}</span>
                 <div style={{ minWidth: 0 }}>
                   <div className="acct-check__title">{t}</div>
                   <div className="acct-check__desc">{d}</div>

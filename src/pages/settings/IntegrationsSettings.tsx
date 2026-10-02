@@ -371,7 +371,7 @@ export function IntegrationsSettings() {
 
       {/* Accounting: Xero, QuickBooks Online, Sage (one connected at a time). */}
       <h2 className="acct-section-title">Accounting</h2>
-      <p className="acct-section-desc">Send invoices and bills to your books. Payments come back automatically.</p>
+      <p className="acct-section-desc">Send invoices and bills to your books. Payments recorded there come back automatically.</p>
       <AccountingProviderCards />
 
       <h2 className="acct-section-title">Fleet tracking</h2>
@@ -733,7 +733,7 @@ export function IntegrationsSettings() {
           // One key row's height: the list usually holds at least one key.
           <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : apiKeys.length === 0 ? (
-          <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+          <div style={{ padding: 0, textAlign: 'left', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
             No keys yet. Create one to connect your own software to TruckWys.
           </div>
         ) : (
@@ -833,7 +833,7 @@ export function IntegrationsSettings() {
         {loadingWebhooks ? (
           <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : webhooks.length === 0 ? (
-          <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+          <div style={{ padding: 0, textAlign: 'left', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
             No webhooks yet. Add one and TruckWys will notify your system when something changes.
           </div>
         ) : (

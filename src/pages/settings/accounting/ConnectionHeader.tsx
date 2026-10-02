@@ -105,7 +105,7 @@ export function ConnectionHeader({ connection, compact = false, hideOpen = false
           <AlertTriangle size={16} aria-hidden="true" />
           <div>
             <strong style={{ fontWeight: 600 }}>{connection.status_reason || `Your ${cfg.short} sign-in has expired.`}</strong>
-            {canWrite ? 'Sign in again to carry on.' : `Ask your company admin to reconnect ${cfg.short}.`} Nothing syncs until then.
+            {canWrite ? 'Sign in again to carry on.' : `Ask your company admin to reconnect ${cfg.short}.`} Nothing syncs until then; your mapping and contacts are kept.
           </div>
           <button type="button" className="tw-btn tw-btn--primary" onClick={reconnect} disabled={!canWrite || reconnecting} title={writeTitle}>
             {reconnecting ? 'Opening…' : `Reconnect ${cfg.short}`}
@@ -259,7 +259,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
           {error && <p className="acct-error" role="alert" style={{ margin: 0, marginRight: 'auto' }}>{error}</p>}
           {!error && <p className="acct-section-desc acct-formfoot__note">{!canWrite ? `${writeTitle}.` : 'Nothing is sent until you finish setup.'}</p>}
           {canWrite && (
-            <button type="button" className="tw-btn acct-formfoot__link" onClick={dis.ask} disabled={dis.busy || busy}>
+            <button type="button" className="tw-btn tw-btn--ghost acct-formfoot__link" onClick={dis.ask} disabled={dis.busy || busy}>
               Use a different {cfg.short} login
             </button>
           )}

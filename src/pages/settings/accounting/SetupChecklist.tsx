@@ -38,7 +38,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: connection.status === 'ACTIVE' ? 'done' : 'bad',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status !== 'ACTIVE'
-        ? (canWrite ? `Sign-in expired. Use Reconnect ${cfg.short} above.` : 'Sign-in expired. Only a company admin can reconnect.')
+        ? (canWrite ? 'Waiting for you to sign in again.' : 'Waiting for a company admin to sign in again.')
         : `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`,
     },
     {
@@ -66,7 +66,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     {
       key: 'cutover',
       look: backfillLook,
-      title: 'Choose a start date',
+      title: r.backfill_state === 'DONE' && connection.cutover_date ? `Start date: ${formatDate(connection.cutover_date)}` : 'Choose a start date',
       desc: r.backfill_state === 'DONE'
         ? `Sent everything dated from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'}.`
         : r.backfill_state === 'RUNNING'
@@ -84,6 +84,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       desc: r.sync_enabled
         ? `New invoices, credit notes and bills go to ${cfg.short} on their own, and payments come back every few minutes.`
         : 'Automatically, once the steps above are done.',
+      // (reworded below when only provider settings are left)
       tab: r.sync_enabled ? 'sync' : undefined,
       action: r.sync_enabled ? 'Sync status' : undefined,
     },
@@ -97,13 +98,17 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     return {
       key: `provider-${i}`, look: 'warn', provider: true,
       title: x ? `${x.what} in ${cfg.short}` : `Change a ${cfg.short} setting`,
-      desc: <>
-        {x ? <>In {cfg.short}: {x.where}. {x.why}</> : text}
-        {connection.web_url && <>{' '}<a className="acct-link acct-nowrap" href={connection.web_url} target="_blank" rel="noopener noreferrer">Open in {cfg.short}<ExternalLink size={12} aria-hidden="true" /></a></>}
-      </>,
+      desc: x ? <><span className="acct-path">{x.where}</span>{x.why}</> : text,
       action: 'Check again',
     };
   }));
+
+  const liveItem = items.find(it => it.key === 'live');
+  const stillOpen = items.filter(it => it.look !== 'done' && it.key !== 'live');
+  if (liveItem && !r.sync_enabled && stillOpen.length && stillOpen.every(it => it.provider)) {
+    const nums = stillOpen.map(it => items.indexOf(it) + 1);
+    liveItem.desc = `Starts once ${nums.length === 1 ? `step ${nums[0]} is` : `steps ${nums.join(' and ')} are`} done.`;
+  }
 
   // Only the next step to do gets the primary button; while the sign-in has
   // expired, Reconnect (in the header) is the only one and the rest wait.
@@ -136,10 +141,17 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
                 <div className="acct-check__desc">{it.desc}</div>
               </div>
               {it.provider ? (
-                <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={checkAgain} disabled={!canWrite || checking} title={writeTitle}>
-                  <RefreshCw size={14} aria-hidden="true" className={checking ? 'animate-spin' : undefined} />
-                  {checking ? 'Checking…' : 'Check again'}
-                </button>
+                <span className="acct-step-actions">
+                  {connection.web_url && (
+                    <a className="tw-btn" href={connection.web_url} target="_blank" rel="noopener noreferrer">
+                      Open in {cfg.short}<ExternalLink size={14} aria-hidden="true" />
+                    </a>
+                  )}
+                  <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={checkAgain} disabled={!canWrite || checking} title={writeTitle}>
+                    <RefreshCw size={14} aria-hidden="true" className={checking ? 'animate-spin' : undefined} />
+                    {checking ? 'Checking…' : 'Check again'}
+                  </button>
+                </span>
               ) : it.tab && it.action && !(blocked && it.look !== 'done') ? (
                 <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : it.look === 'done' ? ' tw-btn--sm acct-step-done-btn' : ''}`} onClick={() => onOpen(it.tab!)}>
                   {it.action}

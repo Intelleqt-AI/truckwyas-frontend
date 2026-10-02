@@ -68,7 +68,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: backfillLook,
       title: r.backfill_state === 'DONE' && connection.cutover_date ? `Start date: ${formatDate(connection.cutover_date)}` : 'Choose a start date',
       desc: r.backfill_state === 'DONE'
-        ? `Everything dated from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'} is already in ${cfg.short}.`
+        ? `Documents from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'} were sent to ${cfg.short}.`
         : r.backfill_state === 'RUNNING'
           ? `Sending documents to ${cfg.short} now.`
           : r.backfill_state === 'FAILED'
@@ -135,7 +135,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     : r.sync_enabled
     ? `Done. ${cfg.short} and TruckWys now stay in step on their own.`
     : reauth
-      ? `Steps 2–${items.length} wait until ${cfg.short} is reconnected.`
+      ? `The other steps wait until ${cfg.short} is reconnected.`
       : open.length
         ? `One-time setup. Nothing is sent to ${cfg.short} until ${open.length === 1 ? `step ${open[0]} is` : `steps ${open[0]}–${open[open.length - 1]} are`} done.`
         : `Sending your history to ${cfg.short}.`;

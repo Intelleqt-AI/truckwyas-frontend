@@ -252,7 +252,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
               <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
               <span className="acct-row__sub">Books in {t.currency}. Only ZAR books can be linked.</span>
             </span>
-            <span />
+            <StatusChip tone="neutral" label="Not supported" size="sm" />
           </div>
         ))}
         <div className="acct-formfoot">

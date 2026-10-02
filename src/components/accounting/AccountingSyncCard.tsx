@@ -30,7 +30,7 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         <p className="acct-sync-line">
           {sync.status === 'BLOCKED'
             ? `Waiting on you before it can go to ${name}.`
-            : `Last sent ${sync.last_synced_at ? formatDate(sync.last_synced_at) : 'never'}. ${sync.status === 'DEAD' ? 'Retry from the Sync tab once it is fixed.' : 'The latest change follows once it is fixed.'}`}
+            : `Last sent ${sync.last_synced_at ? formatDate(sync.last_synced_at) : 'never'}. ${sync.status === 'DEAD' ? 'Newer changes need a retry from the Sync tab.' : 'Newer changes are waiting to send.'}`}
         </p>
       ) : (
         <dl className="fin-dl">
@@ -99,7 +99,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
  */
 export function PaymentSourceBadge({ source, managed = false }: { source?: string | null; managed?: boolean }) {
   const manual = !source || source === 'MANUAL';
-  if (managed) return <span className="acct-source-note"> · Recorded in {manual ? 'TruckWys' : source === 'BANK' ? 'bank feed' : providerConfig(source).short}</span>;
+  if (managed) return <span className="acct-source-note acct-source-note--line">Recorded in {manual ? 'TruckWys' : source === 'BANK' ? 'bank feed' : providerConfig(source).short}</span>;
   if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;
   return <span className="acct-source-badge">{label}</span>;

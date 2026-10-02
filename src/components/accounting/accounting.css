@@ -1077,3 +1077,48 @@
 /* QuickBooks setting step: path muted under the title; a little more air between the phone buttons. */
 .acct-path { font-weight: 400 !important; color: var(--text-secondary) !important; }
 @media (max-width: 560px) { .acct-step-actions--below { gap: 12px; } }
+/* Last tight round */
+/* Mapping summary: refresh meta in the header row; suggestions button truncates with the full list in its tooltip. */
+.acct-refresh-meta { white-space: nowrap; }
+.acct-sum-actions { display: flex; min-width: 0; }
+.acct-sugg-btn { max-width: 100%; min-width: 0; }
+.acct-sugg-btn__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) { .acct-sugg-btn { width: 100%; justify-content: center; } }
+/* Mapping: "Show all" sits right under the last field. */
+.acct-map-gridwrap:has(+ .acct-map-more) .acct-map-grid { padding-bottom: 0; }
+.acct-map-gridwrap:has(+ .acct-map-more) .acct-map-row.is-required { padding-bottom: 6px; }
+.acct-map-more { padding: 0 var(--card-pad, 20px) 10px !important; }
+/* Phone save bar on one line. */
+@media (max-width: 640px) {
+  .acct-map-savebar { flex-wrap: nowrap !important; }
+  .acct-map-savebar .cs-savebar__note { display: block !important; flex: 1 1 auto !important; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .acct-map-savebar > .btn-action, .acct-map-savebar > .tw-btn--ghost { flex: 0 0 auto !important; width: auto !important; }
+}
+/* Reconciliation: text values wrap inside their column, with a gutter. */
+.acct-val-text { display: inline-block; white-space: normal; text-align: right; max-width: 100%; }
+.acct-table--recon td.num { padding-left: 28px; }
+.acct-table--recon td .acct-diff-word { white-space: normal; text-align: right; }
+/* Setup steps: secondary and finished actions are quiet links with a chevron on phones. */
+.acct-step-chev { display: none; }
+@media (max-width: 560px) {
+  .acct-check--steps li > .acct-step-quiet { border: 0 !important; background: none !important; padding: 0 !important; min-height: 32px !important; height: auto !important; color: var(--text-primary) !important; font-weight: 500; gap: 2px; justify-self: start !important; width: auto !important; }
+  .acct-check--steps li > .acct-step-quiet .acct-step-chev { display: inline-block; }
+}
+/* Sign-in expired: on phones the reconnect action lives in step 1. */
+.acct-only-phone-btn { display: none !important; }
+@media (max-width: 560px) {
+  .acct-only-phone-btn { display: inline-flex !important; grid-column: 2; justify-self: stretch !important; width: 100%; }
+  .acct-notice .acct-hide-phone-btn { display: none !important; }
+}
+/* Payment rows: "only here" is quieter than "in the books". */
+.acct-source-note.is-local { color: var(--text-tertiary); }
+
+/* QuickBooks setting step: actions in the right-hand column like the other steps (desktop); under the text on phones. */
+.acct-step-actions--side { display: flex; flex-direction: column; gap: 8px; justify-self: end; align-self: start; min-width: 168px; }
+.acct-step-actions--below { display: none !important; }
+@media (max-width: 560px) {
+  .acct-step-actions--side { display: none !important; }
+  .acct-step-actions--below { display: flex !important; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+  .acct-step-actions--below > .tw-btn--primary { flex: 1 1 100% !important; justify-content: center; }
+  .acct-step-actions--below > .tw-btn:not(.tw-btn--primary) { flex: 0 0 auto !important; }
+}

@@ -871,3 +871,21 @@
 :root[data-theme="dark"] .acct-blockers, .dark .acct-blockers { border-top: 1px solid color-mix(in srgb, var(--status-warning) 35%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--status-warning) 35%, transparent); }
 
 .acct-contact-filter { flex: 0 0 180px; }
+
+/* Mapping, round 4: finished sections fold to one line; open sections lay
+   their rows out two-up where the card is wide enough; the save bar stays in
+   view while the page scrolls. */
+.acct-title-ok { display: inline-flex; align-items: center; gap: 8px; }
+.acct-title-ok svg { color: var(--status-success-text); flex: none; }
+.acct-map-gridwrap { container-type: inline-size; }
+@container (min-width: 560px) {
+  .acct-map-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .acct-map-grid > .acct-map-row { grid-template-columns: minmax(0, 1fr) !important; row-gap: 6px; align-content: start; border-top: 1px solid var(--border-row); }
+  .acct-map-grid > .acct-map-row:nth-child(-n+2) { border-top: 0; }
+  .acct-map-grid > .acct-map-row:nth-child(even) { border-left: 1px solid var(--border-row); }
+  .acct-map-grid .acct-map-row__label { padding-top: 0; font-size: 13px; }
+}
+.acct-map-savebar { position: sticky; bottom: 0; z-index: 6; border: 1px solid var(--border-subtle); border-radius: var(--radius-card); }
+.acct-save-btn:not(:disabled) { background: var(--btn-primary-bg, var(--text-primary)); color: var(--btn-primary-fg, var(--bg-surface)); }
+.acct-sync-line { margin: 4px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.acct-sync-open { margin-top: 12px; font-size: 13px; align-self: flex-start; min-height: 32px; }

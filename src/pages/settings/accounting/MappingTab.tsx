@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { Check, RefreshCw } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetchData } from '@/lib/Api';
@@ -61,6 +61,9 @@ export function MappingTab({ connection }: { connection: Connection }) {
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [optionalOpen, setOptionalOpen] = useState(false);
+  // Sections someone opened (Edit) or closed (Done) by hand; otherwise a
+  // section is open only while it needs input.
+  const [sectionOpen, setSectionOpen] = useState<Partial<Record<MappingSection, boolean>>>({});
 
   const m = q.data;
 
@@ -222,6 +225,33 @@ export function MappingTab({ connection }: { connection: Connection }) {
     const el = section ? document.getElementById(`lbl-${section}.${key}`) : null;
     el?.closest('.acct-map-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
+  const needsInput = (section: MappingSection) =>
+    (m.missing ?? []).some(k => k.startsWith(`${PREFIX[section]}:`))
+    || Object.keys(errors).some(k => k.startsWith(`${section}.`))
+    || Object.keys(draft[section]).length > 0;
+  const isOpen = (section: MappingSection) => sectionOpen[section] ?? needsInput(section);
+  const openSection = (section: MappingSection, open: boolean) => setSectionOpen(o => ({ ...o, [section]: open }));
+  /** "6 mapped" or "2 mapped · 2 not used": what a folded section holds. */
+  const sectionSummary = (section: MappingSection) => {
+    const rows = m[section] as Array<{ key: string }>;
+    const mapped = rows.filter(r => !!sectionValue(section, r.key)).length;
+    const unused = rows.length - mapped;
+    return `All set: ${mapped} mapped${unused ? `, ${unused} not used` : ''}.`;
+  };
+  /** A section with nothing to do: one line, and Edit to open it. */
+  const folded = (section: MappingSection, title: string) => (
+    <AcctCard
+      key={section}
+      title={<span className="acct-title-ok"><Check size={14} strokeWidth={2.5} aria-hidden="true" />{title}</span>}
+      description={sectionSummary(section)}
+      actions={<button type="button" className="tw-btn" onClick={() => openSection(section, true)} aria-expanded={false} aria-label={`Edit ${title.toLowerCase()}`}>Edit</button>}
+    />
+  );
+  /** Close again, once the section has nothing left to do. */
+  const doneAction = (section: MappingSection, title: string) =>
+    sectionOpen[section] && !needsInput(section)
+      ? <button type="button" className="tw-btn tw-btn--ghost" onClick={() => openSection(section, false)} aria-expanded aria-label={`Close ${title.toLowerCase()}`}>Done</button>
+      : undefined;
   const rowClass = (section: MappingSection, key: string) => `acct-map-row${requiredGap(section, key) ? ' is-required' : ''}`;
   const describeAccount = (code: string) => { const a = allAccounts.find(x => x.code === code); return a ? accountLabel(a, cfg.showAccountCodes) : code; };
   const describeTax = (code: string) => { const t = taxRates.find(x => x.code === code); return t ? taxLabel(t) : code; };
@@ -254,16 +284,19 @@ export function MappingTab({ connection }: { connection: Connection }) {
         </> : undefined}
       />
 
+      {!isOpen('revenue_types') ? folded('revenue_types', itemsForRevenue ? 'Products and services' : 'Income accounts') : (
       <AcctCard
         title={itemsForRevenue ? 'Products and services' : 'Income accounts'}
         description={itemsForRevenue
           ? `Pick the ${cfg.short} product or service for each kind of charge. Its income account decides where the money goes.`
           : 'Which income account each kind of charge on your invoices goes to.'}
+        actions={doneAction('revenue_types', itemsForRevenue ? 'Products and services' : 'Income accounts')}
         flush
       >
         {itemsForRevenue && items.length === 0 && (
           <div className="acct-hint" style={{ padding: '12px var(--card-pad, 20px) 0' }}>No products or services came back from {cfg.short}. Add a Service item there, then refresh.</div>
         )}
+        <div className="acct-map-gridwrap"><div className="acct-map-grid">
         {m.revenue_types.map(row => {
           const field = `revenue_types.${row.key}`;
           return (
@@ -279,9 +312,13 @@ export function MappingTab({ connection }: { connection: Connection }) {
             </div>
           );
         })}
+        </div></div>
       </AcctCard>
+      )}
 
-      <AcctCard title="Expense accounts" description="Where supplier bills go, by expense category." flush>
+      {!isOpen('expense_categories') ? folded('expense_categories', 'Expense accounts') : (
+      <AcctCard title="Expense accounts" description="Where supplier bills go, by expense category." actions={doneAction('expense_categories', 'Expense accounts')} flush>
+        <div className="acct-map-gridwrap"><div className="acct-map-grid">
         {m.expense_categories.map(row => {
           const field = `expense_categories.${row.key}`;
           return (
@@ -297,17 +334,21 @@ export function MappingTab({ connection }: { connection: Connection }) {
             </div>
           );
         })}
+        </div></div>
       </AcctCard>
+      )}
 
-      {(['tax_sales', 'tax_purchases'] as const).map(section => (
+      {(['tax_sales', 'tax_purchases'] as const).map(section => !isOpen(section) ? folded(section, section === 'tax_sales' ? 'VAT on sales' : 'VAT on purchases') : (
         <AcctCard
           key={section}
+          actions={doneAction(section, section === 'tax_sales' ? 'VAT on sales' : 'VAT on purchases')}
           title={section === 'tax_sales' ? 'VAT on sales' : 'VAT on purchases'}
           description={section === 'tax_sales'
             ? `For invoices and credit notes. Pick a ${cfg.short} rate with the same percentage.`
             : `For supplier bills. Pick a ${cfg.short} rate with the same percentage.`}
           flush
         >
+          <div className="acct-map-gridwrap"><div className="acct-map-grid">
           {m[section].map(row => {
             const field = `${section}.${row.key}`;
             const chosen = taxRates.find(t => t.code === sectionValue(section, row.key));
@@ -331,6 +372,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
               </div>
             );
           })}
+          </div></div>
         </AcctCard>
       ))}
 

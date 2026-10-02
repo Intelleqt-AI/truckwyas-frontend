@@ -9,6 +9,7 @@ import { settingsBadgeStyle, settingsCardStyle, settingsInputStyle, settingsSeco
 import { formatDate, formatDateTime } from '@/lib/formatters';
 import RowActions from '@/components/ui/RowActions';
 import { StatusChip } from '@/components/ui/StatusChip';
+import { AccountingProviderCards } from '@/components/accounting/AccountingProviderCards';
 
 const cardStyle: React.CSSProperties = { ...settingsCardStyle, padding: 'var(--card-pad, 20px)' };
 
@@ -46,12 +47,6 @@ const sectionTitleStyle: React.CSSProperties = {
  *  neutral state, not an error. */
 function ConnectionPill({ connected }: { connected: boolean }) {
   return <StatusChip status={connected ? 'CONNECTED' : 'DISCONNECTED'} />;
-}
-
-interface XeroStatus {
-  connected: boolean;
-  tenant_name?: string;
-  last_sync?: string;
 }
 
 interface CartrackStatus {
@@ -98,12 +93,6 @@ export function IntegrationsSettings() {
   // webhooks is fixed off; viewing status stays fully live.
   const isDemo = !!authUser?.is_demo;
 
-  // Xero state
-  const [xeroStatus, setXeroStatus] = useState<XeroStatus | null>(null);
-  const [loadingXero, setLoadingXero] = useState(true);
-  const [syncingInvoices, setSyncingInvoices] = useState(false);
-  const [syncingPayments, setSyncingPayments] = useState(false);
-
   // Cartrack state
   const [cartrackStatus, setCartrackStatus] = useState<CartrackStatus | null>(null);
   const [loadingCartrack, setLoadingCartrack] = useState(true);
@@ -142,19 +131,11 @@ export function IntegrationsSettings() {
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
 
   useEffect(() => {
-    loadXeroStatus();
     loadCartrackStatus();
     loadCtrlfleetStatus();
     loadAPIKeys();
     loadWebhooks();
   }, []);
-
-  const loadXeroStatus = () => {
-    fetchData('api/v1/integrations/xero/status/')
-      .then((data) => setXeroStatus(data))
-      .catch(() => setXeroStatus({ connected: false }))
-      .finally(() => setLoadingXero(false));
-  };
 
   const loadCartrackStatus = () => {
     fetchData('api/v1/integrations/cartrack/status/')
@@ -290,61 +271,6 @@ export function IntegrationsSettings() {
     }
   };
 
-  const handleXeroConnect = async () => {
-    // Fetch the Xero OAuth authorization URL (authenticated GET — axios injects the
-    // token and builds a clean URL), then redirect the whole tab into the flow.
-    try {
-      const data = await fetchData('api/v1/integrations/xero/connect/');
-      if (data?.auth_url) {
-        window.location.href = data.auth_url;
-      } else {
-        toast.error('Could not start Xero connection.');
-      }
-    } catch (err: any) {
-      toast.error(
-        err?.status === 503
-          ? "Xero isn't configured on the server yet."
-          : 'Could not start Xero connection.'
-      );
-    }
-  };
-
-  const handleXeroDisconnect = async () => {
-    try {
-      await postData({ url: 'api/v1/integrations/xero/disconnect/', data: {} });
-      toast.success('Xero disconnected');
-      loadXeroStatus();
-    } catch {
-      toast.error('Failed to disconnect Xero');
-    }
-  };
-
-  const handleSyncInvoices = async () => {
-    setSyncingInvoices(true);
-    try {
-      await postData({ url: 'api/v1/integrations/xero/sync-invoices/', data: {} });
-      toast.success('Invoices synced successfully');
-      loadXeroStatus();
-    } catch {
-      toast.error('Failed to sync invoices');
-    } finally {
-      setSyncingInvoices(false);
-    }
-  };
-
-  const handleSyncPayments = async () => {
-    setSyncingPayments(true);
-    try {
-      await postData({ url: 'api/v1/integrations/xero/sync-payments/', data: {} });
-      toast.success('Payments synced successfully');
-      loadXeroStatus();
-    } catch {
-      toast.error('Failed to sync payments');
-    } finally {
-      setSyncingPayments(false);
-    }
-  };
-
   const loadAPIKeys = () => {
     fetchData('api/v1/integrations/api-keys/')
       .then((data) => {
@@ -443,90 +369,17 @@ export function IntegrationsSettings() {
     <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
       <SettingsPageHeader title="Integrations" description="Connect TruckWys to your existing tools" />
 
-      {/* Xero Integration Card */}
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: 'var(--radius-nested)',
-            background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            overflow: 'hidden',
-          }}>
-            <img src="/Xero_logo.jpg" alt="Xero" style={{ width: 48, height: 48, objectFit: 'contain' }} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 2 }}>
-              Xero
-            </h2>
-            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-              Sync invoices and payments with Xero accounting
-            </div>
-          </div>
-          <ConnectionPill connected={!!xeroStatus?.connected} />
-        </div>
+      {/* Accounting: Xero, QuickBooks Online, Sage (one connected at a time). */}
+      <h2 className="acct-section-title">Accounting</h2>
+      <p className="acct-section-desc">Send invoices and bills to your books. Payments recorded there come back automatically.</p>
+      <AccountingProviderCards />
 
-        {loadingXero ? (
-          <div style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
-        ) : xeroStatus?.connected ? (
-          <>
-            <div style={{
-              ...nestedBoxStyle, marginBottom: 16, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
-            }}>
-              <strong style={{ color: 'var(--text-primary)' }}>Connected:</strong> {xeroStatus.tenant_name || 'Xero account'}
-              {xeroStatus.last_sync && (
-                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>
-                  Last sync: {formatDateTime(xeroStatus.last_sync)}
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                onClick={handleSyncInvoices}
-                disabled={syncingInvoices || isDemo}
-                title={isDemo ? 'Not available in the demo' : undefined}
-                className="settings-control"
-                style={{ ...secondaryBtnStyle, cursor: 'pointer' }}
-              >
-                {syncingInvoices ? 'Syncing…' : 'Sync invoices'}
-              </button>
-              <button
-                onClick={handleSyncPayments}
-                disabled={syncingPayments || isDemo}
-                title={isDemo ? 'Not available in the demo' : undefined}
-                className="settings-control"
-                style={{ ...secondaryBtnStyle, cursor: 'pointer' }}
-              >
-                {syncingPayments ? 'Syncing…' : 'Sync payments'}
-              </button>
-              <button
-                onClick={handleXeroDisconnect}
-                disabled={isDemo}
-                title={isDemo ? 'Not available in the demo' : undefined}
-                className="settings-control"
-                style={{
-                  ...secondaryBtnStyle, color: 'var(--text-tertiary)',
-                  cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                }}>
-                Disconnect
-              </button>
-            </div>
-          </>
-        ) : (
-          <button
-            onClick={handleXeroConnect}
-            disabled={isDemo}
-            title={isDemo ? 'Not available in the demo' : undefined}
-            className="settings-control"
-            style={{ ...secondaryBtnStyle, cursor: 'pointer', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
-          >
-            Connect Xero
-          </button>
-        )}
-      </div>
+      <h2 className="acct-section-title">Fleet tracking</h2>
+      <p className="acct-section-desc">Live vehicle positions and status.</p>
 
       {/* Cartrack Card */}
       <div style={cardStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <div className="tw-int-head" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <div style={{
             width: 48, height: 48, borderRadius: 'var(--radius-nested)',
             background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
@@ -543,7 +396,7 @@ export function IntegrationsSettings() {
               Live vehicle location, speed and ignition status
             </div>
           </div>
-          <ConnectionPill connected={!!cartrackStatus?.connected} />
+          <span className="tw-int-head__chip"><ConnectionPill connected={!!cartrackStatus?.connected} /></span>
         </div>
 
         {loadingCartrack ? (
@@ -616,7 +469,7 @@ export function IntegrationsSettings() {
 
       {/* CtrlFleet Card */}
       <div style={cardStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <div className="tw-int-head" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <div style={{
             width: 48, height: 48, borderRadius: 'var(--radius-nested)',
             background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
@@ -633,7 +486,7 @@ export function IntegrationsSettings() {
               Live vehicle location and points of interest
             </div>
           </div>
-          <ConnectionPill connected={!!ctrlfleetStatus?.connected} />
+          <span className="tw-int-head__chip"><ConnectionPill connected={!!ctrlfleetStatus?.connected} /></span>
         </div>
 
         {loadingCtrlfleet ? (
@@ -832,6 +685,9 @@ export function IntegrationsSettings() {
         )}
       </div>
 
+      <h2 className="acct-section-title">Developers</h2>
+      <p className="acct-section-desc">Connect your own systems to TruckWys.</p>
+
       {/* Partner API Keys Card */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -877,8 +733,8 @@ export function IntegrationsSettings() {
           // One key row's height: the list usually holds at least one key.
           <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : apiKeys.length === 0 ? (
-          <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-            No API keys yet. Generate one to enable programmatic access.
+          <div style={{ padding: 0, textAlign: 'left', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+            No keys yet. Create one to connect your own software to TruckWys.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -977,8 +833,8 @@ export function IntegrationsSettings() {
         {loadingWebhooks ? (
           <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : webhooks.length === 0 ? (
-          <div style={{ padding: 'var(--card-pad, 20px)', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-            No webhooks configured. Add one to receive real-time event notifications.
+          <div style={{ padding: 0, textAlign: 'left', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+            No webhooks yet. Add one and TruckWys will notify your system when something changes.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

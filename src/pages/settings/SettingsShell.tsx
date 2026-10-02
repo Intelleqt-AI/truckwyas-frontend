@@ -102,6 +102,11 @@ export function SettingsShell({ activeId, children }: SettingsShellProps) {
   })).filter(s => s.items.length > 0);
   const allItems = visibleSections.flatMap(s => s.items);
   const activeLabel = allItems.find(i => i.id === activeId)?.label ?? 'Settings';
+  // A sub-page a non-admin can read (e.g. the accounting integration) sits
+  // under an admin-only section: the picker still names where they are.
+  const hiddenActive = allItems.some(i => i.id === activeId)
+    ? null
+    : SETTINGS_NAV.flatMap(s => s.items).find(i => i.id === activeId) ?? null;
 
   // Phones: one picker instead of a strip of links that clips at both edges.
   const phoneNav = (
@@ -109,6 +114,7 @@ export function SettingsShell({ activeId, children }: SettingsShellProps) {
       <Select value={activeId} onValueChange={(v) => navigate(v === '__admin' ? '/admin' : `/settings/${v}`)}>
         <SelectTrigger aria-label="Settings section" className="tw-settings-phone-nav__trigger"><SelectValue /></SelectTrigger>
         <SelectContent>
+          {hiddenActive && <SelectItem value={hiddenActive.id}>{hiddenActive.label}</SelectItem>}
           {visibleSections.map(s => (
             <SelectGroup key={s.group}>
               <SelectLabel>{s.group}</SelectLabel>

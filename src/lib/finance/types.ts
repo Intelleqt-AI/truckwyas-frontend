@@ -1,3 +1,5 @@
+import type { AccountingSync } from '@/lib/accounting';
+
 /**
  * Finance API types (Foundation phase): invoices with lines, credit notes,
  * payments, suppliers, expenses, customer tax fields and finance settings.
@@ -8,6 +10,21 @@
  */
 
 export type TaxCode = 'STANDARD' | 'ZERO_RATED' | 'EXEMPT' | 'NO_VAT';
+
+/** What a line charges for; decides the income account it posts to in Xero / QuickBooks. */
+export type RevenueType = 'FREIGHT' | 'FUEL_SURCHARGE' | 'TOLLS' | 'EXTRA_KM' | 'WAITING_TIME' | 'OTHER';
+
+export const REVENUE_TYPES: { value: RevenueType; label: string }[] = [
+  { value: 'FREIGHT', label: 'Freight' },
+  { value: 'FUEL_SURCHARGE', label: 'Fuel surcharge' },
+  { value: 'TOLLS', label: 'Tolls recharged' },
+  { value: 'EXTRA_KM', label: 'Extra km' },
+  { value: 'WAITING_TIME', label: 'Waiting time' },
+  { value: 'OTHER', label: 'Other' },
+];
+
+export const revenueTypeLabel = (t: string | null | undefined): string =>
+  REVENUE_TYPES.find(r => r.value === t)?.label ?? 'Freight';
 
 /** A decimal as the API sends it ("15.00"). */
 export type Decimal = string;
@@ -37,6 +54,8 @@ export interface InvoiceLine {
   net_amount: Decimal;
   vat_amount: Decimal;
   total_amount: Decimal;
+  /** Defaults to FREIGHT on the server. */
+  revenue_type?: RevenueType;
   load: number | null;
   /** Net (excl. VAT) already credited on this line by issued credit notes. */
   credited_net_amount?: Decimal;
@@ -50,6 +69,7 @@ export interface InvoiceLineInput {
   discount_amount?: Decimal;
   discount_percent?: Decimal;
   tax_code: TaxCode;
+  revenue_type?: RevenueType;
   /** Kept from the saved line when a draft is edited. */
   load?: number | null;
 }
@@ -98,6 +118,8 @@ export interface Invoice {
   voided_at: string | null;
   void_reason: string;
   credit_notes: CreditNoteSummary[];
+  /** Where this invoice stands in the connected accounting system (null when none). */
+  accounting_sync?: AccountingSync | null;
   created_at?: string;
   updated_at?: string;
   sent_at?: string | null;
@@ -126,6 +148,8 @@ export interface CreditNoteLine {
   net_amount: Decimal;
   vat_amount: Decimal;
   total_amount: Decimal;
+  /** Inherited from the invoice line when linked to one. */
+  revenue_type?: RevenueType;
   invoice_line: number | null;
 }
 
@@ -145,6 +169,8 @@ export interface CreditNote {
   total_amount: Decimal;
   created_at: string;
   voided_at: string | null;
+  /** Where this credit note stands in the connected accounting system (null when none). */
+  accounting_sync?: AccountingSync | null;
 }
 
 export interface CreditNoteLineInput {
@@ -152,6 +178,7 @@ export interface CreditNoteLineInput {
   quantity: Decimal;
   unit_price: Decimal;
   tax_code: TaxCode;
+  revenue_type?: RevenueType;
   invoice_line?: number;
 }
 

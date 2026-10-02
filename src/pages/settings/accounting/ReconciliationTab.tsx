@@ -126,8 +126,8 @@ export function ReconciliationTab({ connection, onOpen }: { connection: Connecti
             <div className="acct-table-wrap acct-only-wide" role="region" aria-label={`${title} differences`} tabIndex={0}>
               <table className="acct-table acct-table--recon">
                 <colgroup>
-                  <col style={{ width: '28%' }} /><col style={{ width: '24%' }} />
-                  <col style={{ width: '24%' }} /><col style={{ width: '24%' }} />{hasLinks && <col style={{ width: 76 }} />}
+                  <col style={{ width: '37%' }} /><col style={{ width: '19%' }} />
+                  <col style={{ width: '23%' }} /><col style={{ width: '21%' }} />{hasLinks && <col style={{ width: 76 }} />}
                 </colgroup>
                 <thead>
                   <tr>
@@ -191,7 +191,7 @@ function DiffRow({ d, providerName, hasLinks }: { d: ReconDifference; providerNa
     <tr>
       <td>
         {d.local_url ? <Link className="acct-link" to={d.local_url}>{head}</Link> : head}
-        {(() => { const sub = [...rest, `${FIELD_LABEL[d.field] ?? humanise(d.field)} differs`].join(' · '); return <div className="acct-row__sub acct-oneline" title={sub}>{sub}</div>; })()}
+        {(() => { const sub = [`${FIELD_LABEL[d.field] ?? humanise(d.field)} differs`, ...rest].join(' · '); return <div className="acct-row__sub acct-oneline" title={sub}>{sub}</div>; })()}
       </td>
       <td className="num">{showValue(d.truckwys)}</td>
       <td className="num">{showValue(d.provider)}</td>

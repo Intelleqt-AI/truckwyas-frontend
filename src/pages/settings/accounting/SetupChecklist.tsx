@@ -159,9 +159,10 @@ function ProviderBlockers({ connection, blockers }: { connection: Connection; bl
         <AlertTriangle size={16} aria-hidden="true" />
         <div style={{ minWidth: 0 }}>
           <p className="acct-blockers__title">Change {blockers.length === 1 ? 'this setting' : `these ${blockers.length} settings`} in {cfg.short}</p>
-          {blockers.length === 1
-            ? <p className="acct-blockers__list acct-blockers__one">{blockers[0]}</p>
-            : <ul className="acct-blockers__list">{blockers.map(b => <li key={b}>{b}</li>)}</ul>}
+          <ul className={`acct-blockers__items${blockers.length === 1 ? ' is-one' : ''}`}>
+            {blockers.map(b => <BlockerItem key={b} text={b} />)}
+          </ul>
+          <p className="acct-blockers__after">When it's changed, press Refresh.</p>
         </div>
       </div>
       <div className="acct-blockers__actions">
@@ -171,6 +172,24 @@ function ProviderBlockers({ connection, blockers }: { connection: Connection; bl
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * One provider setting, split into what to change, where, and why when the
+ * server's sentence has the usual shape ('Turn on "X" in QuickBooks (path),
+ * then press Refresh: reason'); any other sentence shows as it came.
+ */
+function BlockerItem({ text }: { text: string }) {
+  const m = text.match(/^(Turn (?:on|off) "[^"]+") in [^(]+\(([^)]+)\),? then press Refresh:\s*(.+)$/);
+  if (!m) return <li className="acct-blocker"><span className="acct-blocker__what">{text}</span></li>;
+  const why = m[3].charAt(0).toUpperCase() + m[3].slice(1);
+  return (
+    <li className="acct-blocker">
+      <span className="acct-blocker__what">{m[1].replace(/"([^"]+)"/, '\u201c$1\u201d')}</span>
+      <span className="acct-blocker__where">Where: {m[2]}</span>
+      <span className="acct-blocker__why">{why}</span>
+    </li>
   );
 }
 

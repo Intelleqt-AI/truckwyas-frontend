@@ -834,3 +834,11 @@
   .acct-map-savebar .cs-savebar__note { display: block !important; flex: 1 1 100%; }
   .acct-map-savebar > .btn-action { flex: 1 1 100% !important; }
 }
+/* QuickBooks settings to change: what (bold), where (menu path), why (muted). */
+.acct-blockers__items { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 12px; }
+.acct-blocker { display: grid; gap: 2px; font: 400 13px/20px var(--font-sans); }
+.acct-blockers__items:not(.is-one) .acct-blocker + .acct-blocker { padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--status-warning) 30%, transparent); }
+.acct-blocker__what { font-weight: 500; color: var(--text-primary); font-size: 14px; }
+.acct-blocker__where { color: var(--text-secondary); }
+.acct-blocker__why { color: var(--text-secondary); }
+.acct-blockers__after { margin: 8px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }

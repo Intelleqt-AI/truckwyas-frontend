@@ -73,7 +73,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
     <>
       <AcctCard
         title="Reconciliation"
-        description={`Each night we compare invoices, customer balances and monthly sales and VAT with ${cfg.short}. Differences under 1c are ignored.`}
+        description={`Each night we compare invoices, customer balances and monthly sales and VAT with ${cfg.short}. Differences under 1 cent are ignored.`}
         actions={runButton}
       >
         {!last ? (
@@ -95,9 +95,9 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                 const bad = differences.filter(d => d.scope === sc.scope).length;
                 return (
                   <div key={sc.scope}>
-                    <span>{sc.scope === 'MONTH' ? 'VAT months' : sc.title}</span>
+                    <span>{sc.scope === 'MONTH' ? 'Months' : sc.title}</span>
                     <strong>{(n ?? 0).toLocaleString('en-ZA')}</strong>
-                    {differences.length > 0 && <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>}
+                    {differences.length > 0 && <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} ${bad === 1 ? 'differs' : 'differ'}` : 'All match'}</em>}
                   </div>
                 );
               })}
@@ -126,7 +126,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                     <th>{first}</th>
                     <th className="num">TruckWys</th>
                     <th className="num">{cfg.short}</th>
-                    <th className="num">Difference</th>
+                    <th className="num" title={`TruckWys minus ${cfg.short}`}>Difference</th>
                     {hasLinks && <th><span className="acct-sr">Open in {cfg.short}</span></th>}
                   </tr>
                 </thead>

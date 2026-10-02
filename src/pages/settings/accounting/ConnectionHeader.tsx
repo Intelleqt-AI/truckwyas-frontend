@@ -54,7 +54,7 @@ function useDisconnect(connection: Connection) {
  * Org name, status, who connected it and when, and the connection's actions.
  * `compact` (every tab but Setup) keeps only the identity row.
  */
-export function ConnectionHeader({ connection, compact = false }: { connection: Connection; compact?: boolean }) {
+export function ConnectionHeader({ connection, compact = false, hideOpen = false }: { connection: Connection; compact?: boolean; /** The page already offers "Open in …" (a setting to change there). */ hideOpen?: boolean }) {
   const { canWrite, writeTitle } = useAccountingPermissions();
   const cfg = providerConfig(connection.provider);
   const r = connection.readiness;
@@ -89,7 +89,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
           </p>
         </div>
         <div className="acct-head__actions">
-          {connection.web_url && !reauth ? (
+          {connection.web_url && !reauth && !hideOpen ? (
             <a href={connection.web_url} target="_blank" rel="noopener noreferrer" className="tw-btn acct-open-btn" aria-label={`Open in ${cfg.short}`} title={`Open in ${cfg.short}`}>
               <span className="acct-open-btn__text">Open in {cfg.short}</span>
               <ExternalLink size={14} aria-hidden="true" />

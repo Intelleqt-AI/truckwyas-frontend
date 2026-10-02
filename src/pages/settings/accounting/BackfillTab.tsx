@@ -84,7 +84,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
   if (!r.mapping_complete) reasons.push('Map every account and VAT code first');
   if (r.contacts_to_confirm > 0 || (p?.contacts_unconfirmed ?? 0) > 0) reasons.push(`Confirm the ${plural(Math.max(r.contacts_to_confirm, p?.contacts_unconfirmed ?? 0), 'contact')} matched on name only`);
   if (!date) reasons.push('Choose a start date');
-  if (connection.status === 'ACTIVE' && providerBlockers(r).length) reasons.push(`Change the ${cfg.short} settings listed on the Setup tab, then refresh`);
+  if (connection.status === 'ACTIVE' && providerBlockers(r).length) reasons.push(`Change the ${cfg.short} settings listed on the Setup tab`);
   const canStart = reasons.length === 0 && !locked && !starting;
 
   const start = async () => {

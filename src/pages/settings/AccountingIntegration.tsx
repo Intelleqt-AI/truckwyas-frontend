@@ -5,7 +5,7 @@ import { fetchData } from '@/lib/Api';
 import { AlertTriangle, CheckCircle2, ChevronLeft, Info, X, XCircle } from 'lucide-react';
 import { AccountingProviderCards, ComingSoonNote } from '@/components/accounting/AccountingProviderCards';
 import {
-  ACCT_KEYS, ACCT_URL, apiMessage, apiStatus, callbackMessage, type Reconciliation, invalidateAccounting, providerBySlug, providerConfig, useAccountingConnection,
+  ACCT_KEYS, ACCT_URL, apiMessage, providerBlockers, apiStatus, callbackMessage, type Reconciliation, invalidateAccounting, providerBySlug, providerConfig, useAccountingConnection,
 } from '@/lib/accounting';
 import { SettingsShell } from './SettingsShell';
 import { SettingsPageHeader, settingsCardStyle } from './settingsUi';
@@ -184,7 +184,7 @@ export default function AccountingIntegration() {
   } else {
     body = (
       <>
-        <ConnectionHeader connection={live} compact />
+        <ConnectionHeader connection={live} compact hideOpen={tab === 'setup' && providerBlockers(live.readiness).length > 0} />
         <div className="acct-tabs">
           <div className="section-header__tabs acct-utabs" role="tablist" ref={tabsRef} aria-label={`${cfg!.short} settings`}>
             {ACCOUNTING_TABS.map(t => {

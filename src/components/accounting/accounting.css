@@ -889,3 +889,7 @@
 .acct-save-btn:not(:disabled) { background: var(--btn-primary-bg, var(--text-primary)); color: var(--btn-primary-fg, var(--bg-surface)); }
 .acct-sync-line { margin: 4px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
 .acct-sync-open { margin-top: 12px; font-size: 13px; align-self: flex-start; min-height: 32px; }
+/* A setting to change in the provider: an amber-numbered step like the others. */
+.acct-step-num.is-warn { font-weight: 600; }
+.acct-check li.is-provider .acct-check__desc .acct-link { font-size: 13px; color: var(--text-primary); }
+.acct-check--steps li.is-provider > .tw-btn { min-width: 148px; }

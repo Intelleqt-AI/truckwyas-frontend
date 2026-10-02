@@ -205,7 +205,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
     <>
       {dis.modal}
       <h2 id="acct-org-title" className="acct-section-title">
-        {single ? `Confirm your ${cfg.short} organisation` : `Choose your ${cfg.short} organisation`}
+        {single ? `Link your ${cfg.short} organisation` : `Choose the ${cfg.short} organisation to link`}
       </h2>
       <p className="acct-section-desc">
         {single
@@ -246,13 +246,13 @@ export function OrgPicker({ connection }: { connection: Connection }) {
         )}
         {unavailable.map(t => (
           <div key={t.tenant_id} className="acct-row acct-org acct-org--confirm is-disabled">
-            <span className="acct-org__radio" aria-hidden="true" />
+            <span className="acct-org__radio"><input type="radio" className="acct-radio" disabled aria-label={`${t.name} can't be linked`} /></span>
             <span className="acct-org__mark"><span className="acct-logo acct-org-initials" aria-hidden="true">{t.currency}</span></span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
               <span className="acct-row__sub">Books in {t.currency}. Only ZAR books can be linked.</span>
             </span>
-            <StatusChip tone="neutral" label="Can't link" size="sm" />
+            <span />
           </div>
         ))}
         <div className="acct-formfoot">

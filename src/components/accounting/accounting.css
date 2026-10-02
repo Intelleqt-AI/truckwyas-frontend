@@ -795,9 +795,13 @@
 
 /* Round 3 fixes */
 /* Integration cards: the status pill stays top-right beside the name at every width. */
+/* Phones: every integration card puts its status pill on its own line under the name. */
 @media (max-width: 480px) {
-  .acct-card__top { grid-template-columns: 48px minmax(0, 1fr) auto !important; }
-  .acct-card__chip { grid-column: 3 !important; grid-row: 1 !important; justify-self: end !important; }
+  .acct-card__top { grid-template-columns: 48px minmax(0, 1fr) !important; row-gap: 8px; }
+  .acct-card__chip { grid-column: 2 !important; grid-row: 2 !important; justify-self: start !important; padding-top: 0; }
+  .tw-int-head { flex-wrap: wrap; row-gap: 8px !important; }
+  .tw-int-head > div:nth-child(2) { flex: 1 1 0 !important; min-width: 0; }
+  .tw-int-head__chip { flex-basis: 100%; padding: 0 0 0 60px; }
 }
 /* Mapping: the suggestion text, then its button on its own line. */
 .acct-hint--stack { display: block !important; }
@@ -820,3 +824,13 @@
   .acct-contact-filter { flex: 1 1 0 !important; }
 }
 .acct-progress__bar { height: 6px; }
+
+/* Final pass */
+.acct-tiles strong.is-zero { color: var(--text-primary); }
+.acct-diff-word::before { content: none; }
+.acct-notice--outline-danger { border: 1px solid color-mix(in srgb, var(--status-danger) 40%, transparent) !important; }
+@media (max-width: 640px) {
+  .acct-map-savebar { flex-wrap: wrap !important; }
+  .acct-map-savebar .cs-savebar__note { display: block !important; flex: 1 1 100%; }
+  .acct-map-savebar > .btn-action { flex: 1 1 100% !important; }
+}

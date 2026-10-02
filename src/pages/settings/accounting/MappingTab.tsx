@@ -232,7 +232,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         title={m.complete && !dirty ? 'Everything required is mapped' : m.missing.length > 0 ? `${m.missing.length} required ${m.missing.length === 1 ? 'line' : 'lines'} still to map` : 'Unsaved changes'}
         description={<>
           Nothing is sent to {cfg.short} until every required line is mapped.
-          {m.options.fetched_at && <> Last read from {cfg.short} {hoursAgo(m.options.fetched_at)}.</>}
+          {m.options.fetched_at && <> Accounts updated from {cfg.short} {hoursAgo(m.options.fetched_at)}.</>}
           {m.missing.length > 0 && !(m.complete && !dirty) && (
             <ul className="acct-jump-list">{m.missing.map(k => (
               <li key={k}><button type="button" className="acct-jumpbtn" onClick={() => jumpTo(k)}>{missingMappingLabel(k)}</button></li>
@@ -247,7 +247,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
               {`Use ${pendingSuggestions.length === 1 ? 'suggestion' : `${pendingSuggestions.length} suggestions`}`}
             </button>
           )}
-          <button type="button" className="tw-btn tw-btn--ghost" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
+          <button type="button" className="tw-btn" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
             <RefreshCw size={14} aria-hidden="true" className={refreshing ? 'animate-spin' : undefined} />
             {refreshing ? 'Reading…' : `Refresh from ${cfg.short}`}
           </button>

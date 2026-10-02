@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
-import { AlertTriangle, CheckCircle2, ChevronLeft, Info, Lock, X, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, Info, X, XCircle } from 'lucide-react';
 import { AccountingProviderCards, ComingSoonNote } from '@/components/accounting/AccountingProviderCards';
 import {
   ACCT_KEYS, ACCT_URL, apiMessage, apiStatus, callbackMessage, type Reconciliation, invalidateAccounting, providerBySlug, providerConfig, useAccountingConnection,
@@ -73,7 +73,7 @@ export default function AccountingIntegration() {
         Integrations
       </Link>
       <span aria-hidden="true" className="section-header__sep">·</span>
-      {cfg ? cfg.name : 'No system connected'}
+      {cfg ? cfg.name : 'Not connected'}
     </>
   );
 
@@ -154,17 +154,16 @@ export default function AccountingIntegration() {
         <p className="acct-section-desc acct-desc-cap">Send invoices and bills to your books. Payments come back automatically. <ComingSoonNote /></p>
         <AccountingProviderCards hideManage />
         <div style={{ height: 12 }} />
-        <AcctCard title="How setup works" description="About 10 minutes, done by a company admin. You'll see these steps again after connecting." flush>
+        <AcctCard title="How setup works" description="About 10 minutes, done by a company admin. Sync then starts automatically." flush>
           <ol className="acct-check">
             {[
               ['Connect your accounting system', 'Sign in to it and choose which books to link.'],
               ['Map charges, expenses and VAT', 'Tell TruckWys where each kind of charge and supplier bill goes in your books, and which VAT rates to use.'],
               ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
               ['Choose a start date', 'We send documents from that date. Anything earlier should already be in your books.'],
-              ['Sync starts', 'Automatically, once the steps above are done.'],
             ].map(([t, d], i) => (
               <li key={t}>
-                <span className="acct-step-num is-plain" aria-hidden="true">{i + 1}</span>
+                <span className="acct-step-num" aria-hidden="true">{i + 1}</span>
                 <div style={{ minWidth: 0 }}>
                   <div className="acct-check__title">{t}</div>
                   <div className="acct-check__desc">{d}</div>
@@ -207,8 +206,7 @@ export default function AccountingIntegration() {
                   data-locked={locked ? '' : undefined}
                 >
                   <span className="acct-utab">
-                    {locked && <Lock size={12} aria-hidden="true" />}
-                    {t.label}
+                                        {t.label}
                     {n != null && <span className="acct-tab-num" aria-label={tabCountTitle(t.id, n)}>{n}</span>}
                   </span>
                 </button>

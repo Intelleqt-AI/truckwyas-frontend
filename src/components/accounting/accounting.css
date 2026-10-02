@@ -861,3 +861,34 @@
   .acct-map-savebar > .tw-btn--ghost { flex: 0 0 auto !important; width: auto !important; }
   .acct-map-savebar > .btn-action { flex: 1 1 0 !important; width: auto !important; }
 }
+
+/* Round F1 */
+/* Mapping grid: row lines only (no half-height column rule); an odd last field keeps its column width. */
+@container (min-width: 560px) {
+  .acct-map-grid { column-gap: 0; }
+  .acct-map-grid > .acct-map-row:nth-child(even) { border-left: 0; }
+  .acct-map-grid > .acct-map-row:last-child:nth-child(odd) { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; }
+  .acct-map-grid > .acct-map-row:last-child:nth-child(odd) > .acct-map-row__label { grid-column: 1; }
+  .acct-map-grid > .acct-map-row:last-child:nth-child(odd) > .acct-map-row__field { grid-column: 1; grid-row: 2; }
+}
+.acct-hint--inline { display: block; }
+.acct-use-link { display: inline-flex; align-items: center; min-height: 24px; font-weight: 500; color: var(--text-primary); }
+@media (max-width: 640px) { .acct-use-link { min-height: 32px; } }
+.acct-refresh-meta { display: inline-flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
+.acct-refresh-link { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; font-size: 13px; }
+@media (max-width: 640px) { .acct-card-actions--below > .tw-btn--primary { flex: 1 1 100% !important; } .acct-refresh-meta { flex: 1 1 100%; justify-content: space-between; } }
+/* How setup works: plain numbers, not live step markers. */
+.acct-step-num.is-plain { border: 0 !important; background: transparent !important; color: var(--text-tertiary) !important; font-size: 13px; }
+/* Sign-in expired: waiting steps look waiting. */
+.acct-check li.is-blocked:not(:first-child) .acct-check__title, .acct-check li.is-blocked:not(:first-child) .acct-check__desc { color: var(--text-tertiary) !important; }
+.acct-check li.is-blocked:not(:first-child) .acct-step-num { opacity: 0.6; }
+.acct-notice--outline-danger { border-color: color-mix(in srgb, var(--status-danger) 22%, transparent) !important; }
+/* The automatic last step reads as a closing note. */
+.acct-check--steps li:last-child .acct-step-num.is-auto, .acct-check--steps li:last-child .acct-step-num:not(.is-done) { border-style: dashed; }
+/* Finished-step buttons share one width with the others on desktop. */
+@media (min-width: 561px) { .acct-check--steps li > .acct-step-done-btn { min-width: 96px !important; justify-self: end; } }
+/* Org picker: a row that can't be linked is dimmed as a whole. */
+.acct-org.is-disabled { opacity: 0.6; }
+.acct-org.is-disabled .acct-row__title { color: var(--text-primary); }
+.acct-org.is-selected { background: color-mix(in srgb, var(--text-primary) 9%, var(--bg-surface)) !important; }
+.acct-org.is-disabled .acct-radio { border-color: var(--text-tertiary) !important; }

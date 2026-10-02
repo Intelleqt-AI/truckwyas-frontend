@@ -30,7 +30,7 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         <p className="acct-sync-line">
           {sync.status === 'BLOCKED'
             ? `Waiting on you before it can go to ${name}.`
-            : `${name} has the version from ${sync.last_synced_at ? formatDate(sync.last_synced_at) : 'before this change'}. ${sync.status === 'DEAD' ? 'Your latest change was not sent; retry it from the Sync tab.' : 'Your latest change goes as soon as the problem above is fixed.'}`}
+            : `${name} has the version from ${sync.last_synced_at ? formatDate(sync.last_synced_at) : 'before the latest change'}. ${sync.status === 'DEAD' ? 'Newer changes were not sent; retry from the Sync tab.' : `Newer changes go once the ${/account|tax|vat|tracking/i.test(sync.last_error) ? 'account mapping' : 'sync problem'} is fixed.`}`}
         </p>
       ) : (
         <dl className="fin-dl">
@@ -82,8 +82,8 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
     <div className="fl-notice fl-notice--warning acct-sync-notice" role="status">
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
-        <strong>{`Latest change isn't in ${name} yet`}</strong>
-        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? 'Fix that and it goes through on the next automatic try.' : 'Fix it, then retry from the Sync tab.'}
+        <strong>{`Not up to date in ${name}`}</strong>
+        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? `Fix that and ${name} gets the latest version on the next automatic try.` : 'Fix it, then retry from the Sync tab.'}
       </div>
       <Link to={`/settings/integrations/accounting?tab=${/account|tax|vat|tracking/i.test(sync.last_error) ? 'mapping' : 'sync'}`} className="tw-btn fl-notice__action">
         {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix account mapping' : 'View sync issue'}

@@ -202,7 +202,7 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   } else if (row.status === 'SKIPPED') {
     match = <div className="acct-row__sub">Not synced. Their documents stay in TruckWys only and show as sync errors.</div>;
   } else {
-    match = <div className="acct-row__sub">No {providerName} contact found. Pick one, or create a new one.</div>;
+    match = <div className="acct-row__sub">No {providerName} contact found. Pick one, or create one from the ⋯ menu.</div>;
   }
 
   const menu: RowActionItem[] = [];

@@ -146,7 +146,7 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
     );
   } else if (other) {
     note = <span className="acct-card__note">Disconnect {other.short} first. One accounting system at a time.</span>;
-    actions = <button type="button" className={btn} disabled title={`Disconnect ${other.short} first`}>Connect {cfg.short}</button>;
+    actions = null;
   } else if (!info.configured) {
     note = <span className="acct-card__note">Not set up on this server yet. Ask TruckWys support to switch it on.</span>;
     actions = <button type="button" className={btn} disabled>Connect {cfg.short}</button>;

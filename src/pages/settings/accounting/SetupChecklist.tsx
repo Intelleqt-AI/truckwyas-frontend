@@ -19,7 +19,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: connection.status === 'ACTIVE' ? 'done' : 'bad',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status !== 'ACTIVE'
-        ? (canWrite ? `Sign-in expired. Use Reconnect ${cfg.short} above.` : 'Sign-in expired. Only a company admin can reconnect.')
+        ? (canWrite ? 'Waiting for you to sign in again.' : 'Waiting for a company admin to sign in again.')
         : `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`,
     },
     {
@@ -47,7 +47,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     {
       key: 'cutover',
       look: backfillLook,
-      title: 'Choose a start date',
+      title: r.backfill_state === 'DONE' && connection.cutover_date ? `Start date: ${formatDate(connection.cutover_date)}` : 'Choose a start date',
       desc: r.backfill_state === 'DONE'
         ? `Sent everything dated from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'}.`
         : r.backfill_state === 'RUNNING'

@@ -134,13 +134,13 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
 /** Who connected it and when: a short card at the end of the Setup tab. */
 export function ConnectionDetails({ connection }: { connection: Connection }) {
   const live = connection.readiness?.sync_enabled ?? false;
-  // Only what the steps above don't already say.
-  if (!live && !connection.cutover_date) return null;
+  // Only what the steps above don't already say (step 4 already shows the start date).
+  if (!live) return null;
   return (
     <section style={{ ...settingsCardStyle, padding: 'var(--card-pad, 20px)' }} aria-label="Connection details">
       <dl className="acct-facts acct-facts--4" style={{ margin: 0 }}>
         {connection.cutover_date && <div><dt>Start date</dt><dd>{formatDate(connection.cutover_date)}</dd></div>}
-        {live && <div><dt>Payments last fetched</dt><dd>{connection.last_payment_sync_at ? formatDateTime(connection.last_payment_sync_at) : 'Not yet'}</dd></div>}
+        {<div><dt>Payments last fetched</dt><dd>{connection.last_payment_sync_at ? formatDateTime(connection.last_payment_sync_at) : 'Not yet'}</dd></div>}
         {live && <div><dt>Last checked</dt><dd>{connection.last_reconciled_at ? formatDateTime(connection.last_reconciled_at) : 'Not yet'}</dd></div>}
       </dl>
     </section>

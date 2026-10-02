@@ -121,7 +121,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
                     <div className="acct-row__sub" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                       <span>{OBJECT_TYPE_LABEL[e.object_type] ?? humanise(e.object_type)} <DocLink url={e.local_url}>{e.label}</DocLink></span>
                       {e.status !== 'ERROR' && <StatusChip tone={meta.tone} label={meta.label} size="sm" />}
-                      {e.status === 'ERROR' && e.next_attempt_at && <span>· {e.attempts} of 8 tries used, next {nextTry(e.next_attempt_at)}</span>}
+                      {e.status === 'ERROR' && e.next_attempt_at && <><span aria-hidden="true">·</span><span>{e.attempts} of 8 tries used, next {nextTry(e.next_attempt_at)}</span></>}
                     </div>
                   </div>
                   <div className="acct-row__actions">

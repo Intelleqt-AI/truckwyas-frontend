@@ -95,9 +95,9 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                 const bad = differences.filter(d => d.scope === sc.scope).length;
                 return (
                   <div key={sc.scope}>
-                    <span>{sc.scope === 'MONTH' ? 'Months' : sc.title}</span>
+                    <span>{sc.scope === 'MONTH' ? 'Months' : sc.title} checked</span>
                     <strong>{(n ?? 0).toLocaleString('en-ZA')}</strong>
-                    {differences.length > 0 && <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} ${bad === 1 ? 'differs' : 'differ'}` : 'All match'}</em>}
+                    <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} ${bad === 1 ? 'differs' : 'differ'}` : 'All match'}</em>
                   </div>
                 );
               })}

@@ -113,7 +113,7 @@ export function ConnectionHeader({ connection, compact = false, onOpenTab }: { c
             <strong style={{ fontWeight: 600 }}>{connection.status_reason || `Your ${cfg.short} sign-in has expired.`}</strong>
             {canWrite ? 'Sign in again to carry on. Nothing is lost.' : `Ask your company admin to reconnect ${cfg.short}. Nothing is lost.`}
           </div>
-          <button type="button" className="tw-btn tw-btn--primary" onClick={reconnect} disabled={!canWrite || reconnecting} title={writeTitle}>
+          <button type="button" className="tw-btn tw-btn--primary acct-hide-phone-btn" onClick={reconnect} disabled={!canWrite || reconnecting} title={writeTitle}>
             {reconnecting ? 'Opening…' : `Reconnect ${cfg.short}`}
           </button>
         </div>

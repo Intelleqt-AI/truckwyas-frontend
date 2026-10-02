@@ -34,7 +34,7 @@ const FIELD_LABEL: Record<string, string> = {
 const isMoney = (v: string) => /^-?\d+(\.\d+)?$/.test(String(v).trim());
 /** Provider status codes in plain words (Xero's AUTHORISED is an unpaid, approved invoice). */
 const STATUS_WORD: Record<string, string> = { AUTHORISED: 'Awaiting payment', SUBMITTED: 'Awaiting approval', OPEN: 'Open', OVERDUE: 'Overdue', VOIDED: 'Void' };
-const showValue = (v: string) => (isMoney(v) ? formatCurrency(v) : STATUS_WORD[String(v).toUpperCase()] ?? (humanise(v) || '—'));
+const showValue = (v: string): React.ReactNode => (isMoney(v) ? formatCurrency(v) : <span className="acct-val-text">{STATUS_WORD[String(v).toUpperCase()] ?? (humanise(v) || '—')}</span>);
 
 /** Does TruckWys agree with the books? Per invoice, per customer, per month. */
 export function ReconciliationTab({ connection, onOpen }: { connection: Connection; onOpen?: (tab: AccountingTab) => void }) {

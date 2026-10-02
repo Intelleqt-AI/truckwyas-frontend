@@ -1,4 +1,5 @@
-import { Check, Loader2, X } from 'lucide-react';
+import { Check, ChevronRight, Loader2, X } from 'lucide-react';
+import { startConnect } from '@/components/accounting/AccountingProviderCards';
 import { providerConfig, type Connection } from '@/lib/accounting';
 import { formatDate } from '@/lib/formatters';
 import { ConnectionDetails } from './ConnectionHeader';
@@ -19,7 +20,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: connection.status === 'ACTIVE' ? 'done' : 'todo',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status !== 'ACTIVE'
-        ? (canWrite ? 'Use Reconnect above. Your mapping and contacts are kept.' : 'Needs a company admin. Your mapping and contacts are kept.')
+        ? (canWrite ? 'Your mapping and contacts are kept.' : 'Needs a company admin. Your mapping and contacts are kept.')
         : `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`,
     },
     {
@@ -56,7 +57,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
             ? 'The first send stopped part-way. Open it to see what went wrong and try again.'
             : `Anything dated before it should already be in ${cfg.short}.`,
       tab: 'cutover',
-      action: r.backfill_state === 'DONE' ? 'View' : r.backfill_state === 'RUNNING' ? 'Watch progress' : 'Choose start date',
+      action: r.backfill_state === 'DONE' ? 'Review' : r.backfill_state === 'RUNNING' ? 'Watch progress' : 'Choose start date',
     },
     {
       key: 'live',
@@ -66,7 +67,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
         ? `New invoices, credit notes and bills go to ${cfg.short} on their own, and payments come back every few minutes.`
         : 'Automatically, once the steps above are done.',
       tab: r.sync_enabled ? 'sync' : undefined,
-      action: r.sync_enabled ? 'Sync status' : undefined,
+      action: r.sync_enabled ? 'Review' : undefined,
     },
   ];
 
@@ -97,9 +98,13 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
                 <div className="acct-check__title"><span className="acct-sr">Step {i + 1}: </span>{it.title}</div>
                 <div className="acct-check__desc">{it.desc}</div>
               </div>
-              {it.tab && it.action && !(blocked && it.look !== 'done') ? (
-                <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : it.look === 'done' ? ' tw-btn--sm acct-step-done-btn' : ''}`} onClick={() => onOpen(it.tab!)}>
+              {it.key === 'connect' && reauth && canWrite ? (
+                // Phones: the reconnect action sits in its step (the banner's button is desktop-only).
+                <button type="button" className="tw-btn tw-btn--primary acct-only-phone-btn" onClick={() => startConnect(cfg.slug, cfg.short)}>Reconnect {cfg.short}</button>
+              ) : it.tab && it.action && !(blocked && it.look !== 'done') ? (
+                <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ` acct-step-quiet${it.look === 'done' ? ' tw-btn--sm acct-step-done-btn' : ''}`}`} onClick={() => onOpen(it.tab!)}>
                   {it.action}
+                  {it.key !== nextKey && <ChevronRight size={14} aria-hidden="true" className="acct-step-chev" />}
                 </button>
               ) : <span />}
             </li>

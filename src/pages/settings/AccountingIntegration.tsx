@@ -224,7 +224,7 @@ export default function AccountingIntegration() {
                 const locked = live.status === 'NEEDS_REAUTH' && t.id !== 'setup';
                 return (
                   <SelectItem key={t.id} value={t.id} disabled={locked}>
-                    {t.label}{n != null ? ` · ${tabCountTitle(t.id, n)}` : ''}{locked ? ' · after you reconnect' : ''}
+                    {t.label}{n != null ? ` · ${tabCountTitle(t.id, n)}` : ''}{locked ? ' · after reconnecting' : ''}
                   </SelectItem>
                 );
               })}

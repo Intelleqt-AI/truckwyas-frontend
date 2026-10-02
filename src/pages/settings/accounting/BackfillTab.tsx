@@ -125,7 +125,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
   const cutoverCard = (
       <AcctCard
         title="Cut-over date"
-        description={`From this date TruckWys sends every invoice, credit note, supplier bill and recorded payment to ${cfg.short}. Anything dated earlier is not sent: we assume it's already in your books.`}
+        description={`TruckWys sends everything dated from here on to ${cfg.short}. Earlier documents are assumed to be in your books already.`}
       >
         <div className="acct-cutover">
           <div className="acct-cutover__date">

@@ -1,11 +1,13 @@
 import type { StatusTone } from '@/components/ui/StatusChip';
-import type { ConnectionStatus, DocumentSyncStatus, Readiness } from '@/lib/accounting';
+import type { ConnectionStatus, DocumentSyncStatus, Readiness, SyncCounts } from '@/lib/accounting';
 
 /** Chip tone + label for a connection's status. */
-export function connectionChip(status: ConnectionStatus, readiness?: Readiness | null): { tone: StatusTone; label: string } {
+export function connectionChip(status: ConnectionStatus, readiness?: Readiness | null, counts?: SyncCounts | null): { tone: StatusTone; label: string } {
   if (status === 'ACTIVE' && readiness && !readiness.sync_enabled) {
     return readiness.backfill_state === 'RUNNING' ? { tone: 'info', label: 'Sending history' } : { tone: 'warning', label: 'Setup needed' };
   }
+  const failing = (counts?.errors ?? 0) + (counts?.dead ?? 0);
+  if (status === 'ACTIVE' && failing > 0) return { tone: 'warning', label: `Connected · ${failing} to fix` };
   switch (status) {
     case 'ACTIVE': return { tone: 'success', label: 'Connected' };
     case 'NEEDS_REAUTH': return { tone: 'danger', label: 'Sign-in expired' };

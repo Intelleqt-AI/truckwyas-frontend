@@ -58,7 +58,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
   const { canWrite, writeTitle } = useAccountingPermissions();
   const cfg = providerConfig(connection.provider);
   const r = connection.readiness;
-  const chip = connectionChip(connection.status, r);
+  const chip = connectionChip(connection.status, r, connection.counts);
   const dis = useDisconnect(connection);
   const [reconnecting, setReconnecting] = useState(false);
   const reauth = connection.status === 'NEEDS_REAUTH';
@@ -105,7 +105,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
           <AlertTriangle size={16} aria-hidden="true" />
           <div>
             <strong style={{ fontWeight: 600 }}>{connection.status_reason || `Your ${cfg.short} sign-in has expired.`}</strong>
-            {canWrite ? `Sign in to ${cfg.short} again to carry on.` : `Ask your company admin to reconnect ${cfg.short}.`} Nothing is sent or fetched until then.
+            {canWrite ? 'Sign in again to carry on.' : `Ask your company admin to reconnect ${cfg.short}.`} Nothing syncs until then.
           </div>
           <button type="button" className="tw-btn tw-btn--primary" onClick={reconnect} disabled={!canWrite || reconnecting} title={writeTitle}>
             {reconnecting ? 'Opening…' : `Reconnect ${cfg.short}`}
@@ -218,7 +218,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
         ) : single ? (
           <div className="acct-row acct-org acct-org--confirm is-selected">
             <span className="acct-org__radio"><input type="radio" className="acct-radio" checked readOnly aria-label={`${single.name} selected`} /></span>
-            <span className="acct-org__mark"><ProviderLogo provider={connection.provider} /></span>
+            <span className="acct-org__mark"><OrgInitials name={single.name} /></span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-row__title" style={{ display: 'block' }}>{single.name}</span>
               <span className="acct-row__sub">Books in {single.currency || 'ZAR'}</span>
@@ -247,7 +247,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
         {unavailable.map(t => (
           <div key={t.tenant_id} className="acct-row acct-org acct-org--confirm is-disabled">
             <span className="acct-org__radio"><input type="radio" className="acct-radio" disabled aria-label={`${t.name} can't be linked`} /></span>
-            <span className="acct-org__mark"><ProviderLogo provider={connection.provider} /></span>
+            <span className="acct-org__mark"><OrgInitials name={t.name} /></span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
               <span className="acct-row__sub">Books in {t.currency}. Only ZAR books can be linked.</span>
@@ -270,4 +270,10 @@ export function OrgPicker({ connection }: { connection: Connection }) {
       </section>
     </>
   );
+}
+
+/** The organisation's initials ("GH"): the provider is already named in the heading. */
+function OrgInitials({ name }: { name: string }) {
+  const letters = name.replace(/\(.*?\)/g, '').split(/\s+/).filter(w => /^[A-Za-z0-9]/.test(w)).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
+  return <span className="acct-logo acct-org-initials" aria-hidden="true">{letters}</span>;
 }

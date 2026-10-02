@@ -2,12 +2,13 @@ import { Check, Loader2, X } from 'lucide-react';
 import { providerConfig, type Connection } from '@/lib/accounting';
 import { formatDate } from '@/lib/formatters';
 import { ConnectionDetails } from './ConnectionHeader';
-import { AcctCard, plural, type StepLook } from './shared';
+import { AcctCard, plural, useAccountingPermissions, type StepLook } from './shared';
 import type { AccountingTab } from './tabs';
 
 /** What still has to happen before documents start flowing, in order. */
 export function SetupChecklist({ connection, onOpen }: { connection: Connection; onOpen: (tab: AccountingTab) => void }) {
   const cfg = providerConfig(connection.provider);
+  const { canWrite } = useAccountingPermissions();
   const r = connection.readiness;
   const missing = r.missing_mappings ?? [];
   const backfillLook: StepLook = r.backfill_state === 'DONE' ? 'done' : r.backfill_state === 'RUNNING' ? 'busy' : r.backfill_state === 'FAILED' ? 'bad' : 'todo';
@@ -18,7 +19,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: connection.status === 'ACTIVE' ? 'done' : 'bad',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status !== 'ACTIVE'
-        ? 'Waiting for an admin to sign in again.'
+        ? (canWrite ? `Use Reconnect ${cfg.short} above to sign in again.` : 'Only a company admin can reconnect.')
         : `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`,
     },
     {
@@ -60,10 +61,10 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     {
       key: 'live',
       look: r.sync_enabled ? 'done' : 'todo',
-      title: 'Sync turns on',
+      title: 'Sync starts',
       desc: r.sync_enabled
         ? `New invoices, credit notes and bills go to ${cfg.short} on their own, and payments come back every few minutes.`
-        : 'Starts by itself once the steps above are done.',
+        : 'Automatically, once the steps above are done.',
       tab: r.sync_enabled ? 'sync' : undefined,
       action: r.sync_enabled ? 'Sync status' : undefined,
     },
@@ -84,7 +85,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
 
   return (
     <>
-    <AcctCard title={r.sync_enabled ? `${cfg.short} is set up` : `Finish setting up ${cfg.short}`} description={subtitle} flush>
+    <AcctCard title={reauth ? `Reconnect ${cfg.short} to carry on` : r.sync_enabled ? `${cfg.short} is set up` : `Finish setting up ${cfg.short}`} description={subtitle} flush>
       <ol className="acct-check acct-check--steps">
         {items.map((it, i) => {
           const auto = it.key === 'live';

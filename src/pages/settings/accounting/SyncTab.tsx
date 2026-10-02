@@ -16,7 +16,7 @@ import type { AccountingTab } from './tabs';
 // One vocabulary for failures, used in the list and the activity log.
 const ERROR_META: Record<string, { tone: StatusTone; label: string }> = {
   ERROR: { tone: 'warning', label: 'Needs a fix' },
-  DEAD: { tone: 'danger', label: 'Gave up' },
+  DEAD: { tone: 'danger', label: 'Stopped retrying' },
   BLOCKED: { tone: 'neutral', label: 'Waiting on you' },
 };
 const LEVEL: Record<string, { tone: StatusTone; label: string }> = {
@@ -107,7 +107,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
 
   const attention = (
     <>
-      <AcctCard title={s.errors.length ? <span className="acct-title-warn"><AlertTriangle size={16} aria-hidden="true" />Needs attention</span> : 'Needs attention'} description={s.errors.length ? "Fix the cause, then retry. We also retry on our own for a while." : undefined} flush>
+      <AcctCard title={s.errors.length ? <span className="acct-title-warn"><AlertTriangle size={16} aria-hidden="true" />Needs attention</span> : 'Needs attention'} description={s.errors.length ? "Fix the cause, then retry. We also retry on our own, up to 8 times." : undefined} flush>
         {s.errors.length === 0 ? (
           <div className="acct-empty">Nothing is stuck. Every document reached {cfg.short}.</div>
         ) : (
@@ -173,9 +173,9 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
         <div style={{ padding: 'var(--card-pad, 20px)' }}>
           <div className="acct-tiles">
             <div><span>In {cfg.short}</span><strong>{c.synced.toLocaleString('en-ZA')}</strong></div>
-            <div><span>Queued</span><strong className={c.queued ? undefined : 'is-zero'}>{c.queued.toLocaleString('en-ZA')}</strong></div>
+            <div title="Waiting to send"><span>Waiting to send</span><strong className={c.queued ? undefined : 'is-zero'}>{c.queued.toLocaleString('en-ZA')}</strong></div>
             <div><span>{c.errors > 0 && <span className="acct-dot acct-dot--warning acct-dot--inline" aria-hidden="true" />}Needs a fix</span><strong className={c.errors ? undefined : 'is-zero'}>{c.errors.toLocaleString('en-ZA')}</strong></div>
-            <div title="Stopped retrying after repeated failures; retry from the list below"><span>Gave up</span><strong className={c.dead ? undefined : 'is-zero'}>{c.dead.toLocaleString('en-ZA')}</strong></div>
+            <div title="Stopped retrying after 8 tries; retry from the list above"><span>Stopped retrying</span><strong className={c.dead ? undefined : 'is-zero'}>{c.dead.toLocaleString('en-ZA')}</strong></div>
           </div>
         </div>
       </AcctCard>
@@ -191,7 +191,7 @@ export function SyncTab({ connection, onOpen }: { connection: Connection; onOpen
                 <span className={`acct-dot acct-dot--${(LEVEL[ev.level] ?? LEVEL.INFO).tone}`} title={(LEVEL[ev.level] ?? LEVEL.INFO).label} aria-label={(LEVEL[ev.level] ?? LEVEL.INFO).label} role="img" />
                 <div style={{ minWidth: 0 }}>
                   <div className="acct-row__title" style={{ fontWeight: 400 }}>
-                    {ev.label ? <><DocLink url={ev.local_id ? (/CREDIT_NOTE/.test(ev.object_type) ? `/finance/credit-notes/${ev.local_id}` : /INVOICE/.test(ev.object_type) ? `/finance/invoices/${ev.local_id}` : null) : null}>{ev.label}</DocLink> · </> : null}{ev.message || humanise(ev.action)}
+                    {ev.level !== 'INFO' && <span className="acct-event-flag">{(LEVEL[ev.level] ?? LEVEL.INFO).label}: </span>}{ev.label ? <><DocLink url={ev.local_id ? (/CREDIT_NOTE/.test(ev.object_type) ? `/finance/credit-notes/${ev.local_id}` : /INVOICE/.test(ev.object_type) ? `/finance/invoices/${ev.local_id}` : null) : null}>{ev.label}</DocLink> · </> : null}{ev.message || humanise(ev.action)}
                   </div>
                 </div>
                 <span className="acct-event-time" title={formatDateTime(ev.created_at)}>{formatRelativeTime(ev.created_at)}</span>

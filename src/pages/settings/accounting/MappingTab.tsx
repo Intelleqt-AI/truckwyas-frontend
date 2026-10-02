@@ -190,10 +190,9 @@ export function MappingTab({ connection }: { connection: Connection }) {
     const empty = !sectionValue(section, key);
     if (s && sectionValue(section, key) !== s) {
       return (
-        <div className={`acct-hint${requiredGap(section, key) ? ' is-required' : ''}`}>
-          <span>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {describe(s)}.{' '}
-            {canWrite && <button type="button" className="tw-btn tw-btn--sm acct-use-btn" onClick={() => setSection(section, key, s)}>Use it</button>}
-          </span>
+        <div className={`acct-hint acct-hint--stack${requiredGap(section, key) ? ' is-required' : ''}`}>
+          <span>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {describe(s)}.</span>
+          {canWrite && <button type="button" className="tw-btn tw-btn--sm acct-use-btn" onClick={() => setSection(section, key, s)}>Use suggestion</button>}
         </div>
       );
     }
@@ -220,7 +219,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         title={m.complete && !dirty ? 'Everything required is mapped' : m.missing.length > 0 ? `${m.missing.length} required ${m.missing.length === 1 ? 'line' : 'lines'} still to map` : 'Unsaved changes'}
         description={<>
           Nothing is sent to {cfg.short} until every required line is mapped.
-          {m.options.fetched_at && <> Accounts last read from {cfg.short} {hoursAgo(m.options.fetched_at)}.</>}
+          {m.options.fetched_at && <> Last read from {cfg.short} {hoursAgo(m.options.fetched_at)}.</>}
           {m.missing.length > 0 && !(m.complete && !dirty) && (
             <ul className="acct-jump-list">{m.missing.map(k => (
               <li key={k}><button type="button" className="acct-jumpbtn" onClick={() => jumpTo(k)}>{missingMappingLabel(k)}</button></li>
@@ -231,11 +230,11 @@ export function MappingTab({ connection }: { connection: Connection }) {
         actionsBelow
         actions={(canWrite && pendingSuggestions.length > 0) || canWrite ? <>
           {canWrite && pendingSuggestions.length > 0 && (
-            <button type="button" className="tw-btn" onClick={applyAllSuggestions} title="Fills in the fields; nothing is saved until you press Save mapping">
+            <button type="button" className="tw-btn tw-btn--primary" onClick={applyAllSuggestions} title="Fills in the fields; nothing is saved until you press Save mapping">
               {`Apply ${pendingSuggestions.length === 1 ? 'suggestion' : `${pendingSuggestions.length} suggestions`}`}
             </button>
           )}
-          <button type="button" className="tw-btn" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
+          <button type="button" className="tw-btn tw-btn--ghost" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
             <RefreshCw size={14} aria-hidden="true" className={refreshing ? 'animate-spin' : undefined} />
             {refreshing ? 'Reading…' : `Refresh from ${cfg.short}`}
           </button>
@@ -315,7 +314,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
 
       <AcctCard
         title={<>Payments bank account<span className="acct-optional"> · optional</span></>}
-        description={`Payments you record in TruckWys after the cut-over date are sent to this ${cfg.short} bank account.`}
+        description={`Payments already recorded in TruckWys from the cut-over date are sent to this ${cfg.short} bank account when history is sent. Only needed if there are any.`}
         flush
       >
         <div className="acct-map-row">

@@ -95,9 +95,9 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                 const bad = differences.filter(d => d.scope === sc.scope).length;
                 return (
                   <div key={sc.scope}>
-                    <span>{sc.title === 'Sales and VAT by month' ? 'Months' : sc.title}</span>
+                    <span>{sc.scope === 'MONTH' ? 'Months of VAT' : sc.title} checked</span>
                     <strong>{(n ?? 0).toLocaleString('en-ZA')}</strong>
-                    <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>
+                    {differences.length > 0 && <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>}
                   </div>
                 );
               })}
@@ -112,19 +112,18 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
         const rows = differences.filter(d => d.scope === scope);
                 if (!rows.length) return null;
         void i;
-        const hasLinks = true; // same column template in every table, link or not
+        const hasLinks = rows.some(d => !!d.provider_url);
         return (
           <AcctCard key={scope} id={`acct-recon-${scope.toLowerCase()}`} title={<>{title}<span className="acct-optional"> · {plural(rows.length, 'difference')}</span></>} flush>
             <div className="acct-table-wrap acct-only-wide" role="region" aria-label={`${title} differences`} tabIndex={0}>
               <table className="acct-table acct-table--recon">
                 <colgroup>
-                  <col style={{ width: '25%' }} /><col style={{ width: '17%' }} /><col style={{ width: '19%' }} />
-                  <col style={{ width: '19%' }} /><col style={{ width: '20%' }} />{hasLinks && <col style={{ width: 64 }} />}
+                  <col style={{ width: '37%' }} /><col style={{ width: '21%' }} />
+                  <col style={{ width: '21%' }} /><col style={{ width: '21%' }} />{hasLinks && <col style={{ width: 56 }} />}
                 </colgroup>
                 <thead>
                   <tr>
                     <th>{first}</th>
-                    <th>Field</th>
                     <th className="num">TruckWys</th>
                     <th className="num">{cfg.short}</th>
                     <th className="num">Difference</th>
@@ -184,9 +183,8 @@ function DiffRow({ d, providerName, hasLinks }: { d: ReconDifference; providerNa
     <tr>
       <td>
         {d.local_url ? <Link className="acct-link" to={d.local_url}>{head}</Link> : head}
-        {rest.length > 0 && <div className="acct-row__sub">{rest.join(' · ')}</div>}
+        <div className="acct-row__sub">{[...rest, FIELD_LABEL[d.field] ?? humanise(d.field)].join(' · ')}</div>
       </td>
-      <td>{FIELD_LABEL[d.field] ?? humanise(d.field)}</td>
       <td className="num">{showValue(d.truckwys)}</td>
       <td className="num">{showValue(d.provider)}</td>
       <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <span className="acct-diff-word">Differs</span>}</td>

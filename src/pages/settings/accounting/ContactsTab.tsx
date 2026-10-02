@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Segmented } from '@/components/ui/Segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 import RowActions, { type RowActionItem } from '@/components/ui/RowActions';
@@ -54,6 +53,7 @@ export function ContactsTab({ connection }: { connection: Connection }) {
 
   const summary = q.data?.summary ?? {};
   const total = ORDER.reduce((n, s) => n + (summary[s] ?? 0), 0);
+  const toDo = (summary.SUGGESTED ?? 0) + (summary.UNMATCHED ?? 0);
   const rows = useMemo(() => {
     const list = [...(q.data?.results ?? [])];
     list.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status) || a.local_name.localeCompare(b.local_name));
@@ -102,38 +102,40 @@ export function ContactsTab({ connection }: { connection: Connection }) {
     <>
       <AcctCard
         title="Match contacts"
-        description={<span className="acct-desc-measure" style={{ display: 'block' }}>We match contacts automatically on VAT number, registration number or email. Name-only matches need your confirmation.</span>}
+        description={<span className="acct-desc-measure" style={{ display: 'block' }}>
+          {toDo > 0 ? <><strong className="acct-strong">{plural(toDo, 'contact')} need{toDo === 1 ? 's' : ''} you.</strong>{' '}</> : total > 0 ? <><strong className="acct-strong">Every contact is sorted.</strong>{' '}</> : null}
+          We match on VAT number, registration number or email. Name-only matches need your confirmation.
+        </span>}
         actions={<>
-          <button type="button" className="tw-btn" onClick={runMatching} disabled={!canWrite || matching} title={writeTitle}>
+          <button type="button" className="tw-btn tw-btn--ghost" onClick={runMatching} disabled={!canWrite || matching} title={writeTitle}>
             <RefreshCw size={14} aria-hidden="true" className={matching ? 'animate-spin' : undefined} />
             {matching ? 'Matching…' : 'Run matching again'}
           </button>
         </>}
         flush
       >
-        <div className="acct-toolbar">
-          <div className="acct-status-wide"><Segmented label="Status" value={status} onChange={setStatus} options={statusOptions} size="sm" /></div>
-          <div className="acct-status-narrow">
+        <div className="acct-toolbar acct-contact-toolbar">
+          <div className="acct-contact-search">
+            <Search size={14} aria-hidden="true" />
+            <input type="search" className="settings-control" style={{ ...settingsInputStyle, paddingLeft: 32, minHeight: 36, height: 36, fontSize: 13 }}
+              value={term} onChange={e => setTerm(e.target.value)} placeholder="Search name, VAT or email" aria-label="Search contacts" />
+          </div>
+          <div className="acct-contact-filter">
             <Select value={status} onValueChange={v => setStatus(v as StatusFilter)}>
-              <SelectTrigger aria-label="Status" style={{ minHeight: 36, height: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
-              <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'Status: all' : o.label} ({o.count ?? 0})</SelectItem>)}</SelectContent>
+              <SelectTrigger aria-label="Status" className="acct-select" style={{ minHeight: 36, height: 36, fontSize: 13 }}><SelectValue /></SelectTrigger>
+              <SelectContent>{statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.value === 'ALL' ? 'All statuses' : o.label} ({o.count ?? 0})</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="acct-kind-filter">
+          <div className="acct-contact-filter">
             <Select value={kind} onValueChange={v => setKind(v as KindFilter)}>
               <SelectTrigger aria-label="Show customers, suppliers or both" style={{ minHeight: 36, height: 36, fontSize: 13 }} className="acct-select"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">Type: all</SelectItem>
-                <SelectItem value="CUSTOMER">Type: customers</SelectItem>
-                <SelectItem value="SUPPLIER">Type: suppliers</SelectItem>
+                <SelectItem value="ALL">Customers and suppliers</SelectItem>
+                <SelectItem value="CUSTOMER">Customers</SelectItem>
+                <SelectItem value="SUPPLIER">Suppliers</SelectItem>
               </SelectContent>
             </Select>
           </div>
-        </div>
-        <div className="acct-contact-search">
-          <Search size={14} aria-hidden="true" />
-          <input type="search" className="settings-control" style={{ ...settingsInputStyle, paddingLeft: 32, minHeight: 36, height: 36, fontSize: 13 }}
-            value={term} onChange={e => setTerm(e.target.value)} placeholder="Search by name, VAT number or email" aria-label="Search contacts" />
         </div>
         {q.isLoading ? (
           <LoadingBlock label="Loading contacts" />

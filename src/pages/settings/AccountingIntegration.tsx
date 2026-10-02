@@ -65,11 +65,16 @@ export default function AccountingIntegration() {
   const title = 'Accounting';
   // A sub-page of Integrations: the subtitle line carries the way back, as on
   // every detail page (the settings nav keeps "Integrations" highlighted).
+  // Same subtitle as other detail pages (Invoices): the way back, then what this page is.
   const description = (
-    <Link to="/settings/integrations" className="section-header__back">
-      <ChevronLeft size={14} strokeWidth={1.75} aria-hidden="true" />
-      Integrations
-    </Link>
+    <>
+      <Link to="/settings/integrations" className="section-header__back">
+        <ChevronLeft size={14} strokeWidth={1.75} aria-hidden="true" />
+        Integrations
+      </Link>
+      <span aria-hidden="true" className="section-header__sep">·</span>
+      {cfg ? cfg.name : 'No system connected'}
+    </>
   );
 
   const bannerIcon = banner?.tone === 'success' ? <CheckCircle2 size={16} aria-hidden="true" />
@@ -149,13 +154,14 @@ export default function AccountingIntegration() {
         <p className="acct-section-desc acct-desc-cap">Send invoices and bills to your books. Payments come back automatically.</p>
         <AccountingProviderCards hideManage />
         <p className="acct-section-desc acct-desc-cap" style={{ marginTop: 0, marginBottom: 24 }}><ComingSoonNote /></p>
-        <AcctCard title="After you connect" description="Takes about 10 minutes and needs a company admin." flush>
+        <AcctCard title="How setup works" description="About 10 minutes, done by a company admin. The same five steps show on the Setup tab." flush>
           <ol className="acct-check">
             {[
+              ['Connect your accounting system', 'Sign in above and choose the organisation that holds your books.'],
               ['Map accounts and VAT', 'Pick the income account and VAT rate for each kind of charge, and where supplier bills go.'],
               ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
               ['Choose a cut-over date', 'We send documents from that date. Anything earlier should already be in your books.'],
-              ['Sync turns on', 'By itself, once the steps above are done.'],
+              ['Sync starts', 'Automatically, once the steps above are done.'],
             ].map(([t, d], i) => (
               <li key={t}>
                 <span className="acct-step-num is-plain" aria-hidden="true">{i + 1}</span>

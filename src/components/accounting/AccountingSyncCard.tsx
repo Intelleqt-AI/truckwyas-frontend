@@ -34,7 +34,7 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         )}
         {(sync.status === 'ERROR' || sync.status === 'DEAD' || sync.status === 'BLOCKED') && (
           <div className="fin-dl__row">
-            <dt>Latest edit</dt>
+            <dt>Latest change</dt>
             <dd>{sync.status === 'BLOCKED' ? 'Waiting on you' : sync.status === 'DEAD' ? 'Not sent' : 'Waiting to send'}</dd>
           </div>
         )}

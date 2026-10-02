@@ -681,7 +681,7 @@ export default function InvoiceDetail() {
               onClick={() => setShowPaymentForm(true)} disabled={showPaymentForm}
               extra={{ 'aria-expanded': showPaymentForm, 'aria-controls': 'record-payment' }} />
           ) : primary === 'pay-external' ? (
-            <HeadAction icon={<ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />} label={`Record payment in ${acctName}`} short={`Record in ${acctName}`}
+            <HeadAction icon={<ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />} label={`Record payment in ${acctName}`} short="Record payment"
               onClick={openRecordInProvider} extra={{ title: `Opens this invoice in ${acctName}. Payments sync from ${acctName} automatically.` }} />
           ) : (
             <button type="button" className="tw-btn" onClick={handleDownloadPDF} disabled={downloading}>

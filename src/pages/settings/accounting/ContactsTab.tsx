@@ -229,7 +229,8 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
     <li className={`acct-row acct-row--contact${row.status === 'SUGGESTED' ? ' is-highlight' : ''}`}>
       <div style={{ minWidth: 0 }}>
         <div className="acct-row__title">{row.local_name}</div>
-        <div className="acct-row__sub">{row.kind === 'SUPPLIER' ? 'Supplier' : 'Customer'}{ids ? ` · ${ids}` : ''}</div>
+        <div className="acct-row__sub">{row.kind === 'SUPPLIER' ? 'Supplier' : 'Customer'}</div>
+        {ids && <div className="acct-row__sub">{ids}</div>}
       </div>
       {/* Status first, then the match: every chip starts at the same x. */}
       <div style={{ minWidth: 0 }}>

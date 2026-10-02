@@ -1,9 +1,11 @@
 import type { StatusTone } from '@/components/ui/StatusChip';
-import type { ConnectionStatus, DocumentSyncStatus, Readiness } from '@/lib/accounting';
+import { providerBlockers, type ConnectionStatus, type DocumentSyncStatus, type Readiness } from '@/lib/accounting';
 
 /** Chip tone + label for a connection's status. */
-export function connectionChip(status: ConnectionStatus, readiness?: Readiness | null, attention = 0): { tone: StatusTone; label: string } {
+export function connectionChip(status: ConnectionStatus, readiness?: Readiness | null, attention = 0, providerShort?: string): { tone: StatusTone; label: string } {
   if (status === 'ACTIVE' && readiness && !readiness.sync_enabled) {
+    const ownStepsDone = readiness.mapping_complete && readiness.contacts_to_confirm === 0 && readiness.backfill_state === 'DONE';
+    if (ownStepsDone && providerBlockers(readiness).length) return { tone: 'warning', label: providerShort ? `Change needed in ${providerShort}` : 'Setting to change' };
     return readiness.backfill_state === 'RUNNING' ? { tone: 'info', label: 'Sending history' } : { tone: 'warning', label: 'Setup needed' };
   }
   if (status === 'ACTIVE' && attention > 0) return { tone: 'warning', label: `${attention} ${attention === 1 ? 'needs' : 'need'} attention` };

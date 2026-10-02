@@ -54,12 +54,12 @@ function useDisconnect(connection: Connection) {
  * Org name, status, who connected it and when, and the connection's actions.
  * `compact` (every tab but Setup) keeps only the identity row.
  */
-export function ConnectionHeader({ connection, compact = false, onOpenTab }: { connection: Connection; compact?: boolean; /** Opens the tab the attention pill points at. */ onOpenTab?: (tab: 'sync' | 'reconciliation') => void }) {
+export function ConnectionHeader({ connection, compact = false, hideOpen = false, onOpenTab }: { connection: Connection; compact?: boolean; /** The page already offers "Open in …" (a setting to change there). */ hideOpen?: boolean; /** Opens the tab the attention pill points at. */ onOpenTab?: (tab: 'sync' | 'reconciliation') => void }) {
   const { canWrite, writeTitle } = useAccountingPermissions();
   const cfg = providerConfig(connection.provider);
   const r = connection.readiness;
   const attention = useAccountingAttention(connection);
-  const chip = connectionChip(connection.status, r, attention.count);
+  const chip = connectionChip(connection.status, r, attention.count, cfg.short);
   const dis = useDisconnect(connection);
   const [reconnecting, setReconnecting] = useState(false);
   const reauth = connection.status === 'NEEDS_REAUTH';
@@ -82,7 +82,7 @@ export function ConnectionHeader({ connection, compact = false, onOpenTab }: { c
       <div className="acct-head">
         <ProviderLogo provider={connection.provider} />
         <div className="acct-head__main">
-          <h2 id="acct-conn-title" className="acct-head__name">{connection.tenant_name || `${cfg.short} organisation`}</h2>
+          <h2 id="acct-conn-title" className="acct-head__name">{connection.tenant_name || `${cfg.short} ${cfg.orgWord}`}</h2>
           {/* The status always sits on the caption line, in the same place in every state. */}
           <p className="acct-head__caption">
             <span>{cfg.name}</span>
@@ -95,7 +95,7 @@ export function ConnectionHeader({ connection, compact = false, onOpenTab }: { c
           </p>
         </div>
         <div className="acct-head__actions">
-          {connection.web_url && !reauth ? (
+          {connection.web_url && !reauth && !hideOpen ? (
             <a href={connection.web_url} target="_blank" rel="noopener noreferrer" className="tw-btn acct-open-btn" aria-label={`Open in ${cfg.short}`} title={`Open in ${cfg.short}`}>
               <span className="acct-open-btn__text">Open in {cfg.short}</span>
               <ExternalLink size={14} aria-hidden="true" />

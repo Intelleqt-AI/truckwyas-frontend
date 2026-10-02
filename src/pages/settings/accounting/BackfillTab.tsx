@@ -6,7 +6,7 @@ import { formatDate, formatDateTime, formatRelativeTime } from '@/lib/formatters
 import { fetchData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import {
-  ACCT_KEYS, ACCT_URL, accountingApi, apiMessage, invalidateAccounting, providerConfig,
+  ACCT_KEYS, ACCT_URL, accountingApi, apiCode, apiMessage, invalidateAccounting, providerBlockers, providerConfig,
   type Backfill, type Connection, type StepState,
 } from '@/lib/accounting';
 import { AcctCard, ErrorBlock, LoadingBlock, StepIcon, plural, useAccountingPermissions, type StepLook } from './shared';
@@ -84,6 +84,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
   if (!r.mapping_complete) reasons.push('Map every account and VAT code first');
   if (r.contacts_to_confirm > 0 || (p?.contacts_unconfirmed ?? 0) > 0) reasons.push(`Confirm the ${plural(Math.max(r.contacts_to_confirm, p?.contacts_unconfirmed ?? 0), 'contact')} matched on name only`);
   if (!date) reasons.push('Choose a start date');
+  if (connection.status === 'ACTIVE' && providerBlockers(r).length) reasons.push(`Change the ${cfg.short} settings listed on the Setup tab`);
   const canStart = reasons.length === 0 && !locked && !starting;
 
   const start = async () => {
@@ -94,7 +95,10 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
       qc.setQueryData([...ACCT_KEYS.backfill, date], res);
       qc.invalidateQueries({ queryKey: ACCT_KEYS.connection });
     } catch (e) {
-      setError(apiMessage(e, "Couldn't start. Try again."));
+      setError(apiCode(e) === 'provider_settings'
+        ? `${cfg.short} settings stop this: ${apiMessage(e, 'see the Setup tab')}. Change them in ${cfg.short}, then use Refresh from ${cfg.short} on the Setup tab.`
+        : apiMessage(e, "Couldn't start. Try again."));
+      if (apiCode(e) === 'provider_settings') qc.invalidateQueries({ queryKey: ACCT_KEYS.connection });
     } finally {
       setStarting(false);
     }

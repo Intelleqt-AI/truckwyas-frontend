@@ -678,6 +678,20 @@
 .acct-check li.is-blocked:not(:first-child) .acct-step-num { opacity: 0.5; }
 .acct-select[data-empty], .acct-select[data-empty] > span { color: var(--text-tertiary) !important; }
 
+/* Lettermark for providers without a logo file: a filled disc, sized like the Xero mark. */
+.acct-logo__mark { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; font: 700 15px/1 var(--font-sans); letter-spacing: -0.02em; text-transform: lowercase; }
+.acct-logo--sm .acct-logo__mark { width: 24px; height: 24px; font-size: 11px; }
+/* Settings that must change inside the accounting system before anything is sent. */
+.acct-blockers { margin: 0; padding: 16px var(--card-pad, 20px); border-bottom: 1px solid var(--border-subtle); display: grid; gap: 12px; }
+.acct-blockers__head { display: flex; align-items: flex-start; gap: 10px; }
+.acct-blockers__head svg { flex: none; margin-top: 2px; color: var(--status-warning-text); }
+.acct-blockers__title { font: 600 14px/20px var(--font-sans); color: var(--text-primary); margin: 0; }
+.acct-blockers__list { margin: 6px 0 0; padding: 0 0 0 18px; display: grid; gap: 6px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.acct-blockers__actions { padding-left: 26px; }
+@media (max-width: 560px) { .acct-blockers__actions { padding-left: 0; } .acct-blockers__actions .tw-btn { width: 100%; justify-content: center; } }
+.acct-blockers { background: var(--status-warning-bg); }
+.acct-blockers__one { padding-left: 0; }
+.acct-blockers__list { color: var(--text-primary); }
 /* Design pass (Oct 2026): phone tab picker, neutral tab counts, readable locked tabs. */
 .acct-tabs-phone { display: none; margin: 0 0 16px; }
 .acct-tabs-phone__trigger { width: 100%; }
@@ -820,9 +834,24 @@
   .acct-map-savebar .cs-savebar__note { display: block !important; flex: 1 1 100%; }
   .acct-map-savebar > .btn-action { flex: 1 1 100% !important; }
 }
+/* QuickBooks settings to change: what (bold), where (menu path), why (muted). */
+.acct-blockers__items { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 12px; }
+.acct-blocker { display: grid; gap: 2px; font: 400 13px/20px var(--font-sans); }
+.acct-blockers__items:not(.is-one) .acct-blocker + .acct-blocker { padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--status-warning) 30%, transparent); }
+.acct-blocker__what { font-weight: 500; color: var(--text-primary); font-size: 14px; }
+.acct-blocker__where { color: var(--text-secondary); }
+.acct-blocker__why { color: var(--text-secondary); }
+.acct-blockers__after { margin: 8px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
 /* Finished steps: a quiet link-weight action, never a full-width button. */
 .acct-check--steps li > .acct-step-done-btn { min-width: 0 !important; color: var(--text-secondary); }
 @media (max-width: 560px) { .acct-check--steps li > .acct-step-done-btn { justify-self: start !important; width: auto !important; padding-left: 0; } }
+/* QuickBooks settings callout: one 8px rhythm; the menu path reads as a path. */
+.acct-blockers { gap: 12px; }
+.acct-blockers__items { margin-top: 6px; gap: 8px; }
+.acct-blocker__where { font-weight: 500; color: var(--text-primary); }
+.acct-blockers__after { margin-top: 6px; }
+.acct-blockers__actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+@media (max-width: 560px) { .acct-blockers__actions .tw-btn--ghost { width: auto !important; } }
 /* Last QBO-round shared fixes */
 .acct-nowrap { white-space: nowrap; }
 @media (max-width: 640px) { .acct-dotsep { display: none; } .acct-block-phone { display: block; } }
@@ -834,6 +863,12 @@
   .acct-tiles:not(.acct-tiles--3) > div { border: 0 !important; }
   .acct-tiles:not(.acct-tiles--3) { row-gap: 8px; }
 }
+/* QuickBooks settings callout, final: title says the change, one line says where and why. */
+.acct-blockers__body { margin: 4px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.acct-blockers__items .acct-blocker { display: grid; gap: 0; }
+.acct-blockers__actions .tw-btn--ghost { padding-left: 8px; }
+@media (max-width: 560px) { .acct-blockers__actions { flex-direction: column; align-items: stretch; } .acct-blockers__actions .tw-btn--ghost { justify-content: center; width: 100% !important; } }
+:root[data-theme="dark"] .acct-blockers, .dark .acct-blockers { border-top: 1px solid color-mix(in srgb, var(--status-warning) 35%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--status-warning) 35%, transparent); }
 
 .acct-contact-filter { flex: 0 0 180px; }
 
@@ -854,6 +889,10 @@
 .acct-save-btn:not(:disabled) { background: var(--btn-primary-bg, var(--text-primary)); color: var(--btn-primary-fg, var(--bg-surface)); }
 .acct-sync-line { margin: 4px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
 .acct-sync-open { margin-top: 12px; font-size: 13px; align-self: flex-start; min-height: 32px; }
+/* A setting to change in the provider: an amber-numbered step like the others. */
+.acct-step-num.is-warn { font-weight: 600; }
+.acct-check li.is-provider .acct-check__desc .acct-link { font-size: 13px; color: var(--text-primary); }
+.acct-check--steps li.is-provider > .tw-btn { min-width: 148px; }
 /* Phone save bar: a short line, then Discard and Save side by side. */
 @media (max-width: 640px) {
   .acct-map-savebar { gap: 8px 12px !important; padding: 10px 16px !important; }
@@ -892,11 +931,17 @@
 .acct-org.is-disabled .acct-row__title { color: var(--text-primary); }
 .acct-org.is-selected { background: color-mix(in srgb, var(--text-primary) 9%, var(--bg-surface)) !important; }
 .acct-org.is-disabled .acct-radio { border-color: var(--text-tertiary) !important; }
+/* QuickBooks setting step: the menu path on its own line; both actions together. */
+.acct-path { display: block; font-weight: 500; color: var(--text-secondary); }
+.acct-step-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; justify-self: end; min-width: 168px; }
+@media (max-width: 560px) { .acct-step-actions { grid-column: 2; justify-self: stretch; flex-direction: column; } }
 .acct-hint--inline > span, .acct-hint.is-required.acct-hint--inline > span { display: inline !important; }
 .acct-use-link { margin-left: 2px; vertical-align: baseline; }
 @container (min-width: 560px) {
   .acct-map-grid > .acct-map-row:last-child:nth-child(odd) { column-gap: 40px; }
 }
+.acct-check--steps li.is-provider { align-items: start; }
+.acct-check--steps li.is-provider > .acct-step-actions { align-self: start; }
 
 /* Round F2 */
 .acct-tiles span span, .acct-tiles span .acct-hide-phone { display: inline !important; }
@@ -923,6 +968,13 @@
 .acct-org.is-selected { box-shadow: inset 2px 0 0 var(--text-primary) !important; }
 @media (max-width: 640px) { .acct-formfoot__link { min-height: 44px; } }
 
+/* QuickBooks setting step: actions sit under the text, so the row keeps the list's rhythm. */
+.acct-step-actions--below { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+@media (max-width: 560px) { .acct-step-actions--below > * { flex: 1 1 100%; justify-content: center; } }
+/* Phones: only the next step's button is full width; the rest are compact. */
+@media (max-width: 560px) {
+  .acct-check--steps li > .tw-btn:not(.tw-btn--primary) { justify-self: start !important; width: auto !important; min-width: 0 !important; min-height: 44px; }
+}
 /* Post-F3 regressions */
 .acct-tiles span .acct-dot { display: inline-block !important; width: 8px; height: 8px; margin: 0 6px 1px 0; vertical-align: middle; }
 @media (min-width: 721px) {
@@ -939,6 +991,8 @@
 .acct-org.is-disabled .acct-radio { visibility: visible; opacity: 0.5; }
 /* Save with nothing to save reads as disabled. */
 .acct-save-btn:disabled { color: var(--text-disabled, var(--text-tertiary)) !important; border-color: var(--border-subtle) !important; opacity: 0.7 !important; cursor: not-allowed; }
+/* QuickBooks steps: finished-step actions are quiet links so the setting step leads. */
+.acct-check--steps li > .acct-step-done-btn { border-color: transparent; background: transparent; }
 
 /* Locked decisions (owner, Oct 2026) */
 /* (a) Phones: step buttons are compact; only the next step's primary is full width. */
@@ -973,3 +1027,12 @@
 }
 .acct-table--recon td.num, .acct-table--recon th.num { padding-left: 24px; }
 .acct-dot-note .acct-dot { margin-right: 6px; }
+/* QuickBooks, post-F4: compact phone buttons inside the setting step (only Open is full width),
+   amber outlined marker like the others, finished-step buttons as outline secondaries. */
+@media (max-width: 560px) {
+  .acct-step-actions--below > * { flex: 0 0 auto !important; }
+  .acct-step-actions--below > .tw-btn--primary { flex: 1 1 100% !important; }
+}
+.acct-step-num.is-warn { background: transparent !important; border: 1px solid var(--status-warning) !important; color: var(--status-warning-text) !important; }
+.acct-check--steps li > .acct-step-done-btn { border-color: var(--border-default) !important; background: var(--bg-surface) !important; justify-self: end; }
+@media (max-width: 560px) { .acct-check--steps li > .acct-step-done-btn { justify-self: start !important; padding-left: 12px !important; } }

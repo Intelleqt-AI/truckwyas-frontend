@@ -58,7 +58,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
   const { canWrite, writeTitle } = useAccountingPermissions();
   const cfg = providerConfig(connection.provider);
   const r = connection.readiness;
-  const chip = connectionChip(connection.status, r);
+  const chip = connectionChip(connection.status, r, connection.counts);
   const dis = useDisconnect(connection);
   const [reconnecting, setReconnecting] = useState(false);
   const reauth = connection.status === 'NEEDS_REAUTH';
@@ -105,7 +105,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
           <AlertTriangle size={16} aria-hidden="true" />
           <div>
             <strong style={{ fontWeight: 600 }}>{connection.status_reason || `Your ${cfg.short} sign-in has expired.`}</strong>
-            An admin needs to sign in to {cfg.short} again. Nothing is sent or fetched until then.
+            {canWrite ? 'Sign in again to carry on.' : `Ask your company admin to reconnect ${cfg.short}.`} Nothing syncs until then.
           </div>
           <button type="button" className="tw-btn tw-btn--primary" onClick={reconnect} disabled={!canWrite || reconnecting} title={writeTitle}>
             {reconnecting ? 'Opening…' : `Reconnect ${cfg.short}`}
@@ -119,7 +119,7 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
           <div><dt>Connected on</dt><dd>{connection.connected_at ? formatDate(connection.connected_at) : '—'}</dd></div>
           <div><dt>Base currency</dt><dd>{connection.base_currency || '—'}</dd></div>
           <div>
-            <dt>Cut-over date</dt>
+            <dt>Start date</dt>
             <dd>{connection.cutover_date ? formatDate(connection.cutover_date) : 'Not chosen'}</dd>
           </div>
           {/* Sync facts only mean something once sync is on. */}
@@ -139,7 +139,7 @@ export function ConnectionDetails({ connection }: { connection: Connection }) {
   return (
     <section style={{ ...settingsCardStyle, padding: 'var(--card-pad, 20px)' }} aria-label="Connection details">
       <dl className="acct-facts acct-facts--4" style={{ margin: 0 }}>
-        {connection.cutover_date && <div><dt>Cut-over date</dt><dd>{formatDate(connection.cutover_date)}</dd></div>}
+        {connection.cutover_date && <div><dt>Start date</dt><dd>{formatDate(connection.cutover_date)}</dd></div>}
         {live && <div><dt>Payments last fetched</dt><dd>{connection.last_payment_sync_at ? formatDateTime(connection.last_payment_sync_at) : 'Not yet'}</dd></div>}
         {live && <div><dt>Last checked</dt><dd>{connection.last_reconciled_at ? formatDateTime(connection.last_reconciled_at) : 'Not yet'}</dd></div>}
       </dl>
@@ -218,7 +218,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
         ) : single ? (
           <div className="acct-row acct-org acct-org--confirm is-selected">
             <span className="acct-org__radio"><input type="radio" className="acct-radio" checked readOnly aria-label={`${single.name} selected`} /></span>
-            <span className="acct-org__mark"><ProviderLogo provider={connection.provider} /></span>
+            <span className="acct-org__mark"><span className="acct-logo acct-org-initials" aria-hidden="true">{single.currency || 'ZAR'}</span></span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-row__title" style={{ display: 'block' }}>{single.name}</span>
               <span className="acct-row__sub">Books in {single.currency || 'ZAR'}</span>
@@ -246,13 +246,13 @@ export function OrgPicker({ connection }: { connection: Connection }) {
         )}
         {unavailable.map(t => (
           <div key={t.tenant_id} className="acct-row acct-org acct-org--confirm is-disabled">
-            <span className="acct-org__radio"><input type="radio" className="acct-radio" disabled aria-label={`${t.name} can't be linked`} /></span>
-            <span className="acct-org__mark"><ProviderLogo provider={connection.provider} /></span>
+            <span className="acct-org__radio" aria-hidden="true" />
+            <span className="acct-org__mark"><span className="acct-logo acct-org-initials" aria-hidden="true">{t.currency}</span></span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
-              <span className="acct-row__sub">Books in {t.currency} · only ZAR books can be linked</span>
+              <span className="acct-row__sub">Books in {t.currency}. Only ZAR books can be linked.</span>
             </span>
-            <StatusChip tone="neutral" label="Not supported" size="sm" />
+            <StatusChip tone="neutral" label="Can't link" size="sm" />
           </div>
         ))}
         <div className="acct-formfoot">
@@ -271,3 +271,4 @@ export function OrgPicker({ connection }: { connection: Connection }) {
     </>
   );
 }
+

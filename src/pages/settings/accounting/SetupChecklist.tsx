@@ -11,6 +11,7 @@ import type { AccountingTab } from './tabs';
 /** What still has to happen before documents start flowing, in order. */
 export function SetupChecklist({ connection, onOpen }: { connection: Connection; onOpen: (tab: AccountingTab) => void }) {
   const cfg = providerConfig(connection.provider);
+  const { canWrite } = useAccountingPermissions();
   const r = connection.readiness;
   const missing = r.missing_mappings ?? [];
   const backfillLook: StepLook = r.backfill_state === 'DONE' ? 'done' : r.backfill_state === 'RUNNING' ? 'busy' : r.backfill_state === 'FAILED' ? 'bad' : 'todo';
@@ -21,7 +22,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: connection.status === 'ACTIVE' ? 'done' : 'bad',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status !== 'ACTIVE'
-        ? 'Waiting for an admin to sign in again.'
+        ? (canWrite ? 'Your sign-in expired. Reconnect above.' : 'Your sign-in expired. Only a company admin can reconnect.')
         : `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`,
     },
     {
@@ -49,9 +50,9 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     {
       key: 'cutover',
       look: backfillLook,
-      title: 'Choose a cut-over date',
+      title: 'Choose a start date',
       desc: r.backfill_state === 'DONE'
-        ? `Documents from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the cut-over date'} onwards are in ${cfg.short}.`
+        ? `Documents from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'} onwards are in ${cfg.short}.`
         : r.backfill_state === 'RUNNING'
           ? `Sending documents to ${cfg.short} now.`
           : r.backfill_state === 'FAILED'
@@ -63,12 +64,12 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     {
       key: 'live',
       look: r.sync_enabled ? 'done' : 'todo',
-      title: 'Sync turns on',
+      title: 'Sync starts',
       desc: r.sync_enabled
         ? `New invoices, credit notes and bills go to ${cfg.short} on their own, and payments come back every few minutes.`
         : providerBlockers(r).length && connection.status === 'ACTIVE' && !items0Open(r)
           ? `Starts once the ${cfg.short} setting above is changed.`
-          : 'Starts by itself once the steps above are done.',
+          : 'Automatically, once the steps above are done.',
       tab: r.sync_enabled ? 'sync' : undefined,
       action: r.sync_enabled ? 'Sync status' : undefined,
     },
@@ -104,14 +105,12 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
               <div style={{ minWidth: 0 }}>
                 <div className="acct-check__title"><span className="acct-sr">Step {i + 1}: </span>{it.title}</div>
                 <div className="acct-check__desc">{it.desc}</div>
-                {auto && it.look !== 'done' && !blocked && <div className="acct-step-inline">Automatic</div>}
               </div>
               {it.tab && it.action && !(blocked && it.look !== 'done') ? (
                 <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>
                   {it.action}
                 </button>
-              ) : auto && it.look !== 'done' && !blocked ? <span className="acct-step-auto">Automatic</span>
-                : <span />}
+              ) : <span />}
             </li>
           );
         })}

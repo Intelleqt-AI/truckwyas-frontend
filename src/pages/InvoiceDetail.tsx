@@ -681,7 +681,7 @@ export default function InvoiceDetail() {
               onClick={() => setShowPaymentForm(true)} disabled={showPaymentForm}
               extra={{ 'aria-expanded': showPaymentForm, 'aria-controls': 'record-payment' }} />
           ) : primary === 'pay-external' ? (
-            <HeadAction icon={<ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />} label={`Record in ${acctName}`} short={`Record in ${acctName}`}
+            <HeadAction icon={<ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />} label={`Record payment in ${acctName}`} short={`Record in ${acctName}`}
               onClick={openRecordInProvider} extra={{ title: `Opens this invoice in ${acctName}. Payments sync from ${acctName} automatically.` }} />
           ) : (
             <button type="button" className="tw-btn" onClick={handleDownloadPDF} disabled={downloading}>
@@ -947,7 +947,7 @@ export default function InvoiceDetail() {
                       : `${payments.length} recorded, by payment date`}
                   </p>
                 </div>
-                {managedHere && canRecordInProvider && <PaymentsManagedNote providerName={acctName} recordUrl={recordInProviderUrl} />}
+                {managedHere && canRecordInProvider && primary !== 'pay-external' && <PaymentsManagedNote providerName={acctName} recordUrl={recordInProviderUrl} />}
               </div>
 
               <ul className={`fin-paylist${managedHere ? ' acct-paylist-top' : ''}`}>
@@ -1020,7 +1020,7 @@ export default function InvoiceDetail() {
           )}
 
           {/* Where the balance comes from, once anything has been paid or credited. */}
-          {!isDraft && !isVoid && (credited > 0.005 || num(invoice.paid_amount) > 0.005) && (
+          {!isDraft && !isVoid && !partPaid && (credited > 0.005 || num(invoice.paid_amount) > 0.005) && (
             <section className="card" aria-labelledby="balance-title">
               <div className="fin-panel-head" style={{ marginBottom: 4 }}>
                 <div className="fin-panel-head__text">

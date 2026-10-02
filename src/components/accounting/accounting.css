@@ -692,3 +692,131 @@
 .acct-blockers { background: var(--status-warning-bg); }
 .acct-blockers__one { padding-left: 0; }
 .acct-blockers__list { color: var(--text-primary); }
+/* Design pass (Oct 2026): phone tab picker, neutral tab counts, readable locked tabs. */
+.acct-tabs-phone { display: none; margin: 0 0 16px; }
+.acct-tabs-phone__trigger { width: 100%; }
+@media (max-width: 640px) {
+  .acct-tabs { display: none; }
+  .acct-tabs-phone { display: block; }
+}
+.acct-tab-num { margin-left: 6px; }
+.tw-seg__opt[data-locked] { color: var(--text-tertiary) !important; opacity: 1; }
+.tw-seg__opt[data-locked] svg { margin-right: 4px; }
+.acct-title-warn { display: inline-flex; align-items: center; gap: 8px; }
+.acct-title-warn svg { color: var(--status-warning-text); flex: none; }
+/* Contacts toolbar: the status strip only where it fits whole; else the picker. */
+.acct-toolbar { container-type: inline-size; }
+.acct-status-wide { flex: 0 1 auto; min-width: 0; }
+.acct-status-narrow { display: none; flex: 1 1 160px; min-width: 0; }
+@container (max-width: 700px) {
+  .acct-status-wide { display: none; }
+  .acct-status-narrow { display: block; }
+}
+.acct-kind-filter { flex: 0 0 160px !important; }
+@media (max-width: 640px) { .acct-kind-filter { flex: 1 1 0 !important; } }
+.acct-contact-search { position: relative; padding: 12px var(--card-pad, 20px); border-bottom: 1px solid var(--border-subtle); }
+.acct-contact-search > svg { position: absolute; left: calc(var(--card-pad, 20px) + 12px); top: 50%; transform: translateY(-50%); color: var(--text-tertiary); }
+.acct-row--contact .acct-row__actions { align-self: start !important; }
+.acct-jumpbtn { height: 32px; padding: 0 12px; font-size: 13px; }
+.acct-use-btn { height: 28px; margin-left: 4px; vertical-align: middle; }
+.acct-hint.is-required > span { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 0; }
+@media (max-width: 640px) { .acct-use-btn { height: 36px; } .acct-jumpbtn { height: 36px; } }
+.acct-diff-word { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--status-warning-text); white-space: nowrap; }
+.acct-diff-word::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--status-warning-dot); }
+.acct-table--recon tr > td:nth-child(5):last-child { text-align: center; }
+.acct-table--recon td:first-child { overflow-wrap: anywhere; }
+/* Org picker: a radio that can't be picked is a faint empty ring in both themes. */
+.acct-org.is-disabled .acct-radio { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-default); background: transparent; opacity: 0.6; }
+/* Setup on phones: full-width step buttons (only the next one filled); the step text already says it's automatic. */
+@media (max-width: 560px) {
+  .acct-check--steps li > .tw-btn { justify-self: stretch !important; width: 100%; }
+  .acct-check--steps .acct-step-inline { display: none !important; }
+}
+.acct-step-num.is-plain { border-color: transparent; background: var(--status-neutral-bg); color: var(--text-secondary); }
+/* Integrations page on phones: every card puts its status under the name, like the accounting cards. */
+.tw-int-head__chip { flex: none; display: inline-flex; }
+
+.fl-notice.acct-sync-notice { background: color-mix(in srgb, var(--status-warning) 7%, var(--bg-surface)); border-color: color-mix(in srgb, var(--status-warning) 45%, transparent); }
+
+/* Round 2 */
+/* Tab counts are to-dos: a small amber count chip (the tooltip says what it counts). */
+.tw-seg__count.acct-tab-num, .tw-seg__opt.is-active .tw-seg__count.acct-tab-num { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; box-sizing: border-box; background: var(--status-warning-bg); color: var(--status-warning-text); font: 600 11px/1 var(--font-sans); }
+.tw-seg__opt[data-locked] { color: var(--text-secondary) !important; }
+/* Buttons inside card rows: one height. */
+.acct-row__actions .tw-btn, .acct-hint .tw-btn, .acct-formfoot .tw-btn--sm { height: 32px; min-height: 32px; }
+@media (max-width: 640px) { .acct-row__actions .tw-btn, .acct-hint .tw-btn { height: 40px; min-height: 40px; } }
+/* Contacts toolbar: search, then two compact selects; wraps on phones. */
+.acct-contact-toolbar { flex-wrap: wrap !important; flex-direction: row !important; gap: 8px; }
+.acct-contact-toolbar .acct-contact-search { position: relative; flex: 1 1 220px; min-width: 0; padding: 0; border: 0; }
+.acct-contact-toolbar .acct-contact-search > svg { left: 12px; }
+.acct-contact-filter { flex: 0 0 190px; min-width: 0; }
+@media (max-width: 640px) {
+  .acct-contact-toolbar .acct-contact-search { flex: 1 1 100%; }
+  .acct-contact-filter { flex: 1 1 0; }
+}
+.acct-strong { font-weight: 500; color: var(--text-primary); }
+.acct-event-flag { font-weight: 500; color: var(--status-warning-text); }
+@media (max-width: 640px) {
+  .acct-tiles:not(.acct-tiles--3) > div:nth-child(n+3) { border-top: 1px solid var(--border-row) !important; padding-top: 12px; margin-top: 4px; }
+  .acct-tiles:not(.acct-tiles--3) > div:nth-child(3) { border-left: 0 !important; }
+}
+.acct-diff-word { color: var(--text-primary); }
+.acct-tiles--3 > div > span:first-child { white-space: normal; }
+@media (max-width: 640px) { .acct-diff-card .acct-link[href^="http"] { display: inline-flex; min-height: 40px; align-items: center; } }
+/* Integration cards: the status pill lines up with the title row on every card. */
+.acct-card__top { align-items: start; }
+.acct-card__top > .acct-logo { align-self: start; }
+.acct-card__chip { align-self: start; padding-top: 2px; }
+.acct-card__chip:empty { display: none; }
+.tw-int-head { align-items: flex-start !important; }
+.tw-int-head__chip { padding-top: 2px; }
+
+/* Org picker: initials tile, a visible selected outline, a disabled radio you can still see. */
+.acct-org-initials { background: var(--bg-deep); color: var(--text-secondary); font: 600 15px/20px var(--font-sans); }
+.acct-org.is-selected { box-shadow: inset 0 0 0 1px var(--border-strong) !important; }
+.acct-org.is-disabled .acct-radio { border-color: var(--border-strong); opacity: 1; background: var(--bg-deep); }
+.acct-org.is-disabled .acct-org-initials { opacity: 0.6; }
+.acct-hint--stack > .acct-use-btn { margin: 8px 0 0; height: 32px; }
+@media (max-width: 640px) { .acct-hint--stack > .acct-use-btn { height: 40px; } }
+/* Nothing to save: an outlined, disabled button that still reads. */
+.acct-save-btn:disabled { opacity: 1 !important; background: transparent !important; color: var(--text-tertiary) !important; border: 1px solid var(--border-default) !important; }
+.acct-map-row.is-disabled-row .acct-select { border-style: dashed; }
+.acct-diff-word { height: 20px; line-height: 20px; vertical-align: top; }
+@media (max-width: 640px) { .acct-card-actions > .tw-btn--ghost { flex: 0 0 auto !important; padding-left: 0; } }
+
+/* Round 3: the section tabs are the dashboard's underline tabs (as on Finance). */
+.acct-tabs { display: block; margin: 0 0 20px; }
+.acct-utabs.section-header__tabs { margin-top: 0; gap: 24px; }
+.acct-utab { display: inline-flex; align-items: center; gap: 6px; }
+.acct-utabs .section-header__tab[data-locked] { color: var(--text-tertiary); cursor: not-allowed; }
+.acct-utabs .section-header__tab[data-locked]:hover { color: var(--text-tertiary); }
+.acct-utabs .acct-tab-num { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; box-sizing: border-box; background: var(--status-neutral-bg); color: var(--text-primary); font: 500 12px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .acct-tabs { display: none; } }
+
+/* Round 3 fixes */
+/* Integration cards: the status pill stays top-right beside the name at every width. */
+@media (max-width: 480px) {
+  .acct-card__top { grid-template-columns: 48px minmax(0, 1fr) auto !important; }
+  .acct-card__chip { grid-column: 3 !important; grid-row: 1 !important; justify-self: end !important; }
+}
+/* Mapping: the suggestion text, then its button on its own line. */
+.acct-hint--stack { display: block !important; }
+.acct-hint--stack > span { display: block !important; }
+.acct-hint--stack > .acct-use-btn { display: inline-flex; margin: 8px 0 0 !important; }
+.acct-jumpbtn { border-color: var(--border-default) !important; }
+/* Org picker: selection is a tint (no box against the rounded card edge). */
+.acct-org.is-selected { box-shadow: none !important; background: color-mix(in srgb, var(--text-primary) 6%, var(--bg-surface)) !important; }
+.acct-org.is-selected .acct-org-initials { background: var(--bg-surface); color: var(--text-primary); }
+.acct-org-initials { font-size: 12px !important; letter-spacing: 0.02em; }
+.acct-org.is-disabled .acct-row__title { color: var(--text-secondary); }
+/* Reauth: waiting steps keep readable text; only their markers dim. */
+.acct-check li.is-blocked:not(:first-child) .acct-check__title { color: var(--text-secondary) !important; }
+.acct-check li.is-blocked:not(:first-child) .acct-check__desc { color: var(--text-tertiary) !important; }
+/* Buttons inside card rows match the card-header buttons. */
+.acct-row__actions .tw-btn, .acct-hint .tw-btn { height: var(--control-h, 36px); min-height: var(--control-h, 36px); }
+/* Contacts toolbar in a narrow card: search on its own line, then the two filters. */
+@container (max-width: 700px) {
+  .acct-contact-toolbar .acct-contact-search { flex: 1 1 100% !important; }
+  .acct-contact-filter { flex: 1 1 0 !important; }
+}
+.acct-progress__bar { height: 6px; }

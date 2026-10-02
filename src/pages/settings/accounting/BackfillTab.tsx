@@ -69,8 +69,8 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
     prevState.current = b?.state;
   }, [b, qc, cfg.short]);
 
-  if (q.isLoading) return <AcctCard title="Cut-over date"><LoadingBlock label="Loading cut-over" /></AcctCard>;
-  if (q.isError || !b) return <AcctCard title="Cut-over date"><ErrorBlock message={apiMessage(q.error, "Couldn't load the cut-over status.")} onRetry={() => q.refetch()} /></AcctCard>;
+  if (q.isLoading) return <AcctCard title="Start date"><LoadingBlock label="Loading start date" /></AcctCard>;
+  if (q.isError || !b) return <AcctCard title="Start date"><ErrorBlock message={apiMessage(q.error, "Couldn't load the start date.")} onRetry={() => q.refetch()} /></AcctCard>;
 
   const r = connection.readiness;
   const running = b.state === 'RUNNING';
@@ -83,7 +83,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
   if (connection.status !== 'ACTIVE') reasons.push(`Reconnect ${cfg.short} first`);
   if (!r.mapping_complete) reasons.push('Map every account and VAT code first');
   if (r.contacts_to_confirm > 0 || (p?.contacts_unconfirmed ?? 0) > 0) reasons.push(`Confirm the ${plural(Math.max(r.contacts_to_confirm, p?.contacts_unconfirmed ?? 0), 'contact')} matched on name only`);
-  if (!date) reasons.push('Choose a cut-over date');
+  if (!date) reasons.push('Choose a start date');
   if (connection.status === 'ACTIVE' && providerBlockers(r).length) reasons.push(`Change the ${cfg.short} settings listed on the Setup tab, then refresh`);
   const canStart = reasons.length === 0 && !locked && !starting;
 
@@ -114,7 +114,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
     if (x.state === 'RUNNING') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : `${x.count.toLocaleString('en-ZA')} so far`;
     if (x.state === 'DONE') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : 'Done';
     if (x.state === 'SKIPPED') return '';
-    return total ? `0 of ${total.toLocaleString('en-ZA')}` : 'Not started';
+    return total ? `0 of ${total.toLocaleString('en-ZA')}` : 'Waiting';
   };
   // The bar follows the documents (where the preview knows them), not the steps.
   const itemTotal = Object.values(totals).reduce<number>((n, v) => n + (v ?? 0), 0);
@@ -128,8 +128,8 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
 
   const cutoverCard = (
       <AcctCard
-        title="Cut-over date"
-        description={`From this date TruckWys sends every invoice, credit note, supplier bill and recorded payment to ${cfg.short}. Anything dated earlier is not sent: we assume it's already in your books.`}
+        title="Start date"
+        description={`TruckWys sends everything dated from here on to ${cfg.short}. Earlier documents are assumed to be in your books already.`}
       >
         <div className="acct-cutover">
           <div className="acct-cutover__date">
@@ -139,7 +139,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
               </>
             ) : (
               <>
-                <label htmlFor="acct-cutover" className="acct-sr">Cut-over date</label>
+                <label htmlFor="acct-cutover" className="acct-sr">Start date</label>
                 <DatePicker id="acct-cutover" value={date} onChange={setDate} />
               </>
             )}
@@ -172,7 +172,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
         {!locked && p && p.historic_receipts > 0 && (
           <p className="acct-section-desc" style={{ margin: '8px 0 0' }}>
             Payments already recorded in TruckWys go into the bank account chosen under{' '}
-            <button type="button" className="acct-linkbtn" onClick={() => onOpen('mapping')}>Accounts and VAT</button>.
+            <button type="button" className="acct-linkbtn" onClick={() => onOpen('mapping')}>Mapping</button>.
           </p>
         )}
 
@@ -199,7 +199,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
         <AcctCard
           title={running ? `Sending history to ${cfg.short}` : 'Progress'}
           description={running
-            ? <>{`${startedAt ? `Started ${formatRelativeTime(b.started_at!).toLowerCase()}` : 'Started'} · updated ${formatRelativeTime(new Date(q.dataUpdatedAt || Date.now())).toLowerCase()}. You can leave this page; sending carries on.`}
+            ? <>{`${b.cutover_date ? `Everything from ${formatDate(b.cutover_date)}. ` : ''}${startedAt ? `Started ${formatRelativeTime(b.started_at!).toLowerCase()}` : 'Started'} · updated ${formatRelativeTime(new Date(q.dataUpdatedAt || Date.now())).toLowerCase()}. You can leave this page; sending carries on.`}
           <div className="acct-progress acct-progress--head" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pctDone)}
             aria-label={itemTotal ? `${itemsDone} of ${itemTotal} documents sent` : `${doneSteps} of ${b.steps.length} steps done`}>
             <div className="acct-progress__bar"><span style={{ width: `${pctDone}%` }} /></div>

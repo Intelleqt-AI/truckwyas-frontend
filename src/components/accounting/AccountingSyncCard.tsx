@@ -62,7 +62,7 @@ export function PaymentsManagedNote({ providerName, recordUrl }: { providerName:
     <div className="acct-managed">
       {recordUrl && (
         <a href={recordUrl} target="_blank" rel="noopener noreferrer" className="tw-btn acct-record-btn">
-          Record in {providerName}
+          Record payment in {providerName}
           <ExternalLink size={14} aria-hidden="true" />
         </a>
       )}
@@ -76,7 +76,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
   const name = providerConfig(sync.provider).short || sync.provider_name;
   const retrying = sync.status === 'ERROR';
   return (
-    <div className="fl-notice fl-notice--warning" role="status">
+    <div className="fl-notice fl-notice--warning acct-sync-notice" role="status">
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
         <strong>{retrying ? `Last change didn't reach ${name}` : `This ${what} isn't up to date in ${name}`}</strong>
@@ -96,7 +96,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
  */
 export function PaymentSourceBadge({ source, managed = false }: { source?: string | null; managed?: boolean }) {
   const manual = !source || source === 'MANUAL';
-  if (managed) return <span className="acct-source-note"> · {manual ? 'Recorded in TruckWys' : `From ${source === 'BANK' ? 'bank feed' : providerConfig(source).short}`}</span>;
+  if (managed) return <span className="acct-source-note"> · {manual ? 'From TruckWys' : `From ${source === 'BANK' ? 'bank feed' : providerConfig(source).short}`}</span>;
   if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;
   return <span className="acct-source-badge">{label}</span>;

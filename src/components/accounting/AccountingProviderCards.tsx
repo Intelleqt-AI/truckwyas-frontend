@@ -108,7 +108,7 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
   const cfg = providerConfig(info.provider);
   const mine = live && live.provider === info.provider ? live : null;
   const other = live && live.provider !== info.provider ? providerConfig(live.provider) : null;
-  const chip = mine ? connectionChip(mine.status, mine.readiness) : null;
+  const chip = mine ? connectionChip(mine.status, mine.readiness, mine.counts) : null;
 
   // Same layout as the other integration cards on this page (Cartrack,
   // CtrlFleet): logo, name and one grey line, status on the right, the
@@ -126,9 +126,10 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
     desc = mine.status === 'PENDING_ORG'
       ? `Signed in to ${cfg.short}; no organisation chosen yet.`
       : `Linked to ${mine.tenant_name || `your ${cfg.short} ${cfg.orgWord}`}`;
-    const left = mine.status === 'ACTIVE' && !mine.readiness.sync_enabled
-      ? [!mine.readiness.mapping_complete, mine.readiness.contacts_to_confirm > 0, mine.readiness.backfill_state !== 'DONE'].filter(Boolean).length : 0;
-    if (left > 0) desc = <>{mine.tenant_name || `${cfg.short} ${cfg.orgWord}`}<span className="acct-card__note">{left} setup {left === 1 ? 'step' : 'steps'} left</span></>;
+    const steps = mine.status === 'ACTIVE' && !mine.readiness.sync_enabled
+      ? [!mine.readiness.mapping_complete && 'mapping', mine.readiness.contacts_to_confirm > 0 && 'contacts', mine.readiness.backfill_state !== 'DONE' && 'start date'].filter((x): x is string => !!x) : [];
+    const left = steps.length;
+    if (left > 0) desc = <>{mine.tenant_name || `${cfg.short} ${cfg.orgWord}`}<span className="acct-card__note">Still to do: {steps.join(', ')}</span></>;
     if (mine.status === 'NEEDS_REAUTH') note = <span className="acct-card__note acct-card__note--danger">{mine.status_reason || `Your ${cfg.short} sign-in has expired.`} Nothing is sent until an admin reconnects.</span>;
     const needsYou = mine.status === 'PENDING_ORG' || (mine.status === 'ACTIVE' && !mine.readiness.sync_enabled);
     actions = (
@@ -171,7 +172,7 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
         <div className="acct-card__chip">
           {loading
             ? <span className="tw-status" style={{ visibility: 'hidden' }} aria-hidden="true">Setup needed</span>
-            : chip ? <StatusChip tone={chip.tone} label={chip.label} /> : <StatusChip status="DISCONNECTED" />}
+            : chip ? <StatusChip tone={chip.tone} label={chip.label} /> : hideManage ? null : <StatusChip status="DISCONNECTED" />}
         </div>
       </div>
       {actions && <div className="acct-card__actions">{actions}</div>}

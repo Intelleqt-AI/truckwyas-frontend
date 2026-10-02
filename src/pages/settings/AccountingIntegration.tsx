@@ -17,6 +17,7 @@ import { BackfillTab } from './accounting/BackfillTab';
 import { SyncTab } from './accounting/SyncTab';
 import { ReconciliationTab } from './accounting/ReconciliationTab';
 import { AcctCard, ErrorBlock, LoadingBlock, useAccountingPermissions } from './accounting/shared';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ACCOUNTING_TABS, isAccountingTab, type AccountingTab } from './accounting/tabs';
 import '@/components/accounting/accounting.css';
 
@@ -64,11 +65,16 @@ export default function AccountingIntegration() {
   const title = 'Accounting';
   // A sub-page of Integrations: the subtitle line carries the way back, as on
   // every detail page (the settings nav keeps "Integrations" highlighted).
+  // Same subtitle as other detail pages (Invoices): the way back, then what this page is.
   const description = (
-    <Link to="/settings/integrations" className="section-header__back">
-      <ChevronLeft size={14} strokeWidth={1.75} aria-hidden="true" />
-      Integrations
-    </Link>
+    <>
+      <Link to="/settings/integrations" className="section-header__back">
+        <ChevronLeft size={14} strokeWidth={1.75} aria-hidden="true" />
+        Integrations
+      </Link>
+      <span aria-hidden="true" className="section-header__sep">·</span>
+      {cfg ? cfg.name : 'No system connected'}
+    </>
   );
 
   const bannerIcon = banner?.tone === 'success' ? <CheckCircle2 size={16} aria-hidden="true" />
@@ -98,7 +104,7 @@ export default function AccountingIntegration() {
     if (el && strip) {
       const base = strip.getBoundingClientRect().left - strip.scrollLeft;
       const pos = (n: HTMLElement) => n.getBoundingClientRect().left - base;
-      const tabsEls = Array.from(strip.querySelectorAll<HTMLElement>('.tw-seg__opt'));
+      const tabsEls = Array.from(strip.querySelectorAll<HTMLElement>('.section-header__tab'));
       const elRight = pos(el) + el.offsetWidth;
       // Smallest scroll that shows the open tab whole (plus room for the fade),
       // rounded to the start of a tab so no word is cut on the left.
@@ -145,18 +151,20 @@ export default function AccountingIntegration() {
     body = (
       <>
         <h2 className="acct-section-title">Connect your accounting system</h2>
-        <p className="acct-section-desc acct-desc-cap">Send invoices and bills to your books. Payments come back automatically.</p>
+        <p className="acct-section-desc acct-desc-cap">Send invoices and bills to your books. Payments come back automatically. <ComingSoonNote /></p>
         <AccountingProviderCards hideManage />
-        <p className="acct-section-desc acct-desc-cap" style={{ marginTop: 0, marginBottom: 24 }}><ComingSoonNote /></p>
-        <AcctCard title="After you connect" description="Takes about 10 minutes and needs a company admin." flush>
+        <div style={{ height: 12 }} />
+        <AcctCard title="How setup works" description="About 10 minutes, done by a company admin. You'll see these steps again after connecting." flush>
           <ol className="acct-check">
             {[
+              ['Connect your accounting system', 'Sign in to it and choose which books to link.'],
               ['Map charges, expenses and VAT', 'Tell TruckWys where each kind of charge and supplier bill goes in your books, and which VAT rates to use.'],
               ['Confirm contacts', 'Most customers and suppliers are matched for you on VAT or registration number.'],
-              ['Choose a cut-over date', 'We send documents from that date. Anything earlier should already be in your books.'],
+              ['Choose a start date', 'We send documents from that date. Anything earlier should already be in your books.'],
+              ['Sync starts', 'Automatically, once the steps above are done.'],
             ].map(([t, d], i) => (
               <li key={t}>
-                <span className="acct-step-num is-auto" aria-hidden="true">{i + 1}</span>
+                <span className="acct-step-num is-plain" aria-hidden="true">{i + 1}</span>
                 <div style={{ minWidth: 0 }}>
                   <div className="acct-check__title">{t}</div>
                   <div className="acct-check__desc">{d}</div>
@@ -179,9 +187,10 @@ export default function AccountingIntegration() {
       <>
         <ConnectionHeader connection={live} compact />
         <div className="acct-tabs">
-          <div className="tw-seg" role="tablist" ref={tabsRef} aria-label={`${cfg!.short} settings`}>
+          <div className="section-header__tabs acct-utabs" role="tablist" ref={tabsRef} aria-label={`${cfg!.short} settings`}>
             {ACCOUNTING_TABS.map(t => {
               const n = tabBadge(t.id);
+              const locked = live.status === 'NEEDS_REAUTH' && t.id !== 'setup';
               return (
                 <button
                   key={t.id}
@@ -190,19 +199,39 @@ export default function AccountingIntegration() {
                   id={`acct-tab-${t.id}`}
                   aria-selected={tab === t.id}
                   aria-controls="acct-tabpanel"
-                  className={`tw-seg__opt${tab === t.id ? ' is-active' : ''}`}
-                  onClick={() => openTab(t.id)}
-                  disabled={live.status === 'NEEDS_REAUTH' && t.id !== 'setup'}
-                  title={live.status === 'NEEDS_REAUTH' && t.id !== 'setup' ? `Locked until you reconnect ${cfg!.short}` : undefined}
-                  data-locked={live.status === 'NEEDS_REAUTH' && t.id !== 'setup' ? '' : undefined}
+                  className={`section-header__tab${tab === t.id ? ' is-active' : ''}`}
+                  data-label={t.label}
+                  onClick={() => { if (!locked) openTab(t.id); }}
+                  aria-disabled={locked || undefined}
+                  title={locked ? `Available after you reconnect ${cfg!.short}` : n != null ? tabCountTitle(t.id, n) : undefined}
+                  data-locked={locked ? '' : undefined}
                 >
-                  {live.status === 'NEEDS_REAUTH' && t.id !== 'setup' && <Lock size={11} aria-hidden="true" />}
-                  {t.label}
-                  {n != null && <span className={`acct-tab-count${t.id === 'mapping' || t.id === 'contacts' || t.id === 'sync' || t.id === 'reconciliation' ? ' is-todo' : ''}`} title={tabCountTitle(t.id, n)} aria-label={tabCountTitle(t.id, n)}>{n}</span>}
+                  <span className="acct-utab">
+                    {locked && <Lock size={12} aria-hidden="true" />}
+                    {t.label}
+                    {n != null && <span className="acct-tab-num" aria-label={tabCountTitle(t.id, n)}>{n}</span>}
+                  </span>
                 </button>
               );
             })}
           </div>
+        </div>
+        {/* Phones: one picker instead of a strip that clips, as the settings nav does. */}
+        <div className="acct-tabs-phone">
+          <Select value={tab} onValueChange={v => openTab(v as AccountingTab)}>
+            <SelectTrigger aria-label={`${cfg!.short} settings page`} className="acct-tabs-phone__trigger"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {ACCOUNTING_TABS.map(t => {
+                const n = tabBadge(t.id);
+                const locked = live.status === 'NEEDS_REAUTH' && t.id !== 'setup';
+                return (
+                  <SelectItem key={t.id} value={t.id} disabled={locked}>
+                    {t.label}{n != null ? ` · ${tabCountTitle(t.id, n)}` : ''}{locked ? ' · after you reconnect' : ''}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
         </div>
         <div id="acct-tabpanel" role="tabpanel" aria-labelledby={`acct-tab-${tab}`}>
           {tab === 'setup' && <SetupChecklist connection={live} onOpen={openTab} />}
@@ -219,7 +248,7 @@ export default function AccountingIntegration() {
   return (
     <SettingsShell activeId="integrations">
       <div style={{ maxWidth: 'var(--form-max, 720px)', minWidth: 0 }}>
-        <SettingsPageHeader title={title} description={description} />
+        <SettingsPageHeader title={title} description={description} subPage />
 
         {banner && (
           <div className={`acct-notice acct-notice--${banner.tone}`} role={banner.tone === 'danger' ? 'alert' : 'status'}>

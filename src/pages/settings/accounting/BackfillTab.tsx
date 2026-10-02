@@ -114,7 +114,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
     if (x.state === 'RUNNING') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : `${x.count.toLocaleString('en-ZA')} so far`;
     if (x.state === 'DONE') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : 'Done';
     if (x.state === 'SKIPPED') return '';
-    return total ? `0 of ${total.toLocaleString('en-ZA')}` : 'Waiting';
+    return total ? `0 of ${total.toLocaleString('en-ZA')}` : 'Queued';
   };
   // The bar follows the documents (where the preview knows them), not the steps.
   const itemTotal = Object.values(totals).reduce<number>((n, v) => n + (v ?? 0), 0);
@@ -129,7 +129,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
   const cutoverCard = (
       <AcctCard
         title="Start date"
-        description={`TruckWys sends everything dated from here on to ${cfg.short}. Earlier documents are assumed to be in your books already.`}
+        description={`TruckWys sends everything dated on or after this date to ${cfg.short}. Earlier documents are assumed to be in your books already.`}
       >
         <div className="acct-cutover">
           <div className="acct-cutover__date">
@@ -199,7 +199,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
         <AcctCard
           title={running ? `Sending history to ${cfg.short}` : 'Progress'}
           description={running
-            ? <>{`${b.cutover_date ? `Everything from ${formatDate(b.cutover_date)}. ` : ''}${startedAt ? `Started ${formatRelativeTime(b.started_at!).toLowerCase()}` : 'Started'} · updated ${formatRelativeTime(new Date(q.dataUpdatedAt || Date.now())).toLowerCase()}. You can leave this page; sending carries on.`}
+            ? <>{`${b.cutover_date ? `Sending everything dated from ${formatDate(b.cutover_date)}. ` : ''}${startedAt ? `Started ${formatRelativeTime(b.started_at!).toLowerCase()}` : 'Started'}, updated ${formatRelativeTime(new Date(q.dataUpdatedAt || Date.now())).toLowerCase()}.`}<span style={{ display: 'block' }}>You can leave this page; sending carries on.</span>
           <div className="acct-progress acct-progress--head" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pctDone)}
             aria-label={itemTotal ? `${itemsDone} of ${itemTotal} documents sent` : `${doneSteps} of ${b.steps.length} steps done`}>
             <div className="acct-progress__bar"><span style={{ width: `${pctDone}%` }} /></div>

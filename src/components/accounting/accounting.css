@@ -852,3 +852,14 @@
 .acct-blockers__after { margin-top: 6px; }
 .acct-blockers__actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 @media (max-width: 560px) { .acct-blockers__actions .tw-btn--ghost { width: auto !important; } }
+/* Last QBO-round shared fixes */
+.acct-nowrap { white-space: nowrap; }
+@media (max-width: 640px) { .acct-dotsep { display: none; } .acct-block-phone { display: block; } }
+.acct-source-note--line { display: block !important; }
+.acct-optional { color: var(--text-secondary) !important; }
+.acct-check--steps li > .acct-step-done-btn { height: 32px; min-height: 32px; color: var(--text-primary); }
+@media (max-width: 560px) { .acct-check--steps li > .acct-step-done-btn { padding-left: 12px; margin-top: 4px; } }
+@media (max-width: 640px) {
+  .acct-tiles:not(.acct-tiles--3) > div { border: 0 !important; }
+  .acct-tiles:not(.acct-tiles--3) { row-gap: 8px; }
+}

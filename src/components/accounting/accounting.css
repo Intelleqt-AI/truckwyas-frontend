@@ -935,3 +935,10 @@
 .acct-path { display: block; font-weight: 500; color: var(--text-secondary); }
 .acct-step-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; justify-self: end; min-width: 168px; }
 @media (max-width: 560px) { .acct-step-actions { grid-column: 2; justify-self: stretch; flex-direction: column; } }
+.acct-hint--inline > span, .acct-hint.is-required.acct-hint--inline > span { display: inline !important; }
+.acct-use-link { margin-left: 2px; vertical-align: baseline; }
+@container (min-width: 560px) {
+  .acct-map-grid > .acct-map-row:last-child:nth-child(odd) { column-gap: 40px; }
+}
+.acct-check--steps li.is-provider { align-items: start; }
+.acct-check--steps li.is-provider > .acct-step-actions { align-self: start; }

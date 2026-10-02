@@ -16,6 +16,7 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
   const name = cfg.short || sync.provider_name;
   const chip = documentSyncChip(sync.status);
   const titleId = `acct-sync-${what.replace(' ', '-')}`;
+  const failing = ['ERROR', 'DEAD', 'BLOCKED'].includes(sync.status);
   return (
     <section className="card acct-sync-card" aria-labelledby={titleId}>
       <div className="fin-panel-head" style={{ marginBottom: 4 }}>
@@ -24,27 +25,29 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
           <StatusChip tone={chip.tone} label={chip.label} size="sm" />
         </div>
       </div>
-      <dl className="fin-dl">
-        {/* Only when it differs from ours (it usually doesn't). */}
-        {sync.external_number && sync.external_number !== localNumber && (
+      {failing ? (
+        // Something didn't go through: one plain sentence instead of label/value rows.
+        <p className="acct-sync-line">
+          {sync.status === 'BLOCKED'
+            ? `Waiting on you before it can go to ${name}.`
+            : `${name} has the version from ${sync.last_synced_at ? formatDate(sync.last_synced_at) : 'before this change'}. ${sync.status === 'DEAD' ? 'Your latest change was not sent; retry it from the Sync tab.' : 'Your latest change goes as soon as the problem above is fixed.'}`}
+        </p>
+      ) : (
+        <dl className="fin-dl">
+          {sync.external_number && sync.external_number !== localNumber && (
+            <div className="fin-dl__row">
+              <dt>Number in {name}</dt>
+              <dd>{sync.external_number}</dd>
+            </div>
+          )}
           <div className="fin-dl__row">
-            <dt>Number in {name}</dt>
-            <dd>{sync.external_number}</dd>
+            <dt>Last sent</dt>
+            <dd style={{ whiteSpace: 'nowrap' }}>{sync.last_synced_at ? formatDate(sync.last_synced_at) : 'Not sent yet'}</dd>
           </div>
-        )}
-        {(sync.status === 'ERROR' || sync.status === 'DEAD' || sync.status === 'BLOCKED') && (
-          <div className="fin-dl__row">
-            <dt>Latest change</dt>
-            <dd>{sync.status === 'BLOCKED' ? 'Waiting on you' : sync.status === 'DEAD' ? 'Not sent' : 'Waiting to retry'}</dd>
-          </div>
-        )}
-        <div className="fin-dl__row">
-          <dt>{sync.status === 'SYNCED' ? 'Last sent' : 'Last sent successfully'}</dt>
-          <dd style={{ whiteSpace: 'nowrap' }}>{sync.last_synced_at ? formatDate(sync.last_synced_at) : sync.status === 'PENDING' ? 'Not sent yet' : 'Not yet'}</dd>
-        </div>
-      </dl>
+        </dl>
+      )}
       {sync.url && (
-        <a href={sync.url} target="_blank" rel="noopener noreferrer" className="tw-btn" style={{ marginTop: 12, alignSelf: 'flex-start' }}>
+        <a href={sync.url} target="_blank" rel="noopener noreferrer" className="acct-link acct-sync-open">
           Open {what} in {name}
           <ExternalLink size={12} aria-hidden="true" />
         </a>
@@ -79,8 +82,8 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
     <div className="fl-notice fl-notice--warning acct-sync-notice" role="status">
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
-        <strong>{retrying ? `Last change didn't reach ${name}` : `This ${what} isn't up to date in ${name}`}</strong>
-        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? "We keep retrying; it goes through once that's fixed." : "Fix it, then retry from the Sync tab."}
+        <strong>{`Latest change isn't in ${name} yet`}</strong>
+        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? 'Fix that and it goes through on the next automatic try.' : 'Fix it, then retry from the Sync tab.'}
       </div>
       <Link to={`/settings/integrations/accounting?tab=${/account|tax|vat|tracking/i.test(sync.last_error) ? 'mapping' : 'sync'}`} className="tw-btn fl-notice__action">
         {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix account mapping' : 'View sync issue'}

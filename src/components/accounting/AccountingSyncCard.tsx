@@ -31,7 +31,7 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         <p className="acct-sync-line">
           {sync.status === 'BLOCKED'
             ? `Waiting on you before it can go to ${name}.`
-            : `Latest changes not sent yet. Last sent ${sync.last_synced_at ? formatDate(sync.last_synced_at) : 'never'}.`}
+            : `Last sent ${sync.last_synced_at ? formatDate(sync.last_synced_at) : 'never'}`}
         </p>
       ) : (
         <dl className="fin-dl">
@@ -84,7 +84,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
         <strong>{`Not up to date in ${name}`}</strong>
-        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? "Fix the mapping and we'll send the latest version on the next try." : 'Fix it, then retry from the Sync tab.'}
+        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? 'Fix the mapping and it sends on the next try.' : 'Fix it, then retry from the Sync tab.'}
       </div>
       <Link to={`/settings/integrations/accounting?tab=${/account|tax|vat|tracking/i.test(sync.last_error) ? 'mapping' : 'sync'}`} className="tw-btn fl-notice__action">
         {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix account mapping' : 'View sync issue'}
@@ -104,8 +104,13 @@ export function PaymentSourceBadge({ source, managed = false, externalId, provid
     // Its state in the accounting system: came from there, sent there, or only here.
     const where = providerName || (manual ? '' : providerConfig(source).short);
     const label = !manual ? (source === 'BANK' ? 'From bank feed' : `In ${providerConfig(source).short}`)
-      : externalId ? `In ${where || 'your books'}` : `Only in TruckWys · add it in ${where || 'your books'} to match`;
-    return <span className={`acct-source-note acct-source-note--line${manual && !externalId ? ' is-local' : ''}`}>{label}</span>;
+      : externalId ? `In ${where || 'your books'}` : 'Only in TruckWys';
+    const local = manual && !externalId;
+    return (
+      <span className={`acct-source-note acct-source-note--line${local ? ' is-local' : ''}`} title={local ? `Not in ${where || 'your books'}. Add it there so both match.` : undefined}>
+        {local && <span className="acct-dot acct-dot--warning acct-dot--inline" aria-hidden="true" />}{label}
+      </span>
+    );
   }
   if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;

@@ -109,7 +109,7 @@ export function PaymentSourceBadge({ source, managed = false, externalId, provid
     return (
       <span className={`acct-source-note acct-source-note--line acct-paystate${local ? ' is-local' : ''}`}>
         <span className={`acct-dot acct-dot--inline ${local ? 'acct-dot--warning' : 'acct-dot--success'}`} aria-hidden="true" />{label}
-        {local && <span className="acct-paystate__hint">Add it in {where || 'your books'} so both match.</span>}
+        {local && <span className="acct-paystate__hint">Add it in {where || "your books"} to match.</span>}
       </span>
     );
   }

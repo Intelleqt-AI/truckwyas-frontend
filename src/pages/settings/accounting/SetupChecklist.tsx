@@ -52,7 +52,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: backfillLook,
       title: 'Choose a start date',
       desc: r.backfill_state === 'DONE'
-        ? `Start date ${connection.cutover_date ? formatDate(connection.cutover_date) : 'set'}. Earlier history has been sent.`
+        ? `Sent everything dated from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'}.`
         : r.backfill_state === 'RUNNING'
           ? `Sending documents to ${cfg.short} now.`
           : r.backfill_state === 'FAILED'

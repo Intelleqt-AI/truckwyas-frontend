@@ -31,7 +31,7 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         <p className="acct-sync-line">
           {sync.status === 'BLOCKED'
             ? `Waiting on you before it can go to ${name}.`
-            : `Not sent to ${name}: ${/account|tax|vat|tracking/i.test(sync.last_error) ? 'fix the mapping' : 'fix the problem above'} and it ${sync.status === 'DEAD' ? 'can be retried from the Sync tab' : 'sends on the next try'}. Last sent ${sync.last_synced_at ? formatDate(sync.last_synced_at) : 'never'}.`}
+            : `Latest changes not sent yet. Last sent ${sync.last_synced_at ? formatDate(sync.last_synced_at) : 'never'}.`}
         </p>
       ) : (
         <dl className="fin-dl">
@@ -104,7 +104,7 @@ export function PaymentSourceBadge({ source, managed = false, externalId, provid
     // Its state in the accounting system: came from there, sent there, or only here.
     const where = providerName || (manual ? '' : providerConfig(source).short);
     const label = !manual ? (source === 'BANK' ? 'From bank feed' : `In ${providerConfig(source).short}`)
-      : externalId ? `In ${where || 'your books'}` : 'Recorded in TruckWys only';
+      : externalId ? `In ${where || 'your books'}` : `Only in TruckWys · add it in ${where || 'your books'} to match`;
     return <span className={`acct-source-note acct-source-note--line${manual && !externalId ? ' is-local' : ''}`}>{label}</span>;
   }
   if (manual) return null;

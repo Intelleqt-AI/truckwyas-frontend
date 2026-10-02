@@ -79,7 +79,7 @@ export function AccountingProviderCards({ hideManage = false }: { hideManage?: b
           {apiMessage(q.error, "Couldn't load your accounting connection. Refresh the page to try again.")}
         </p>
       )}
-      {available.map(p => (
+      {(primaryCode ? [...available.filter(p => p.provider === primaryCode), ...available.filter(p => p.provider !== primaryCode)] : available).map(p => (
         <ProviderCard
           key={p.provider}
           info={p}
@@ -145,13 +145,13 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
         )}
         {!hideManage && (
           <Link to={attention.tab && !needsYou ? `${ACCOUNTING_PAGE}?tab=${attention.tab}` : ACCOUNTING_PAGE} className={`${btn}${needsYou || attention.count > 0 ? ' tw-btn--primary' : ''}`}>
-            {mine.status === 'PENDING_ORG' ? 'Choose organisation' : mine.status === 'ACTIVE' && !mine.readiness.sync_enabled ? 'Finish setup' : attention.count > 0 ? 'Review' : 'Manage'}
+            {mine.status === 'PENDING_ORG' ? 'Choose organisation' : mine.status === 'ACTIVE' && !mine.readiness.sync_enabled ? 'Finish setup' : attention.count > 0 ? 'Review issues' : 'Manage'}
           </Link>
         )}
       </>
     );
   } else if (other) {
-    note = <span className="acct-card__note acct-card__note--muted">Unavailable while {other.short} is connected. One accounting system at a time.</span>;
+    note = <span className="acct-card__note acct-card__note--muted">Unavailable while {other.short} is connected.</span>;
     actions = null;
   } else if (!info.configured) {
     note = <span className="acct-card__note">Not set up on this server yet. Ask TruckWys support to switch it on.</span>;
@@ -176,7 +176,7 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
         <div className="acct-card__chip">
           {loading
             ? <span className="tw-status" style={{ visibility: 'hidden' }} aria-hidden="true">Setup needed</span>
-            : chip ? <StatusChip tone={chip.tone} label={chip.label} /> : hideManage ? null : <StatusChip status="DISCONNECTED" />}
+            : chip ? <StatusChip tone={chip.tone} label={chip.label} /> : other ? <StatusChip tone="neutral" label="Unavailable" /> : hideManage ? null : <StatusChip status="DISCONNECTED" />}
         </div>
       </div>
       {actions && <div className="acct-card__actions">{actions}</div>}

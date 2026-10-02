@@ -10,7 +10,7 @@ import { connectionChip } from '@/components/accounting/connectionStatus';
 import { formatDate, formatDateTime } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import {
-  ACCT_KEYS, accountingApi, apiMessage, invalidateAccounting, providerConfig, type Connection,
+  ACCT_KEYS, accountingApi, apiMessage, invalidateAccounting, providerConfig, useAccountingAttention, type Connection,
 } from '@/lib/accounting';
 import { settingsCardStyle } from '../settingsUi';
 import { SkelLine, useAccountingPermissions } from './shared';
@@ -54,11 +54,12 @@ function useDisconnect(connection: Connection) {
  * Org name, status, who connected it and when, and the connection's actions.
  * `compact` (every tab but Setup) keeps only the identity row.
  */
-export function ConnectionHeader({ connection, compact = false }: { connection: Connection; compact?: boolean }) {
+export function ConnectionHeader({ connection, compact = false, onOpenTab }: { connection: Connection; compact?: boolean; /** Opens the tab the attention pill points at. */ onOpenTab?: (tab: 'sync' | 'reconciliation') => void }) {
   const { canWrite, writeTitle } = useAccountingPermissions();
   const cfg = providerConfig(connection.provider);
   const r = connection.readiness;
-  const chip = connectionChip(connection.status, r, connection.counts);
+  const attention = useAccountingAttention(connection);
+  const chip = connectionChip(connection.status, r, attention.count);
   const dis = useDisconnect(connection);
   const [reconnecting, setReconnecting] = useState(false);
   const reauth = connection.status === 'NEEDS_REAUTH';
@@ -85,7 +86,12 @@ export function ConnectionHeader({ connection, compact = false }: { connection: 
           {/* The status always sits on the caption line, in the same place in every state. */}
           <p className="acct-head__caption">
             <span>{cfg.name}</span>
-            <StatusChip tone={chip.tone} label={chip.label} size="sm" />
+            {/* Signed out: the banner below is the one signal, so no pill here. */}
+            {reauth ? null : attention.count > 0 && attention.tab && onOpenTab ? (
+              <button type="button" className="acct-chip-btn" onClick={() => onOpenTab(attention.tab!)} title={attention.tab === 'sync' ? 'Open Sync' : 'Open Reconciliation'}>
+                <StatusChip tone={chip.tone} label={chip.label} size="sm" />
+              </button>
+            ) : <StatusChip tone={chip.tone} label={chip.label} size="sm" />}
           </p>
         </div>
         <div className="acct-head__actions">
@@ -204,9 +210,12 @@ export function OrgPicker({ connection }: { connection: Connection }) {
   return (
     <>
       {dis.modal}
-      <h2 id="acct-org-title" className="acct-section-title">
-        {single ? `Link your ${cfg.short} organisation` : `Choose the ${cfg.short} organisation to link`}
-      </h2>
+      <div className="acct-org-head">
+        <ProviderLogo provider={connection.provider} size="sm" />
+        <h2 id="acct-org-title" className="acct-section-title" style={{ margin: 0 }}>
+          {single ? `Link your ${cfg.short} organisation` : `Choose the ${cfg.short} organisation to link`}
+        </h2>
+      </div>
       <p className="acct-section-desc">
         {single
           ? `TruckWys will send your invoices and bills to this ${cfg.short} organisation.`
@@ -218,7 +227,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
         ) : single ? (
           <div className="acct-row acct-org acct-org--confirm is-selected">
             <span className="acct-org__radio"><input type="radio" className="acct-radio" checked readOnly aria-label={`${single.name} selected`} /></span>
-            <span className="acct-org__mark"><span className="acct-logo acct-org-initials" aria-hidden="true">{single.currency || 'ZAR'}</span></span>
+            <span className="acct-org__mark"><OrgInitials name={single.name} /></span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-row__title" style={{ display: 'block' }}>{single.name}</span>
               <span className="acct-row__sub">Books in {single.currency || 'ZAR'}</span>
@@ -247,7 +256,7 @@ export function OrgPicker({ connection }: { connection: Connection }) {
         {unavailable.map(t => (
           <div key={t.tenant_id} className="acct-row acct-org acct-org--confirm is-disabled">
             <span className="acct-org__radio"><input type="radio" className="acct-radio" disabled aria-label={`${t.name} can't be linked`} /></span>
-            <span className="acct-org__mark"><span className="acct-logo acct-org-initials" aria-hidden="true">{t.currency}</span></span>
+            <span className="acct-org__mark"><OrgInitials name={t.name} /></span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-row__title" style={{ display: 'block' }}>{t.name}</span>
               <span className="acct-row__sub">Books in {t.currency}. Only ZAR books can be linked.</span>
@@ -272,3 +281,9 @@ export function OrgPicker({ connection }: { connection: Connection }) {
   );
 }
 
+
+/** The organisation's initials ("GH"), the same avatar style as people and customers. */
+function OrgInitials({ name }: { name: string }) {
+  const letters = name.replace(/\(.*?\)/g, '').split(/\s+/).filter(w => /^[A-Za-z0-9]/.test(w)).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
+  return <span className="acct-logo acct-org-initials" aria-hidden="true">{letters}</span>;
+}

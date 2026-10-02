@@ -16,10 +16,10 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const items: { key: string; look: StepLook; title: string; desc: string; tab?: AccountingTab; action?: string }[] = [
     {
       key: 'connect',
-      look: connection.status === 'ACTIVE' ? 'done' : 'bad',
+      look: connection.status === 'ACTIVE' ? 'done' : 'todo',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status !== 'ACTIVE'
-        ? (canWrite ? 'Waiting for you to sign in again.' : 'Waiting for a company admin to sign in again.')
+        ? (canWrite ? `Sign in to ${cfg.short} again.` : 'Needs a company admin.')
         : `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`,
     },
     {

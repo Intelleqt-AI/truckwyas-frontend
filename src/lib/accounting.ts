@@ -481,3 +481,20 @@ export const OBJECT_TYPE_LABEL: Record<string, string> = {
   CONTACT_SUPPLIER: 'Supplier',
   PAYMENT: 'Payment',
 };
+
+
+/**
+ * What needs someone's attention on a live connection: documents that failed
+ * to send plus reconciliation differences, and the tab to open for them.
+ */
+export function useAccountingAttention(connection: Connection | null | undefined): { count: number; tab: 'sync' | 'reconciliation' | null } {
+  const live = !!connection && connection.status === 'ACTIVE' && !!connection.readiness?.sync_enabled;
+  const recon = useQuery<Reconciliation>({
+    queryKey: ACCT_KEYS.reconciliation, queryFn: () => fetchData(ACCT_URL.reconciliation),
+    enabled: live, retry: 0, staleTime: 60_000,
+  });
+  if (!live || !connection) return { count: 0, tab: null };
+  const failing = (connection.counts?.errors ?? 0) + (connection.counts?.dead ?? 0);
+  const diffs = recon.data?.run?.status === 'FAILED' ? 0 : (recon.data?.run?.difference_count ?? 0);
+  return { count: failing + diffs, tab: failing > 0 ? 'sync' : diffs > 0 ? 'reconciliation' : null };
+}

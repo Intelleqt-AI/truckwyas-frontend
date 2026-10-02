@@ -4,7 +4,7 @@ import { StatusChip } from '@/components/ui/StatusChip';
 import { toast } from '@/lib/toast';
 import { useAuth } from '@/lib/AuthContext';
 import {
-  PROVIDERS, PROVIDER_ORDER, accountingApi, apiMessage, providerConfig, useAccountingProviders,
+  PROVIDERS, PROVIDER_ORDER, accountingApi, apiMessage, providerConfig, useAccountingAttention, useAccountingProviders,
   type Connection, type ProviderCode, type ProviderInfo, type ProviderSlug,
 } from '@/lib/accounting';
 import { ProviderLogo } from './ProviderLogo';
@@ -68,6 +68,9 @@ export function AccountingProviderCards({ hideManage = false }: { hideManage?: b
   // only the status line and the button wait for the server. Systems that
   // aren't available yet share one quiet line instead of full cards.
   const available = providers.filter(p => p.availability !== 'coming_soon');
+  // Several systems to choose from: one primary button only (the last one listed), the rest secondary.
+  const connectable = available.filter(p => p.configured);
+  const primaryCode = !live && connectable.length > 1 ? connectable[connectable.length - 1].provider : null;
   const soon = providers.filter(p => p.availability === 'coming_soon');
   return (
     <div className="acct-cards" aria-busy={q.isLoading || undefined}>
@@ -87,13 +90,15 @@ export function AccountingProviderCards({ hideManage = false }: { hideManage?: b
           onConnect={() => connect(p)}
           hideManage={hideManage}
           loading={q.isLoading}
+          secondaryConnect={primaryCode != null && primaryCode !== p.provider}
         />
       ))}
     </div>
   );
 }
 
-function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hideManage, loading }: {
+function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hideManage, loading, secondaryConnect = false }: {
+  secondaryConnect?: boolean;
   info: ProviderInfo;
   live: Connection | null;
   canWrite: boolean;
@@ -106,7 +111,8 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
   const cfg = providerConfig(info.provider);
   const mine = live && live.provider === info.provider ? live : null;
   const other = live && live.provider !== info.provider ? providerConfig(live.provider) : null;
-  const chip = mine ? connectionChip(mine.status, mine.readiness, mine.counts) : null;
+  const attention = useAccountingAttention(mine);
+  const chip = mine ? connectionChip(mine.status, mine.readiness, attention.count) : null;
 
   // Same layout as the other integration cards on this page (Cartrack,
   // CtrlFleet): logo, name and one grey line, status on the right, the
@@ -138,21 +144,21 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
           </button>
         )}
         {!hideManage && (
-          <Link to={ACCOUNTING_PAGE} className={`${btn}${needsYou ? ' tw-btn--primary' : ''}`}>
-            {mine.status === 'PENDING_ORG' ? 'Choose organisation' : mine.status === 'ACTIVE' && !mine.readiness.sync_enabled ? 'Finish setup' : 'Manage'}
+          <Link to={attention.tab && !needsYou ? `${ACCOUNTING_PAGE}?tab=${attention.tab}` : ACCOUNTING_PAGE} className={`${btn}${needsYou || attention.count > 0 ? ' tw-btn--primary' : ''}`}>
+            {mine.status === 'PENDING_ORG' ? 'Choose organisation' : mine.status === 'ACTIVE' && !mine.readiness.sync_enabled ? 'Finish setup' : attention.count > 0 ? 'Review' : 'Manage'}
           </Link>
         )}
       </>
     );
   } else if (other) {
-    note = <span className="acct-card__note">Disconnect {other.short} first. One accounting system at a time.</span>;
+    note = <span className="acct-card__note acct-card__note--muted">Unavailable while {other.short} is connected. One accounting system at a time.</span>;
     actions = null;
   } else if (!info.configured) {
     note = <span className="acct-card__note">Not set up on this server yet. Ask TruckWys support to switch it on.</span>;
     actions = <button type="button" className={btn} disabled>Connect {cfg.short}</button>;
   } else {
     actions = (
-      <button type="button" className={`${btn} tw-btn--primary`} onClick={onConnect} disabled={!canWrite || busy} title={!canWrite ? disabledTitle : undefined}>
+      <button type="button" className={`${btn}${secondaryConnect ? '' : ' tw-btn--primary'}`} onClick={onConnect} disabled={!canWrite || busy} title={!canWrite ? disabledTitle : undefined}>
         {busy ? 'Opening…' : `Connect ${cfg.short}`}
       </button>
     );

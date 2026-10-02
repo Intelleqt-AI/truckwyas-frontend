@@ -127,7 +127,7 @@ export function ReconciliationTab({ connection, onOpen }: { connection: Connecti
               <table className="acct-table acct-table--recon">
                 <colgroup>
                   <col style={{ width: '37%' }} /><col style={{ width: '19%' }} />
-                  <col style={{ width: '23%' }} /><col style={{ width: '21%' }} />{hasLinks && <col style={{ width: 76 }} />}
+                  <col style={{ width: '23%' }} /><col style={{ width: '21%' }} />{hasLinks && <col style={{ width: 132 }} />}
                 </colgroup>
                 <thead>
                   <tr>
@@ -195,12 +195,12 @@ function DiffRow({ d, providerName, hasLinks }: { d: ReconDifference; providerNa
       </td>
       <td className="num">{showValue(d.truckwys)}</td>
       <td className="num">{showValue(d.provider)}</td>
-      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <span className="acct-diff-word">Status differs</span>}</td>
+      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <span className="acct-diff-none" aria-label="No amount">—</span>}</td>
       {hasLinks && (
         <td>
           {d.provider_url && (
             <a className="acct-open-link" href={d.provider_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${d.label || d.key} in ${providerName}`} title={`Open ${d.label || d.key} in ${providerName}`}>
-              Open<ExternalLink size={12} aria-hidden="true" />
+              Open in {providerName}<ExternalLink size={12} aria-hidden="true" />
             </a>
           )}
         </td>

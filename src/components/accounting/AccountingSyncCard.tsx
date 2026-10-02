@@ -107,8 +107,9 @@ export function PaymentSourceBadge({ source, managed = false, externalId, provid
       : externalId ? `In ${where || 'your books'}` : 'Only in TruckWys';
     const local = manual && !externalId;
     return (
-      <span className={`acct-source-note acct-source-note--line${local ? ' is-local' : ''}`} title={local ? `Not in ${where || 'your books'}. Add it there so both match.` : undefined}>
-        {local && <span className="acct-dot acct-dot--warning acct-dot--inline" aria-hidden="true" />}{label}
+      <span className={`acct-source-note acct-source-note--line acct-paystate${local ? ' is-local' : ''}`}>
+        <span className={`acct-dot acct-dot--inline ${local ? 'acct-dot--warning' : 'acct-dot--success'}`} aria-hidden="true" />{label}
+        {local && <span className="acct-paystate__hint">Add it in {where || 'your books'} so both match.</span>}
       </span>
     );
   }

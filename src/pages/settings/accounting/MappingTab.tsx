@@ -298,9 +298,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
             ))}</ul>
           )}
           {!canWrite && <> {writeTitle}; you can look but not change anything.</>}
-        </>}
-      >
-        {canWrite && pendingSuggestions.length > 0 && (() => {
+          {canWrite && pendingSuggestions.length > 0 && (() => {
           const label = `Use suggestion${pendingSuggestions.length === 1 ? '' : 's'} for ${listJoin(pendingSuggestions.map(p => rowLabel(p.section, p.key)))}`;
           return (
             <div className="acct-sum-actions">
@@ -310,7 +308,8 @@ export function MappingTab({ connection }: { connection: Connection }) {
             </div>
           );
         })()}
-      </AcctCard>
+        </>}
+      />
 
       {!isOpen('revenue_types') ? folded('revenue_types', itemsForRevenue ? 'Products and services' : 'Income accounts') : (
       <AcctCard

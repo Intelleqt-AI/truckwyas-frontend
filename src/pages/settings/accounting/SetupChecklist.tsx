@@ -69,7 +69,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: backfillLook,
       title: r.backfill_state === 'DONE' && connection.cutover_date ? `Start date: ${formatDate(connection.cutover_date)}` : 'Choose a start date',
       desc: r.backfill_state === 'DONE'
-        ? `History from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'} was sent to ${cfg.short}.${connection.status === 'ACTIVE' && providerBlockers(r).length ? ' New documents wait for step 2.' : ''}`
+        ? `History from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'} is in ${cfg.short}.${connection.status === 'ACTIVE' && providerBlockers(r).length ? ' New documents wait for step 2.' : ''}`
         : r.backfill_state === 'RUNNING'
           ? `Sending documents to ${cfg.short} now.`
           : r.backfill_state === 'FAILED'
@@ -127,7 +127,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   if (liveItem && !r.sync_enabled && stillOpen.length && stillOpen.every(it => it.provider)) {
     const nums = stillOpen.map(it => items.indexOf(it) + 1);
     liveItem.desc = r.backfill_state === 'DONE'
-      ? "Until this is fixed. Nothing is lost; documents send once it's on."
+      ? `Paused until ${nums.length === 1 ? `step ${nums[0]} is` : `steps ${nums.join(' and ')} are`} done. Nothing is lost: waiting documents send automatically.`
       : `Waiting on ${nums.length === 1 ? `step ${nums[0]}` : `steps ${nums.join(' and ')}`}.`;
     if (r.backfill_state === 'DONE') liveItem.title = 'Sync paused';
   }

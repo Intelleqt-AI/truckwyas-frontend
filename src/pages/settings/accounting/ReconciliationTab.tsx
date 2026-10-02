@@ -126,8 +126,8 @@ export function ReconciliationTab({ connection, onOpen }: { connection: Connecti
             <div className="acct-table-wrap acct-only-wide" role="region" aria-label={`${title} differences`} tabIndex={0}>
               <table className="acct-table acct-table--recon">
                 <colgroup>
-                  <col style={{ width: '37%' }} /><col style={{ width: '21%' }} />
-                  <col style={{ width: '21%' }} /><col style={{ width: '21%' }} />{hasLinks && <col style={{ width: 56 }} />}
+                  <col style={{ width: '28%' }} /><col style={{ width: '24%' }} />
+                  <col style={{ width: '24%' }} /><col style={{ width: '24%' }} />{hasLinks && <col style={{ width: 56 }} />}
                 </colgroup>
                 <thead>
                   <tr>

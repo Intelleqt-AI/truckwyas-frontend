@@ -1122,3 +1122,10 @@
   .acct-step-actions--below > .tw-btn--primary { flex: 1 1 100% !important; justify-content: center; }
   .acct-step-actions--below > .tw-btn:not(.tw-btn--primary) { flex: 0 0 auto !important; }
 }
+/* Last fixes */
+.acct-sum-actions { margin-top: 14px; }
+@media (max-width: 640px) { .acct-sugg-btn { height: auto !important; min-height: 44px; padding-top: 10px; padding-bottom: 10px; } .acct-sugg-btn__text { white-space: normal !important; overflow: visible; text-align: center; } }
+.acct-save-btn:disabled { color: var(--text-tertiary) !important; background: transparent !important; border: 1px dashed var(--border-default) !important; pointer-events: none; }
+.acct-table--recon td.num { padding-left: 16px !important; }
+.acct-val-text, .acct-table--recon td .acct-diff-word { white-space: nowrap !important; font-size: 13px; }
+.acct-row--error .acct-row__actions .tw-btn { height: var(--control-h, 36px) !important; min-height: var(--control-h, 36px) !important; }

@@ -805,7 +805,7 @@
 /* Buttons inside card rows match the card-header buttons. */
 .acct-row__actions .tw-btn, .acct-hint .tw-btn { height: var(--control-h, 36px); min-height: var(--control-h, 36px); }
 /* Contacts toolbar in a narrow card: search on its own line, then the two filters. */
-@container (max-width: 700px) {
+@container (max-width: 600px) {
   .acct-contact-toolbar .acct-contact-search { flex: 1 1 100% !important; }
   .acct-contact-filter { flex: 1 1 0 !important; }
 }
@@ -834,3 +834,5 @@
   .acct-tiles:not(.acct-tiles--3) > div { border: 0 !important; }
   .acct-tiles:not(.acct-tiles--3) { row-gap: 8px; }
 }
+
+.acct-contact-filter { flex: 0 0 180px; }

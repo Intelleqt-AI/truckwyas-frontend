@@ -16,6 +16,7 @@ import '@/components/shell/shell.css';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PageHeadSkeleton } from '@/components/layout/SectionHeader';
 import { warmRoutesWhenIdle } from '@/components/shell/routePrefetch';
+import { useCapitalStatus } from '@/lib/capital/api';
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // "Auto sign out after 30 minutes of inactivity"
 
@@ -115,7 +116,11 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
 
   const allowedPaths = NAV_ACCESS[userRole] || NAV_ACCESS['VIEWER'];
   const canAccessSettings = !['VIEWER', 'DRIVER'].includes(userRole);
-  const allowed = (key: string) => allowedPaths.includes(key);
+  // The capital desk is not a company-role item: it shows only when the
+  // server says this user is TruckWys staff or a funder member.
+  const { data: capitalStatus } = useCapitalStatus();
+  const deskAccess = !!capitalStatus?.desk?.access;
+  const allowed = (key: string) => (key === '/capital/desk' ? deskAccess : allowedPaths.includes(key));
   // The Copilot page is gated to INSIGHTS_ROLES (App.tsx). Only offer Ask to
   // roles that can reach it, so a DRIVER's query isn't swallowed by the guard.
   const canAsk = ['ADMIN', 'MANAGER', 'OPERATOR', 'DISPATCHER', 'VIEWER'].includes(userRole);

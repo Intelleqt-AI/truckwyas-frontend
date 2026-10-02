@@ -20,12 +20,12 @@ export type LiveTopic =
 const KEYS: Record<LiveTopic, { roots: string[]; sources: string[] }> = {
   invoice: {
     roots: ['invoices', 'invoices-page', 'invoice', 'invoice-aging', 'invoice-payments', 'capital-eligible',
-      'capital-page', 'eligible-invoices-risk', 'customer', 'customer-risk', 'risk-scores', 'load'],
+      'capital-page', 'capital', 'eligible-invoices-risk', 'customer', 'customer-risk', 'risk-scores', 'load'],
     sources: ['invoices'],
   },
   payment: {
     roots: ['invoices', 'invoices-page', 'invoice', 'invoice-aging', 'invoice-payments', 'capital-eligible',
-      'customer', 'customer-risk', 'risk-scores'],
+      'capital', 'customer', 'customer-risk', 'risk-scores'],
     sources: ['payments', 'invoices'],
   },
   expense: {
@@ -61,7 +61,7 @@ const KEYS: Record<LiveTopic, { roots: string[]; sources: string[] }> = {
     sources: ['customers'],
   },
   advance: {
-    roots: ['capital-eligible', 'capital-page', 'eligible-invoices-risk', 'invoice', 'invoices-page'],
+    roots: ['capital-eligible', 'capital-page', 'capital', 'capital-desk', 'eligible-invoices-risk', 'invoice', 'invoices-page'],
     sources: [],
   },
 };

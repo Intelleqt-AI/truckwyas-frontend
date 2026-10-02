@@ -1,0 +1,170 @@
+/* Fast Pay (transporter page, invoice panel, request dialog) and the capital
+   desk. Built on the finance kit (finance-brand.css, finance-ledger.css) and
+   the theme tokens; only what those do not already provide lives here. */
+
+/* Figures: tabular, never wrapping mid-amount. */
+.cap-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cap-muted { color: var(--text-tertiary); }
+
+/* Reasons: a short list, a direction glyph in tertiary, the server's words. */
+.cap-reasons { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cap-reasons li { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 8px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.cap-reasons__dir { color: var(--text-tertiary); font-variant-numeric: tabular-nums; text-align: center; }
+.cap-reasons__dir[data-dir="+"] { color: var(--status-success-text); }
+.cap-reasons__dir[data-dir="!"] { color: var(--status-warning-text); }
+.cap-reasons__code { color: var(--text-tertiary); font-size: 12px; margin-left: 6px; }
+.cap-reasons--compact li { font-size: 12px; line-height: 16px; }
+
+/* Offer breakdown: the payout line is the one figure that matters. */
+.cap-breakdown .fin-dl__row { min-height: 40px; padding: 10px 0; }
+.cap-breakdown .fin-dl__row dd { white-space: nowrap; overflow-wrap: normal; }
+.cap-breakdown .fin-dl__row.is-payout dt { color: var(--text-primary); font-weight: 600; font-size: 14px; }
+.cap-breakdown .fin-dl__row.is-payout dd { font-size: 20px; line-height: 28px; font-weight: 600; }
+.cap-breakdown .fin-dl__row dt small { display: block; font-size: 12px; line-height: 16px; color: var(--text-tertiary); }
+
+/* Notices inside cards and dialogs keep the finance notice look. */
+.cap-notice { margin: 0 0 16px; }
+.cap-notice:last-child { margin-bottom: 0; }
+
+/* Plain list of "what is still needed". */
+.cap-checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cap-checklist li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; font: 400 14px/20px var(--font-sans); color: var(--text-primary); }
+.cap-checklist svg { margin-top: 2px; color: var(--text-tertiary); }
+
+/* Consent block: title, the provider's text, one checkbox. */
+.cap-consent { border: 1px solid var(--border-subtle); border-radius: var(--radius-nested, 8px); padding: 12px 16px; display: grid; gap: 8px; }
+.cap-consent__title { font: 500 14px/20px var(--font-sans); color: var(--text-primary); margin: 0; }
+.cap-consent__text { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); margin: 0; max-height: 120px; overflow-y: auto; white-space: pre-line; }
+.cap-check { display: inline-flex; align-items: center; gap: 8px; font: 500 13px/20px var(--font-sans); color: var(--text-primary); cursor: pointer; min-height: 32px; }
+.cap-check input { width: 16px; height: 16px; accent-color: var(--btn-primary-bg); margin: 0; }
+
+/* Timeline: dot, label, time. Server-provided entries only. */
+.cap-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.cap-timeline li { position: relative; display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 12px; padding-bottom: 16px; }
+.cap-timeline li:last-child { padding-bottom: 0; }
+.cap-timeline li::before { content: ''; position: absolute; left: 7px; top: 14px; bottom: -2px; width: 2px; background: var(--border-subtle); }
+.cap-timeline li:last-child::before { display: none; }
+.cap-timeline__dot { width: 10px; height: 10px; margin: 5px 3px 0; border-radius: 50%; background: var(--text-tertiary); }
+.cap-timeline li:last-child .cap-timeline__dot { background: var(--accent-primary); }
+.cap-timeline__label { font: 500 14px/20px var(--font-sans); color: var(--text-primary); }
+.cap-timeline__at { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+
+/* Simple bars (exposure vs cap). The cap is a 2px mark on the track. */
+.cap-bar { display: block; position: relative; height: 6px; border-radius: 3px; background: var(--status-neutral-bg); overflow: visible; min-width: 48px; }
+[data-theme="light"] .cap-bar { background: var(--border-subtle); }
+.cap-bar__fill { display: block; position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--text-tertiary); max-width: 100%; }
+.cap-bar__fill.is-warn { background: var(--status-warning); }
+.cap-bar__fill.is-bad { background: var(--status-danger); }
+.cap-bar__fill.is-accent { background: var(--accent-primary); }
+.cap-bar__cap { display: block; position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text-primary); border-radius: 1px; }
+.cap-bar--lg { height: 10px; border-radius: 5px; }
+.cap-bar--lg .cap-bar__fill { border-radius: 5px; }
+
+/* Stacked usage bar: outstanding + reserved within the pot. */
+.cap-stack { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--status-neutral-bg); }
+[data-theme="light"] .cap-stack { background: var(--border-subtle); }
+.cap-stack > span { display: block; height: 100%; }
+.cap-stack__a { background: var(--accent-primary); }
+.cap-stack__b { background: var(--text-tertiary); opacity: 0.6; }
+
+/* Bar rows: label, bar, value, note on one 44px row. */
+.cap-rows { display: flex; flex-direction: column; }
+.cap-row {
+  display: grid; grid-template-columns: minmax(96px, 1.1fr) minmax(80px, 2fr) 112px 72px;
+  align-items: center; column-gap: 16px; min-height: 44px; border-bottom: 1px solid var(--border-row);
+  font: 400 14px/20px var(--font-sans); color: var(--text-primary);
+}
+.cap-row:last-child { border-bottom: none; }
+.cap-row__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cap-row__value { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cap-row__note { text-align: right; font-size: 13px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cap-row--head { min-height: 32px; border-bottom: 1px solid var(--border-subtle); font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+@media (max-width: 560px) {
+  .cap-row { grid-template-columns: minmax(0, 1fr) auto auto; row-gap: 4px; padding: 8px 0; }
+  .cap-row > .cap-bar { grid-column: 1 / -1; grid-row: 2; }
+  .cap-row--head > span:nth-child(2) { display: none; }
+}
+
+/* Two columns of cards that collapse to one. */
+.cap-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--card-gap, 16px); align-items: start; }
+.cap-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .cap-grid--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .cap-grid, .cap-grid--3 { grid-template-columns: minmax(0, 1fr); } }
+
+/* Table cells. */
+table.fin-table td.cap-actions, table.fin-table th.cap-actions { text-align: right; white-space: nowrap; width: 1%; }
+.cap-actions .tw-btn + .tw-btn { margin-left: 8px; }
+.cap-sub { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+
+/* Score card (desk). */
+.cap-score { border: 1px solid var(--border-subtle); border-radius: var(--radius-nested, 8px); padding: 12px 16px; display: grid; gap: 8px; min-width: 0; }
+.cap-score__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.cap-score__title { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); margin: 0; }
+.cap-score__grade { font: 600 20px/28px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.cap-score__facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px 16px; margin: 0; }
+.cap-score__facts dt { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); margin: 0; }
+.cap-score__facts dd { font: 500 14px/20px var(--font-sans); color: var(--text-primary); margin: 0; font-variant-numeric: tabular-nums; }
+.cap-flags { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Drawer: a right-hand panel for desk detail (full screen on phones). */
+.cap-drawer-backdrop { position: fixed; inset: 0; z-index: 1000; background: var(--modal-backdrop, rgba(0, 0, 0, 0.6)); display: flex; justify-content: flex-end; }
+.cap-drawer {
+  width: min(640px, 100%); height: 100%; overflow-y: auto; background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle); padding: 24px; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 20px; color: var(--text-primary); font-family: var(--font-sans);
+}
+@media (max-width: 640px) { .cap-drawer { padding: 16px; border-left: 0; } }
+.cap-drawer__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.cap-drawer__title { margin: 0; font: 600 20px/28px var(--font-sans); color: var(--text-primary); overflow-wrap: anywhere; }
+.cap-drawer__sub { margin: 4px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.cap-drawer__section { display: grid; gap: 12px; }
+.cap-drawer__section > h3 { margin: 0; font: 600 14px/20px var(--font-sans); color: var(--text-primary); }
+.cap-drawer__actions { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--border-subtle); }
+.cap-drawer__actions .fin-form { gap: 12px; }
+.cap-drawer__btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* Generic facts grid. */
+.cap-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px 16px; margin: 0; }
+.cap-facts dt { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); margin: 0 0 2px; }
+.cap-facts dd { font: 500 14px/20px var(--font-sans); color: var(--text-primary); margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* Request dialog success state. */
+.cap-success { display: grid; gap: 12px; }
+.cap-success__figure { font: 600 28px/36px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; margin: 0; }
+.cap-success__lead { font: 500 15px/22px var(--font-sans); color: var(--text-primary); margin: 0; }
+
+/* Policy parameter editor. */
+.cap-params { display: grid; gap: 16px; }
+.cap-params__group { border: 1px solid var(--border-subtle); border-radius: var(--radius-nested, 8px); padding: 12px 16px; display: grid; gap: 12px; }
+.cap-params__group > legend { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); padding: 0 4px; }
+.cap-params__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px 16px; }
+.cap-params__field { display: grid; gap: 4px; min-width: 0; }
+.cap-params__field label { font: 400 12px/16px var(--font-sans); color: var(--text-secondary); overflow-wrap: anywhere; }
+.cap-params__field.is-changed label { color: var(--text-primary); font-weight: 500; }
+.cap-params__field input.fin-control { width: 100%; box-sizing: border-box; }
+
+/* Form rows in desk forms: fields side by side, wrapping on phones. */
+.cap-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 16px; }
+.cap-form-foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+
+/* Funder selector in the desk head. */
+.cap-funder { min-width: 180px; }
+
+/* Head chip spacing next to an H1 (matches the finance detail pages). */
+.cap-head-chip { display: inline-flex; align-items: center; }
+
+/* Request button inside table rows. */
+table.fin-table .tw-btn.cap-row-btn { height: 28px; padding: 0 10px; font-size: 12px; line-height: 16px; }
+@media (pointer: coarse) { table.fin-table .tw-btn.cap-row-btn { height: 36px; } }
+
+.cap-pre { margin: 0; padding: 12px; border-radius: var(--radius-nested, 8px); background: var(--bg-raised); font: 400 12px/18px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-secondary); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow-y: auto; }
+.cap-details > summary { cursor: pointer; font: 500 13px/32px var(--font-sans); color: var(--text-secondary); }
+
+/* Phone: offers list rows read name + invoice, payout and action on one
+   line, the decision chip on its own line below (long labels never squeeze
+   the customer name). */
+@media (max-width: 640px) {
+  table.fin-table--stack.cap-stack-table td.m-party.m-span2 { grid-row: 1; }
+  table.fin-table--stack.cap-stack-table td.m-status { grid-column: 1 / span 2; grid-row: 2; justify-self: start; }
+  table.fin-table--stack.cap-stack-table td.actions { grid-row: 1 / span 2; align-self: center; padding-right: 12px !important; }
+}

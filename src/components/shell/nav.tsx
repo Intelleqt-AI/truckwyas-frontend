@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
+import { CAPITAL_LAUNCHED } from '@/lib/features';
 import {
-  House, MessageSquareText, FileText, Receipt, ChartNoAxesColumn, FileBarChart, Users, Truck, Zap, ShieldCheck,
+  House, MessageSquareText, FileText, Receipt, ChartNoAxesColumn, FileBarChart, Users, Truck, Zap, ShieldCheck, Landmark,
 } from 'lucide-react';
 
 /**
@@ -67,8 +68,17 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'soon',
     label: 'Coming soon',
     items: [
-      { id: 'fastpay', key: '/capital', label: 'Fast Pay', to: '/capital', match: ['/capital'], icon: Zap, muted: true },
+      { id: 'fastpay', key: '/capital', label: 'Fast Pay', to: '/capital', match: ['/capital'], exclude: ['/capital/desk'], icon: Zap, muted: !CAPITAL_LAUNCHED },
       { id: 'insurance', key: '/insurance', label: 'Insurance', to: '/insurance', match: ['/insurance'], icon: ShieldCheck, muted: true },
+    ],
+  },
+  {
+    // Shown only to TruckWys staff and funder members (OSLayout allows the
+    // key when capital/status reports desk access).
+    id: 'desk',
+    label: 'Capital',
+    items: [
+      { id: 'capitaldesk', key: '/capital/desk', label: 'Capital desk', short: 'Desk', to: '/capital/desk/book', match: ['/capital/desk'], icon: Landmark },
     ],
   },
 ];

@@ -73,6 +73,7 @@ const Capital = lazy(() => import('./pages/Capital'));
 const CustomerRisk = lazy(() => import('./pages/CustomerRisk'));
 const AdvanceRequest = lazy(() => import('./pages/AdvanceRequest'));
 const AdvanceDetail = lazy(() => import('./pages/AdvanceDetail'));
+const CapitalDesk = lazy(() => import('./pages/CapitalDesk'));
 const Insights = lazy(() => import('./pages/Insights'));
 const Copilot = lazy(() => import('./pages/Copilot'));
 const Insurance = lazy(() => import('./pages/Insurance'));
@@ -311,6 +312,12 @@ const App = () => (
                 <Route path="/customers" element={<Customers />} />
                 <Route path="/customers/new" element={<Customers />} />
                 <Route path="/customers/:id" element={<CustomerDetail />} />
+
+                {/* Capital desk: staff and funder members only. The page itself
+                    checks desk access (capital/status), not the company role,
+                    and sends everyone else home. */}
+                <Route path="/capital/desk" element={<CapitalDesk />} />
+                <Route path="/capital/desk/:tab" element={<CapitalDesk />} />
 
                 {/* Finance-role gated */}
                 <Route element={<RoleRoute roles={FINANCE_ROLES} />}>

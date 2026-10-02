@@ -97,7 +97,7 @@ export function invalidateInvoiceData(qc: QueryClient, invoiceId?: number | stri
     qc.invalidateQueries({ queryKey: ['invoice', String(invoiceId)] });
     qc.invalidateQueries({ queryKey: ['invoice-payments', String(invoiceId)] });
   }
-  for (const key of [['invoices'], ['invoices-page'], ['credit-notes'], ['credit-note'], ['capital-eligible'],
+  for (const key of [['invoices'], ['invoices-page'], ['credit-notes'], ['credit-note'], ['capital-eligible'], ['capital'],
     ['insights-source', 'invoices'], ['insights-source', 'payments'], ['insights-source', 'creditNotes'], ['reports']]) {
     qc.invalidateQueries({ queryKey: key });
   }

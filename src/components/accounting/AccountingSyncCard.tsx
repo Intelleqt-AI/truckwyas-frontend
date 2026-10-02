@@ -22,7 +22,8 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
       <div className="fin-panel-head" style={{ marginBottom: 4 }}>
         <div className="fin-panel-head__text" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%' }}>
           <h2 id={titleId} className="fin-panel-title">{name}</h2>
-          <StatusChip tone={chip.tone} label={chip.label} size="sm" />
+          {/* A failure is already the banner above the invoice: the card stays factual. */}
+          {!failing && <StatusChip tone={chip.tone} label={chip.label} size="sm" />}
         </div>
       </div>
       {failing ? (
@@ -99,7 +100,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
  */
 export function PaymentSourceBadge({ source, managed = false }: { source?: string | null; managed?: boolean }) {
   const manual = !source || source === 'MANUAL';
-  if (managed) return <span className="acct-source-note acct-source-note--line">Recorded in {manual ? 'TruckWys' : source === 'BANK' ? 'bank feed' : providerConfig(source).short}</span>;
+  if (managed) return <span className="acct-source-note acct-source-note--line">{manual ? 'Recorded in TruckWys before the switch' : `Recorded in ${source === 'BANK' ? 'bank feed' : providerConfig(source).short}`}</span>;
   if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;
   return <span className="acct-source-badge">{label}</span>;

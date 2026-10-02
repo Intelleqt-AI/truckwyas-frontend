@@ -184,7 +184,7 @@ export default function AccountingIntegration() {
   } else {
     body = (
       <>
-        <ConnectionHeader connection={live} compact hideOpen={tab === 'setup' && providerBlockers(live.readiness).length > 0} />
+        <ConnectionHeader connection={live} compact onOpenTab={openTab} hideOpen={tab === 'setup' && providerBlockers(live.readiness).length > 0} />
         <div className="acct-tabs">
           <div className="section-header__tabs acct-utabs" role="tablist" ref={tabsRef} aria-label={`${cfg!.short} settings`}>
             {ACCOUNTING_TABS.map(t => {

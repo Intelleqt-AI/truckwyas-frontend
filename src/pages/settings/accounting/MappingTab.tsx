@@ -13,6 +13,9 @@ import { AcctCard, ErrorBlock, LoadingBlock, SkelLine, useAccountingPermissions 
 
 const NONE = '__none';
 
+/** "A", "A and B", "A, B and C". */
+const listJoin = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+
 /** "12 hours ago", "5 minutes ago", "just now". */
 function hoursAgo(iso: string): string {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -64,6 +67,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
   // Sections someone opened (Edit) or closed (Done) by hand; otherwise a
   // section is open only while it needs input.
   const [sectionOpen, setSectionOpen] = useState<Partial<Record<MappingSection, boolean>>>({});
+  const [showAll, setShowAll] = useState<Partial<Record<MappingSection, boolean>>>({});
 
   const m = q.data;
 
@@ -206,8 +210,9 @@ export function MappingTab({ connection }: { connection: Connection }) {
     const empty = !sectionValue(section, key);
     if (s && sectionValue(section, key) !== s) {
       return (
-        <div className={`acct-hint acct-hint--inline${requiredGap(section, key) ? ' is-required' : ''}`}>
-          <span>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {(() => { const d = describe(s); const i = d.lastIndexOf(' '); return <>{i > 0 ? d.slice(0, i + 1) : ''}<span className="acct-nowrap">{i > 0 ? d.slice(i + 1) : d}.{canWrite && <>{' '}<button type="button" className="acct-linkbtn acct-use-link" onClick={() => setSection(section, key, s)}>Use it</button></>}</span></>; })()}</span>
+        <div className={`acct-hint acct-hint--one${requiredGap(section, key) ? ' is-required' : ''}`}>
+          <span className="acct-hint__text" title={`Suggested: ${describe(s)}`}>{requiredGap(section, key) ? 'Required. ' : ''}Suggested: {describe(s)}</span>
+          {canWrite && <button type="button" className="acct-linkbtn acct-use-link" onClick={() => setSection(section, key, s)} aria-label={`Use suggestion: ${describe(s)}`}>Use it</button>}
         </div>
       );
     }
@@ -251,6 +256,23 @@ export function MappingTab({ connection }: { connection: Connection }) {
     sectionOpen[section] && !needsInput(section)
       ? <button type="button" className="tw-btn tw-btn--ghost" onClick={() => openSection(section, false)} aria-expanded aria-label={`Close ${title.toLowerCase()}`}>Done</button>
       : undefined;
+  /** Inside a section opened for its gaps, only the rows that need input show. */
+  const rowNeeds = (section: MappingSection, key: string) =>
+    requiredGap(section, key) || !!errors[`${section}.${key}`] || key in draft[section];
+  const visibleRows = <R extends { key: string }>(section: MappingSection, rows: R[]): R[] =>
+    showAll[section] || sectionOpen[section] || !rows.some(r => rowNeeds(section, r.key)) ? rows : rows.filter(r => rowNeeds(section, r.key));
+  const showAllFooter = (section: MappingSection, rows: Array<{ key: string }>) => {
+    const shown = visibleRows(section, rows).length;
+    if (shown === rows.length && !showAll[section]) return null;
+    return (
+      <div className="acct-map-more">
+        {showAll[section]
+          ? <button type="button" className="acct-linkbtn" onClick={() => setShowAll(o => ({ ...o, [section]: false }))}>Show only what needs input</button>
+          : <button type="button" className="acct-linkbtn" onClick={() => setShowAll(o => ({ ...o, [section]: true }))}>Show all {rows.length} ({rows.length - shown} already mapped)</button>}
+      </div>
+    );
+  };
+  const rowLabel = (section: MappingSection, key: string) => ((m[section] as Array<{ key: string; label: string }>).find(r => r.key === key)?.label ?? key).replace(/\s*\(.*\)$/, '');
   const rowClass = (section: MappingSection, key: string) => `acct-map-row${requiredGap(section, key) ? ' is-required' : ''}`;
   const describeAccount = (code: string) => { const a = allAccounts.find(x => x.code === code); return a ? accountLabel(a, cfg.showAccountCodes) : code; };
   const describeTax = (code: string) => { const t = taxRates.find(x => x.code === code); return t ? taxLabel(t) : code; };
@@ -279,7 +301,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         actions={canWrite && pendingSuggestions.length > 0 ? <>
           {canWrite && pendingSuggestions.length > 0 && (
             <button type="button" className="tw-btn tw-btn--primary" onClick={applyAllSuggestions} title="Fills in the fields; nothing is saved until you press Save mapping">
-              {`Use ${pendingSuggestions.length === 1 ? 'suggestion' : `${pendingSuggestions.length} suggestions`}`}
+              {`Use suggestion${pendingSuggestions.length === 1 ? '' : 's'} for ${listJoin(pendingSuggestions.map(p => rowLabel(p.section, p.key)))}`}
             </button>
           )}
         </> : undefined}
@@ -298,7 +320,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
           <div className="acct-hint" style={{ padding: '12px var(--card-pad, 20px) 0' }}>No products or services came back from {cfg.short}. Add a Service item there, then refresh.</div>
         )}
         <div className="acct-map-gridwrap"><div className="acct-map-grid">
-        {m.revenue_types.map(row => {
+        {visibleRows('revenue_types', m.revenue_types).map(row => {
           const field = `revenue_types.${row.key}`;
           return (
             <div className={rowClass('revenue_types', row.key)} key={row.key}>
@@ -314,13 +336,14 @@ export function MappingTab({ connection }: { connection: Connection }) {
           );
         })}
         </div></div>
+        {showAllFooter('revenue_types', m.revenue_types)}
       </AcctCard>
       )}
 
       {!isOpen('expense_categories') ? folded('expense_categories', 'Expense accounts') : (
       <AcctCard title="Expense accounts" description="Where supplier bills go, by expense category." actions={doneAction('expense_categories', 'Expense accounts')} flush>
         <div className="acct-map-gridwrap"><div className="acct-map-grid">
-        {m.expense_categories.map(row => {
+        {visibleRows('expense_categories', m.expense_categories).map(row => {
           const field = `expense_categories.${row.key}`;
           return (
             <div className={rowClass('expense_categories', row.key)} key={row.key}>
@@ -336,6 +359,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
           );
         })}
         </div></div>
+        {showAllFooter('expense_categories', m.expense_categories)}
       </AcctCard>
       )}
 
@@ -350,7 +374,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
           flush
         >
           <div className="acct-map-gridwrap"><div className="acct-map-grid">
-          {m[section].map(row => {
+          {visibleRows(section, m[section] as Array<{ key: string; label: string; rate: string }>).map(row => {
             const field = `${section}.${row.key}`;
             const chosen = taxRates.find(t => t.code === sectionValue(section, row.key));
             const mismatch = chosen && num(chosen.rate) != null && num(row.rate) != null && num(chosen.rate) !== num(row.rate);
@@ -374,6 +398,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
             );
           })}
           </div></div>
+          {showAllFooter(section, m[section])}
         </AcctCard>
       ))}
 

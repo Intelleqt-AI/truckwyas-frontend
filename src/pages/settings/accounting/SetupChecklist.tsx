@@ -35,10 +35,10 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
   const items: Item[] = [
     {
       key: 'connect',
-      look: connection.status === 'ACTIVE' ? 'done' : 'bad',
+      look: connection.status === 'ACTIVE' ? 'done' : 'todo',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status !== 'ACTIVE'
-        ? (canWrite ? 'Waiting for you to sign in again.' : 'Waiting for a company admin to sign in again.')
+        ? (canWrite ? `Sign in to ${cfg.short} again.` : 'Needs a company admin.')
         : `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`,
     },
     {
@@ -68,7 +68,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: backfillLook,
       title: r.backfill_state === 'DONE' && connection.cutover_date ? `Start date: ${formatDate(connection.cutover_date)}` : 'Choose a start date',
       desc: r.backfill_state === 'DONE'
-        ? `Documents from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'} were sent to ${cfg.short}.`
+        ? `History from ${connection.cutover_date ? formatDate(connection.cutover_date) : 'the start date'} was sent to ${cfg.short}.${connection.status === 'ACTIVE' && providerBlockers(r).length ? ' New documents wait for the setting above.' : ''}`
         : r.backfill_state === 'RUNNING'
           ? `Sending documents to ${cfg.short} now.`
           : r.backfill_state === 'FAILED'

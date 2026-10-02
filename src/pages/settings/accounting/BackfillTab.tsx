@@ -144,7 +144,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
               </>
             )}
             <p className="acct-section-desc" style={{ margin: '6px 0 0' }}>
-              {locked ? 'It can’t change once sending has started.' : 'Usually the first day of a month or VAT period still open in your books.'}
+              {locked ? 'It can’t be changed once sending has started.' : 'Usually the first day of a month or VAT period still open in your books.'}
               {!locked && !date && (
                 <> <button type="button" className="acct-linkbtn" onClick={() => setDate(firstOfMonth())}>Use {formatDate(firstOfMonth())}</button></>
               )}

@@ -107,7 +107,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
                 <div className="acct-check__desc">{it.desc}</div>
               </div>
               {it.tab && it.action && !(blocked && it.look !== 'done') ? (
-                <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>
+                <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : it.look === 'done' ? ' tw-btn--ghost acct-step-done-btn' : ''}`} onClick={() => onOpen(it.tab!)}>
                   {it.action}
                 </button>
               ) : <span />}

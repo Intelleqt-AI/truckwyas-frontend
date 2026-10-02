@@ -107,7 +107,7 @@ export function ContactsTab({ connection }: { connection: Connection }) {
           We match on VAT number, registration number or email. Name-only matches need your confirmation.
         </span>}
         actions={<>
-          <button type="button" className="tw-btn tw-btn--ghost" onClick={runMatching} disabled={!canWrite || matching} title={writeTitle}>
+          <button type="button" className="tw-btn" onClick={runMatching} disabled={!canWrite || matching} title={writeTitle}>
             <RefreshCw size={14} aria-hidden="true" className={matching ? 'animate-spin' : undefined} />
             {matching ? 'Matching…' : 'Run matching again'}
           </button>
@@ -202,7 +202,7 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   } else if (row.status === 'SKIPPED') {
     match = <div className="acct-row__sub">Not synced. Their documents stay in TruckWys only and show as sync errors.</div>;
   } else {
-    match = <div className="acct-row__sub">Pick a {providerName} contact, or we'll create one on first send.</div>;
+    match = <div className="acct-row__sub">No {providerName} contact found. Pick one, or create a new one.</div>;
   }
 
   const menu: RowActionItem[] = [];

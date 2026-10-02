@@ -842,3 +842,6 @@
 .acct-blocker__where { color: var(--text-secondary); }
 .acct-blocker__why { color: var(--text-secondary); }
 .acct-blockers__after { margin: 8px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+/* Finished steps: a quiet link-weight action, never a full-width button. */
+.acct-check--steps li > .acct-step-done-btn { min-width: 0 !important; color: var(--text-secondary); }
+@media (max-width: 560px) { .acct-check--steps li > .acct-step-done-btn { justify-self: start !important; width: auto !important; padding-left: 0; } }

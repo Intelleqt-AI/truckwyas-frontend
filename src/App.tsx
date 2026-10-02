@@ -64,19 +64,23 @@ const CustomerDetail = lazy(() => import('./pages/CustomerDetail'));
 const Invoices = lazy(() => import('./pages/Invoices'));
 const InvoiceDetail = lazy(() => import('./pages/InvoiceDetail'));
 const CreateInvoice = lazy(() => import('./pages/CreateInvoice'));
+const CreditNotes = lazy(() => import('./pages/CreditNotes'));
+const CreditNoteDetail = lazy(() => import('./pages/CreditNoteDetail'));
+const Suppliers = lazy(() => import('./pages/Suppliers'));
 const Expenses = lazy(() => import('./pages/Expenses'));
 const FinanceReports = lazy(() => import('./pages/FinanceReports'));
 const Capital = lazy(() => import('./pages/Capital'));
 const CustomerRisk = lazy(() => import('./pages/CustomerRisk'));
 const AdvanceRequest = lazy(() => import('./pages/AdvanceRequest'));
 const AdvanceDetail = lazy(() => import('./pages/AdvanceDetail'));
+const CapitalDesk = lazy(() => import('./pages/CapitalDesk'));
 const Insights = lazy(() => import('./pages/Insights'));
 const Copilot = lazy(() => import('./pages/Copilot'));
 const Insurance = lazy(() => import('./pages/Insurance'));
 // PartnerDashboard removed — moved to standalone partner portal
 const Settings = lazy(() => import('./pages/Settings'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
-const XeroIntegration = lazy(() => import('./pages/settings/XeroIntegration'));
+const AccountingIntegration = lazy(() => import('./pages/settings/AccountingIntegration'));
 const FleetImport = lazy(() => import('./pages/settings/FleetImport'));
 const BillingHistoryPage = lazy(() => import('./pages/settings/BillingHistoryPage'));
 const Login = lazy(() => import('./pages/Login'));
@@ -297,13 +301,23 @@ const App = () => (
                 <Route path="/finance/invoices" element={<Invoices />} />
                 <Route path="/finance/invoices/new" element={<CreateInvoice />} />
                 <Route path="/finance/invoices/:id" element={<InvoiceDetail />} />
+                <Route path="/finance/invoices/:id/edit" element={<CreateInvoice />} />
+                <Route path="/finance/credit-notes" element={<CreditNotes />} />
+                <Route path="/finance/credit-notes/:id" element={<CreditNoteDetail />} />
                 <Route path="/finance/expenses" element={<Expenses />} />
+                <Route path="/finance/suppliers" element={<Suppliers />} />
                 <Route path="/finance/reports" element={<FinanceReports />} />
 
                 {/* Customers */}
                 <Route path="/customers" element={<Customers />} />
                 <Route path="/customers/new" element={<Customers />} />
                 <Route path="/customers/:id" element={<CustomerDetail />} />
+
+                {/* Capital desk: staff and funder members only. The page itself
+                    checks desk access (capital/status), not the company role,
+                    and sends everyone else home. */}
+                <Route path="/capital/desk" element={<CapitalDesk />} />
+                <Route path="/capital/desk/:tab" element={<CapitalDesk />} />
 
                 {/* Finance-role gated */}
                 <Route element={<RoleRoute roles={FINANCE_ROLES} />}>
@@ -312,7 +326,9 @@ const App = () => (
                   <Route path="/capital/request" element={<AdvanceRequest />} />
                   <Route path="/capital/advances/:id" element={<AdvanceDetail />} />
                   <Route path="/capital/risk-scores" element={<RiskScoreView />} />
-                  <Route path="/settings/integrations/xero" element={<XeroIntegration />} />
+                  <Route path="/settings/integrations/accounting" element={<AccountingIntegration />} />
+                  {/* The old Xero page: keeps any OAuth callback params on the way through. */}
+                  <Route path="/settings/integrations/xero" element={<SectionRedirect to="/settings/integrations/accounting" />} />
                   <Route path="/settings/integrations/fleet" element={<FleetImport />} />
                   <Route path="/settings/billing/history" element={<BillingHistoryPage />} />
                   <Route path="/settings/:section?" element={<Settings />} />

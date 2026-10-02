@@ -1,13 +1,14 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeftRight, CalendarRange, ChevronRight, FileText, Hourglass, Landmark, Receipt, Route, TrendingUp, Users, type LucideIcon,
+  ArrowLeftRight, CalendarRange, ChevronRight, FileText, Hourglass, Landmark, Percent, Receipt, Route, TrendingUp, Users, type LucideIcon,
 } from 'lucide-react';
 import { InfoTip } from '@/components/ui/InfoTip';
 import {
-  DELIVERED, day, inPeriod, isApproved, isIssued, isOpen, moneyWhole, num, resolvePeriod, vatShare, type Ledger, type SourceName,
+  DELIVERED, day, expenseNet, expenseVat, inPeriod, isApproved, isIssued, isOpen, isRejected, moneyWhole, num, resolvePeriod, revenueByMonth,
+  type Ledger, type SourceName,
 } from './data';
 
-export type ReportId = 'pl' | 'sales' | 'cash' | 'debtors' | 'statement' | 'customers' | 'lanes' | 'expenses' | 'vat';
+export type ReportId = 'pl' | 'sales' | 'cash' | 'debtors' | 'statement' | 'customers' | 'lanes' | 'margin' | 'expenses' | 'vat';
 
 export interface ReportDef {
   id: ReportId; group: string; title: string; purpose: string; basis: string; icon: LucideIcon;
@@ -22,15 +23,16 @@ const latestPayment = (d: Ledger) => maxDate(d.payments.map(p => p.payment_date)
 const latestMoney = (d: Ledger) => maxDate([latestPayment(d), maxDate(d.expenses.filter(isApproved).map(e => e.expense_date))]);
 
 export const REPORTS: ReportDef[] = [
-  { id: 'pl', group: 'Profit', title: 'Profit and loss', purpose: 'Did you make a profit, month by month?', basis: 'Excl. VAT · cash or invoice basis', icon: TrendingUp, needs: ['invoices', 'payments', 'expenses'], latest: latestMoney },
-  { id: 'sales', group: 'Profit', title: 'Sales by month', purpose: 'How much you invoiced each month, and what is paid.', basis: 'Issue date · incl. VAT', icon: CalendarRange, needs: ['invoices'], latest: latestInvoice },
+  { id: 'pl', group: 'Profit', title: 'Profit and loss', purpose: 'Did you make a profit, month by month?', basis: 'Excl. VAT · cash or accrual', icon: TrendingUp, needs: ['invoices', 'payments', 'expenses', 'creditNotes'], latest: latestMoney },
+  { id: 'sales', group: 'Profit', title: 'Sales by month', purpose: 'How much you invoiced each month, less credit notes, and what is paid.', basis: 'Excl. VAT · accrual (invoiced)', icon: CalendarRange, needs: ['invoices', 'creditNotes'], latest: latestInvoice },
   { id: 'cash', group: 'Cash', title: 'Cash movement', purpose: 'What money came in and went out?', basis: 'Payment date · excl. bank balance', icon: ArrowLeftRight, needs: ['invoices', 'payments', 'expenses'], latest: latestMoney },
   { id: 'debtors', group: 'Customers and debtors', title: 'Debtors age analysis', purpose: 'Who owes you, and how late is it?', basis: 'As at a date · by due date', icon: Hourglass, needs: ['invoices', 'payments'], latest: d => maxDate([latestInvoice(d), latestPayment(d)]) },
-  { id: 'statement', group: 'Customers and debtors', title: 'Customer statement', purpose: 'What one customer owes, invoice by invoice.', basis: 'Printable · incl. VAT', icon: FileText, needs: ['invoices', 'payments', 'customers'], latest: d => maxDate([latestInvoice(d), latestPayment(d)]) },
-  { id: 'customers', group: 'Customers and debtors', title: 'Revenue by customer', purpose: 'Which customers bring in the revenue?', basis: 'Issue or payment date', icon: Users, needs: ['invoices', 'payments'], latest: latestInvoice },
-  { id: 'lanes', group: 'Customers and debtors', title: 'Revenue by lane', purpose: 'Which routes earn the most, and per km?', basis: 'Delivery date · excl. VAT', icon: Route, needs: ['loads'], latest: d => maxDate(d.loads.map(l => l.delivery_date)) },
-  { id: 'expenses', group: 'Costs', title: 'Expense report', purpose: 'Where the money goes, by category and truck.', basis: 'Expense date · as captured', icon: Receipt, needs: ['expenses', 'vehicles'], latest: d => maxDate(d.expenses.map(e => e.expense_date)) },
-  { id: 'vat', group: 'Tax and accountant', title: 'VAT report', purpose: 'How much output VAT you charged.', basis: 'Invoice or payments basis', icon: Landmark, needs: ['invoices', 'payments'], latest: d => maxDate([latestInvoice(d), latestPayment(d)]) },
+  { id: 'statement', group: 'Customers and debtors', title: 'Customer statement', purpose: 'What one customer owes, invoice by invoice.', basis: 'Printable · incl. VAT', icon: FileText, needs: ['invoices', 'payments', 'customers', 'creditNotes'], latest: d => maxDate([latestInvoice(d), latestPayment(d)]) },
+  { id: 'customers', group: 'Customers and debtors', title: 'Revenue by customer', purpose: 'Which customers bring in the revenue?', basis: 'Excl. VAT · accrual or cash', icon: Users, needs: ['invoices', 'payments', 'creditNotes'], latest: latestInvoice },
+  { id: 'lanes', group: 'Customers and debtors', title: 'Revenue by lane', purpose: 'Which routes earn the most, and per km?', basis: 'Load prices · excl. VAT', icon: Route, needs: ['loads'], latest: d => maxDate(d.loads.map(l => l.delivery_date)) },
+  { id: 'margin', group: 'Customers and debtors', title: 'Lane margin', purpose: 'What each route really earns after its costs.', basis: 'Excl. VAT · actual vs estimate', icon: Percent, needs: [], latest: () => undefined },
+  { id: 'expenses', group: 'Costs', title: 'Expense report', purpose: 'Where the money goes, by category and truck.', basis: 'Expense date · excl. VAT', icon: Receipt, needs: ['expenses', 'vehicles'], latest: d => maxDate(d.expenses.map(e => e.expense_date)) },
+  { id: 'vat', group: 'Tax and accountant', title: 'VAT report', purpose: 'Output VAT charged, input VAT paid, and the net.', basis: 'Invoice or payments basis', icon: Landmark, needs: ['invoices', 'payments', 'creditNotes', 'expenses'], latest: d => maxDate([latestInvoice(d), latestPayment(d)]) },
 ];
 
 const GROUPS = ['Profit', 'Cash', 'Customers and debtors', 'Costs', 'Tax and accountant'];
@@ -43,19 +45,23 @@ const LAST_12 = () => resolvePeriod('last-12');
 const sum = (xs: number[]) => xs.reduce((s, v) => s + v, 0);
 function keyFigure(id: ReportId, d: Ledger): KeyFigure {
   const p = LAST_12();
-  const invById = new Map(d.invoices.map(i => [i.id, i]));
   const paid = d.payments.filter(x => inPeriod(x.payment_date, p));
   const issued = d.invoices.filter(i => isIssued(i) && inPeriod(i.issue_date, p));
-  const approvedCosts = sum(d.expenses.filter(e => isApproved(e) && inPeriod(e.expense_date, p)).map(e => num(e.amount)));
+  // Costs: not rejected (approved and pending), excl. input VAT, as the P&L counts them.
+  const costs = sum(d.expenses.filter(e => !isRejected(e) && inPeriod(e.expense_date, p)).map(expenseNet));
   const fig = (v: number, caption: string, whole = true): KeyFigure => ({ value: whole ? moneyWhole(v) : String(v), caption });
   switch (id) {
     case 'pl': {
-      if (!paid.length && !approvedCosts) return null;
-      const rev = sum(paid.map(x => num(x.amount) * (1 - vatShare(x.invoice != null ? invById.get(x.invoice) : undefined))));
-      return fig(rev - approvedCosts, 'Net profit, cash basis');
+      if (!paid.length && !costs) return null;
+      const rev = revenueByMonth(d, 'cash', p).excl;
+      return fig(rev - costs, 'Net profit excl. VAT, cash');
     }
-    case 'sales': return issued.length ? fig(sum(issued.map(i => num(i.total_amount))), 'Invoiced incl. VAT') : null;
-    case 'cash': return paid.length || approvedCosts ? fig(sum(paid.map(x => num(x.amount))) - approvedCosts, 'Net movement') : null;
+    case 'sales': return issued.length ? fig(revenueByMonth(d, 'accrual', p).excl, 'Revenue excl. VAT, accrual') : null;
+    case 'cash': {
+      // Cash movement: approved expenses as paid, incl. VAT (the Cash report's rule).
+      const out = sum(d.expenses.filter(e => isApproved(e) && inPeriod(e.expense_date, p)).map(e => num(e.amount)));
+      return paid.length || out ? fig(sum(paid.map(x => num(x.amount))) - out, 'Net movement') : null;
+    }
     case 'debtors': {
       const open = d.invoices.filter(isOpen);
       return open.length ? fig(sum(open.map(i => num(i.balance))), 'Owed to you now') : null;
@@ -72,8 +78,13 @@ function keyFigure(id: ReportId, d: Ledger): KeyFigure {
       const done = d.loads.filter(l => DELIVERED.has((l.status || '').toUpperCase()) && inPeriod(l.delivery_date, p));
       return done.length ? fig(sum(done.map(l => num(l.total_amount))), 'Delivered, excl. VAT') : null;
     }
-    case 'expenses': return approvedCosts ? fig(approvedCosts, 'Approved costs') : null;
-    case 'vat': return issued.length ? fig(sum(issued.map(i => num(i.vat_amount))), 'Output VAT, invoice basis') : null;
+    case 'expenses': return costs ? fig(costs, 'Costs excl. VAT') : null;
+    case 'vat': {
+      if (!issued.length) return null;
+      const output = revenueByMonth(d, 'accrual', p).vat;
+      const input = sum(d.expenses.filter(e => !isRejected(e) && inPeriod(e.expense_date, p)).map(expenseVat));
+      return fig(output - input, 'Net VAT, output less input');
+    }
     default: return null;
   }
 }

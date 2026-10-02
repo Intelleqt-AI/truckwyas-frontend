@@ -14,6 +14,7 @@ import { CustomersDirectory } from "./settings/CustomersDirectory";
 import { VehiclesDirectory } from "./settings/VehiclesDirectory";
 import { VehicleTypesDirectory } from "./settings/VehicleTypesDirectory";
 import { DeveloperApi } from "./settings/DeveloperApi";
+import { InvoiceNumberingSettings } from "./settings/InvoiceNumberingSettings";
 
 // Section id -> component. Labels, grouping and the admin-only flag live in
 // SETTINGS_NAV (SettingsShell.tsx) so the sub-page routes share the same nav.
@@ -25,6 +26,7 @@ const COMPONENTS: Record<string, () => JSX.Element> = {
   users: UsersPermissions,
   billing: BillingSettings,
   integrations: IntegrationsSettings,
+  'invoice-numbering': InvoiceNumberingSettings,
   customers: CustomersDirectory,
   vehicles: VehiclesDirectory,
   'vehicle-types': VehicleTypesDirectory,

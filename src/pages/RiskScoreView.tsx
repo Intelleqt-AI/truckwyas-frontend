@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
-import { formatDate, formatPercent } from '@/lib/formatters';
+import { formatDate } from '@/lib/formatters';
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 import { InfoTip } from '@/components/ui/InfoTip';
@@ -74,7 +74,6 @@ export default function RiskScoreView() {
         customer_name: inv.customer,
         total_score: Math.round(inv.risk_score || 0),
         tier: String(inv.risk_tier || inv.tier || 'HIGH').toUpperCase(),
-        fee_percent: inv.fee_rate_pct,
         is_eligible: true,
         factor_payment_history: null,
         factor_invoice_age: null,
@@ -205,7 +204,6 @@ export default function RiskScoreView() {
                   <th>Tier</th>
                   <th>Scored</th>
                   <th>Meets the rules</th>
-                  {CAPITAL_LAUNCHED && <th className="num">Fee</th>}
                 </tr>
               </thead>
               <tbody>
@@ -228,9 +226,6 @@ export default function RiskScoreView() {
                         {expired && <span className="fin-text-muted"> · expired</span>}
                       </td>
                       <td>{cs.is_eligible ? 'Yes' : <span className="fin-text-muted">No</span>}</td>
-                      {CAPITAL_LAUNCHED && (
-                        <td className="num">{cs.is_eligible && cs.fee_percent != null ? formatPercent(parseFloat(cs.fee_percent), 1) : '—'}</td>
-                      )}
                     </tr>
                   );
                 })}

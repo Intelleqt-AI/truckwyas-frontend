@@ -246,9 +246,9 @@ export default function VehicleFinancialProfile() {
   // ---- Performance
   const fleetKm = fleetPerKm(ledger.data?.loads);
   const basis = <>
-    Delivered and invoiced loads on this truck, counted in the month of delivery, over the last 12 months (the Reports definition).
-    {' '}Margin after truck costs: revenue less approved expenses logged on this truck (fuel, tolls, maintenance, insurance) in the same months; expenses waiting for approval are not deducted, as in the P&L, and the line under the margin shows what it becomes if they are approved.
-    {perf.costCount > 0 ? ` Approved costs in these months: ${randWhole(perf.costs)}${perf.pending > 0 ? `; ${randWhole(perf.pending)} more is waiting for approval` : ''}.` : ''}
+    Delivered and invoiced loads on this truck, at their load price excl. VAT, counted in the month of delivery, over the last 12 months (the Reports definition).
+    {' '}Margin after truck costs: revenue less expenses excl. VAT logged on this truck (fuel, tolls, maintenance, insurance) in the same months, approved or awaiting approval (rejected ones are left out), as in the P&L.
+    {perf.costCount > 0 ? ` Costs in these months: ${randWhole(perf.costs)}${perf.pending > 0 ? `, of which ${randWhole(perf.pending)} is awaiting approval` : ''}.` : ''}
     {' '}Revenue per km uses loads with a distance{perf.km > 0 ? ` (${kmText(perf.km)} here)` : ''}; the fleet figure{fleetKm ? ` (${randCents(fleetKm.perKm)} per km)` : ''} is every delivered load with a distance over the same 12 months, the basis Insights uses. Days on a job count calendar days from pickup to delivery.
     {partial ? ` Based on the latest ${loads.length} of ${loadsTotal} loads.` : ''}
     {perf.older > 0 ? ` ${plural(perf.older, 'older delivered load')} fall outside the 12 months.` : ''}

@@ -52,7 +52,7 @@ const tabActive = (t: SectionTab, pathname: string) =>
 /** Section subtitles used when a tabbed page passes none, so the reserved
  *  subtitle line is never an empty gap between the H1 and the tabs. */
 const SECTION_DESCRIPTIONS: Record<string, string> = {
-  Finance: 'Invoices, expenses and what you are owed',
+  Finance: 'Invoices, credit notes, expenses and suppliers',
   Fleet: 'Your trucks, your drivers and what each is doing',
 };
 
@@ -374,10 +374,13 @@ export function PageHeadSkeleton() {
   );
 }
 
-// Finance tabs (Invoices, Expenses). Reports has its own sidebar item, so it is not a tab.
+// Finance tabs: money in (invoices, credit notes), money out (expenses,
+// suppliers). Reports has its own sidebar item, so it is not a tab.
 export const FINANCE_TABS: SectionTab[] = [
   { label: 'Invoices', to: '/finance/invoices' },
+  { label: 'Credit notes', to: '/finance/credit-notes' },
   { label: 'Expenses', to: '/finance/expenses' },
+  { label: 'Suppliers', to: '/finance/suppliers' },
 ];
 
 export const FLEET_TABS: SectionTab[] = [

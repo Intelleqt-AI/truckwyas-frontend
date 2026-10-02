@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { BellRing, Banknote, Send, FileSearch, Pencil } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BellRing, Banknote, Send, FileSearch, Pencil, Lock, Ban, ExternalLink } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchData, patchData, postData } from "@/lib/Api";
+import { deleteData, fetchData, patchData, postData } from "@/lib/Api";
 
 import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import "./finance-brand.css";
@@ -19,6 +19,21 @@ import { useBalancedColumns } from "@/components/fleet-detail/useBalancedColumns
 import { daysBetween, todayISO } from "@/components/reports/data";
 import InvoiceSendPreview, { type InvoiceMessageKind } from "@/components/finance/InvoiceSendPreview";
 import { canSendReminder, invoiceBalance, REMINDER_STATUSES } from "@/lib/invoiceStatus";
+import "@/components/finance/finance-ledger.css";
+import { CreditNoteDialog } from "@/components/finance/CreditNoteDialog";
+import { FinDialog, ReasonDialog } from "@/components/finance/FinDialog";
+import { PaymentEditDialog } from "@/components/finance/PaymentEditDialog";
+import { isManualPayment } from "@/lib/finance/payments";
+import { ACCT_KEYS, isPaymentsManagedError, paymentsManagedRecordUrl, usePaymentsManaged } from "@/lib/accounting";
+import { AccountingSyncCard, AccountingSyncNotice, PaymentSourceBadge, PaymentsManagedNote } from "@/components/accounting/AccountingSyncCard";
+import { TotalsBreakdown } from "@/components/finance/TotalsBreakdown";
+import { FastPayInvoicePanel } from "@/components/capital/FastPayInvoicePanel";
+import RowActions from "@/components/ui/RowActions";
+import { ConfirmModal } from "@/components/ConfirmModal";
+import { FIN_URL, errorText, invalidateInvoiceData } from "@/lib/finance/api";
+import { formatQuantity, sumLines, taxCodeShort, toNumber } from "@/lib/finance/tax";
+import type { Invoice, InvoiceLine, Payment } from "@/lib/finance/types";
+import { revenueTypeLabel } from "@/lib/finance/types";
 
 // External Fast Pay application link. The applied-state key is unchanged so
 // invoices already marked "Applied" stay marked.
@@ -81,6 +96,28 @@ export default function InvoiceDetail() {
   const [dueError, setDueError] = useState<string | null>(null);
   // Outgoing messages are previewed and confirmed before they are sent.
   const [preview, setPreview] = useState<InvoiceMessageKind | null>(null);
+  // Ledger actions: credit note, void, delete draft, note, payment edit/delete.
+  const [creditOpen, setCreditOpen] = useState(false);
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [deletingPayment, setDeletingPayment] = useState<Payment | null>(null);
+  const flash = (msg: string, isError = false) => { setToast({ msg, isError }); setTimeout(() => setToast(null), isError ? 5000 : 3000); };
+  const refreshLedger = () => invalidateInvoiceData(queryClient, id);
+  // While an accounting system (Xero, QuickBooks) is connected it owns
+  // payments: TruckWys shows them but never records or edits them.
+  const { managed: paymentsManaged, providerName: acctName, connection: acctConnection } = usePaymentsManaged();
+  const [managedRecordUrl, setManagedRecordUrl] = useState<string | null>(null);
+  useEffect(() => { if (paymentsManaged) setShowPaymentForm(false); }, [paymentsManaged]);
+  /** A payment write was refused because the accounting system owns payments (409). */
+  const onPaymentsManaged = (error: unknown) => {
+    setShowPaymentForm(false);
+    setEditingPayment(null);
+    setManagedRecordUrl(paymentsManagedRecordUrl(error));
+    queryClient.invalidateQueries({ queryKey: ACCT_KEYS.connection });
+    flash(errorText(error, 'Payments are recorded in your accounting system while it is connected.'), true);
+  };
 
   const invoiceQuery = useQuery({
     queryKey: ['invoice', id],
@@ -97,6 +134,8 @@ export default function InvoiceDetail() {
   const { data: capitalData } = useQuery({
     queryKey: ['capital-eligible'],
     queryFn: () => fetchData('api/v1/capital/eligible/').catch(() => null),
+    // Launched, the Fast Pay panel reads the server offers instead.
+    enabled: !CAPITAL_LAUNCHED,
   });
   const eligibleInvoices: any[] = capitalData?.invoices || [];
   const capitalEntry = eligibleInvoices.find((e: any) => String(e.id) === String(id));
@@ -245,7 +284,8 @@ export default function InvoiceDetail() {
           amount: parseFloat(paymentAmount),
           payment_date: paymentDate,
           payment_method: paymentMethod,
-          reference: paymentReference
+          reference: paymentReference,
+          reference_number: paymentReference,
         }
       });
       setToast({ msg: 'Payment recorded' });
@@ -254,14 +294,42 @@ export default function InvoiceDetail() {
       setPaymentDate('');
       setPaymentReference('');
       setTimeout(() => setToast(null), 3000);
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ['invoice-payments', id] });
+      refreshLedger();
     } catch (error) {
+      if (isPaymentsManagedError(error)) { onPaymentsManaged(error); return; }
       const msg = error instanceof Error ? error.message : 'Failed to record payment';
       setToast({ msg, isError: true });
       setTimeout(() => setToast(null), 5000);
     } finally {
       setRecordingPayment(false);
+    }
+  };
+
+  const handleVoid = async (reason: string) => {
+    await postData({ url: FIN_URL.invoiceVoid(id!), data: { reason } });
+    setVoidOpen(false);
+    flash('Invoice voided');
+    refreshLedger();
+  };
+
+  const handleDeleteDraft = async () => {
+    try {
+      await deleteData({ url: FIN_URL.invoice(id!) });
+      invalidateInvoiceData(queryClient);
+      navigate('/finance/invoices');
+    } catch (error) {
+      flash(errorText(error, "Couldn't delete the draft"), true);
+    }
+  };
+
+  const handleDeletePayment = async (p: Payment) => {
+    try {
+      await deleteData({ url: FIN_URL.payment(p.id) });
+      flash('Payment deleted');
+      refreshLedger();
+    } catch (error) {
+      if (isPaymentsManagedError(error)) { setDeletingPayment(null); onPaymentsManaged(error); return; }
+      flash(errorText(error, "Couldn't delete the payment"), true);
     }
   };
 
@@ -302,17 +370,40 @@ export default function InvoiceDetail() {
     );
   }
 
-  const status: string = invoice.status || '';
+  const status: string = String(invoice.status || '').toUpperCase();
+  const inv = invoice as Invoice;
+  // CANCELLED is shown as "Void" on invoices.
+  const isVoid = status === 'CANCELLED' || !!inv.voided_at;
+  const isDraft = status === 'DRAFT';
+  const statusLabel = isVoid ? 'Void' : undefined;
+  const credited = toNumber(inv.credited_amount);
+  const creditNotes = Array.isArray(inv.credit_notes) ? inv.credit_notes : [];
+  const issuedCredits = creditNotes.filter(c => String(c.status).toUpperCase() !== 'VOID');
+  const ledgerLines: InvoiceLine[] = Array.isArray(inv.lines) ? [...inv.lines].sort((a, b) => a.position - b.position) : [];
+  const hasLedgerLines = ledgerLines.length > 0;
   const total = parseFloat(invoice.total_amount || invoice.amount || '0');
   const hasBalance = invoice.balance !== undefined && invoice.balance !== null;
   const balance = num(invoice.balance);
-  const showBalance = hasBalance && status !== 'PAID' && status !== 'DRAFT';
+  const showBalance = hasBalance && status !== 'PAID' && status !== 'DRAFT' && status !== 'CREDITED' && !isVoid;
   const applied = appliedIds.has(String(id));
-  const canSend = status === 'DRAFT' || status === 'SENT' || status === 'VIEWED';
+  const canSend = !isVoid && (status === 'DRAFT' || status === 'SENT' || status === 'VIEWED');
+  const canEditDraft = isDraft && !inv.is_locked;
+  // Credit what is left of a sent invoice; the server has the final say.
+  // Never on drafts or void invoices; a financed invoice belongs to the financier (the server refuses, 409).
+  const canCredit = !isDraft && !isVoid && !inv.is_financed && status !== 'CREDITED' && total - credited > 0.005;
+  // Void: no payments, no credit notes, not financed (the API's rule).
+  const canVoid = !isDraft && !isVoid && !inv.is_financed && payments.length === 0 && num(invoice.paid_amount) === 0 && issuedCredits.length === 0;
   // Any sent invoice with an unpaid balance past its due date, including
   // part-paid ones (shared definition in lib/invoiceStatus).
   const canRemind = canSendReminder(invoice);
-  const canRecordPayment = status === 'SENT' || status === 'VIEWED' || status === 'OVERDUE' || status === 'PARTIALLY_PAID';
+  // Never on drafts or void invoices (the API refuses both).
+  const isPayable = !isDraft && (status === 'SENT' || status === 'VIEWED' || status === 'OVERDUE' || status === 'PARTIALLY_PAID') && !isVoid;
+  // Managed elsewhere: "Record in Xero" opens this invoice there instead.
+  const managedHere = paymentsManaged || !!managedRecordUrl;
+  const canRecordPayment = isPayable && !managedHere;
+  const recordInProviderUrl = inv.accounting_sync?.url || managedRecordUrl || acctConnection?.web_url || null;
+  const canRecordInProvider = isPayable && managedHere;
+  const openRecordInProvider = () => { if (recordInProviderUrl) window.open(recordInProviderUrl, '_blank', 'noopener,noreferrer'); };
   const totalPaid = (payments || []).reduce((sum: number, p: any) => sum + num(p.amount), 0);
   const paidToDate = invoice.paid_amount != null ? num(invoice.paid_amount) : null;
   const vat = (invoice.vat_amount ?? invoice.tax_amount) != null ? num(invoice.vat_amount ?? invoice.tax_amount) : null;
@@ -322,16 +413,21 @@ export default function InvoiceDetail() {
   const daysLate = showBalance ? daysPastDue : null;
   // A draft whose due date has already passed: said once, calmly, before it is sent.
   const draftPastDue = status === 'DRAFT' && daysPastDue != null && daysPastDue > 0;
-  const canEditDue = status !== 'PAID' && status !== 'CANCELLED';
+  // The due date is locked once the invoice is sent; drafts change it here or in the editor.
+  const canEditDue = isDraft;
   const startDueEdit = () => { setDueDraft(String(invoice.due_date || '').slice(0, 10)); setDueError(null); setEditingDue(true); };
   // Part-paid: the document ends with "Paid to date" and "Balance due".
+  // Balance = total - paid - credited, so a credited invoice also ends with the steps.
   const partPaid = showBalance && Math.abs(balance - total) > 0.005;
-  const paidInDoc = partPaid ? (paidToDate ?? total - balance) : null;
+  const paidInDoc = partPaid ? (paidToDate ?? total - balance - credited) : null;
   // The charge lines. An invoice made from a load with no itemised lines
   // shows that load as its one line, for the subtotal.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rawLines: any[] = Array.isArray(invoice.line_items) ? invoice.line_items : [];
-  const itemised = rawLines.length > 0;
+  const itemised = hasLedgerLines || rawLines.length > 0;
+  // VAT per tax code from the saved lines (the server's rounded figures).
+  const lineTotals = hasLedgerLines ? sumLines(ledgerLines.map(l => ({ net: l.net_amount, vat: l.vat_amount, discount: l.discount_amount, tax_code: l.tax_code }))) : null;
+  const anyDiscount = ledgerLines.some(l => toNumber(l.discount_amount) > 0);
   const lines: { description: string; note?: string; quantity: number; unit: number }[] = itemised
     ? rawLines.map((item) => ({
         description: item.description || item.item_description || '—',
@@ -378,7 +474,7 @@ export default function InvoiceDetail() {
     .sort((a, b) => (a.at == null ? 1 : 0) - (b.at == null ? 1 : 0) || (a.at != null && b.at != null ? a.at - b.at : 0) || a.i - b.i);
 
   // Past due: chasing is the job, so the reminder is the primary action.
-  const primary = canRemind ? 'remind' : canSend ? 'send' : canRecordPayment ? 'pay' : null;
+  const primary = canRemind ? 'remind' : canSend ? 'send' : canRecordPayment ? 'pay' : canRecordInProvider && recordInProviderUrl ? 'pay-external' : null;
   const moreActions = [
     ...(primary === 'remind' && canSend
       ? [{ label: sending ? 'Sending…' : 'Resend invoice', onSelect: () => setPreview('invoice'), disabled: sending }]
@@ -390,9 +486,21 @@ export default function InvoiceDetail() {
     ...(primary !== 'pay' && canRecordPayment
       ? [{ label: 'Record payment', onSelect: () => setShowPaymentForm(true), disabled: showPaymentForm }]
       : []),
+    ...(primary !== 'pay-external' && canRecordInProvider
+      ? [{
+          label: `Record payment in ${acctName}`,
+          hint: recordInProviderUrl ? `Payments sync from ${acctName} automatically.` : `This invoice hasn't reached ${acctName} yet.`,
+          onSelect: openRecordInProvider,
+          disabled: !recordInProviderUrl,
+        }]
+      : []),
     ...(primary !== null
       ? [{ label: downloading ? 'Downloading…' : 'Download PDF', onSelect: handleDownloadPDF, disabled: downloading }]
       : []),
+    ...(!isDraft && !isVoid ? [{ label: 'Edit note', onSelect: () => setNotesOpen(true) }] : []),
+    ...(canCredit ? [{ label: 'Issue credit note', onSelect: () => setCreditOpen(true) }] : []),
+    ...(canVoid ? [{ label: 'Void invoice', onSelect: () => setVoidOpen(true), danger: true }] : []),
+    ...(isDraft ? [{ label: 'Delete draft', onSelect: () => setConfirmDelete(true), danger: true }] : []),
   ];
 
   // Bill to, dates and terms: the top of the document, or the rail's first
@@ -486,32 +594,98 @@ export default function InvoiceDetail() {
         />
       )}
 
+      {creditOpen && (
+        <CreditNoteDialog
+          invoice={inv}
+          onClose={() => setCreditOpen(false)}
+          onIssued={(note) => {
+            setCreditOpen(false);
+            flash(note?.credit_note_number ? `Credit note ${note.credit_note_number} issued` : 'Credit note issued');
+            refreshLedger();
+          }}
+        />
+      )}
+      {voidOpen && (
+        <ReasonDialog
+          title={`Void ${invoice.invoice_number}`}
+          description="The invoice stays on record, marked void, and is no longer owed. Use this for an invoice sent by mistake; to correct one, issue a credit note."
+          placeholder="e.g. Sent to the wrong customer"
+          confirmLabel="Void invoice"
+          danger
+          onSubmit={handleVoid}
+          onClose={() => setVoidOpen(false)}
+        />
+      )}
+      {confirmDelete && (
+        <ConfirmModal
+          title="Delete draft"
+          message={`Delete draft ${invoice.invoice_number}? It has not been sent, so nothing else changes. This cannot be undone.`}
+          confirmLabel="Delete draft"
+          danger
+          onConfirm={handleDeleteDraft}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
+      {notesOpen && (
+        <NoteDialog
+          invoiceId={invoice.id}
+          initial={invoice.notes || ''}
+          onClose={() => setNotesOpen(false)}
+          onSaved={() => { setNotesOpen(false); flash('Note saved'); refreshLedger(); }}
+        />
+      )}
+      {editingPayment && (
+        <PaymentEditDialog
+          payment={editingPayment}
+          onClose={() => setEditingPayment(null)}
+          onSaved={() => { setEditingPayment(null); flash('Payment updated'); refreshLedger(); }}
+          onPaymentsManaged={onPaymentsManaged}
+        />
+      )}
+      {deletingPayment && (
+        <ConfirmModal
+          title="Delete payment"
+          message={`Delete the payment of ${formatCurrency(num(deletingPayment.amount))} on ${safeDate(deletingPayment.payment_date)}? The invoice balance goes back up by that amount.`}
+          confirmLabel="Delete payment"
+          danger
+          onConfirm={() => handleDeletePayment(deletingPayment)}
+          onCancel={() => setDeletingPayment(null)}
+        />
+      )}
+
       <SectionHeader
         title={invoice.invoice_number}
-        titleAdornment={<span className="fin-head-chip"><StatusChip status={status} /></span>}
+        titleAdornment={<span className="fin-head-chip"><StatusChip status={status} label={statusLabel} /></span>}
         back={{ to: '/finance/invoices', label: 'Invoices' }}
         description={<>
           {/* Phones: the status sits here, so the ID and the primary share the title row. */}
-          <span className="fin-head-chip--sub"><StatusChip status={status} size="sm" /><span aria-hidden="true" className="section-header__sep" style={{ marginLeft: 6 }}>·</span></span>
+          <span className="fin-head-chip--sub"><StatusChip status={status} label={statusLabel} size="sm" /><span aria-hidden="true" className="section-header__sep" style={{ marginLeft: 6 }}>·</span></span>
           {invoice.customer_name}
           {/* The number itself says it is a load ("LOAD-…"). */}
           {/* Phones: when the charges line already names the load, it is not repeated here. */}
           {invoice.load_number && <span className={itemised ? undefined : 'fin-hide-phone'}>{' · '}<span className="fin-id" title="Load">{invoice.load_number}</span></span>}
         </>}
         actions={<>
-          {/* One primary action; everything else sits behind one menu. */}
+          {/* One primary action; everything else sits behind one menu. A
+              draft also offers Edit beside it (lines change until it is sent). */}
+          {canEditDraft && (
+            <button type="button" className="tw-btn" onClick={() => navigate(`/finance/invoices/${id}/edit`)}>Edit draft</button>
+          )}
           {primary === 'remind' ? (
             <HeadAction icon={<BellRing size={16} strokeWidth={1.75} aria-hidden="true" />} label={sendingReminder ? 'Sending…' : 'Send reminder'} short={sendingReminder ? 'Sending…' : 'Remind'}
               onClick={() => setPreview('reminder')} disabled={sendingReminder} />
           ) : primary === 'send' ? (
             <HeadAction icon={<Send size={16} strokeWidth={1.75} aria-hidden="true" />}
-              label={sending ? 'Sending…' : status === 'VIEWED' ? 'Resend to customer' : 'Send to customer'}
-              short={sending ? 'Sending…' : status === 'VIEWED' ? 'Resend' : 'Send'}
+              label={sending ? 'Sending…' : status === 'VIEWED' || status === 'SENT' ? 'Resend to customer' : 'Send to customer'}
+              short={sending ? 'Sending…' : status === 'VIEWED' || status === 'SENT' ? 'Resend' : 'Send'}
               onClick={() => setPreview('invoice')} disabled={sending} />
           ) : primary === 'pay' ? (
             <HeadAction icon={<Banknote size={16} strokeWidth={1.75} aria-hidden="true" />} label="Record payment" short="Record payment"
               onClick={() => setShowPaymentForm(true)} disabled={showPaymentForm}
               extra={{ 'aria-expanded': showPaymentForm, 'aria-controls': 'record-payment' }} />
+          ) : primary === 'pay-external' ? (
+            <HeadAction icon={<ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />} label={`Record payment in ${acctName}`} short="Record payment"
+              onClick={openRecordInProvider} extra={{ title: `Opens this invoice in ${acctName}. Payments sync from ${acctName} automatically.` }} />
           ) : (
             <button type="button" className="tw-btn" onClick={handleDownloadPDF} disabled={downloading}>
               {downloading ? 'Downloading…' : 'Download PDF'}
@@ -527,63 +701,150 @@ export default function InvoiceDetail() {
           Dates are facts in the document, not KPI tiles; each figure once. */}
       <div className="fin-detail-grid">
         <div className="fin-main-col" ref={bal.mainRef}>
+        <AccountingSyncNotice sync={inv.accounting_sync} what="invoice" />
+        {/* Why this invoice can't change: void, financed, or sent (locked). */}
+        {isVoid ? (
+          <div className="fl-notice fl-notice--danger" role="status">
+            <Ban size={16} aria-hidden="true" />
+            <div>
+              <strong>Void{inv.voided_at ? ` since ${safeDate(inv.voided_at)}` : ''}</strong>
+              {inv.void_reason ? `Reason: ${inv.void_reason}. ` : ''}A void invoice is kept for the record and is not owed.
+            </div>
+          </div>
+        ) : inv.is_financed ? (
+          <div className="fl-notice fl-notice--warning" role="status">
+            <Lock size={16} aria-hidden="true" />
+            <div>
+              <strong>Financed through Fast Pay</strong>
+              {inv.lock_reason || 'This invoice has been financed, so it is locked: it can’t be edited or voided. Payments go to the financier.'}
+            </div>
+          </div>
+        ) : inv.is_locked ? (
+          <div className="fl-notice" role="status">
+            <Lock size={16} aria-hidden="true" />
+            <div>
+              <strong>Locked</strong>
+              {inv.lock_reason ? `${inv.lock_reason}. ` : ''}Sent invoices can't be edited — issue a credit note to correct one.
+            </div>
+            {canCredit && <button type="button" className="tw-btn fl-notice__action" onClick={() => setCreditOpen(true)}>Issue credit note</button>}
+          </div>
+        ) : null}
         <section className="card fin-table-card fin-doc" aria-labelledby="invoice-doc-title">
           <h2 id="invoice-doc-title" className="fin-sr">Invoice {invoice.invoice_number}</h2>
           {bal.inMain('facts') && facts(false)}
 
-          {/* Charges: the itemised lines, or (an invoice charged as one amount
-              from its load) a single line that says so, then the totals, so
-              every invoice reads as a complete document. */}
+          {/* Charges: the itemised lines (with tax code and VAT per line), or
+              (an invoice charged as one amount from its load) a single line
+              that says so, then the totals, so every invoice reads as a
+              complete document. */}
           <div className="fin-doc__lines">
             <div className="fin-doc__head">
               <h3 className="fin-panel-title">Charges</h3>
               <p className="fin-panel-desc">
-                {itemised ? `${lines.length} ${lines.length === 1 ? 'line' : 'lines'}, excl. VAT` : 'One amount, excl. VAT'}
+                {hasLedgerLines
+                  ? `${ledgerLines.length} ${ledgerLines.length === 1 ? 'line' : 'lines'}, amounts excl. VAT`
+                  : itemised ? `${lines.length} ${lines.length === 1 ? 'line' : 'lines'}, excl. VAT` : 'One amount, excl. VAT'}
               </p>
             </div>
             <div className="fin-table-scroll">
-              <table className="fin-table fin-doc__table table-heading-roles">
-                <thead>
-                  <tr>
-                    <th className="fin-cell-fill">Description</th>
-                    <th className="num m-hide">Quantity</th>
-                    <th className="num m-hide">Unit price</th>
-                    <th className="num">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((item, idx) => (
-                    <tr key={idx}>
-                      <td className="fin-strong fin-cell-fill">
-                        <div className="fin-doc__desc" title={item.description}>{item.description}</div>
-                        {item.note && <span className="fin-cell-sub">{item.note}</span>}
-                        {/* Phones: quantity and unit price under the description. */}
-                        {itemised && <span className="fin-cell-sub fin-mobile-only">{item.quantity} × {formatCurrency(item.unit)}</span>}
-                      </td>
-                      <td className="num m-hide">{item.quantity}</td>
-                      <td className="num m-hide">{formatCurrency(item.unit)}</td>
-                      <td className="num">{formatCurrency(item.quantity * item.unit)}</td>
+              {hasLedgerLines ? (
+                <table className="fin-table fin-doc__table table-heading-roles">
+                  <thead>
+                    <tr>
+                      <th className="fin-cell-fill">Description</th>
+                      <th className="num m-hide">Qty</th>
+                      <th className="num m-hide">Unit price</th>
+                      {anyDiscount && <th className="num m-hide">Discount</th>}
+                      <th className="m-hide">Tax</th>
+                      <th className="num m-hide">VAT</th>
+                      <th className="num">Amount</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {ledgerLines.map((l) => (
+                      <tr key={l.id}>
+                        <td className="fin-strong fin-cell-fill">
+                          <div className="fin-doc__desc" title={l.description}>{l.description}</div>
+                          {l.revenue_type && l.revenue_type !== 'FREIGHT' && <span className="fl-line-type">{revenueTypeLabel(l.revenue_type)}</span>}
+                          {/* Phones: quantity, price, tax and VAT under the description. */}
+                          <span className="fin-cell-sub fin-mobile-only">
+                            {formatQuantity(l.quantity)} × {formatCurrency(l.unit_price)}
+                            {toNumber(l.discount_amount) > 0 ? `, less ${formatCurrency(l.discount_amount)}` : ''}
+                            {' · '}{taxCodeShort(l.tax_code)}, VAT {formatCurrency(l.vat_amount)}
+                          </span>
+                        </td>
+                        <td className="num m-hide">{formatQuantity(l.quantity)}</td>
+                        <td className="num m-hide">{formatCurrency(l.unit_price)}</td>
+                        {anyDiscount && <td className="num m-hide">{toNumber(l.discount_amount) > 0 ? `−${formatCurrency(l.discount_amount)}` : '—'}</td>}
+                        <td className="m-hide"><span className="fl-tax">{taxCodeShort(l.tax_code)}</span></td>
+                        <td className="num m-hide">{formatCurrency(l.vat_amount)}</td>
+                        <td className="num">{formatCurrency(l.net_amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="fin-table fin-doc__table table-heading-roles">
+                  <thead>
+                    <tr>
+                      <th className="fin-cell-fill">Description</th>
+                      <th className="num m-hide">Quantity</th>
+                      <th className="num m-hide">Unit price</th>
+                      <th className="num">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lines.map((item, idx) => (
+                      <tr key={idx}>
+                        <td className="fin-strong fin-cell-fill">
+                          <div className="fin-doc__desc" title={item.description}>{item.description}</div>
+                          {item.note && <span className="fin-cell-sub">{item.note}</span>}
+                          {/* Phones: quantity and unit price under the description. */}
+                          {itemised && <span className="fin-cell-sub fin-mobile-only">{item.quantity} × {formatCurrency(item.unit)}</span>}
+                        </td>
+                        <td className="num m-hide">{item.quantity}</td>
+                        <td className="num m-hide">{formatCurrency(item.unit)}</td>
+                        <td className="num">{formatCurrency(item.quantity * item.unit)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
             <dl className="fin-doc__totals">
-              {invoice.subtotal != null && (
-                <div><dt>Subtotal</dt><dd>{formatCurrency(num(invoice.subtotal))}</dd></div>
-              )}
               {num(invoice.discount) > 0 && (
-                <div><dt>Discount</dt><dd>−{formatCurrency(num(invoice.discount))}</dd></div>
+                <>
+                  <div><dt>Before discount</dt><dd>{formatCurrency(num(invoice.subtotal) + num(invoice.discount))}</dd></div>
+                  <div><dt>Discount</dt><dd>−{formatCurrency(num(invoice.discount))}</dd></div>
+                </>
               )}
-              {vat != null && (
-                <div><dt>VAT{vatRateText ? ` (${vatRateText})` : ''}</dt><dd>{formatCurrency(vat)}</dd></div>
+              {invoice.subtotal != null && (
+                <div><dt>Subtotal excl. VAT</dt><dd>{formatCurrency(num(invoice.subtotal))}</dd></div>
+              )}
+              {lineTotals && lineTotals.byCode.length > 1 ? (
+                lineTotals.byCode.map(b => (
+                  <div key={b.code}><dt>{taxCodeShort(b.code)} on {formatCurrency(b.net)}</dt><dd>{formatCurrency(b.vat)}</dd></div>
+                ))
+              ) : vat != null && (
+                <div>
+                  <dt>{lineTotals && lineTotals.byCode[0] && lineTotals.byCode[0].code !== 'STANDARD'
+                    ? `VAT (${taxCodeShort(lineTotals.byCode[0].code).toLowerCase()})`
+                    : `VAT${vatRateText ? ` (${vatRateText})` : lineTotals ? ' (15%)' : ''}`}</dt>
+                  <dd>{formatCurrency(vat)}</dd>
+                </div>
               )}
               <div className={partPaid ? 'is-rule' : 'is-rule is-total'}><dt>{showBalance && !partPaid ? 'Total due' : 'Total, incl. VAT'}</dt><dd>{formatCurrency(total)}</dd></div>
+              {partPaid && (paidInDoc ?? 0) > 0.005 && (
+                <div><dt>Paid to date</dt><dd>−{formatCurrency(paidInDoc ?? 0)}</dd></div>
+              )}
+              {partPaid && credited > 0.005 && (
+                <div><dt>Credited</dt><dd>−{formatCurrency(credited)}</dd></div>
+              )}
               {partPaid && (
-                <>
-                  <div><dt>Paid to date</dt><dd>−{formatCurrency(paidInDoc ?? 0)}</dd></div>
-                  <div className="is-total"><dt>Balance due</dt><dd>{formatCurrency(balance)}</dd></div>
-                </>
+                <div className="is-total"><dt>Balance due</dt><dd>{formatCurrency(balance)}</dd></div>
+              )}
+              {!partPaid && credited > 0.005 && (
+                <div><dt>Credited</dt><dd>−{formatCurrency(credited)}</dd></div>
               )}
             </dl>
           </div>
@@ -601,7 +862,8 @@ export default function InvoiceDetail() {
           {!bal.inMain('facts') && (
             <section className="card fin-facts-card" aria-label="Invoice dates and terms">{facts(true)}</section>
           )}
-          {showPaymentForm && (
+          <AccountingSyncCard sync={inv.accounting_sync} what="invoice" localNumber={inv.invoice_number} />
+          {showPaymentForm && !managedHere && (
             <section className="card" id="record-payment" aria-labelledby="record-payment-title">
               <div className="fin-panel-head">
                 <div className="fin-panel-head__text">
@@ -677,27 +939,47 @@ export default function InvoiceDetail() {
             </section>
           )}
 
-          {payments && payments.length > 0 && (
+          {((payments && payments.length > 0) || canRecordInProvider) && (
             <section className="card fin-table-card" aria-labelledby="payments-title">
               <div className="fin-panel-head">
                 <div className="fin-panel-head__text">
                   <h2 id="payments-title" className="fin-panel-title">Payments</h2>
-                  <p className="fin-panel-desc">{payments.length} recorded, by payment date</p>
+                  <p className="fin-panel-desc">
+                    {managedHere
+                      ? `${formatCurrency(totalPaid)} paid. Record new payments in ${acctName}; they appear here within a few minutes.`
+                      : `${payments.length} recorded, by payment date`}
+                  </p>
                 </div>
+                {managedHere && canRecordInProvider && primary !== 'pay-external' && <PaymentsManagedNote providerName={acctName} recordUrl={recordInProviderUrl} />}
               </div>
-              <ul className="fin-paylist">
+
+              <ul className={`fin-paylist${managedHere ? ' acct-paylist-top' : ''}`}>
                 {payments.map((payment: any, idx: number) => {
-                  const ref = payment.reference || payment.reference_number || payment.payment_number;
+                  const ref = payment.reference_number || payment.reference || payment.payment_number;
                   return (
-                    <li key={idx} className="fin-paylist__row">
+                    <li key={payment.id ?? idx} className="fin-paylist__row">
                       <span className="fin-paylist__main">
                         <span className="fin-date">{safeDate(payment.payment_date || payment.date)}</span>
                         <span className="fin-paylist__sub">
                           {methodLabel(payment.payment_method || payment.method || 'EFT')}
                           {ref && <> · <span className="fin-id">{ref}</span></>}
+                          {managedHere && <PaymentSourceBadge source={payment.source} managed />}
                         </span>
+                        {!managedHere && <PaymentSourceBadge source={payment.source} />}
                       </span>
-                      <span className="fin-paylist__amt">{formatCurrency(num(payment.amount))}</span>
+                      <span className="fl-pay-actions">
+                        <span className="fin-paylist__amt">{formatCurrency(num(payment.amount))}</span>
+                        {/* Only payments recorded here can change; synced ones belong to their source. */}
+                        {payment.id != null && isManualPayment(payment) && !managedHere && (
+                          <RowActions
+                            label={`Payment of ${formatCurrency(num(payment.amount))} on ${safeDate(payment.payment_date)}`}
+                            items={[
+                              { label: 'Edit payment', onSelect: () => setEditingPayment(payment) },
+                              { label: 'Delete payment', onSelect: () => setDeletingPayment(payment), danger: true },
+                            ]}
+                          />
+                        )}
+                      </span>
                     </li>
                   );
                 })}
@@ -709,6 +991,51 @@ export default function InvoiceDetail() {
                   </li>
                 )}
               </ul>
+            </section>
+          )}
+
+
+          {creditNotes.length > 0 && (
+            <section className="card fin-table-card" aria-labelledby="credit-notes-title">
+              <div className="fin-panel-head">
+                <div className="fin-panel-head__text">
+                  <h2 id="credit-notes-title" className="fin-panel-title">Credit notes</h2>
+                  <p className="fin-panel-desc">{formatCurrency(credited)} credited, incl. VAT</p>
+                </div>
+              </div>
+              <ul className="fin-paylist">
+                {creditNotes.map(c => {
+                  const voided = String(c.status).toUpperCase() === 'VOID';
+                  return (
+                    <li key={c.id} className="fin-paylist__row">
+                      <span className="fin-paylist__main">
+                        <Link to={`/finance/credit-notes/${c.id}`} className="fin-id acct-ink-link">{c.credit_note_number}</Link>
+                        <span className="fin-paylist__sub">{safeDate(c.issue_date)}{voided ? ' · Void' : ''}</span>
+                      </span>
+                      <span className="fin-paylist__amt" style={voided ? { textDecoration: 'line-through', color: 'var(--text-tertiary)' } : undefined}>
+                        −{formatCurrency(c.total_amount)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
+          {/* Where the balance comes from, once anything has been paid or credited. */}
+          {!isDraft && !isVoid && !partPaid && (credited > 0.005 || num(invoice.paid_amount) > 0.005) && (
+            <section className="card" aria-labelledby="balance-title">
+              <div className="fin-panel-head" style={{ marginBottom: 4 }}>
+                <div className="fin-panel-head__text">
+                  <h2 id="balance-title" className="fin-panel-title">Balance</h2>
+                </div>
+              </div>
+              <dl className="fin-dl">
+                <div className="fin-dl__row"><dt>Invoice total</dt><dd>{formatCurrency(total)}</dd></div>
+                <div className="fin-dl__row"><dt>Paid</dt><dd>−{formatCurrency(num(invoice.paid_amount))}</dd></div>
+                <div className="fin-dl__row"><dt>Credited</dt><dd>−{formatCurrency(credited)}</dd></div>
+                <div className="fin-dl__row is-total"><dt>Balance</dt><dd>{formatCurrency(balance)}</dd></div>
+              </dl>
             </section>
           )}
 
@@ -728,7 +1055,10 @@ export default function InvoiceDetail() {
             </dl>
           </section>
 
-          {(capitalEntry || ineligibleEntry) && (
+          {CAPITAL_LAUNCHED && id && <FastPayInvoicePanel invoiceId={id} />}
+
+          {/* Pre-launch view, unchanged until CAPITAL_LAUNCHED is flipped. */}
+          {!CAPITAL_LAUNCHED && (capitalEntry || ineligibleEntry) && (
             <section className="card" aria-labelledby="fastpay-title">
               <div className="fin-panel-head">
                 <div className="fin-panel-head__text">
@@ -778,5 +1108,38 @@ function HeadAction({ icon, label, short, onClick, disabled, extra }: {
       {icon}
       <span className="fin-act__long">{label}</span>
     </button>
+  );
+}
+
+/** Notes stay editable on a sent (locked) invoice; nothing else does. */
+function NoteDialog({ invoiceId, initial, onClose, onSaved }: { invoiceId: number; initial: string; onClose: () => void; onSaved: () => void }) {
+  const [notes, setNotes] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true); setError('');
+    try {
+      await patchData({ url: FIN_URL.invoice(invoiceId), data: { notes } });
+      onSaved();
+    } catch (err) {
+      setError(errorText(err, "Couldn't save the note"));
+      setBusy(false);
+    }
+  };
+  return (
+    <FinDialog title="Edit note" description="The note prints on the invoice. The amounts can't change once it is sent." onClose={onClose} busy={busy}>
+      <form className="fin-form" onSubmit={save}>
+        <div>
+          <label className="fin-label" htmlFor="inv-note">Note</label>
+          <textarea id="inv-note" className="fin-control" rows={4} value={notes} onChange={e => setNotes(e.target.value)} data-autofocus />
+        </div>
+        {error && <p className="fin-help fin-text-danger" role="alert" style={{ margin: 0 }}>{error}</p>}
+        <div className="fin-dialog__foot">
+          <button type="button" className="tw-btn" onClick={onClose} disabled={busy}>Cancel</button>
+          <button type="submit" className="tw-btn tw-btn--primary" disabled={busy || notes === initial}>{busy ? 'Saving…' : 'Save note'}</button>
+        </div>
+      </form>
+    </FinDialog>
   );
 }

@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
 import {
-  addMonths, day, isIssued, isOpen, methodLabel, monthLabel, money, moneyWhole, num, plural, todayISO, ymNow,
+  addMonths, day, isCreditIssued, isIssued, isOpen, methodLabel, monthLabel, money, moneyWhole, num, plural, todayISO, ymNow,
   type Company, type Ledger,
 } from './data';
 import { ageInvoices } from './DebtorsAge';
@@ -37,6 +37,10 @@ export default function CustomerStatement({ d, company }: { d: Ledger; company?:
   type Entry = { date: string; type: string; ref: string; due?: string; debit: number; credit: number; href?: string; order: number };
   const entries: Entry[] = [
     ...invoices.map(i => ({ date: i.issue_date, type: 'Invoice', ref: i.invoice_number, due: i.due_date, debit: num(i.total_amount), credit: 0, href: `/finance/invoices/${i.id}`, order: 0 })),
+    // Issued credit notes reduce what is owed, on their own date.
+    ...(d.creditNotes ?? []).filter(c => isCreditIssued(c) && invIds.has(c.invoice)).map(c => ({
+      date: c.issue_date, type: 'Credit note', ref: `${c.credit_note_number} for ${c.invoice_number}`, debit: 0, credit: num(c.total_amount), href: `/finance/credit-notes/${c.id}`, order: 1,
+    })),
     ...payments.map(p => ({ date: p.payment_date, type: `Payment, ${methodLabel(p.payment_method)}`, ref: `${p.payment_number || `PMT-${p.id}`}${p.invoice_number ? ` for ${p.invoice_number}` : ''}`, debit: 0, credit: num(p.amount), href: p.invoice != null ? `/finance/invoices/${p.invoice}` : undefined, order: 1 })),
     // Invoices marked paid with no payment recorded: credit on the paid date so the balance holds.
     ...invoices.filter(i => (i.status || '').toUpperCase() === 'PAID' && !withPayments.has(i.id) && i.paid_at).map(i => ({
@@ -53,7 +57,7 @@ export default function CustomerStatement({ d, company }: { d: Ledger; company?:
   const closing = opening + invoiced - paid;
 
   const table: Statement = {
-    columns: [{ label: 'Date', type: 'date' }, { label: 'Transaction' }, { label: 'Reference' }, { label: 'Due', type: 'date', phone: false }, { label: 'Invoiced', type: 'money' }, { label: 'Paid', type: 'money' }, { label: 'Balance', type: 'money' }],
+    columns: [{ label: 'Date', type: 'date' }, { label: 'Transaction' }, { label: 'Reference' }, { label: 'Due', type: 'date', phone: false }, { label: 'Invoiced', type: 'money' }, { label: 'Paid or credited', type: 'money' }, { label: 'Balance', type: 'money' }],
     rows: [
       ...(sinceDate ? [{ key: 'open', kind: 'subtotal' as const, cells: [sinceDate, 'Opening balance', '', '', '', '', opening] }] : []),
       ...shown.map<SRow>((e, i) => ({ key: `e${i}`, cells: [e.date, e.type, e.ref, e.due ?? '', e.debit || '', e.credit || '', (bal += e.debit - e.credit)] })),
@@ -85,7 +89,7 @@ export default function CustomerStatement({ d, company }: { d: Ledger; company?:
       printTitle={`Statement for ${name}, ${since ? `from ${monthLabel(since)}` : 'all activity'}`}
       companyName={company?.company_name}
       info={<Info title="Customer statement" lines={[
-        'Issued invoices and recorded payments for one customer, oldest first, with the running balance. Amounts include VAT.',
+        'Issued invoices, credit notes and recorded payments for one customer, oldest first, with the running balance. Amounts include VAT.',
         'Drafts and cancelled invoices are left out. Opening balance: everything before the start month.',
         'Print it or export it to send to the customer.',
       ]} />}

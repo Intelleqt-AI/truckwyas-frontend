@@ -1,5 +1,7 @@
 import "./table-heading-roles.css";
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
+import { useFastPayInvoices } from '@/lib/capital/api';
+import type { Offer } from '@/lib/capital/types';
 import "./finance-brand.css";
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -9,6 +11,7 @@ import { fetchData, postData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import SectionHeader, { FINANCE_TABS } from "@/components/layout/SectionHeader";
 import RowActions from "@/components/ui/RowActions";
+import { providerConfig, usePaymentsManaged } from "@/lib/accounting";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { wholeRand } from "@/components/finance/FinTile";
 import { KpiRow, KpiTile } from "@/components/ui/KpiTile";
@@ -121,6 +124,8 @@ async function loadInvoicesPage() {
 
 export default function Invoices() {
   const navigate = useNavigate();
+  // While an accounting system owns payments, the row menu sends people there.
+  const { managed: paymentsManaged } = usePaymentsManaged();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -156,7 +161,14 @@ export default function Invoices() {
   const { data: capitalData } = useQuery({
     queryKey: ["capital-eligible"],
     queryFn: () => fetchData("api/v1/capital/eligible/").catch(() => null),
+    // Launched, Fast Pay reads the server offers instead (below).
+    enabled: !CAPITAL_LAUNCHED,
   });
+  // Launched: each invoice's Fast Pay offer or live request, from the server.
+  const fastPay = useFastPayInvoices({ enabled: CAPITAL_LAUNCHED });
+  const offerById = new Map<string, Offer>(
+    [...(fastPay.data?.offers ?? []), ...(fastPay.data?.ineligible ?? [])].map((o) => [String(o.invoice_id), o]),
+  );
   const eligibleInvoices: any[] = capitalData?.invoices || [];
   const eligibleById = new Map(eligibleInvoices.map((e: any) => [String(e.id), e]));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -580,7 +592,7 @@ export default function Invoices() {
                   // Days relative to the due date, stated in words next to it:
                   // whole SA calendar days, the Debtors report's count.
                   const ageDays = dueDate ? daysBetween(String(dueDate), today) : 0;
-                  const open = invStatus !== "PAID" && invStatus !== "DRAFT" && !!dueDate;
+                  const open = invStatus !== "PAID" && invStatus !== "DRAFT" && invStatus !== "CANCELLED" && invStatus !== "CREDITED" && !!dueDate;
                   const agingLabel = !open
                     ? null
                     : ageDays > 0
@@ -620,7 +632,8 @@ export default function Invoices() {
                       </td>
                       <td className="m-status">
                         <span className="fin-inline-list" style={{ flexWrap: "nowrap" }}>
-                          <StatusChip status={invStatus} size="sm" />
+                          {/* Cancelled invoices are shown as "Void". */}
+                          <StatusChip status={invStatus} label={invStatus === "CANCELLED" ? "Void" : undefined} size="sm" />
                           {capitalEntry && tier && (
                             <StatusChip
                               tone={TIER_TONE[tier] ?? "neutral"}
@@ -631,12 +644,16 @@ export default function Invoices() {
                           )}
                         </span>
                       </td>
-                      <td className={`num m-amount${invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005 ? " fin-cell-2" : ""}`}>
+                      <td className={`num m-amount${(invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005) || (invStatus !== "CREDITED" && parseFloat(inv.credited_amount || "0") > 0.005) ? " fin-cell-2" : ""}`}>
                         {/* Lists show whole rands; cents stay on the invoice and in the title (R8). */}
                         <span title={formatCurrency(amount)}>{wholeRand(amount)}</span>
                         {/* Part-paid: what is still owed, under the invoice total. */}
                         {invStatus === "PARTIALLY_PAID" && invoiceBalance(inv) > 0.005 && (
                           <span className="fin-cell-sub" title={`${formatCurrency(invoiceBalance(inv))} due`}>{wholeRand(invoiceBalance(inv))} due</span>
+                        )}
+                        {/* Part-credited: what credit notes took off. */}
+                        {invStatus !== "PARTIALLY_PAID" && invStatus !== "CREDITED" && parseFloat(inv.credited_amount || "0") > 0.005 && (
+                          <span className="fin-cell-sub" title={`${formatCurrency(inv.credited_amount)} credited`}>{wholeRand(parseFloat(inv.credited_amount))} credited</span>
                         )}
                       </td>
                       <td className="actions" onClick={(e) => e.stopPropagation()}>
@@ -644,6 +661,18 @@ export default function Invoices() {
                           label={`Invoice ${invNumber}`}
                           items={[
                             { label: "Open invoice", onSelect: () => navigate(`/finance/invoices/${inv.id}`) },
+                            ...(inv.accounting_sync?.url
+                              ? [{
+                                  label: paymentsManaged && ["SENT", "VIEWED", "OVERDUE", "PARTIALLY_PAID"].includes(invStatus)
+                                    ? `Record payment in ${providerConfig(inv.accounting_sync.provider).short}`
+                                    : `Open in ${providerConfig(inv.accounting_sync.provider).short}`,
+                                  hint: paymentsManaged ? `Payments sync from ${providerConfig(inv.accounting_sync.provider).short} automatically.` : undefined,
+                                  onSelect: () => { window.open(inv.accounting_sync.url, "_blank", "noopener,noreferrer"); },
+                                }]
+                              : []),
+                            ...(invStatus === "DRAFT"
+                              ? [{ label: "Edit draft", onSelect: () => navigate(`/finance/invoices/${inv.id}/edit`) }]
+                              : []),
                             ...(invStatus === "DRAFT"
                               ? [{
                                   label: sendingId === inv.id ? "Sending…" : "Send to customer",
@@ -675,6 +704,7 @@ export default function Invoices() {
                             ...(ineligibleEntry
                               ? [{ label: "Not eligible for Fast Pay", hint: String(ineligibleEntry.reason ?? ""), onSelect: () => {}, disabled: true }]
                               : []),
+                            ...(CAPITAL_LAUNCHED ? fastPayMenu(offerById.get(String(inv.id)), navigate) : []),
                           ]}
                         />
                       </td>
@@ -715,4 +745,17 @@ export default function Invoices() {
       )}
     </div>
   );
+}
+
+/** Launched: the invoice row's Fast Pay menu item, from the server offer. */
+function fastPayMenu(offer: Offer | undefined, navigate: (to: string) => void) {
+  if (!offer) return [];
+  if (offer.advance) {
+    const advanceId = offer.advance.id;
+    return [{ label: `Fast Pay: ${offer.advance.status_label}`, onSelect: () => navigate(`/capital/advances/${advanceId}`) }];
+  }
+  if (offer.decision === "DECLINE" || !offer.eligible) {
+    return [{ label: "Not eligible for Fast Pay", hint: offer.reasons?.[0]?.text ?? offer.explanation, onSelect: () => {}, disabled: true }];
+  }
+  return [{ label: "Request Fast Pay", onSelect: () => navigate(`/capital?request=${offer.invoice_id}`) }];
 }

@@ -130,7 +130,7 @@ export function ContactsTab({ connection }: { connection: Connection }) {
             <Select value={kind} onValueChange={v => setKind(v as KindFilter)}>
               <SelectTrigger aria-label="Show customers, suppliers or both" style={{ minHeight: 36, height: 36, fontSize: 13 }} className="acct-select"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">Customers and suppliers</SelectItem>
+                <SelectItem value="ALL">All types</SelectItem>
                 <SelectItem value="CUSTOMER">Customers</SelectItem>
                 <SelectItem value="SUPPLIER">Suppliers</SelectItem>
               </SelectContent>

@@ -59,6 +59,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [optionalOpen, setOptionalOpen] = useState(false);
 
   const m = q.data;
 
@@ -179,6 +180,9 @@ export function MappingTab({ connection }: { connection: Connection }) {
   const cats = m.options.tracking_categories ?? [];
   const disabled = !canWrite || saving;
   const branchCat = cats.find(c => c.id === tracking.branch_category_id);
+  // Optional cards fold away unless something is set or has an error there.
+  const showOptional = optionalOpen || !!receipts || !!tracking.vehicle_category_id || !!tracking.branch_category_id
+    || Object.keys(errors).some(k => k === 'receipts_account' || k.startsWith('tracking.'));
 
   // The server's "missing" list says which empty rows block the sync; any
   // other empty row is optional. Both are labelled, so nothing is guesswork.
@@ -312,6 +316,8 @@ export function MappingTab({ connection }: { connection: Connection }) {
         </AcctCard>
       ))}
 
+      {showOptional ? (
+        <>
       <AcctCard
         title={<>Payments bank account<span className="acct-optional"> · optional</span></>}
         description={`Payments already recorded in TruckWys from the cut-over date are sent to this ${cfg.short} bank account when history is sent. Only needed if there are any.`}
@@ -370,6 +376,14 @@ export function MappingTab({ connection }: { connection: Connection }) {
           </>
         )}
       </AcctCard>
+        </>
+      ) : (
+        <AcctCard
+          title={<>Bank account and tracking<span className="acct-optional"> · optional</span></>}
+          description={`Where past payments go in ${cfg.short}, and vehicle or branch tags on each line. Most companies can skip these.`}
+          actions={<button type="button" className="tw-btn" onClick={() => setOptionalOpen(true)} aria-expanded={false}>Show</button>}
+        />
+      )}
 
       {canWrite && (
         // The same sticky save bar as Company details.

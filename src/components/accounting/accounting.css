@@ -774,3 +774,5 @@
 /* Nothing to save: an outlined, disabled button that still reads. */
 .acct-save-btn:disabled { opacity: 1 !important; background: transparent !important; color: var(--text-tertiary) !important; border: 1px solid var(--border-default) !important; }
 .acct-map-row.is-disabled-row .acct-select { border-style: dashed; }
+.acct-diff-word { height: 20px; line-height: 20px; vertical-align: top; }
+@media (max-width: 640px) { .acct-card-actions > .tw-btn--ghost { flex: 0 0 auto !important; padding-left: 0; } }

@@ -709,7 +709,7 @@
 @media (max-width: 640px) { .acct-use-btn { height: 36px; } .acct-jumpbtn { height: 36px; } }
 .acct-diff-word { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--status-warning-text); white-space: nowrap; }
 .acct-diff-word::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--status-warning-dot); }
-.acct-table--recon td:last-child { text-align: center; }
+.acct-table--recon tr > td:nth-child(5):last-child { text-align: center; }
 .acct-table--recon td:first-child { overflow-wrap: anywhere; }
 /* Org picker: a radio that can't be picked is a faint empty ring in both themes. */
 .acct-org.is-disabled .acct-radio { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-default); background: transparent; opacity: 0.6; }
@@ -721,11 +721,7 @@
 .acct-step-num.is-plain { border-color: transparent; background: var(--status-neutral-bg); color: var(--text-secondary); }
 /* Integrations page on phones: every card puts its status under the name, like the accounting cards. */
 .tw-int-head__chip { flex: none; display: inline-flex; }
-@media (max-width: 480px) {
-  .tw-int-head { flex-wrap: wrap; row-gap: 4px !important; }
-  .tw-int-head > div:nth-child(2) { flex: 1 1 0 !important; min-width: 0; }
-  .tw-int-head__chip { flex-basis: 100%; padding-left: 60px; }
-}
+
 .fl-notice.acct-sync-notice { background: color-mix(in srgb, var(--status-warning) 7%, var(--bg-surface)); border-color: color-mix(in srgb, var(--status-warning) 45%, transparent); }
 
 /* Round 2 */
@@ -760,10 +756,7 @@
 .acct-card__chip:empty { display: none; }
 .tw-int-head { align-items: flex-start !important; }
 .tw-int-head__chip { padding-top: 2px; }
-@media (max-width: 480px) {
-  .acct-card__chip { padding-top: 0; margin-top: 4px; }
-  .tw-int-head__chip { padding-top: 0; margin-top: 4px; }
-}
+
 /* Org picker: initials tile, a visible selected outline, a disabled radio you can still see. */
 .acct-org-initials { background: var(--bg-deep); color: var(--text-secondary); font: 600 15px/20px var(--font-sans); }
 .acct-org.is-selected { box-shadow: inset 0 0 0 1px var(--border-strong) !important; }
@@ -776,3 +769,40 @@
 .acct-map-row.is-disabled-row .acct-select { border-style: dashed; }
 .acct-diff-word { height: 20px; line-height: 20px; vertical-align: top; }
 @media (max-width: 640px) { .acct-card-actions > .tw-btn--ghost { flex: 0 0 auto !important; padding-left: 0; } }
+
+/* Round 3: the section tabs are the dashboard's underline tabs (as on Finance). */
+.acct-tabs { display: block; margin: 0 0 20px; }
+.acct-utabs.section-header__tabs { margin-top: 0; gap: 24px; }
+.acct-utab { display: inline-flex; align-items: center; gap: 6px; }
+.acct-utabs .section-header__tab[data-locked] { color: var(--text-tertiary); cursor: not-allowed; }
+.acct-utabs .section-header__tab[data-locked]:hover { color: var(--text-tertiary); }
+.acct-utabs .acct-tab-num { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; box-sizing: border-box; background: var(--status-neutral-bg); color: var(--text-primary); font: 500 12px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .acct-tabs { display: none; } }
+
+/* Round 3 fixes */
+/* Integration cards: the status pill stays top-right beside the name at every width. */
+@media (max-width: 480px) {
+  .acct-card__top { grid-template-columns: 48px minmax(0, 1fr) auto !important; }
+  .acct-card__chip { grid-column: 3 !important; grid-row: 1 !important; justify-self: end !important; }
+}
+/* Mapping: the suggestion text, then its button on its own line. */
+.acct-hint--stack { display: block !important; }
+.acct-hint--stack > span { display: block !important; }
+.acct-hint--stack > .acct-use-btn { display: inline-flex; margin: 8px 0 0 !important; }
+.acct-jumpbtn { border-color: var(--border-default) !important; }
+/* Org picker: selection is a tint (no box against the rounded card edge). */
+.acct-org.is-selected { box-shadow: none !important; background: color-mix(in srgb, var(--text-primary) 6%, var(--bg-surface)) !important; }
+.acct-org.is-selected .acct-org-initials { background: var(--bg-surface); color: var(--text-primary); }
+.acct-org-initials { font-size: 12px !important; letter-spacing: 0.02em; }
+.acct-org.is-disabled .acct-row__title { color: var(--text-secondary); }
+/* Reauth: waiting steps keep readable text; only their markers dim. */
+.acct-check li.is-blocked:not(:first-child) .acct-check__title { color: var(--text-secondary) !important; }
+.acct-check li.is-blocked:not(:first-child) .acct-check__desc { color: var(--text-tertiary) !important; }
+/* Buttons inside card rows match the card-header buttons. */
+.acct-row__actions .tw-btn, .acct-hint .tw-btn { height: var(--control-h, 36px); min-height: var(--control-h, 36px); }
+/* Contacts toolbar in a narrow card: search on its own line, then the two filters. */
+@container (max-width: 700px) {
+  .acct-contact-toolbar .acct-contact-search { flex: 1 1 100% !important; }
+  .acct-contact-filter { flex: 1 1 0 !important; }
+}
+.acct-progress__bar { height: 6px; }

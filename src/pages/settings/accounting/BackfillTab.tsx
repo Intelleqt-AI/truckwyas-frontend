@@ -69,8 +69,8 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
     prevState.current = b?.state;
   }, [b, qc, cfg.short]);
 
-  if (q.isLoading) return <AcctCard title="Cut-over date"><LoadingBlock label="Loading cut-over" /></AcctCard>;
-  if (q.isError || !b) return <AcctCard title="Cut-over date"><ErrorBlock message={apiMessage(q.error, "Couldn't load the cut-over status.")} onRetry={() => q.refetch()} /></AcctCard>;
+  if (q.isLoading) return <AcctCard title="Start date"><LoadingBlock label="Loading start date" /></AcctCard>;
+  if (q.isError || !b) return <AcctCard title="Start date"><ErrorBlock message={apiMessage(q.error, "Couldn't load the start date.")} onRetry={() => q.refetch()} /></AcctCard>;
 
   const r = connection.readiness;
   const running = b.state === 'RUNNING';
@@ -83,7 +83,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
   if (connection.status !== 'ACTIVE') reasons.push(`Reconnect ${cfg.short} first`);
   if (!r.mapping_complete) reasons.push('Map every account and VAT code first');
   if (r.contacts_to_confirm > 0 || (p?.contacts_unconfirmed ?? 0) > 0) reasons.push(`Confirm the ${plural(Math.max(r.contacts_to_confirm, p?.contacts_unconfirmed ?? 0), 'contact')} matched on name only`);
-  if (!date) reasons.push('Choose a cut-over date');
+  if (!date) reasons.push('Choose a start date');
   const canStart = reasons.length === 0 && !locked && !starting;
 
   const start = async () => {
@@ -124,7 +124,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
 
   const cutoverCard = (
       <AcctCard
-        title="Cut-over date"
+        title="Start date"
         description={`TruckWys sends everything dated from here on to ${cfg.short}. Earlier documents are assumed to be in your books already.`}
       >
         <div className="acct-cutover">
@@ -135,7 +135,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
               </>
             ) : (
               <>
-                <label htmlFor="acct-cutover" className="acct-sr">Cut-over date</label>
+                <label htmlFor="acct-cutover" className="acct-sr">Start date</label>
                 <DatePicker id="acct-cutover" value={date} onChange={setDate} />
               </>
             )}

@@ -35,7 +35,7 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         {(sync.status === 'ERROR' || sync.status === 'DEAD' || sync.status === 'BLOCKED') && (
           <div className="fin-dl__row">
             <dt>Latest change</dt>
-            <dd>{sync.status === 'BLOCKED' ? 'Waiting on you' : sync.status === 'DEAD' ? 'Not sent' : 'Waiting to send'}</dd>
+            <dd>{sync.status === 'BLOCKED' ? 'Waiting on you' : 'Not sent yet'}</dd>
           </div>
         )}
         <div className="fin-dl__row">
@@ -62,7 +62,7 @@ export function PaymentsManagedNote({ providerName, recordUrl }: { providerName:
     <div className="acct-managed">
       {recordUrl && (
         <a href={recordUrl} target="_blank" rel="noopener noreferrer" className="tw-btn acct-record-btn">
-          Record in {providerName}
+          Record payment in {providerName}
           <ExternalLink size={14} aria-hidden="true" />
         </a>
       )}
@@ -96,7 +96,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
  */
 export function PaymentSourceBadge({ source, managed = false }: { source?: string | null; managed?: boolean }) {
   const manual = !source || source === 'MANUAL';
-  if (managed) return <span className="acct-source-note"> · {manual ? 'Recorded in TruckWys' : `From ${source === 'BANK' ? 'bank feed' : providerConfig(source).short}`}</span>;
+  if (managed) return <span className="acct-source-note"> · {manual ? 'From TruckWys' : `From ${source === 'BANK' ? 'bank feed' : providerConfig(source).short}`}</span>;
   if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;
   return <span className="acct-source-badge">{label}</span>;

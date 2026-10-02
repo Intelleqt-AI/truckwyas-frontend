@@ -19,7 +19,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
       look: connection.status === 'ACTIVE' ? 'done' : 'bad',
       title: connection.status === 'ACTIVE' ? `Connect ${cfg.short}` : `Reconnect ${cfg.short}`,
       desc: connection.status !== 'ACTIVE'
-        ? (canWrite ? `Use Reconnect ${cfg.short} above to sign in again.` : 'Only a company admin can reconnect.')
+        ? (canWrite ? 'Your sign-in expired. Reconnect above.' : 'Your sign-in expired. Only a company admin can reconnect.')
         : `Connected${connection.connected_by ? ` by ${connection.connected_by}` : ''}${connection.connected_at ? ` on ${formatDate(connection.connected_at)}` : ''}. Books in ${connection.base_currency || 'ZAR'}.`,
     },
     {
@@ -47,9 +47,9 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
     {
       key: 'cutover',
       look: backfillLook,
-      title: 'Choose a cut-over date',
+      title: 'Choose a start date',
       desc: r.backfill_state === 'DONE'
-        ? `Documents from ${connection.cutover_date ?? 'the cut-over date'} onwards are in ${cfg.short}.`
+        ? `Documents from ${connection.cutover_date ?? 'the start date'} onwards are in ${cfg.short}.`
         : r.backfill_state === 'RUNNING'
           ? `Sending documents to ${cfg.short} now.`
           : r.backfill_state === 'FAILED'
@@ -85,7 +85,7 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
 
   return (
     <>
-    <AcctCard title={reauth ? `Reconnect ${cfg.short} to carry on` : r.sync_enabled ? `${cfg.short} is set up` : `Finish setting up ${cfg.short}`} description={subtitle} flush>
+    <AcctCard title={r.sync_enabled ? `${cfg.short} is set up` : `Finish setting up ${cfg.short}`} description={subtitle} flush>
       <ol className="acct-check acct-check--steps">
         {items.map((it, i) => {
           const auto = it.key === 'live';
@@ -96,14 +96,12 @@ export function SetupChecklist({ connection, onOpen }: { connection: Connection;
               <div style={{ minWidth: 0 }}>
                 <div className="acct-check__title"><span className="acct-sr">Step {i + 1}: </span>{it.title}</div>
                 <div className="acct-check__desc">{it.desc}</div>
-                {auto && it.look !== 'done' && !blocked && <div className="acct-step-inline">Automatic</div>}
               </div>
               {it.tab && it.action && !(blocked && it.look !== 'done') ? (
                 <button type="button" className={`tw-btn${it.key === nextKey ? ' tw-btn--primary' : ''}`} onClick={() => onOpen(it.tab!)}>
                   {it.action}
                 </button>
-              ) : auto && it.look !== 'done' && !blocked ? <span className="acct-step-auto">Automatic</span>
-                : <span />}
+              ) : <span />}
             </li>
           );
         })}

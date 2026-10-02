@@ -234,8 +234,8 @@ export function MappingTab({ connection }: { connection: Connection }) {
         actionsBelow
         actions={(canWrite && pendingSuggestions.length > 0) || canWrite ? <>
           {canWrite && pendingSuggestions.length > 0 && (
-            <button type="button" className="tw-btn tw-btn--primary" onClick={applyAllSuggestions} title="Fills in the fields; nothing is saved until you press Save mapping">
-              {`Apply ${pendingSuggestions.length === 1 ? 'suggestion' : `${pendingSuggestions.length} suggestions`}`}
+            <button type="button" className="tw-btn" onClick={applyAllSuggestions} title="Fills in the fields; nothing is saved until you press Save mapping">
+              {`Use ${pendingSuggestions.length === 1 ? 'suggestion' : `${pendingSuggestions.length} suggestions`}`}
             </button>
           )}
           <button type="button" className="tw-btn tw-btn--ghost" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
@@ -320,7 +320,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
         <>
       <AcctCard
         title={<>Payments bank account<span className="acct-optional"> · optional</span></>}
-        description={`Payments already recorded in TruckWys from the cut-over date are sent to this ${cfg.short} bank account when history is sent. Only needed if there are any.`}
+        description={`Payments already recorded in TruckWys from the start date are sent to this ${cfg.short} bank account when history is sent. Only needed if there are any.`}
         flush
       >
         <div className="acct-map-row">
@@ -379,8 +379,8 @@ export function MappingTab({ connection }: { connection: Connection }) {
         </>
       ) : (
         <AcctCard
-          title={<>Bank account and tracking<span className="acct-optional"> · optional</span></>}
-          description={`Where past payments go in ${cfg.short}, and vehicle or branch tags on each line. Most companies can skip these.`}
+          title="Bank account and tracking"
+          description={`Optional. Where past payments go in ${cfg.short}, and vehicle or branch tags on each line.`}
           actions={<button type="button" className="tw-btn" onClick={() => setOptionalOpen(true)} aria-expanded={false}>Show</button>}
         />
       )}

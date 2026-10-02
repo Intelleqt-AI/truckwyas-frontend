@@ -415,7 +415,7 @@ export const paymentsManagedRecordUrl = (e: unknown): string | null =>
 export function callbackMessage(result: string | null, reason: string | null, providerName: string): { tone: 'success' | 'warning' | 'danger'; title: string; body: string } | null {
   if (!result) return null;
   if (result === 'connected') {
-    return { tone: 'success', title: `${providerName} is connected`, body: 'Next, map your accounts and VAT, confirm your contacts and choose a cut-over date.' };
+    return { tone: 'success', title: `${providerName} is connected`, body: 'Next, map your accounts and VAT, confirm your contacts and choose a start date.' };
   }
   if (result === 'choose_org') {
     return { tone: 'warning', title: `Choose your ${providerName} organisation`, body: `Your ${providerName} login has more than one organisation. Pick the one that holds this company's books.` };

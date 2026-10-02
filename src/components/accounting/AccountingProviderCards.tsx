@@ -125,7 +125,7 @@ function ProviderCard({ info, live, canWrite, disabledTitle, busy, onConnect, hi
       ? `Signed in to ${cfg.short}; no organisation chosen yet.`
       : `Linked to ${mine.tenant_name || `your ${cfg.short} organisation`}`;
     const steps = mine.status === 'ACTIVE' && !mine.readiness.sync_enabled
-      ? [!mine.readiness.mapping_complete && 'mapping', mine.readiness.contacts_to_confirm > 0 && 'contacts', mine.readiness.backfill_state !== 'DONE' && 'cut-over date'].filter((x): x is string => !!x) : [];
+      ? [!mine.readiness.mapping_complete && 'mapping', mine.readiness.contacts_to_confirm > 0 && 'contacts', mine.readiness.backfill_state !== 'DONE' && 'start date'].filter((x): x is string => !!x) : [];
     const left = steps.length;
     if (left > 0) desc = <>{mine.tenant_name || `${cfg.short} organisation`}<span className="acct-card__note">Still to do: {steps.join(', ')}</span></>;
     if (mine.status === 'NEEDS_REAUTH') note = <span className="acct-card__note acct-card__note--danger">{mine.status_reason || `Your ${cfg.short} sign-in has expired.`} Nothing is sent until an admin reconnects.</span>;

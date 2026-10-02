@@ -4,7 +4,7 @@ export const ACCOUNTING_TABS: { id: AccountingTab; label: string }[] = [
   { id: 'setup', label: 'Setup' },
   { id: 'mapping', label: 'Mapping' },
   { id: 'contacts', label: 'Contacts' },
-  { id: 'cutover', label: 'Cut-over' },
+  { id: 'cutover', label: 'Start date' },
   { id: 'sync', label: 'Sync' },
   { id: 'reconciliation', label: 'Reconciliation' },
 ];

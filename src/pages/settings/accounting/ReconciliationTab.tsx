@@ -95,7 +95,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
                 const bad = differences.filter(d => d.scope === sc.scope).length;
                 return (
                   <div key={sc.scope}>
-                    <span>{sc.scope === 'MONTH' ? 'Months of VAT' : sc.title} checked</span>
+                    <span>{sc.scope === 'MONTH' ? 'VAT months' : sc.title}</span>
                     <strong>{(n ?? 0).toLocaleString('en-ZA')}</strong>
                     {differences.length > 0 && <em className={`acct-tile-status${bad ? ' is-bad' : ''}`}>{bad ? `${bad} differ` : 'All match'}</em>}
                   </div>
@@ -112,7 +112,7 @@ export function ReconciliationTab({ connection }: { connection: Connection }) {
         const rows = differences.filter(d => d.scope === scope);
                 if (!rows.length) return null;
         void i;
-        const hasLinks = rows.some(d => !!d.provider_url);
+        const hasLinks = true; // same columns in every table, so figures line up card to card
         return (
           <AcctCard key={scope} id={`acct-recon-${scope.toLowerCase()}`} title={<>{title}<span className="acct-optional"> · {plural(rows.length, 'difference')}</span></>} flush>
             <div className="acct-table-wrap acct-only-wide" role="region" aria-label={`${title} differences`} tabIndex={0}>

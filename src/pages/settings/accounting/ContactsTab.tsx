@@ -103,7 +103,7 @@ export function ContactsTab({ connection }: { connection: Connection }) {
       <AcctCard
         title="Match contacts"
         description={<span className="acct-desc-measure" style={{ display: 'block' }}>
-          {toDo > 0 ? <><strong className="acct-strong">{plural(toDo, 'contact')} need{toDo === 1 ? 's' : ''} you.</strong>{' '}</> : total > 0 ? <><strong className="acct-strong">Every contact is sorted.</strong>{' '}</> : null}
+          {toDo > 0 ? <><strong className="acct-strong">{plural(toDo, 'contact')} need{toDo === 1 ? 's' : ''} a decision.</strong>{' '}</> : total > 0 ? <><strong className="acct-strong">Every contact is sorted.</strong>{' '}</> : null}
           We match on VAT number, registration number or email. Name-only matches need your confirmation.
         </span>}
         actions={<>
@@ -202,7 +202,7 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
   } else if (row.status === 'SKIPPED') {
     match = <div className="acct-row__sub">Not synced. Their documents stay in TruckWys only and show as sync errors.</div>;
   } else {
-    match = <div className="acct-row__sub">Pick a {providerName} contact, or we'll create one in {providerName} when the first document is sent.</div>;
+    match = <div className="acct-row__sub">Pick a {providerName} contact, or we'll create one on first send.</div>;
   }
 
   const menu: RowActionItem[] = [];

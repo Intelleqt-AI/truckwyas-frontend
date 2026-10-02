@@ -217,10 +217,10 @@ function ContactRow({ row, providerName, canWrite, busy, onConfirm, onPick }: {
       );
       menu.push({ label: 'Pick another', onSelect: onPick });
     } else if (row.status === 'UNMATCHED') {
-      primary = <>
+      primary = <span className="acct-row__btns">
         <button type="button" className="tw-btn tw-btn--sm" disabled={busy} onClick={onPick}>Pick a contact</button>
-        <button type="button" className="tw-btn tw-btn--sm tw-btn--ghost" disabled={busy} onClick={() => onConfirm({ action: 'create' }, `${row.local_name} will be created in ${providerName}`)}>Create new</button>
-      </>;
+        <button type="button" className="tw-btn tw-btn--sm" disabled={busy} onClick={() => onConfirm({ action: 'create' }, `${row.local_name} will be created in ${providerName}`)}>Create new</button>
+      </span>;
     } else {
       menu.push({ label: row.status === 'MATCHED' ? 'Change contact' : 'Pick a contact', onSelect: onPick });
     }

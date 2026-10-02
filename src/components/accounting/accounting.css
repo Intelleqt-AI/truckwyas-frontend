@@ -922,3 +922,20 @@
 .acct-org.is-disabled .acct-radio { visibility: hidden; }
 .acct-org.is-selected { box-shadow: inset 2px 0 0 var(--text-primary) !important; }
 @media (max-width: 640px) { .acct-formfoot__link { min-height: 44px; } }
+
+/* Post-F3 regressions */
+.acct-tiles span .acct-dot { display: inline-block !important; width: 8px; height: 8px; margin: 0 6px 1px 0; vertical-align: middle; }
+@media (min-width: 721px) {
+  .acct-row--contact { grid-template-columns: minmax(0, 200px) minmax(0, 1fr) 240px !important; }
+  .acct-row--contact .acct-row__actions { align-self: start !important; }
+}
+.acct-row__btns { display: inline-flex; gap: 8px; }
+@media (max-width: 720px) { .acct-row--contact .acct-row__btns { grid-column: 1 / -1; grid-row: 3; justify-self: start; } }
+.acct-diff-word, .acct-table .acct-diff--text { font-weight: 400 !important; }
+/* Org picker: tint for the chosen row (no bar); unavailable row keeps a readable name and a faint radio. */
+.acct-org.is-selected { box-shadow: none !important; background: color-mix(in srgb, var(--text-primary) 5%, var(--bg-surface)) !important; }
+.acct-org.is-disabled .acct-row__title { opacity: 1; color: var(--text-primary); }
+.acct-org.is-disabled .acct-row__sub { color: var(--text-tertiary); }
+.acct-org.is-disabled .acct-radio { visibility: visible; opacity: 0.5; }
+/* Save with nothing to save reads as disabled. */
+.acct-save-btn:disabled { color: var(--text-disabled, var(--text-tertiary)) !important; border-color: var(--border-subtle) !important; opacity: 0.7 !important; cursor: not-allowed; }

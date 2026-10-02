@@ -5,7 +5,7 @@ import { providerBlockers, type ConnectionStatus, type DocumentSyncStatus, type 
 export function connectionChip(status: ConnectionStatus, readiness?: Readiness | null, counts?: SyncCounts | null, providerShort?: string): { tone: StatusTone; label: string } {
   if (status === 'ACTIVE' && readiness && !readiness.sync_enabled) {
     const ownStepsDone = readiness.mapping_complete && readiness.contacts_to_confirm === 0 && readiness.backfill_state === 'DONE';
-    if (ownStepsDone && providerBlockers(readiness).length) return { tone: 'warning', label: providerShort ? `Change in ${providerShort}` : 'Setting to change' };
+    if (ownStepsDone && providerBlockers(readiness).length) return { tone: 'warning', label: providerShort ? `Action in ${providerShort}` : 'Setting to change' };
     return readiness.backfill_state === 'RUNNING' ? { tone: 'info', label: 'Sending history' } : { tone: 'warning', label: 'Setup needed' };
   }
   const failing = (counts?.errors ?? 0) + (counts?.dead ?? 0);

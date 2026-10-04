@@ -1125,6 +1125,34 @@ export default function QuoteBuilder() {
   // digits and gets rejected outright ("no more than 12 digits in total").
   // 6dp (~11cm precision) is far more than a freight quote needs.
   const round6 = (n?: number) => (n == null ? n : Math.round(n * 1e6) / 1e6);
+  // The route response kept on the quote for ML training, without the map
+  // paths: every alternative's full point list made a long trip's snapshot
+  // ~870 KB, over the backend's 200 KB cap (the save failed). The priced
+  // route's path is saved on its own as route_geometry; distances, times,
+  // tolls, traffic and terrain all stay. Traffic sections go only if a
+  // snapshot would still be near the cap.
+  const SNAPSHOT_SOFT_MAX = 180_000;
+  type Json = Record<string, unknown>;
+  const compactRouteResponse = (data: RouteData | null) => {
+    if (!data) return data;
+    const strip = (rt: unknown, dropSections: boolean): unknown => {
+      if (!rt || typeof rt !== "object") return rt;
+      const { geometry, sections, ...rest } = rt as Json;
+      return {
+        ...rest,
+        ...(Array.isArray(geometry) ? { geometry_points: geometry.length } : {}),
+        ...(dropSections ? (Array.isArray(sections) ? { sections_count: sections.length } : {}) : { sections }),
+      };
+    };
+    const build = (dropSections: boolean) => {
+      const out = strip(data, dropSections) as Json;
+      const routes = (data as unknown as Json).routes;
+      if (Array.isArray(routes)) out.routes = routes.map((rt) => strip(rt, dropSections));
+      return out;
+    };
+    const full = build(false);
+    return JSON.stringify(full).length > SNAPSHOT_SOFT_MAX ? build(true) : full;
+  };
   // Same class of bug as the coordinates above, different field: base_rate,
   // fuel_surcharge, toll_charges, driver_allowance, additional_charges and
   // total_amount are all DecimalField(max_digits=10, decimal_places=2) —
@@ -1164,7 +1192,7 @@ export default function QuoteBuilder() {
     // Only for a route calculated for these inputs — never the stub an edited
     // quote starts with, which would overwrite the saved snapshot.
     ...(routeIsCurrent ? { route_snapshot: {
-      request: lastRouteRequestRef.current, response: routeData, selected_route_index: selectedRouteIndex,
+      request: lastRouteRequestRef.current, response: compactRouteResponse(routeData), selected_route_index: selectedRouteIndex,
       fuel_price_per_litre_used: fuelPricePerL, fuel_type_used: fuelType,
       // "market_check": applied from the market price check ("ai_market" is
       // still read back from quotes saved before the rename).

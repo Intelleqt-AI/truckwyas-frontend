@@ -9,9 +9,10 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Package, Plus } from 'lucide-react';
 import SectionHeader, { type SectionTab } from '@/components/layout/SectionHeader';
-import { useQuery } from '@tanstack/react-query';
-import { postData } from '@/lib/Api';
-import { fetchAllPages } from '@/components/insights/findings';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { fetchData, postData } from '@/lib/Api';
+import { TablePager } from '@/components/ui/TablePager';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
 import { formatCurrency, formatDate, formatMoneyWhole } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
@@ -22,6 +23,7 @@ import { rowLink } from '@/lib/rowLink';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { SkeletonRows, TilesSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { staleWork, staleLabel, staleAction } from './bookings-stale';
+import { priceInclVat } from "@/lib/vat";
 
 interface Load {
   id: number;
@@ -30,6 +32,7 @@ interface Load {
   delivery_location: string;
   status: string;
   total_amount: string;
+  customer_price?: { total_incl_vat?: string | null } | null;
   driver_name?: string;
   vehicle_info?: string;
   pickup_date?: string;
@@ -89,17 +92,34 @@ const shortStale = (since: string, days: string) => {
 // In transit, not straight to Delivered).
 const staleStep = (l: Load) => (l.status === 'LOADING' ? 'Mark it in transit or cancel it' : staleAction(l));
 
-// Newest first: delivered date, else due date, else pickup.
-const whenOf = (l: Load) => Date.parse(l.actual_delivered_at || l.delivery_date || l.pickup_date || l.created_at || '') || 0;
-
 // Cities read as a route; the full addresses stay in the tooltip.
 const placeOf = (loc?: string, city?: string) => String(loc || '').split(',')[0].trim() || (city || '').trim() || '—';
 const routeText = (l: Load) => `${placeOf(l.pickup_location, l.pickup_city)} → ${placeOf(l.delivery_location, l.delivery_city)}`;
 
 type BookingTab = 'quotes' | 'orders' | 'history';
 
-const ACTIVE_STATUSES = ['PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'];
-const HISTORY_STATUSES = ['DELIVERED', 'INVOICED', 'CANCELLED'];
+const PAGE_SIZE = 20;
+
+/** The tab's tiles, as the API sends them (core.services.load_list). */
+interface OrdersSummary {
+  open_count: number; need_vehicle: number; need_vehicle_overdue: number; moving_no_vehicle: number;
+  in_transit: number; in_transit_overdue: number; left_open: number; open_total_incl_vat: number; any_loads: boolean;
+}
+interface HistorySummary {
+  history_count: number; delivered_not_invoiced: number; invoiced: number; invoiced_total_incl_vat: number;
+  completed: number; completed_total_incl_vat: number; any_loads: boolean;
+}
+interface LoadsPage<S> { count: number; results: Load[]; summary?: S }
+
+// One page of a tab, server-side: the tab's statuses, the status chip, the
+// search (customer, load, route, driver, truck) and the page go to the API;
+// History comes newest first (delivered date, else due date, else pickup).
+const loadsPage = <S,>(tab: 'orders' | 'history', status: string, q: string, page: number): Promise<LoadsPage<S>> => {
+  const params = new URLSearchParams({ tab, page: String(page), page_size: String(PAGE_SIZE) });
+  if (status !== 'All') params.set('status', status);
+  if (q) params.set('q', q);
+  return fetchData(`api/v1/loads/?${params}`);
+};
 
 /** Shared sub-navigation for every Bookings list view. */
 export const BOOKINGS_TABS: SectionTab[] = [
@@ -121,30 +141,15 @@ const TAB_DESCRIPTIONS: Record<BookingTab, string> = {
 };
 
 export default function LoadsList() {
-  const loadsQuery = useQuery({
-    queryKey: ["loads-list"],
-    // Every page (the endpoint returns 20 at a time), so the tiles and the
-    // History list count every load, not the latest 20.
-    queryFn: () => fetchAllPages<Load>('api/v1/loads/').then(r => r.rows),
-    // Give the backend enough time to wake from a cold start (Render free tier ~20-30s).
-    // Retry up to 4 times with increasing delays: 3s, 6s, 9s, 12s.
-    retry: (failureCount, error: any) => {
-      if (error?.status === 401 || error?.status === 403) return false;
-      return failureCount < 4;
-    },
-    retryDelay: (attempt) => Math.min(3000 * (attempt + 1), 12000),
-  });
-  const { data, isFetching, refetch } = loadsQuery;
-  // Failed (or failing and retrying) with nothing to show: say so straight away.
-  const failed = loadFailed(loadsQuery);
-  const loading = loadsQuery.isLoading && !failed;
-  const loads: Load[] = data ?? [];
-  const error = failed ? 'Failed to load bookings' : null;
   const [convertingIds, setConvertingIds] = useState<Set<number>>(new Set());
   const [orderFilter, setOrderFilter] = useState('All');
   const [historyFilter, setHistoryFilter] = useState('All');
   const [historySearch, setHistorySearch] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [historyPage, setHistoryPage] = useState(1);
+  const orderQ = useDebouncedValue(orderSearch.trim());
+  const historyQ = useDebouncedValue(historySearch.trim());
   // Owned here (not inside QuotesList) so the search box + Board/List toggle
   // can render inline with the Quotes/Orders/History tabs.
   const [quoteSearch, setQuoteSearch] = useState('');
@@ -157,6 +162,41 @@ export default function LoadsList() {
   const activeTab: BookingTab = (['quotes', 'orders', 'history'] as BookingTab[]).includes(urlSegment as BookingTab)
     ? (urlSegment as BookingTab)
     : 'orders';
+
+  // Give the backend enough time to wake from a cold start (Render free tier ~20-30s).
+  // Retry up to 4 times with increasing delays: 3s, 6s, 9s, 12s.
+  const retry = (failureCount: number, error: any) => {
+    if (error?.status === 401 || error?.status === 403) return false;
+    return failureCount < 4;
+  };
+  const retryDelay = (attempt: number) => Math.min(3000 * (attempt + 1), 12000);
+  // 'loads-list' first, so every place that refreshes the old list refreshes these.
+  const ordersQuery = useQuery({
+    queryKey: ['loads-list', 'orders', orderFilter, orderQ, ordersPage],
+    queryFn: () => loadsPage<OrdersSummary>('orders', orderFilter, orderQ, ordersPage),
+    enabled: activeTab === 'orders',
+    placeholderData: keepPreviousData,
+    retry, retryDelay,
+  });
+  const historyQuery = useQuery({
+    queryKey: ['loads-list', 'history', historyFilter, historyQ, historyPage],
+    queryFn: () => loadsPage<HistorySummary>('history', historyFilter, historyQ, historyPage),
+    enabled: activeTab === 'history',
+    placeholderData: keepPreviousData,
+    retry, retryDelay,
+  });
+  const loadsQuery = activeTab === 'history' ? historyQuery : ordersQuery;
+  const { isFetching, refetch } = loadsQuery;
+  // Failed (or failing and retrying) with nothing to show: say so straight away.
+  const failed = activeTab !== 'quotes' && loadFailed(loadsQuery);
+  const loading = loadsQuery.isLoading && !failed;
+  const error = failed ? 'Failed to load bookings' : null;
+  const orders = ordersQuery.data;
+  const history = historyQuery.data;
+  const os = orders?.summary;
+  const hs = history?.summary;
+  const searching = (typed: string, settled: string, q: { isFetching: boolean; isPlaceholderData: boolean }) =>
+    typed.trim() !== settled || (q.isFetching && q.isPlaceholderData);
 
   const handleConvertToInvoice = async (load: Load, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -185,25 +225,8 @@ export default function LoadsList() {
 
   useAutoRefresh(refetch);
 
-  const activeLoads = loads.filter(l => ACTIVE_STATUSES.includes(l.status));
-  const historyLoads = loads.filter(l => HISTORY_STATUSES.includes(l.status)).sort((a, b) => whenOf(b) - whenOf(a) || b.id - a.id);
-
-  const matchesText = (l: Load, q: string) => {
-    if (!q) return true;
-    const t = q.toLowerCase();
-    return [l.customer_name, l.load_number, l.pickup_location, l.delivery_location, l.pickup_city, l.delivery_city, l.driver_name, l.vehicle_info]
-      .some(v => (v || '').toLowerCase().includes(t));
-  };
-  const filteredOrders = activeLoads.filter(l => (orderFilter === 'All' || l.status === orderFilter) && matchesText(l, orderSearch));
-  const filteredHistory = historyLoads.filter(l => {
-    const matchStatus = historyFilter === 'All' || l.status === historyFilter;
-    const matchSearch = !historySearch || 
-      (l.customer_name || '').toLowerCase().includes(historySearch.toLowerCase()) ||
-      (l.load_number || '').toLowerCase().includes(historySearch.toLowerCase()) ||
-      (l.pickup_location || '').toLowerCase().includes(historySearch.toLowerCase()) ||
-      (l.delivery_location || '').toLowerCase().includes(historySearch.toLowerCase());
-    return matchStatus && matchSearch;
-  });
+  const filteredOrders = orders?.results ?? [];
+  const filteredHistory = history?.results ?? [];
 
   const renderTable = (data: Load[], showInvoiceAction: boolean, emptyText: string) => loading ? (
     // Loading: the real table head with placeholder rows at the final row
@@ -288,9 +311,9 @@ export default function LoadsList() {
                 <StatusChip status={load.status} size="sm" />
                 {staleFlag('status')}
               </td>
-              <td className="is-money" title={formatCurrency(parseFloat(load.total_amount || '0'))}>
+              <td className="is-money" title={`${formatCurrency(priceInclVat(load))} incl. VAT`}>
                 {/* Lists show whole rands at every width; cents stay on the invoice (R7). */}
-                {formatMoneyWhole(parseFloat(load.total_amount || '0'))}
+                {formatMoneyWhole(priceInclVat(load))}
               </td>
               {showInvoiceAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
                 {/* One quiet row menu (R4): no column of blue "Create invoice" links. */}
@@ -315,7 +338,7 @@ export default function LoadsList() {
         </tbody>
       </table>
       {data.length === 0 && (
-        loads.length === 0 ? (
+        !anyLoads ? (
           <div className="bk-empty">
             <div className="bk-empty__icon"><Package size={32} aria-hidden="true" /></div>
             <h2 className="bk-empty__title">No loads yet</h2>
@@ -353,11 +376,10 @@ export default function LoadsList() {
   );
   const wholeRand = (n: number) => formatMoneyWhole(n);
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-  const needVehicle = activeLoads.filter(l => hasNoVehicle(l) && !ON_THE_MOVE.includes(l.status));
-  const needVehicleStale = needVehicle.filter(l => staleWork(l)?.overdue).length;
-  const movingNoVehicle = activeLoads.filter(l => hasNoVehicle(l) && ON_THE_MOVE.includes(l.status)).length;
-  const deliveredNotInvoiced = historyLoads.filter(l => l.status === 'DELIVERED').length;
-  const completedLoads = historyLoads.filter(l => l.status !== 'CANCELLED');
+  const openCount = os?.open_count ?? 0;
+  // Any load at all, in either tab: "No loads yet" only for a new company.
+  const anyLoads = (activeTab === 'history' ? hs?.any_loads : os?.any_loads) ?? true;
+  const historyCount = hs?.history_count ?? 0;
 
   // Body below the shared header. Loading and error states render here so
   // the title and sub-navigation stay put while data arrives.
@@ -404,29 +426,29 @@ export default function LoadsList() {
       {/* ORDERS TAB */}
       {activeTab === 'orders' && !body && (
         <div className="bk-tab-fill">
-          {loading ? <TilesSkeleton count={3} /> : activeLoads.length > 0 ? summary([
+          {loading ? <TilesSkeleton count={3} /> : openCount > 0 && os ? summary([
             {
               // Only orders that can still get a vehicle (Pending, Assigned).
               // One already loading or in transit can't, so it is named in
               // the note, not counted (R7).
               label: 'Need a vehicle',
-              value: needVehicle.length,
-              note: needVehicle.length === 0 ? 'All have a vehicle'
-                : needVehicleStale === needVehicle.length ? 'All past delivery date'
-                : needVehicleStale > 0 ? `${needVehicleStale} past delivery date` : 'Assign a vehicle',
-              tip: `Pending or Assigned orders with no vehicle.${movingNoVehicle > 0 ? ` Not counted: ${movingNoVehicle === 1 ? '1 order already loading or in transit without one; it' : `${movingNoVehicle} orders already loading or in transit without one; they`} can no longer be given a vehicle, only closed or cancelled.` : ''}`,
-              attention: needVehicle.length > 0,
+              value: os.need_vehicle,
+              note: os.need_vehicle === 0 ? 'All have a vehicle'
+                : os.need_vehicle_overdue === os.need_vehicle ? 'All past delivery date'
+                : os.need_vehicle_overdue > 0 ? `${os.need_vehicle_overdue} past delivery date` : 'Assign a vehicle',
+              tip: `Pending or Assigned orders with no vehicle.${os.moving_no_vehicle > 0 ? ` Not counted: ${os.moving_no_vehicle === 1 ? '1 order already loading or in transit without one; it' : `${os.moving_no_vehicle} orders already loading or in transit without one; they`} can no longer be given a vehicle, only closed or cancelled.` : ''}`,
+              attention: os.need_vehicle > 0,
             },
             (() => {
               // The note describes these same loads (R7), never the other
               // statuses, so it can't read as a breakdown of the figure.
-              const inTransit = activeLoads.filter(l => l.status === 'IN_TRANSIT');
-              const late = inTransit.filter(l => staleWork(l)?.overdue).length;
+              const inTransit = os.in_transit;
+              const late = os.in_transit_overdue;
               return {
                 label: 'In transit',
-                value: inTransit.length,
-                note: inTransit.length === 0 ? 'None on the road'
-                  : late === inTransit.length ? (inTransit.length === 1 ? 'Past its delivery date' : 'All past delivery date')
+                value: inTransit,
+                note: inTransit === 0 ? 'None on the road'
+                  : late === inTransit ? (inTransit === 1 ? 'Past its delivery date' : 'All past delivery date')
                   : late > 0 ? `${late} past delivery date` : 'All on schedule',
                 tip: 'Orders with status In transit. Loads past their delivery date are flagged in the table: close them via the order.',
               };
@@ -434,9 +456,9 @@ export default function LoadsList() {
             (() => {
               // "Active" means current work (R7): orders left open past their
               // dates are counted as left open, never as active.
-              const total = activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0);
-              const leftOpen = activeLoads.filter(l => staleWork(l)).length;
-              const current = activeLoads.length - leftOpen;
+              const total = os.open_total_incl_vat;
+              const leftOpen = os.left_open;
+              const current = openCount - leftOpen;
               return {
                 label: 'Open order value',
                 value: wholeRand(total),
@@ -457,12 +479,12 @@ export default function LoadsList() {
           )}
 
           <Toolbar
-            meta={`${filteredOrders.length} ${filteredOrders.length === 1 ? 'order' : 'orders'}`}
+            meta={`${orders?.count ?? 0} ${orders?.count === 1 ? 'order' : 'orders'}`}
             end={
               <StatusFilter
                 label="Filter orders by status"
                 value={orderFilter}
-                onChange={setOrderFilter}
+                onChange={v => { setOrderFilter(v); setOrdersPage(1); }}
                 options={['All', 'PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'].map(status => ({ value: status, label: status === 'All' ? 'All' : formatStatus(status) }))}
               />
             }
@@ -470,38 +492,41 @@ export default function LoadsList() {
             <SearchInput
               aria-label="Search orders"
               placeholder="Search customer, load or route"
+              busy={searching(orderSearch, orderQ, ordersQuery)}
               value={orderSearch}
-              onChange={e => setOrderSearch(e.target.value)}
+              onChange={e => { setOrderSearch(e.target.value); setOrdersPage(1); }}
             />
           </Toolbar>
 
-          {renderTable(filteredOrders, false, activeLoads.length === 0 ? 'Nothing in progress right now.' : 'No orders match this filter.')}
+          {renderTable(filteredOrders, false, openCount === 0 ? 'Nothing in progress right now.' : 'No orders match this filter.')}
+          {!loading && <TablePager page={ordersPage} pageSize={PAGE_SIZE} count={orders?.count ?? 0} onPage={setOrdersPage}
+            busy={ordersQuery.isFetching && ordersQuery.isPlaceholderData} />}
         </div>
       )}
 
       {/* HISTORY TAB */}
       {activeTab === 'history' && !body && (
         <div className="bk-tab-fill">
-          {loading ? <TilesSkeleton count={3} /> : historyLoads.length > 0 && summary([
+          {loading ? <TilesSkeleton count={3} /> : historyCount > 0 && hs && summary([
             {
               label: 'Delivered, not invoiced',
-              value: deliveredNotInvoiced,
-              note: deliveredNotInvoiced > 0 ? 'Invoice to get paid' : 'All invoiced',
-              attention: deliveredNotInvoiced > 0,
+              value: hs.delivered_not_invoiced,
+              note: hs.delivered_not_invoiced > 0 ? 'Invoice to get paid' : 'All invoiced',
+              attention: hs.delivered_not_invoiced > 0,
             },
             {
               label: 'Invoiced',
-              value: historyLoads.filter(l => l.status === 'INVOICED').length,
+              value: hs.invoiced,
               // Only facts about invoiced loads (R5): their value, not cancellations.
-              note: `${wholeRand(historyLoads.filter(l => l.status === 'INVOICED').reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0))} billed`,
+              note: `${wholeRand(hs.invoiced_total_incl_vat)} billed`,
             },
             (() => {
-              const total = completedLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0);
+              const total = hs.completed_total_incl_vat;
               return {
                 label: 'Delivered revenue',
                 value: wholeRand(total),
                 title: formatCurrency(total),
-                note: plural(completedLoads.length, 'load', 'loads'),
+                note: plural(hs.completed, 'load', 'loads'),
                 tip: 'Sum of order totals across delivered and invoiced loads.',
               };
             })(),
@@ -509,7 +534,7 @@ export default function LoadsList() {
 
           <Toolbar
             className="bk-hist-toolbar"
-            meta={`${filteredHistory.length} ${filteredHistory.length === 1 ? 'record' : 'records'}`}
+            meta={`${history?.count ?? 0} ${history?.count === 1 ? 'record' : 'records'}`}
             end={
               // Phones: the count and a status select share one row under
               // the search, like Orders (two rows, not three; R7).
@@ -517,7 +542,7 @@ export default function LoadsList() {
                 compactOnPhone
                 label="Filter history by status"
                 value={historyFilter}
-                onChange={setHistoryFilter}
+                onChange={v => { setHistoryFilter(v); setHistoryPage(1); }}
                 options={['All', 'DELIVERED', 'INVOICED', 'CANCELLED'].map(status => ({ value: status, label: status === 'All' ? 'All' : formatStatus(status) }))}
               />
             }
@@ -525,12 +550,15 @@ export default function LoadsList() {
             <SearchInput
               aria-label="Search history"
               placeholder="Search customer, load or route"
+              busy={searching(historySearch, historyQ, historyQuery)}
               value={historySearch}
-              onChange={e => setHistorySearch(e.target.value)}
+              onChange={e => { setHistorySearch(e.target.value); setHistoryPage(1); }}
             />
           </Toolbar>
 
-          {renderTable(filteredHistory, true, historyLoads.length === 0 ? 'No delivered, invoiced or cancelled loads yet.' : 'No loads match your search or filter.')}
+          {renderTable(filteredHistory, true, historyCount === 0 ? 'No delivered, invoiced or cancelled loads yet.' : 'No loads match your search or filter.')}
+          {!loading && <TablePager page={historyPage} pageSize={PAGE_SIZE} count={history?.count ?? 0} onPage={setHistoryPage}
+            busy={historyQuery.isFetching && historyQuery.isPlaceholderData} />}
         </div>
       )}
     </div>

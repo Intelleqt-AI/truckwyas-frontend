@@ -2,7 +2,7 @@ import '@/pages/table-heading-roles.css';
 import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import '@/pages/admin/admin-brand.css';
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
@@ -194,6 +194,8 @@ export function CompaniesTable() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-companies-full', debouncedSearch, statusFilter, page],
+    // New search or page: keep the current rows until the new ones land.
+    placeholderData: keepPreviousData,
     queryFn: () => fetchData(`api/v1/admin/companies/${queryString}`),
   });
 

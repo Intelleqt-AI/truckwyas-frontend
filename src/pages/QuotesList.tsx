@@ -5,7 +5,7 @@ import './bookings-section.css';
 import { useState, useEffect, useMemo, useRef } from "react";
 import { BoardScrollbar } from "@/components/BoardScrollbar";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { fetchData, patchData, postData } from "@/lib/Api";
 import { formatCurrency, formatDate, formatDateShort, formatMoneyWhole } from "@/lib/formatters";
 import { Loader } from "@/components/Loader";
@@ -122,7 +122,7 @@ function QuoteCardBody({ quote }: { quote: any }) {
       <div className="bk-qcard__customer" title={quote.customer_name || ''}>{quote.customer_name || '—'}</div>
       <div className="bk-qcard__route" title={routeOf(quote)}>{routeOf(quote)}</div>
       <div className="bk-qcard__foot">
-        <span className="bk-qcard__amount" title={formatCurrency(parseFloat(quote.total_amount || '0'))}>{formatMoneyWhole(parseFloat(quote.total_amount || '0'))}</span>
+        <span className="bk-qcard__amount" title={`${formatCurrency(priceInclVat(quote))} incl. VAT`}>{formatMoneyWhole(priceInclVat(quote))}</span>
         {/* Only a low price confidence is worth a word on the card; otherwise the date it was made. */}
         {boardStage(quote) === 'EXPIRED' && quote.valid_until
           ? <span className="bk-qcard__meta" title={`${String(quote.status).toUpperCase() === 'SENT' ? 'Sent' : 'Draft'}, valid until ${formatDate(quote.valid_until)}`}>Expired {formatDateShort(quote.valid_until)}</span>
@@ -262,6 +262,7 @@ interface QuotePage {
   count: number;
   next: string | null;
   total_amount?: string | number;
+  total_incl_vat?: string | number;
 }
 
 // One pipeline column's data, fetched independently from the backend —
@@ -286,6 +287,9 @@ function useQuoteColumn(status: string | null, search: string, enabled: boolean 
     getNextPageParam: (lastPage, allPages) => (lastPage?.next ? allPages.length + 1 : undefined),
     enabled,
     retry: 1,
+    // A new search keeps each column's current cards until its results land
+    // (no blank board while typing); the search box shows it's working.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -296,7 +300,8 @@ function flattenColumn(q: ReturnType<typeof useQuoteColumn>) {
   return {
     items: q.data?.pages.flatMap(p => p.results) ?? [],
     count: q.data?.pages[0]?.count ?? 0,
-    totalAmount: Number(q.data?.pages[0]?.total_amount ?? 0),
+    // Column total incl. VAT, as the cards show (server-summed over every page).
+    totalAmount: Number(q.data?.pages[0]?.total_incl_vat ?? q.data?.pages[0]?.total_amount ?? 0),
     hasNextPage: !!q.hasNextPage,
     isLoading: q.isLoading,
     isFetchingNextPage: q.isFetchingNextPage,
@@ -323,6 +328,7 @@ interface QuotesListProps {
  */
 export { idTail, RecordNo, RecordId } from './recordNo';
 import { RecordNo } from './recordNo';
+import { priceInclVat } from "@/lib/vat";
 
 export function StatusFilter<V extends string>({ label, value, onChange, options, className, compactOnPhone }: {
   label: string; value: V; onChange: (v: V) => void;
@@ -413,6 +419,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   const bookedQ = useQuoteColumn('BOOKED', debouncedSearch);
   const declinedQ = useQuoteColumn('DECLINED', debouncedSearch);
   const allQ = useQuoteColumn(null, debouncedSearch, view === 'list' && statusFilter === 'ALL');
+  // Typing ahead of the debounce, or a column still fetching the new search.
+  const searchBusy = search !== debouncedSearch
+    || [draftQ, sentQ, acceptedQ, bookedQ, declinedQ, allQ].some((q) => q.isFetching && q.isPlaceholderData);
   const columnQueries = useMemo(
     () => ({ DRAFT: draftQ, SENT: sentQ, ACCEPTED: acceptedQ, BOOKED: bookedQ, DECLINED: declinedQ }),
     [draftQ, sentQ, acceptedQ, bookedQ, declinedQ]
@@ -425,7 +434,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   // One stage definition everywhere (R5): the board's, shared with Home.
   const isMarkedLost = (q: any) => String(q.status).toUpperCase() === 'SENT' && boardStage(q) === 'DECLINED';
   const movedLost = flattenColumn(sentQ).items.filter(isMarkedLost);
-  const amountOf = (q: any) => parseFloat(q.total_amount || '0') || 0;
+  const amountOf = (q: any) => priceInclVat(q);
   const movedLostTotal = movedLost.reduce((n: number, q: any) => n + amountOf(q), 0);
   // R8: a Draft or Sent quote past its valid-until date is Expired (the same
   // boardStage rule as Home's pipeline). Without a search the exact set comes
@@ -643,14 +652,18 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       {/* Toolbar — search, Board/List toggle and count sit on their own row
           under the shared Bookings header, so the tab row keeps one geometry. */}
       <div className="bk-toolbar">
-        <input
-          type="search"
-          className="bk-search"
-          aria-label="Search quotes"
-          placeholder={isPhone ? 'Search quotes' : 'Search quotes, customers, routes'}
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+        <span className={`bk-search-wrap${searchBusy ? ' is-busy' : ''}`}>
+          <input
+            type="search"
+            className="bk-search"
+            aria-label="Search quotes"
+            aria-busy={searchBusy || undefined}
+            placeholder={isPhone ? 'Search quotes' : 'Search quotes, customers, routes'}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {searchBusy && <span className="tw-search__busy" role="status" aria-label="Searching" />}
+        </span>
         {isPhone ? (
           <>
             {view === 'list' && (
@@ -907,9 +920,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                     <td className="is-date bk-col-phone">
                       {quote.created_at ? formatDate(quote.created_at) : '—'}
                     </td>
-                    <td className="is-money" title={formatCurrency(parseFloat(quote.total_amount || '0'))}>
+                    <td className="is-money" title={`${formatCurrency(priceInclVat(quote))} incl. VAT`}>
                       {/* Lists show whole rands; the quote itself carries the cents (R7). */}
-                      {formatMoneyWhole(parseFloat(quote.total_amount || '0'))}
+                      {formatMoneyWhole(priceInclVat(quote))}
                     </td>
                     {anyAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
                       {!!bookedLoadOf(quote) && (

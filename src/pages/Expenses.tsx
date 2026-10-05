@@ -4,8 +4,8 @@ import './table-heading-roles.css';
 import './finance-brand.css';
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { useQuery } from '@tanstack/react-query';
-import { postData, putData, deleteData } from '@/lib/Api';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { fetchData, postData, putData, deleteData } from '@/lib/Api';
 import { fetchAllPages } from '@/components/insights/findings';
 import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
 import { KpiStats } from '@/components/ui/KpiTile';
@@ -109,31 +109,18 @@ function FilterSelect({ label, value, onChange, options, short, allValue }: {
 
 const expenseDate = (e: Expense) => new Date(e.expense_date || e.date);
 
+// GET expenses/summary/ (core/services/expense_list.py): the overview over
+// every expense, so the page never downloads them all.
+type ExpenseSummary = {
+  spend_total: number; spend_count: number;
+  approved_year_amount: number; approved_year_count: number;
+  pending_amount: number; pending_count: number;
+  months: { year: number; month: number; amount: number; count: number }[];
+  by_category: { category: string; amount: number; count: number }[];
+  status_counts: Record<string, number>;
+};
+
 export default function Expenses() {
-  // Every expense (all pages), so tiles, charts and counts agree with the
-  // P&L and Insights, never "the latest 20". Vehicles too (filter options).
-  const expensesQuery = useQuery({
-    queryKey: ["expenses-page"],
-    queryFn: async () => {
-      const [exp, veh] = await Promise.all([
-        fetchAllPages<Expense>('api/v1/expenses/'),
-        // A vehicles failure must not hide the expenses list.
-        fetchAllPages<Vehicle>('api/v1/vehicles/').catch(() => ({ rows: [] as Vehicle[], count: 0, complete: true })),
-      ]);
-      return { expenses: exp.rows, total: exp.count, complete: exp.complete, vehicles: veh.rows };
-    },
-  });
-  const { data, isError, refetch } = expensesQuery;
-  // Failed (or failing and retrying) with nothing to show: say so, never R 0 figures.
-  const failed = loadFailed(expensesQuery);
-  const loading = expensesQuery.isLoading && !failed;
-
-  const expenses = data?.expenses ?? [];
-  const totalExpenseCount: number = data?.total ?? expenses.length;
-  // Only false past 50 pages (1 000 expenses): then the figures say so.
-  const complete = data?.complete ?? true;
-  const vehicles = data?.vehicles ?? [];
-
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [vehicleFilter, setVehicleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -151,6 +138,62 @@ export default function Expenses() {
   } | null>(null);
   const perPage = 10;
 
+  // Server-side list: the filters, search and page go to the API (it sorts
+  // newest first); the overview comes from the summary over every expense
+  // (GET expenses/summary/, the same rules the page used to apply to its
+  // full download). The previous page stays on screen while the next loads.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+  const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const dateRange = (() => {
+    const t = new Date();
+    if (dateFilter === 'this_month') return [ymd(new Date(t.getFullYear(), t.getMonth(), 1)), ymd(new Date(t.getFullYear(), t.getMonth() + 1, 0))];
+    if (dateFilter === 'last_month') return [ymd(new Date(t.getFullYear(), t.getMonth() - 1, 1)), ymd(new Date(t.getFullYear(), t.getMonth(), 0))];
+    if (dateFilter === 'custom') return [customFrom, customTo];
+    return ['', ''];
+  })();
+  const filterParams = (() => {
+    const q = new URLSearchParams();
+    if (categoryFilter !== 'All') q.set('category', categoryFilter);
+    if (vehicleFilter !== 'All') q.set('vehicle', vehicleFilter);
+    if (statusFilter !== 'ALL') q.set('status', statusFilter);
+    if (dateRange[0]) q.set('expense_date__gte', dateRange[0]);
+    if (dateRange[1]) q.set('expense_date__lte', dateRange[1]);
+    if (debouncedSearch.trim()) q.set('search', debouncedSearch.trim());
+    return q;
+  })();
+  const expensesQuery = useQuery({
+    queryKey: ['expenses-page', filterParams.toString(), page],
+    queryFn: () => {
+      const q = new URLSearchParams(filterParams);
+      q.set('page', String(page)); q.set('page_size', String(perPage));
+      return fetchData(`api/v1/expenses/?${q.toString()}`);
+    },
+    placeholderData: keepPreviousData,
+  });
+  const summaryQuery = useQuery<ExpenseSummary>({
+    queryKey: ['expenses-summary'],
+    queryFn: () => fetchData('api/v1/expenses/summary/'),
+  });
+  // Vehicles only feed the vehicle filter's options.
+  const vehiclesQuery = useQuery({
+    queryKey: ['expenses-vehicles'],
+    queryFn: () => fetchAllPages<Vehicle>('api/v1/vehicles/').catch(() => ({ rows: [] as Vehicle[], count: 0, complete: true })),
+  });
+  const refetch = () => { expensesQuery.refetch(); summaryQuery.refetch(); };
+  // Failed (or failing and retrying) with nothing to show: say so, never R 0 figures.
+  const failed = loadFailed(expensesQuery);
+  const loading = (expensesQuery.isLoading || summaryQuery.isLoading) && !failed;
+  const listData = expensesQuery.data;
+  const rows: Expense[] = Array.isArray(listData) ? listData : (listData?.results ?? []);
+  const matchCount: number = typeof listData?.count === 'number' ? listData.count : rows.length;
+  const summary = summaryQuery.data ?? null;
+  const vehicles = vehiclesQuery.data?.rows ?? [];
+  const searching = search !== debouncedSearch || (expensesQuery.isFetching && expensesQuery.isPlaceholderData);
+
   useEffect(() => {
     document.title = "Expenses - TruckWys";
   }, []);
@@ -158,21 +201,7 @@ export default function Expenses() {
   // Live-refresh on the auto-refresh tick / focus / live events.
   useAutoRefresh(() => { refetch(); });
 
-  // Calculate date range
   const now = new Date();
-  let startDate: Date | null = null;
-  let endDate: Date | null = null;
-
-  if (dateFilter === 'this_month') {
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-  } else if (dateFilter === 'last_month') {
-    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-  } else if (dateFilter === 'custom') {
-    startDate = customFrom ? new Date(customFrom) : null;
-    endDate = customTo ? new Date(`${customTo}T23:59:59`) : null;
-  }
 
   const vehicleLabel = (e: Expense) => {
     if (!e.vehicle) return '—';
@@ -180,32 +209,7 @@ export default function Expenses() {
     return e.vehicle_registration || v?.plate || v?.registration || v?.vehicle_number || e.vehicle_info || '—';
   };
 
-  // Filter expenses
-  const q = search.trim().toLowerCase();
-  const filtered = expenses.filter(e => {
-    const catOk = categoryFilter === 'All' || e.category === categoryFilter;
-    const vehOk = vehicleFilter === 'All' || (e.vehicle && e.vehicle.toString() === vehicleFilter);
-    const srchOk = !q
-      || e.description?.toLowerCase().includes(q)
-      || e.vendor?.toLowerCase().includes(q)
-      || e.supplier_name?.toLowerCase().includes(q)
-      || e.expense_number?.toLowerCase().includes(q);
-    const statOk = statusFilter === 'ALL' || (e.status || 'PENDING').toUpperCase() === statusFilter;
-
-    let dateOk = true;
-    if (startDate || endDate) {
-      const eDate = expenseDate(e);
-      dateOk = (!startDate || eDate >= startDate) && (!endDate || eDate <= endDate);
-    }
-
-    return catOk && vehOk && srchOk && statOk && dateOk;
-  });
-
-  // Sort by date desc
-  const sorted = [...filtered].sort((a, b) => expenseDate(b).getTime() - expenseDate(a).getTime());
-
-  const totalPages = Math.ceil(sorted.length / perPage);
-  const rows = sorted.slice((page - 1) * perPage, page * perPage);
+  const totalPages = Math.ceil(matchCount / perPage);
 
   const handleDelete = (exp: Expense) => {
     setConfirmOpts({
@@ -242,7 +246,15 @@ export default function Expenses() {
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
+    // Every expense matching the filters, fetched only when exporting.
+    let sorted: Expense[] = [];
+    try {
+      sorted = (await fetchAllPages<Expense>(`api/v1/expenses/?${filterParams.toString()}`)).rows;
+    } catch {
+      toast.error('Could not export the expenses. Try again.');
+      return;
+    }
     const headers = ['Date', 'Category', 'Description', 'Supplier', 'Vehicle', 'Tax code', 'Amount incl. VAT', 'VAT', 'Status'];
     const csvRows = [
       headers.join(','),
@@ -289,22 +301,20 @@ export default function Expenses() {
 
   // The toolbar renders at once (also while loading) so nothing below the
   // overview moves when the data arrives.
-  const statusCount = (s: string) => (loading ? undefined : expenses.filter(e => s === 'ALL' || (e.status || 'PENDING').toUpperCase() === s).length);
+  const statusCount = (s: string) => (summary ? summary.status_counts[s] : undefined);
   const toolbar = (
     <Toolbar
       className="fin-toolbar exp-toolbar"
       aria-label="Filter expenses"
       meta={loading ? ' ' : (
-        <>
-          {sorted.length} {sorted.length === 1 ? 'expense' : 'expenses'}
-          {!complete && ` · first ${expenses.length} of ${totalExpenseCount}`}
-        </>
+        <>{matchCount} {matchCount === 1 ? 'expense' : 'expenses'}</>
       )}
     >
       <SearchInput
         wrapClassName="exp-search"
         placeholder="Search expenses"
         aria-label="Search expenses by description, supplier or reference"
+        busy={searching}
         value={search}
         onChange={e => { setSearch(e.target.value); resetPage(); }}
       />
@@ -367,10 +377,9 @@ export default function Expenses() {
     );
   }
 
-  // Money that counts as spend: approved and pending (rejected is not spend).
-  const isRejected = (e: Expense) => (e.status || '').toUpperCase() === 'REJECTED';
-  const spend = expenses.filter(e => !isRejected(e));
-  const spendTotal = spend.reduce((sum, e) => sum + amountOf(e), 0);
+  // Spend is approved and pending (rejected is not spend), from the summary.
+  const spendTotal = summary?.spend_total ?? 0;
+  const spendCount = summary?.spend_count ?? 0;
   const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
   // Calendar months by expense date.
@@ -380,24 +389,24 @@ export default function Expenses() {
   const monthShort = (key: number) => MONTHS[((key % 12) + 12) % 12];
   const yearOf = (key: number) => Math.floor(key / 12);
   const monthText = (key: number) => `${monthShort(key)} ${yearOf(key)}`;
-  const inMonth = (e: Expense, key: number) => monthKey(expenseDate(e)) === key;
-  const sumOf = (list: Expense[]) => list.reduce((s, e) => s + amountOf(e), 0);
+  // Spend per calendar month (13 months from the server, keyed like monthKey).
+  const monthTotals = new Map<number, { amount: number; count: number }>(
+    (summary?.months ?? []).map(m => [m.year * 12 + (m.month - 1), { amount: m.amount, count: m.count }]),
+  );
+  const monthOf = (key: number) => monthTotals.get(key) ?? { amount: 0, count: 0 };
 
   // Last 12 months (this month and the 11 before), as in Reports.
   const yearKeys = Array.from({ length: 12 }, (_, i) => nowKey - 11 + i);
-  const inYear = (e: Expense) => { const k = monthKey(expenseDate(e)); return k >= yearKeys[0] && k <= nowKey; };
-  const approvedYear = expenses.filter(e => (e.status || '').toUpperCase() === 'APPROVED' && inYear(e));
-  const pendingExpenses = expenses.filter(e => (e.status || 'PENDING').toUpperCase() === 'PENDING');
-  const pendingAmount = sumOf(pendingExpenses);
+  const approvedYearAmount = summary?.approved_year_amount ?? 0;
+  const approvedYearCount = summary?.approved_year_count ?? 0;
+  const pendingCount = summary?.pending_count ?? 0;
+  const pendingAmount = summary?.pending_amount ?? 0;
 
   // Months with spend inside the 12: leading and trailing empty months are
   // not drawn (inner empty months stay, a real zero), as in Reports.
-  const withSpend = yearKeys.filter(k => spend.some(e => inMonth(e, k)));
+  const withSpend = yearKeys.filter(k => monthOf(k).count > 0);
   const chartKeys = withSpend.length ? yearKeys.slice(yearKeys.indexOf(withSpend[0]), yearKeys.indexOf(withSpend[withSpend.length - 1]) + 1) : [];
-  const monthlyTrend = chartKeys.map(key => {
-    const list = spend.filter(e => inMonth(e, key));
-    return { key, amount: sumOf(list), count: list.length };
-  });
+  const monthlyTrend = chartKeys.map(key => ({ key, ...monthOf(key) }));
   const maxMonthlyAmount = Math.max(1, ...monthlyTrend.map(m => m.amount));
   // Phones label only the highest and the latest month (the others are in
   // each bar's title and name); two neighbours would touch, so the highest wins.
@@ -407,19 +416,18 @@ export default function Expenses() {
     return new Set(last < 0 ? [] : last - top === 1 ? [top] : [top, last]);
   })();
   const latestKey = withSpend[withSpend.length - 1];
-  const latestList = latestKey != null ? spend.filter(e => inMonth(e, latestKey)) : [];
-  const prevList = latestKey != null ? spend.filter(e => inMonth(e, latestKey - 1)) : [];
+  const latestTotals = latestKey != null ? monthOf(latestKey) : { amount: 0, count: 0 };
   const vsPrev = (() => {
     if (latestKey == null) return null;
-    const cur = sumOf(latestList); const prev = sumOf(prevList);
+    const cur = latestTotals.amount; const prev = monthOf(latestKey - 1).amount;
     if (prev === 0) return `None in ${monthLong(latestKey - 1)}`;
     const pct = ((cur - prev) / prev) * 100;
     return `${pct >= 0 ? '+' : '−'}${formatPercent(Math.abs(pct), 0)} vs ${monthLong(latestKey - 1)}`;
   })();
 
   // Category totals across every expense, approved and pending.
-  const byCategory = spend.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + amountOf(e); return acc; }, {} as Record<string, number>);
-  const categoryCounts = spend.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + 1; return acc; }, {} as Record<string, number>);
+  const byCategory: Record<string, number> = Object.fromEntries((summary?.by_category ?? []).map(c => [c.category, c.amount]));
+  const categoryCounts: Record<string, number> = Object.fromEntries((summary?.by_category ?? []).map(c => [c.category, c.count]));
   const categoryBreakdown = Object.entries(byCategory)
     .map(([category, total]) => ({ category, label: catLabel(category), total }))
     .filter(c => c.total > 0)
@@ -443,23 +451,23 @@ export default function Expenses() {
             ...(latestKey != null ? [{
               label: latestKey === nowKey ? `Spent in ${monthLong(latestKey)}` : `Spent in ${monthText(latestKey)}`,
               aside: <InfoTip>{`Approved and pending expenses dated ${monthText(latestKey)}, amounts as entered.${latestKey !== nowKey ? ` Nothing is dated after ${monthText(latestKey)} yet.` : ''}`}</InfoTip>,
-              figure: <span title={formatCurrency(sumOf(latestList))}>{wholeRand(sumOf(latestList))}</span>,
-              note: vsPrev ?? plural(latestList.length, 'expense'),
+              figure: <span title={formatCurrency(latestTotals.amount)}>{wholeRand(latestTotals.amount)}</span>,
+              note: vsPrev ?? plural(latestTotals.count, 'expense'),
             }] : []),
             {
               label: 'Approved, 12 months',
               aside: <InfoTip>{`Approved expenses dated ${monthText(yearKeys[0])} to ${monthText(nowKey)}: the costs in the profit and loss for the same period.`}</InfoTip>,
-              figure: <span title={formatCurrency(sumOf(approvedYear))}>{wholeRand(sumOf(approvedYear))}</span>,
-              note: plural(approvedYear.length, 'expense'),
+              figure: <span title={formatCurrency(approvedYearAmount)}>{wholeRand(approvedYearAmount)}</span>,
+              note: plural(approvedYearCount, 'expense'),
             },
             {
               label: 'To approve',
               aside: <InfoTip>Pending expenses, any date, amounts as entered. They are not in the profit and loss until approved.</InfoTip>,
               figure: <span title={formatCurrency(pendingAmount)}>{wholeRand(pendingAmount)}</span>,
-              note: pendingExpenses.length === 0 ? 'Nothing waiting' : (
+              note: pendingCount === 0 ? 'Nothing waiting' : (
                 statusFilter !== 'PENDING'
-                  ? <button type="button" className="exp-stat-link" onClick={() => { setStatusFilter('PENDING'); resetPage(); }}>{`Show ${plural(pendingExpenses.length, 'expense')}`}</button>
-                  : plural(pendingExpenses.length, 'expense')
+                  ? <button type="button" className="exp-stat-link" onClick={() => { setStatusFilter('PENDING'); resetPage(); }}>{`Show ${plural(pendingCount, 'expense')}`}</button>
+                  : plural(pendingCount, 'expense')
               ),
             },
           ]}
@@ -469,9 +477,9 @@ export default function Expenses() {
             <div className="fin-panel-head__text">
               <h2 id="exp-cat-title" className="fin-panel-title fin-panel-title--tip">
                 Spend by category
-                <InfoTip align="end">{formatCurrency(spendTotal)} across {plural(spend.length, 'expense')}, approved and pending, amounts as entered. Rejected expenses are left out.</InfoTip>
+                <InfoTip align="end">{formatCurrency(spendTotal)} across {plural(spendCount, 'expense')}, approved and pending, amounts as entered. Rejected expenses are left out.</InfoTip>
               </h2>
-              <p className="fin-panel-desc">All {plural(spend.length, 'expense')}, approved and pending</p>
+              <p className="fin-panel-desc">All {plural(spendCount, 'expense')}, approved and pending</p>
             </div>
           </div>
           {categoryBreakdown.length === 0 ? (
@@ -559,13 +567,13 @@ export default function Expenses() {
               {rows.length === 0 ? (
                 <tr className="is-empty">
                   <td colSpan={8} style={{ padding: 0 }}>
-                    {isError ? (
+                    {expensesQuery.isError && !listData ? (
                       <div className="fin-empty">
                         <p className="fin-empty__title">Couldn’t load expenses</p>
                         <p className="fin-empty__body">Check your connection and try again.</p>
                         <button className="btn-action" onClick={() => refetch()}>Retry loading</button>
                       </div>
-                    ) : expenses.length === 0 ? (
+                    ) : summary?.status_counts?.ALL === 0 ? (
                       <div className="fin-empty">
                         <p className="fin-empty__title">No expenses yet</p>
                         <p className="fin-empty__body">Add your first expense to track costs.</p>
@@ -622,7 +630,7 @@ export default function Expenses() {
 
         {totalPages > 1 && (
           <div className="fin-table-foot">
-            <span>{(page - 1) * perPage + 1} to {Math.min(page * perPage, sorted.length)} of {sorted.length}</span>
+            <span>{(page - 1) * perPage + 1} to {Math.min(page * perPage, matchCount)} of {matchCount}</span>
             <div className="fin-table-foot__nav">
               <button type="button" className="tw-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</button>
               <button type="button" className="tw-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</button>

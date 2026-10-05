@@ -2,7 +2,7 @@ import './table-heading-roles.css';
 import './finance-brand.css';
 import '@/components/finance/finance-ledger.css';
 import { useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import SectionHeader, { FINANCE_TABS } from '@/components/layout/SectionHeader';
 import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
 import { Segmented } from '@/components/ui/Segmented';
@@ -12,10 +12,10 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import '@/components/data/load-error.css';
 import { SupplierDialog } from '@/components/finance/SupplierDialog';
-import { deleteData, patchData } from '@/lib/Api';
+import { deleteData, fetchData, patchData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { categoryLabel } from '@/lib/finance/categories';
-import { FIN_URL, errorText, useSuppliers } from '@/lib/finance/api';
+import { FIN_URL, errorText } from '@/lib/finance/api';
 import type { Supplier } from '@/lib/finance/types';
 
 type ActiveFilter = 'ACTIVE' | 'INACTIVE' | 'ALL';
@@ -24,27 +24,40 @@ const PAGE_SIZE = 20;
 /** Who the business buys from: one record per supplier, linked from expenses. */
 export default function Suppliers() {
   const qc = useQueryClient();
-  const query = useSuppliers();
-  const failed = loadFailed(query);
-  const loading = query.isLoading && !failed;
-  const suppliers = query.data?.rows ?? [];
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ActiveFilter>('ACTIVE');
   const [page, setPage] = useState(1);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+  // Server-side list: active filter, search and page go to the API (sorted by
+  // name); the response also carries the active / inactive / all counts.
+  // Keyed under 'suppliers' so refresh() and the supplier picker's updates reach it.
+  const query = useQuery<{ count: number; results: Supplier[]; counts?: Record<ActiveFilter, number> }>({
+    queryKey: ['suppliers', 'page', filter, debouncedSearch, page],
+    queryFn: () => {
+      const q = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+      if (filter !== 'ALL') q.set('is_active', filter === 'ACTIVE' ? 'true' : 'false');
+      if (debouncedSearch.trim()) q.set('search', debouncedSearch.trim());
+      return fetchData(`${FIN_URL.suppliers}?${q.toString()}`);
+    },
+    placeholderData: keepPreviousData,
+  });
+  const failed = loadFailed(query);
+  const loading = query.isLoading && !failed;
+  const searching = search !== debouncedSearch || (query.isFetching && query.isPlaceholderData);
   const [editing, setEditing] = useState<Supplier | 'new' | null>(null);
   const [deleting, setDeleting] = useState<Supplier | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   useEffect(() => { document.title = 'Suppliers - TruckWys'; }, []);
 
-  const q = search.trim().toLowerCase();
-  const filtered = suppliers
-    .filter(s => filter === 'ALL' || (filter === 'ACTIVE' ? s.is_active !== false : s.is_active === false))
-    .filter(s => !q || [s.name, s.vat_number, s.registration_number, s.email].some(v => String(v || '').toLowerCase().includes(q)))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const count = (f: ActiveFilter) => (loading ? undefined : suppliers.filter(s => f === 'ALL' || (f === 'ACTIVE' ? s.is_active !== false : s.is_active === false)).length);
+  const rows = query.data?.results ?? [];
+  const matchCount = query.data?.count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(matchCount / PAGE_SIZE));
+  const count = (f: ActiveFilter) => query.data?.counts?.[f];
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['suppliers'] });
 
@@ -96,8 +109,8 @@ export default function Suppliers() {
   return (
     <div className="fin-page">
       {header}
-      <Toolbar className="fin-toolbar" aria-label="Filter suppliers" meta={loading ? ' ' : `${filtered.length} ${filtered.length === 1 ? 'supplier' : 'suppliers'}`}>
-        <SearchInput wrapClassName="inv-search" placeholder="Search suppliers" aria-label="Search suppliers by name, VAT number or email"
+      <Toolbar className="fin-toolbar" aria-label="Filter suppliers" meta={loading ? ' ' : `${matchCount} ${matchCount === 1 ? 'supplier' : 'suppliers'}`}>
+        <SearchInput wrapClassName="inv-search" placeholder="Search suppliers" aria-label="Search suppliers by name, VAT number or email" busy={searching}
           value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
         <Segmented<ActiveFilter>
           label="Filter by status"
@@ -132,7 +145,7 @@ export default function Suppliers() {
                 {rows.length === 0 ? (
                   <tr className="is-empty">
                     <td colSpan={6} style={{ padding: 0 }}>
-                      {suppliers.length === 0 ? (
+                      {count('ALL') === 0 ? (
                         <div className="fin-empty">
                           <p className="fin-empty__title">No suppliers yet</p>
                           <p className="fin-empty__body">Add the businesses you buy from, or add them as you capture expenses.</p>
@@ -181,7 +194,7 @@ export default function Suppliers() {
           </div>
           {totalPages > 1 && (
             <div className="fin-table-foot">
-              <span>{(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}</span>
+              <span>{(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, matchCount)} of {matchCount}</span>
               <div className="fin-table-foot__nav">
                 <button type="button" className="tw-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</button>
                 <button type="button" className="tw-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</button>

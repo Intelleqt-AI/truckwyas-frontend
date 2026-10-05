@@ -1,8 +1,11 @@
 import './customers-directory-controls.css';
 import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import '@/pages/settings/settings-brand.css';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { TablePager } from "@/components/ui/TablePager";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
+import { toast } from "@/lib/toast";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
 import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,6 +42,8 @@ const sectionStyle: React.CSSProperties = { ...settingsCardStyle, marginBottom: 
 const labelStyle = settingsLabelStyle;
 const inputStyle = settingsInputStyle;
 
+const PAGE_SIZE = 20;
+
 export function CustomersDirectory() {
   const { user: authUser } = useAuth();
   // Shared public demo account — creation/edit/delete controls are fixed off,
@@ -62,23 +67,42 @@ export function CustomersDirectory() {
   const [editSaving, setEditSaving] = useState(false);
   const [editErr, setEditErr] = useState('');
 
+  // Server-side: search and page go to the API, so the directory reaches
+  // every customer, not just the first page.
+  const [page, setPage] = useState(1);
+  const [count, setCount] = useState(0);
+  const q = useDebouncedValue(search.trim());
+  const latest = useRef(0);
   const load = () => {
-    setLoading(true);
-    fetchData('api/v1/customers/').then((d: any) => {
-      setCustomers(Array.isArray(d) ? d : (d?.results || []));
-    }).catch(() => setCustomers([])).finally(() => setLoading(false));
+    const ticket = ++latest.current;
+    const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+    if (q) params.set('search', q);
+    fetchData(`api/v1/customers/?${params}`).then((d: any) => {
+      if (ticket !== latest.current) return;   // a newer search or page won
+      const rows: Customer[] = Array.isArray(d) ? d : (d?.results || []);
+      const total = Array.isArray(d) ? rows.length : (d?.count ?? rows.length);
+      // A delete can empty the last page: step back to the new last page.
+      if (!rows.length && page > 1 && total > 0) { setPage(Math.max(1, Math.ceil(total / PAGE_SIZE))); return; }
+      setCustomers(rows);
+      setCount(total);
+    }).catch(() => { if (ticket === latest.current) { setCustomers([]); setCount(0); } })
+      .finally(() => { if (ticket === latest.current) setLoading(false); });
   };
 
-  useEffect(() => { load(); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [page, q]);
 
-  const filtered = customers.filter(c =>
-    c.name?.toLowerCase().includes(search.toLowerCase()) ||
-    c.company_name?.toLowerCase().includes(search.toLowerCase()) ||
-    c.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Searched and paged on the server.
+  const filtered = customers;
 
   const handleDelete = async (id: number) => {
-    await deleteData({ url: `api/v1/customers/${id}/` }).catch(() => {});
+    try {
+      await deleteData({ url: `api/v1/customers/${id}/` });
+      toast.success('Customer deleted');
+    } catch (err: any) {
+      // e.g. "This customer can't be deleted: 3 quotes, 1 invoice and 1 load are linked to it."
+      toast.error(err?.message || "Couldn't delete the customer");
+    }
     load();
   };
 
@@ -152,14 +176,14 @@ export function CustomersDirectory() {
           display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between',
         }}>
           <h2 style={settingsCardTitleStyle}>
-            Customers <span style={{ fontWeight: 400, color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>({customers.length})</span>
+            Customers <span style={{ fontWeight: 400, color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>({count})</span>
           </h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', minWidth: 0, gap: 12 }}>
             <input
               className="settings-control"
               aria-label="Search customers"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
               placeholder="Search…"
               style={{ ...settingsInputStyle, width: 180, maxWidth: '100%' }}
             />
@@ -282,6 +306,7 @@ export function CustomersDirectory() {
               ))}
             </tbody>
           </table>
+          <TablePager page={page} pageSize={PAGE_SIZE} count={count} onPage={setPage} />
           </div>
         )}
       </div>

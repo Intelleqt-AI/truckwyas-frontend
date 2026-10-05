@@ -8,7 +8,7 @@ import './table-heading-roles.css';
 import { Plus, UserRound as EmptyDriversIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { fetchData, postData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { toast } from '@/lib/toast';
@@ -29,8 +29,7 @@ import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import { fleetMenuItems, useFleetPhoneHead } from '@/components/fleet-detail/fleetHead';
-import { DELIVERED, useLedger } from '@/components/reports/data';
-import { isOpenLoad } from '@/lib/staleWork';
+import { TablePager } from '@/components/ui/TablePager';
 
 interface Driver {
   id: number;
@@ -49,18 +48,14 @@ interface Driver {
   hire_date?: string;
   emergency_contact?: string;
   emergency_phone?: string;
+  /** With ?view=fleet: the open order this driver is on, if any. */
+  open_load_number?: string | null;
   user_details?: {
     id: number;
     first_name?: string;
     last_name?: string;
     phone?: string;
   };
-}
-
-interface DriverOverview {
-  total_drivers: number;
-  active_drivers: number;
-  avg_revenue_per_driver: number;
 }
 
 interface LeaderboardEntry {
@@ -99,6 +94,39 @@ const getDriverName = (d: Driver) => {
   return `Driver ${d.id}`;
 };
 
+const PAGE_SIZE = 20;
+
+/** The Drivers list as the API sends it with ?view=fleet (core.services.driver_list). */
+interface DriversPage {
+  count: number;
+  results: Driver[];
+  summary?: {
+    status_counts: { ALL: number; ACTIVE: number; INACTIVE: number; ON_LEAVE: number };
+    expired_count: number;
+    expired_names: string[];
+    next_renewal: { name: string; date: string } | null;
+    renew_soon: number;
+    delivered_loads: number;
+    no_driver_loads: number;
+    has_efficiency: boolean;
+    has_revenue: boolean;
+  };
+}
+
+/** user_details flattened onto the driver, plus the leaderboard's score when the driver has none. */
+function flattenDriver(driver: Driver, leaderboard: LeaderboardEntry[]): Driver {
+  const ud: any = driver.user_details || {};
+  const flattened: Driver = {
+    ...driver,
+    first_name: driver.first_name || ud.first_name || '',
+    last_name: driver.last_name || ud.last_name || '',
+    name: driver.name || ud.name || (ud.first_name ? `${ud.first_name} ${ud.last_name || ''}`.trim() : ''),
+    phone: driver.phone || ud.phone || '',
+  };
+  const entry = leaderboard.find(lb => lb.driver_id === driver.id);
+  return entry && !flattened.efficiency_score ? { ...flattened, efficiency_score: entry.efficiency_score } : flattened;
+}
+
 export default function Drivers() {
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
@@ -107,8 +135,7 @@ export default function Drivers() {
   const isDemo = !!authUser?.is_demo;
   const [statusFilter, setStatusFilter] = useState('All');
   const phoneHead = useFleetPhoneHead();
-  // Every load (the History ledger), for the Completed loads tile.
-  const ledger = useLedger(['loads']);
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -144,20 +171,25 @@ export default function Drivers() {
   }, [search]);
 
   const driversQuery = useQuery({
-    queryKey: ['drivers-page', debouncedSearch],
+    queryKey: ['drivers-page', debouncedSearch, statusFilter, page],
+    // A new search, chip or page keeps the current rows on screen until its
+    // results land (no blank list while typing); the search box shows it's working.
+    placeholderData: keepPreviousData,
+    // Server-side: search, status chip and page go to the API; the list
+    // carries the tiles and each row the open order it's on
+    // (core.services.driver_list), so the page never loads every load.
     queryFn: async () => {
-      const q = debouncedSearch;
-      const driversUrl = q
-        ? `api/v1/drivers/?search=${encodeURIComponent(q)}`
-        : 'api/v1/drivers/';
-      const [driversData, overviewData, leaderboardData, vehicleData] = await Promise.all([
-        fetchAllPages<any>(driversUrl).then(r => r.rows),
-        fetchData('api/v1/drivers/overview/').catch(() => null),
+      const q = new URLSearchParams({ view: 'fleet', page: String(page), page_size: String(PAGE_SIZE) });
+      if (debouncedSearch) q.set('search', debouncedSearch);
+      if (statusFilter !== 'All') q.set('status', statusFilter);
+      const [driversData, leaderboardData, vehicleData] = await Promise.all([
+        fetchData(`api/v1/drivers/?${q}`) as Promise<DriversPage>,
         fetchData('api/v1/drivers/leaderboard/').catch(() => null),
+        // Every truck, for the Edit panel's vehicle picker (the plain list).
         fetchAllPages<any>('api/v1/vehicles/').then(r => r.rows).catch(() => null),
       ]);
 
-      const vehicleList = Array.isArray(vehicleData) ? vehicleData : (vehicleData?.results || []);
+      const vehicleList = Array.isArray(vehicleData) ? vehicleData : [];
       const vehicles = vehicleList.map((v: any) => ({
         id: v.id,
         plate: v.plate || v.registration || `Vehicle ${v.id}`,
@@ -165,11 +197,10 @@ export default function Drivers() {
         model: v.model,
         driver_id: v.driver ?? null,
       }));
-      const driverList: any[] = driversData;
 
       // Parse leaderboard data
       const lbData = Array.isArray(leaderboardData) ? leaderboardData : (leaderboardData?.data || []);
-      const leaderboardEntries = lbData.map((d: any, i: number) => ({
+      const leaderboardEntries: LeaderboardEntry[] = lbData.map((d: any, i: number) => ({
         driver_id: d.id || d.driver_id || i,
         driver_name: d.driver_name || d.name || `Driver ${d.id}`,
         revenue: d.revenue || d.revenue_generated || 0,
@@ -178,46 +209,8 @@ export default function Drivers() {
         rank: d.rank || i + 1,
       }));
 
-      // Flatten user_details into driver and merge leaderboard data
-      const drivers = driverList.map((driver: any) => {
-        const ud = driver.user_details || {};
-        const flattened: Driver = {
-          ...driver,
-          first_name: driver.first_name || ud.first_name || '',
-          last_name: driver.last_name || ud.last_name || '',
-          name: driver.name || ud.name || (ud.first_name ? `${ud.first_name} ${ud.last_name || ''}`.trim() : ''),
-          phone: driver.phone || ud.phone || '',
-        };
-        const leaderboardEntry = leaderboardEntries.find((lb: LeaderboardEntry) => lb.driver_id === driver.id);
-        if (leaderboardEntry && !flattened.efficiency_score) {
-          return { ...flattened, efficiency_score: leaderboardEntry.efficiency_score };
-        }
-        return flattened;
-      });
-
-      let overview: DriverOverview;
-      if (overviewData?.kpi_cards) {
-        const cards = overviewData.kpi_cards as any[];
-        const findVal = (kw: string) => {
-          const c = cards.find((c: any) => (c.key || c.label || '').toString().toLowerCase().includes(kw));
-          return parseFloat(c?.value) || 0;
-        };
-        overview = {
-          total_drivers: findVal('total') || driverList.length,
-          active_drivers: findVal('active') || driverList.filter((d: any) => d.status === 'ACTIVE').length,
-          avg_revenue_per_driver: findVal('revenue') || findVal('avg') || 0,
-        };
-      } else if (overviewData) {
-        overview = overviewData;
-      } else {
-        overview = {
-          total_drivers: driverList.length,
-          active_drivers: driverList.filter((d: any) => d.status === 'ACTIVE').length,
-          avg_revenue_per_driver: 0,
-        };
-      }
-
-      return { drivers, vehicles, overview, leaderboard: leaderboardEntries };
+      const drivers = (driversData.results ?? []).map(d => flattenDriver(d, leaderboardEntries));
+      return { drivers, count: driversData.count ?? drivers.length, summary: driversData.summary, vehicles, leaderboard: leaderboardEntries };
     },
   });
   const { data, refetch, dataUpdatedAt, isRefetchError } = driversQuery;
@@ -225,7 +218,14 @@ export default function Drivers() {
   const failed = loadFailed(driversQuery);
   const loading = driversQuery.isLoading && !failed;
 
+  // This page of drivers; the tiles and chips count every searched driver.
   const drivers: Driver[] = data?.drivers ?? [];
+  const summary = data?.summary;
+  const matchCount = data?.count ?? drivers.length;
+  // A delete can empty the last page: step back to the new last page.
+  useEffect(() => {
+    if (data && page > 1 && (page - 1) * PAGE_SIZE >= data.count) setPage(Math.max(1, Math.ceil(data.count / PAGE_SIZE)));
+  }, [data, page]);
 
   // Opens the Edit panel for one driver (row menu, or ?edit=<id> from the driver page).
   const openEdit = (d: Driver) => {
@@ -255,10 +255,14 @@ export default function Drivers() {
   useEffect(() => {
     const want = Number(searchParams.get('edit'));
     if (!want || !data) return;
-    const d = drivers.find(x => x.id === want);
     const next = new URLSearchParams(searchParams); next.delete('edit');
     setSearchParams(next, { replace: true });
-    if (d && !isDemo) { openEdit(d); setReturnTo(`/fleet/drivers/${d.id}`); }
+    if (isDemo) return;
+    // The driver may be on another page: fetch them when they aren't here.
+    const here = drivers.find(x => x.id === want);
+    (here ? Promise.resolve(here) : (fetchData(`api/v1/drivers/${want}/`) as Promise<Driver>).then(d => flattenDriver(d, data.leaderboard)))
+      .then(d => { openEdit(d); setReturnTo(`/fleet/drivers/${d.id}`); })
+      .catch(() => toast.error("Couldn't open that driver"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, data]);
   useEffect(() => {
@@ -266,40 +270,35 @@ export default function Drivers() {
   }, [editDriver, returnTo, navigate]);
 
   const vehicles: { id: number; plate: string; make?: string; model?: string; driver_id?: number | null }[] = data?.vehicles ?? [];
-  const overview: DriverOverview | null = data?.overview ?? null;
 
   useAutoRefresh(refetch);
 
-  const filtered = drivers.filter(d => statusFilter === 'All' || d.status === statusFilter);
+  // Filtered by the status chip on the server.
+  const filtered = drivers;
 
   // Summary figures: availability, work done, and the next compliance date.
-  const activeCount = overview?.active_drivers ?? drivers.filter(d => d.status === 'ACTIVE').length;
-  const inactiveCount = drivers.filter(d => d.status === 'INACTIVE').length;
-  const onLeaveCount = drivers.filter(d => d.status === 'ON_LEAVE').length;
-  // Completed loads from the same load ledger as History, so the tile can say
-  // how many delivered loads carry no driver (History 16 = 12 + 4). Falls back
-  // to the drivers' own trip counts if the ledger cannot be read.
-  const ledgerDelivered = ledger.data ? ledger.data.loads.filter((l: any) => DELIVERED.has(String(l.status || '').toUpperCase())) : null;
-  const noDriverLoads = ledgerDelivered ? ledgerDelivered.filter((l: any) => l.driver == null).length : 0;
-  const completedLoads = ledgerDelivered ? ledgerDelivered.length - noDriverLoads : drivers.reduce((sum, d) => sum + (Number(d.total_trips) || 0), 0);
-  // Drivers not active who still hold an open order (the same load ledger,
-  // no new request): one quiet flag in their Status cell (R7).
-  const openLoadByDriver = new Map<number, any>();
-  for (const row of ledger.data?.loads ?? []) {
-    // The load list returns the driver id; the shared ledger type omits it.
-    const l = row as typeof row & { driver?: number | null };
-    if (l.driver != null && isOpenLoad(l as any) && !openLoadByDriver.has(Number(l.driver))) openLoadByDriver.set(Number(l.driver), l);
-  }
+  const counts = summary?.status_counts;
+  const activeCount = counts?.ACTIVE ?? 0;
+  const inactiveCount = counts?.INACTIVE ?? 0;
+  const onLeaveCount = counts?.ON_LEAVE ?? 0;
+  const totalDrivers = counts?.ALL ?? 0;
+  // Completed loads from the same loads as History, so the tile can say how
+  // many delivered loads carry no driver (History 16 = 12 + 4).
+  const deliveredLoads = summary?.delivered_loads ?? 0;
+  const noDriverLoads = summary?.no_driver_loads ?? 0;
+  const completedLoads = deliveredLoads - noDriverLoads;
   const now = Date.now();
-  const withExpiry = drivers.filter(d => d.license_expiry).map(d => ({ d, t: new Date(d.license_expiry as string).getTime() }));
-  const expired = withExpiry.filter(x => x.t < now);
-  const nextRenewal = withExpiry.filter(x => x.t >= now).sort((a, b) => a.t - b.t)[0];
+  const expiredCount = summary?.expired_count ?? 0;
+  const expiredNames = summary?.expired_names ?? [];
+  const nextRenewal = summary?.next_renewal
+    ? { name: summary.next_renewal.name, t: new Date(summary.next_renewal.date).getTime() }
+    : null;
   // Renewals due in the next 90 days: a count the owner can act on (a date is not a KPI).
-  const renewSoon = withExpiry.filter(x => x.t >= now && x.t - now <= 90 * DAY_MS).length;
+  const renewSoon = summary?.renew_soon ?? 0;
   // Score and revenue columns only appear once the driver stats job has
   // produced them; a column of dashes answers nothing.
-  const hasEfficiency = drivers.some(d => (d.efficiency_score || 0) > 0);
-  const hasRevenue = drivers.some(d => Number(d.revenue_generated) > 0);
+  const hasEfficiency = !!summary?.has_efficiency || drivers.some(d => (d.efficiency_score || 0) > 0);
+  const hasRevenue = !!summary?.has_revenue;
   const colCount = 6 + (hasEfficiency ? 1 : 0) + (hasRevenue ? 1 : 0);
   const availabilityNote = [
     inactiveCount ? `${inactiveCount} inactive` : '',
@@ -327,26 +326,26 @@ export default function Drivers() {
 
       {/* Driver summary: separate tiles, same geometry as Vehicles so
           switching tabs never moves the page. Hidden when there are no drivers. */}
-      {!failed && (loading || drivers.length > 0) && (
+      {!failed && (loading || totalDrivers > 0) && (
         <KpiRow className="fleet-kpis">
           <KpiTile
             aria-label="Active drivers"
             label="Active drivers"
-            figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : <>{activeCount}<span className="tw-kpi__of"> of {overview?.total_drivers ?? drivers.length}</span></>}
+            figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : <>{activeCount}<span className="tw-kpi__of"> of {totalDrivers}</span></>}
             note={loading ? 'Loading' : availabilityNote ? availabilityNote.replace(/^./, c => c.toUpperCase()) : 'Everyone is active'}
           />
           <KpiTile
             aria-label="Completed loads"
             label="Completed loads"
-            aside={<InfoTip>Loads delivered or invoiced with a driver recorded, all time. {ledgerDelivered ? `History counts ${ledgerDelivered.length} delivered loads; ${noDriverLoads ? `${noDriverLoads} of them have no driver recorded, so they are not here.` : 'every one has a driver.'}` : 'Delivered loads with no driver are not counted here.'}</InfoTip>}
-            figure={loading || ledger.loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : completedLoads}
-            note={loading || ledger.loading ? 'Loading' : ledgerDelivered && noDriverLoads ? `${noDriverLoads} of ${ledgerDelivered.length} had no driver` : 'All time'}
+            aside={<InfoTip>Loads delivered or invoiced with a driver recorded, all time. History counts {deliveredLoads} delivered loads; {noDriverLoads ? `${noDriverLoads} of them have no driver recorded, so they are not here.` : 'every one has a driver.'}</InfoTip>}
+            figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : completedLoads}
+            note={loading ? 'Loading' : noDriverLoads ? `${noDriverLoads} of ${deliveredLoads} had no driver` : 'All time'}
           />
           {(() => {
-            const hasExpired = expired.length > 0;
+            const hasExpired = expiredCount > 0;
             const note = loading ? 'Loading'
-              : hasExpired ? `${expired.slice(0, 2).map(x => getDriverName(x.d)).join(', ')}${expired.length > 2 ? ` and ${expired.length - 2} more` : ''}`
-              : nextRenewal ? `Next: ${getDriverName(nextRenewal.d)}, in ${Math.ceil((nextRenewal.t - now) / DAY_MS)} days`
+              : hasExpired ? `${expiredNames.join(', ')}${expiredCount > 2 ? ` and ${expiredCount - 2} more` : ''}`
+              : nextRenewal ? `Next: ${nextRenewal.name}, in ${Math.ceil((nextRenewal.t - now) / DAY_MS)} days`
               : 'No expiry dates recorded';
             // Never a big zero: with nothing due in 90 days the tile names the
             // next renewal instead, and with no dates at all it is left out.
@@ -358,7 +357,7 @@ export default function Drivers() {
                   aria-label="Next licence renewal"
                   label="Next licence renewal"
                   figure={<>{days}<span className="tw-kpi__of"> days</span></>}
-                  note={`${getDriverName(nextRenewal.d)}, ${formatDate(new Date(nextRenewal.t))}`}
+                  note={`${nextRenewal.name}, ${formatDate(new Date(nextRenewal.t))}`}
                 />
               );
             }
@@ -366,7 +365,7 @@ export default function Drivers() {
               <KpiTile
                 aria-label={hasExpired ? 'Expired licences' : 'Licence renewals'}
                 label={hasExpired ? 'Expired licences' : 'Renewals in 90 days'}
-                figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : hasExpired ? expired.length : renewSoon}
+                figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : hasExpired ? expiredCount : renewSoon}
                 note={note}
                 tone={hasExpired ? 'danger' : 'neutral'}
               />
@@ -380,7 +379,7 @@ export default function Drivers() {
         <Segmented
           label="Driver status"
           value={statusFilter}
-          onChange={setStatusFilter}
+          onChange={v => { setStatusFilter(v); setPage(1); }}
           options={['All', 'ACTIVE', 'INACTIVE', 'ON_LEAVE'].map(status => ({
             value: status,
             label: status === 'All' ? 'All' : formatStatus(status),
@@ -389,9 +388,10 @@ export default function Drivers() {
       }>
         <SearchInput
           aria-label="Search drivers"
+          busy={search !== debouncedSearch || (driversQuery.isFetching && driversQuery.isPlaceholderData)}
           placeholder="Search name, licence or username"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
         />
       </Toolbar>
 
@@ -419,7 +419,7 @@ export default function Drivers() {
             {loading ? (
               <SkeletonRows rows={10} cols={colCount} />
             ) : filtered.length === 0 ? (
-              drivers.length === 0 ? (
+              totalDrivers === 0 && !debouncedSearch ? (
                 <tr>
                   <td colSpan={colCount} className="fleet-table__state-cell">
                     <div className="fleet-empty">
@@ -470,8 +470,8 @@ export default function Drivers() {
                   </td>
                   <td>
                     <StatusChip status={d.status} size="sm" />
-                    {d.status !== 'ACTIVE' && openLoadByDriver.has(d.id) && (
-                      <span className="fleet-table__sub" title={openLoadByDriver.get(d.id)?.load_number || undefined}>On an open order</span>
+                    {d.status !== 'ACTIVE' && d.open_load_number != null && (
+                      <span className="fleet-table__sub" title={d.open_load_number || undefined}>On an open order</span>
                     )}
                   </td>
                   <td className="is-numeric fleet-col-phone">
@@ -526,6 +526,8 @@ export default function Drivers() {
             })}
           </tbody>
         </table>
+        <TablePager page={page} pageSize={PAGE_SIZE} count={matchCount} onPage={setPage}
+          busy={driversQuery.isFetching && driversQuery.isPlaceholderData} />
       </div>
       )}
 

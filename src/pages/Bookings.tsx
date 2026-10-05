@@ -631,10 +631,31 @@ export default function Bookings() {
                 </div>
               ));
             })()}
-            <div className="bk-kv bk-kv--total">
-              <span className="bk-kv__label">Total</span>
-              <span className="bk-kv__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</span>
-            </div>
+            {(() => {
+              // Total excl. VAT, then VAT and the total incl. VAT (same rule
+              // as the quote: 15%, or 0% for international; backend quote_vat).
+              const vat = load.customer_price as { vat_registered: boolean; vat_label: string; vat_amount: string; total_incl_vat: string } | undefined;
+              const excl = (
+                <div className={`bk-kv${vat?.vat_registered ? '' : ' bk-kv--total'}`}>
+                  <span className="bk-kv__label">{vat?.vat_registered ? 'Total excl. VAT' : 'Total'}</span>
+                  <span className="bk-kv__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</span>
+                </div>
+              );
+              if (!vat?.vat_registered) return excl;
+              return (
+                <>
+                  {excl}
+                  <div className="bk-kv">
+                    <span className="bk-kv__label">{vat.vat_label}</span>
+                    <span className="bk-kv__value">{formatCurrency(parseFloat(vat.vat_amount))}</span>
+                  </div>
+                  <div className="bk-kv bk-kv--total">
+                    <span className="bk-kv__label">Total incl. VAT</span>
+                    <span className="bk-kv__value">{formatCurrency(parseFloat(vat.total_incl_vat))}</span>
+                  </div>
+                </>
+              );
+            })()}
             {/* What fuel was expected to cost vs what was spent (expenses on
                 this order's trips). Hidden when there's neither figure. */}
             {(() => {

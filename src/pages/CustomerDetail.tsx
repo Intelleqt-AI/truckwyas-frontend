@@ -18,7 +18,7 @@ import { FileSearch, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BlockSkeleton, TilesSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { boardStage, usePipeline } from '@/components/overview/today';
-import { useLedger, isOpen, num, todayISO, daysBetween } from '@/components/reports/data';
+import { isOpen, num, todayISO, daysBetween, type Invoice } from '@/components/reports/data';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
@@ -28,6 +28,7 @@ import { RecordId } from './recordNo';
 import { CustomerTaxFields } from '@/components/finance/CustomerTaxFields';
 import { customerTaxFrom, customerTaxPayload, customerTaxProblem } from '@/lib/finance/customerTax';
 import { countryLabel } from '@/lib/finance/validation';
+import { priceInclVat } from "@/lib/vat";
 
 type OpenLoad = {
   id: number; customer?: number | null; status: string; load_number: string; total_amount?: string;
@@ -127,14 +128,26 @@ export default function CustomerDetail() {
   // accepted or turned into a load, out of quotes actually sent. Drafts were
   // never offered, so they are neither won nor lost.
   const pipeline = usePipeline(quotes);
-  // Their open orders (R6): from the same list as Orders (shared cache), so a
+  // Their open orders (R6): the Orders list for this customer only, so a
   // stale load is visible here too, with the same rule and words.
   const loadsQuery = useQuery({
-    queryKey: ["loads-list"],
-    queryFn: () => fetchAllPages<OpenLoad>('api/v1/loads/').then(r => r.rows),
+    queryKey: ["loads-list", "customer", id],
+    queryFn: () => (fetchData(`api/v1/loads/?tab=orders&customer=${id}&page_size=100`) as Promise<{ results: OpenLoad[] }>)
+      .then(r => r.results ?? []),
+    enabled: !!id,
   });
-  // Their invoices, from the same ledger as Invoices and the Debtors report.
-  const ledger = useLedger(['invoices']);
+  // Their invoices only (same list and rules as Invoices and the Debtors
+  // report), not the whole ledger.
+  const invoicesQuery = useQuery({
+    queryKey: ["invoices", "customer", id],
+    queryFn: () => fetchAllPages<Invoice>(`api/v1/invoices/?customer=${id}`).then(r => r.rows),
+    enabled: !!id,
+  });
+  const ledger = {
+    data: invoicesQuery.data ? { invoices: invoicesQuery.data } : undefined,
+    error: invoicesQuery.error,
+    retry: () => { invoicesQuery.refetch(); },
+  };
 
   // A failed request is not a missing record: only a 404 says "not found".
   if (customerFailed && customerError?.status !== 404) return (
@@ -512,8 +525,8 @@ export default function CustomerDetail() {
                             ? <StatusChip status="EXPIRED" label="Expired" size="sm" />
                             : <StatusChip status={q.status} size="sm" />}
                     </td>
-                    <td className="is-money" title={q.total_amount || q.quote_price ? formatZAR(parseFloat(q.total_amount || q.quote_price)) : undefined}>
-                      {q.total_amount || q.quote_price ? wholeRand(parseFloat(q.total_amount || q.quote_price)) : "—"}
+                    <td className="is-money" title={q.total_amount || q.quote_price ? `${formatZAR(q.customer_price ? priceInclVat(q) : parseFloat(q.total_amount || q.quote_price))} incl. VAT` : undefined}>
+                      {q.total_amount || q.quote_price ? wholeRand(q.customer_price ? priceInclVat(q) : parseFloat(q.total_amount || q.quote_price)) : "—"}
                     </td>
                   </tr>
                 ))}
@@ -565,7 +578,7 @@ export default function CustomerDetail() {
                           <StatusChip status={l.status} size="sm" />
                           {st && <span className="bk-status-flag bk-status-flag--stale"><span className="bk-stale-long">{staleLabel(st).text}</span><span className="bk-stale-short">{staleLabel(st).text.replace(` ${new Date().getFullYear()} (`, ' (')}</span></span>}
                         </td>
-                        <td className="is-money" title={formatCurrency(parseFloat(l.total_amount || '0'))}>{formatMoneyWhole(parseFloat(l.total_amount || '0'))}</td>
+                        <td className="is-money" title={`${formatCurrency(priceInclVat(l))} incl. VAT`}>{formatMoneyWhole(priceInclVat(l))}</td>
                       </tr>
                     );
                   })}

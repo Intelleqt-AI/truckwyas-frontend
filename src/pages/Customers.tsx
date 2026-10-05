@@ -7,19 +7,19 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Building2, Plus, X } from "lucide-react";
 import SectionHeader from "@/components/layout/SectionHeader";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import LoadError, { loadFailed } from "@/components/data/LoadError";
 import { rowLink } from "@/lib/rowLink";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
 import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
-import { postData, patchData, deleteData } from "../lib/Api";
+import { fetchData, postData, patchData, deleteData } from "../lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
-import { fetchAllPages } from '@/components/insights/findings';
-import { useLedger, isOpen, num, todayISO } from '@/components/reports/data';
+import { todayISO } from '@/components/reports/data';
+import { TablePager } from '@/components/ui/TablePager';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { formatCurrency, formatMoneyWhole } from '@/lib/formatters';
 import { useAuth } from '@/lib/AuthContext';
@@ -29,6 +29,8 @@ import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import { CustomerTaxFields } from '@/components/finance/CustomerTaxFields';
 import { customerTaxFrom, customerTaxPayload, customerTaxProblem } from '@/lib/finance/customerTax';
 import type { CustomerTaxFields as CustomerTaxApiFields } from '@/lib/finance/types';
+
+const PAGE_SIZE = 20;
 
 interface Customer extends CustomerTaxApiFields {
   id: number;
@@ -46,6 +48,16 @@ interface Customer extends CustomerTaxApiFields {
   status?: string;
   is_active?: boolean;
   created_at?: string;
+  // On list rows only (server: core.services.customer_list).
+  owed_amount?: number | null;
+  overdue_amount?: number | null;
+  oldest_overdue_due?: string | null;
+}
+
+interface CustomersPage {
+  count: number;
+  results: Customer[];
+  flags?: { total_overdue: number; any_partly_late: boolean; any_inactive: boolean };
 }
 
 const PAYMENT_TERMS = [
@@ -106,6 +118,7 @@ export default function Customers() {
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
   const didMountCustomers = useRef(false);
   const [sortBy, setSortBy] = useState("name_asc");
+  const [page, setPage] = useState(1);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -136,53 +149,45 @@ export default function Customers() {
   }, [location.pathname]);
 
   const customersQuery = useQuery({
-    queryKey: ["customers-page", debouncedSearch],
+    queryKey: ["customers-page", debouncedSearch, sortBy, page],
+    // A new search, sort or page keeps the current rows on screen until its
+    // results land (no blank list while typing); the search box shows it's working.
+    placeholderData: keepPreviousData,
+    // Server-side: search, sort and page go to the API. Each row carries what
+    // the customer owes (open invoices, incl. VAT) and the overdue part, and
+    // the list carries the page-wide flags, so the invoice ledger isn't loaded.
     queryFn: () => {
-      const url = debouncedSearch
-        ? `api/v1/customers/?search=${encodeURIComponent(debouncedSearch)}`
-        : "api/v1/customers/";
-      // Same list endpoint, every page followed, so the directory is complete.
-      return fetchAllPages<Customer>(url);
+      const q = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE), sort: sortBy });
+      if (debouncedSearch) q.set("search", debouncedSearch);
+      return fetchData(`api/v1/customers/?${q}`) as Promise<CustomersPage>;
     },
   });
   const { data, refetch } = customersQuery;
   // Failed (or failing and retrying) with nothing to show: say so, never "No customers yet".
   const failed = loadFailed(customersQuery);
   const loading = customersQuery.isLoading && !failed;
-  const customers: Customer[] = data?.rows ?? [];
-  // The endpoint is paginated; count is the true total (every page is followed).
+  const customers: Customer[] = data?.results ?? [];
+  // Customers matching the search, over every page.
   const totalCustomers: number = data?.count ?? customers.length;
-
-  // Money owed per customer, from the same invoice ledger as Invoices and the
-  // Debtors report: issued, not paid, balance above zero (incl. VAT). Overdue
-  // is the part of that past its due date.
-  const ledger = useLedger(['invoices']);
   const today = todayISO();
-  const owedBy = new Map<number, { owed: number; overdue: number; oldestDue?: string }>();
-  for (const inv of ledger.data?.invoices ?? []) {
-    if (inv.customer == null || !isOpen(inv)) continue;
-    const row = owedBy.get(inv.customer) ?? { owed: 0, overdue: 0 };
-    row.owed += num(inv.balance);
-    const due = inv.due_date?.slice(0, 10);
-    if (due && due < today) {
-      row.overdue += num(inv.balance);
-      if (!row.oldestDue || due < row.oldestDue) row.oldestDue = due;
-    }
-    owedBy.set(inv.customer, row);
-  }
+  // A delete can empty the last page: step back to the new last page.
+  useEffect(() => {
+    if (data && page > 1 && (page - 1) * PAGE_SIZE >= data.count) setPage(Math.max(1, Math.ceil(data.count / PAGE_SIZE)));
+  }, [data, page]);
+  const balanceOf = (c: Customer) => ({ owed: c.owed_amount ?? 0, overdue: c.overdue_amount ?? 0, oldestDue: c.oldest_overdue_due ?? undefined });
+
   // Material (R5): a customer's overdue part is at least a tenth of everything
   // overdue and over 30 days late. Only those rows carry the small danger
   // dot; every amount itself stays in ink, so the column never reads as an alarm.
-  const totalOverdue = [...owedBy.values()].reduce((n, r) => n + r.overdue, 0);
+  const totalOverdue = data?.flags?.total_overdue ?? 0;
   const daysLate = (iso?: string) => iso ? Math.floor((Date.parse(today) - Date.parse(iso)) / 86_400_000) : 0;
   const isMaterial = (r?: { overdue: number; oldestDue?: string }) =>
     !!r && r.overdue >= 0.005 && totalOverdue > 0 && r.overdue / totalOverdue >= 0.1 && daysLate(r.oldestDue) > 30;
   // Some balance is partly late: every row then takes the two-line height.
-  const anyPartlyLate = [...owedBy.values()].some(r => r.overdue >= 0.005 && Math.abs(r.overdue - r.owed) >= 0.005);
+  const anyPartlyLate = !!data?.flags?.any_partly_late;
   // One money column: Owed, in ink. A partly late balance gets a quiet second
   // line with the overdue part; a material overdue balance gets one small dot.
   const owedCell = (row: { owed: number; overdue: number; oldestDue?: string } | undefined) => {
-    if (!ledger.data) return <span className="bk-muted">{ledger.error ? 'Not loaded' : '…'}</span>;
     const owed = row?.owed ?? 0;
     const overdue = row?.overdue ?? 0;
     if (owed < 0.005) return <span className="bk-muted">—</span>;
@@ -220,21 +225,11 @@ export default function Customers() {
 
   const customerStatus = (c: Customer) =>
     c.is_active === false || c.status === "INACTIVE" ? "INACTIVE" : "ACTIVE";
-  // Status earns a column only when some customer is inactive.
-  const anyInactive = customers.some(c => customerStatus(c) !== 'ACTIVE');
+  // Status earns a column only when some matching customer is inactive.
+  const anyInactive = !!data?.flags?.any_inactive;
 
-  const filtered = [...customers].sort((a, b) => {
-      switch (sortBy) {
-        case "name_asc":  return displayName(a).localeCompare(displayName(b));
-        case "name_desc": return displayName(b).localeCompare(displayName(a));
-        case "owed":      return (owedBy.get(b.id)?.owed ?? 0) - (owedBy.get(a.id)?.owed ?? 0);
-        case "overdue":   return (owedBy.get(b.id)?.overdue ?? 0) - (owedBy.get(a.id)?.overdue ?? 0);
-        case "city":      return (a.city || "").localeCompare(b.city || "");
-        case "newest":    return (b.created_at || "").localeCompare(a.created_at || "");
-        case "oldest":    return (a.created_at || "").localeCompare(b.created_at || "");
-        default:          return 0;
-      }
-    });
+  // Sorted and paged on the server.
+  const filtered = customers;
 
   function openEdit(c: Customer) {
     setEditCustomer(c);
@@ -305,13 +300,11 @@ export default function Customers() {
       {/* Toolbar sits above the card, as on every other list. */}
       <Toolbar
         className="cu-toolbar"
-        meta={data && !data.complete
-          ? `First ${customers.length} of ${totalCustomers} customers`
-          : `${totalCustomers} ${totalCustomers === 1 ? "customer" : "customers"}`}
+        meta={`${totalCustomers} ${totalCustomers === 1 ? "customer" : "customers"}`}
         end={
           <>
             <span id="customers-sort-label" className="cu-sort-label">Sort</span>
-            <Select value={sortBy} onValueChange={setSortBy}>
+            <Select value={sortBy} onValueChange={v => { setSortBy(v); setPage(1); }}>
               <SelectTrigger aria-labelledby="customers-sort-label" style={{ width: 'auto', minWidth: 168 }}>
                 <SelectValue />
               </SelectTrigger>
@@ -330,9 +323,10 @@ export default function Customers() {
       >
         <SearchInput
           aria-label="Search customers"
+          busy={search !== debouncedSearch || (customersQuery.isFetching && customersQuery.isPlaceholderData)}
           placeholder="Search name, company, email, city"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
         />
       </Toolbar>
 
@@ -370,7 +364,7 @@ export default function Customers() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              customers.length === 0 ? (
+              !debouncedSearch ? (
                 <tr>
                   <td colSpan={anyInactive ? 8 : 7} style={{ padding: 0, whiteSpace: "normal" }}>
                     <div className="bk-empty" style={{ padding: "48px 24px" }}>
@@ -440,7 +434,7 @@ export default function Customers() {
                   <td className="bk-col-terms bk-col-narrow">
                     {paymentTermsLabel(c.payment_terms_default).replace(/ days$/, '')}
                   </td>
-                  <td className="is-money bk-col-money cu-owed">{owedCell(owedBy.get(c.id))}</td>
+                  <td className="is-money bk-col-money cu-owed">{owedCell(balanceOf(c))}</td>
                   {anyInactive && (
                     <td>
                       <StatusChip status={status === "ACTIVE" ? "ACTIVE" : "INACTIVE"} size="sm" />
@@ -480,6 +474,8 @@ export default function Customers() {
           </tbody>
         </table>
         </div>
+        <TablePager page={page} pageSize={PAGE_SIZE} count={totalCustomers} onPage={setPage}
+          busy={customersQuery.isFetching && customersQuery.isPlaceholderData} />
       </div>
 
       <PasteImportDrawer

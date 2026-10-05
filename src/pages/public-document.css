@@ -73,6 +73,13 @@
 .pd-hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px 24px; flex-wrap: wrap; }
 .pd-hero__amount { margin-top: 4px; font-size: 32px; line-height: 40px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--pd-text); overflow-wrap: anywhere; }
 .pd-hero__line { margin-top: 4px; font-size: 14px; line-height: 20px; color: var(--pd-muted); }
+/* Price breakdown under the total: excl. VAT, VAT, total incl. VAT. */
+.pd-price { margin: 12px 0 0; display: grid; gap: 4px; max-width: 360px; font-size: 14px; line-height: 20px; }
+.pd-price > div { display: flex; justify-content: space-between; gap: 16px; }
+.pd-price dt { color: var(--pd-muted); }
+.pd-price dd { margin: 0; font-variant-numeric: tabular-nums; color: var(--pd-text); white-space: nowrap; }
+.pd-price__total { margin-top: 2px; padding-top: 6px; border-top: 1px solid var(--pd-border, rgba(127,127,127,.25)); font-weight: 600; }
+.pd-price__total dt { color: var(--pd-text); }
 
 .pd-chip {
   display: inline-flex; align-items: center;

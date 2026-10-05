@@ -1,5 +1,4 @@
 import './fleet-vehicles-brand.css';
-import { fetchAllPages } from '@/components/insights/findings';
 import { formatDate, formatMoneyWhole, formatWeight, sentenceCaseLabel } from '@/lib/formatters';
 import { SkeletonRows } from '@/components/fleet-detail/ContentSkeleton';
 import StaleDataNotice from '@/components/data/StaleDataNotice';
@@ -8,7 +7,7 @@ import { Plus, Truck as EmptyFleetIcon } from 'lucide-react';
 import { useEffect, useState, useRef, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { fleetMenuItems, useFleetPhoneHead } from '@/components/fleet-detail/fleetHead';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { fetchData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { toast } from '@/lib/toast';
@@ -30,9 +29,9 @@ import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
-import { DELIVERED } from '@/components/reports/data';
 import { capacityTonnes } from '@/components/fleet-detail/parts';
-import { isOpenLoad, staleWork, staleLabel } from '@/lib/staleWork';
+import { staleWork, staleLabel } from '@/lib/staleWork';
+import { TablePager } from '@/components/ui/TablePager';
 
 interface Vehicle {
   id: number;
@@ -134,7 +133,6 @@ const COLUMNS: { label: string; numeric?: boolean; cls?: string; tip?: ReactNode
 ];
 
 // Open orders: the ones that put a truck and a driver on the road.
-const ACTIVE_LOAD = ['ASSIGNED', 'LOADING', 'IN_TRANSIT'];
 const SOON_DAYS = 30;
 const DAY = 86_400_000;
 const daysUntil = (iso?: string | null) => {
@@ -168,77 +166,30 @@ const formatZAR = (v: number | string | null | undefined) => {
 };
 
 
-// Fetches all fleet data + derives lists. Lives in the queryFn so the result is
-// cached by TanStack Query (keyed by search below) and survives navigation —
-// revisiting the page no longer refires these requests until the cache goes stale.
-async function loadFleet(q: string) {
-  const vehiclesUrl = q
-    ? `api/v1/vehicles/?search=${encodeURIComponent(q)}`
-    : 'api/v1/vehicles/';
-  const [vehData, overviewData, insightsData, vtData, driverData, loadRows] = await Promise.all([
-    // Every page (the API returns 20 at a time), so "of 23" matches Insights.
-    fetchAllPages<Vehicle>(vehiclesUrl).then(r => r.rows),
-    fetchData('api/v1/fleet/overview/'),
-    fetchData('api/v1/fleet/intelligence/'),
-    fetchData('api/v1/vehicle-types/'),
-    fetchData('api/v1/drivers/'),
-    // Every load, so "Doing now" can name the open order for each truck.
-    fetchAllPages<any>('api/v1/loads/').then(r => r.rows).catch(() => [] as any[]),
-  ]);
+const PAGE_SIZE = 20;
 
-  const vehicles: Vehicle[] = vehData;
+/** An open order as the Vehicles list sends it (core.services.vehicle_list). */
+interface ActiveLoad {
+  id: number; load_number?: string; status: string; vehicle: number;
+  delivery_city?: string; delivery_location?: string; customer_name?: string; driver_name?: string | null;
+  delivery_date?: string | null; pickup_date?: string | null; created_at?: string | null;
+}
+type FleetRow = Vehicle & { delivered_revenue?: number; delivered_loads?: number; active_load?: ActiveLoad | null; holding_open?: boolean };
+interface FleetSummary {
+  total: number; job: number; free: number; shop: number; out_of_service: number;
+  job_no_order: number; free_on_order: number; shop_on_order: number; free_holding: number;
+  delivered: { revenue: number; loads: number; no_vehicle_revenue: number; no_vehicle_loads: number };
+}
+interface FleetPage { count: number; results: FleetRow[]; summary: FleetSummary }
 
-  const overview: FleetOverview | null = overviewData;
-
-  const insights: FleetInsight[] = Array.isArray(insightsData) ? insightsData : (insightsData?.opportunities || []);
-
-  const vtList = Array.isArray(vtData) ? vtData : (vtData?.results || []);
-  const vehicleTypes = vtList.map((vt: any) => ({ id: vt.id, name: vt.name }));
-
-  const driverList = Array.isArray(driverData) ? driverData : (driverData?.results || []);
-  const drivers = driverList.map((d: any) => {
-    const ud = d.user_details || {};
-    const fn = d.first_name || ud.first_name || '';
-    const ln = d.last_name || ud.last_name || '';
-    const name = fn && ln ? `${fn} ${ln}` : fn || ln || d.name || `Driver ${d.id}`;
-    return { id: d.id, name };
-  });
-
-  // The open order naming each truck; a current order wins over a stale one
-  // (R6 shared stale rule), so a truck is only shown as stale when every
-  // order it is on has been left open.
-  const activeLoadByVehicle: Record<number, any> = {};
-  for (const l of loadRows) {
-    if (l.vehicle == null || !ACTIVE_LOAD.includes(l.status)) continue;
-    const had = activeLoadByVehicle[l.vehicle];
-    if (!had || (staleWork(had) && !staleWork(l))) activeLoadByVehicle[l.vehicle] = l;
-  }
-
-  // Home's idle rule (overview/signals.ts idleSignal): every open load
-  // (Pending included) per truck, so the Available note counts the same
-  // trucks "holding an order left open" as Home does.
-  const openByVehicle: Record<number, { current: boolean }> = {};
-  for (const l of loadRows) {
-    if (l.vehicle == null || !isOpenLoad(l)) continue;
-    const k = Number(l.vehicle);
-    openByVehicle[k] = { current: (openByVehicle[k]?.current ?? false) || !staleWork(l) };
-  }
-
-  // Delivered work on the Reports definition (delivered, invoiced, completed,
-  // paid), from every load: the same total as History and Reports. Rows show
-  // each truck's share; loads with no vehicle recorded belong to no row.
-  const delivered = { revenue: 0, loads: 0, noVehicleRevenue: 0, noVehicleLoads: 0 };
-  const deliveredByVehicle: Record<number, { revenue: number; loads: number }> = {};
-  for (const l of loadRows) {
-    if (!DELIVERED.has(String(l.status || '').toUpperCase())) continue;
-    const amt = Number(l.total_amount) || 0;
-    delivered.revenue += amt; delivered.loads += 1;
-    if (l.vehicle == null) { delivered.noVehicleRevenue += amt; delivered.noVehicleLoads += 1; continue; }
-    const row = deliveredByVehicle[l.vehicle] ?? (deliveredByVehicle[l.vehicle] = { revenue: 0, loads: 0 });
-    row.revenue += amt; row.loads += 1;
-  }
-
-  return { vehicles, overview, insights, vehicleTypes, drivers, activeLoadByVehicle, openByVehicle, delivered, deliveredByVehicle };
+// One page of trucks, server-side: search, tile filter and the revenue
+// order go to the API. Each row carries its open order and delivered work,
+// and the list carries the tiles, so the page never loads every load.
+function loadFleet(q: string, tile: FilterKey | null, page: number): Promise<FleetPage> {
+  const params = new URLSearchParams({ view: 'fleet', page: String(page), page_size: String(PAGE_SIZE), sort: 'revenue' });
+  if (q) params.set('search', q);
+  if (tile) params.set('tile', tile);
+  return fetchData(`api/v1/vehicles/?${params}`);
 }
 
 export default function Vehicles() {
@@ -255,7 +206,7 @@ export default function Vehicles() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
-  const [sortBy, setSortBy] = useState('revenue');
+  const [page, setPage] = useState(1);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const phoneHead = useFleetPhoneHead();
@@ -277,49 +228,43 @@ export default function Vehicles() {
   } | null>(null);
 
   const fleetQuery = useQuery({
-    // search drives the vehicles fetch URL (server-side search), so it must be
-    // part of the key — the tile filter / sortBy are applied client-side in render.
-    queryKey: ['vehicles-page', debouncedSearch],
-    queryFn: () => loadFleet(debouncedSearch),
+    // Search, tile filter and page all go to the server.
+    queryKey: ['vehicles-page', debouncedSearch, tileFilter, page],
+    queryFn: () => loadFleet(debouncedSearch, tileFilter, page),
+    // A new search keeps the current rows on screen until its results land
+    // (no blank list while typing); the search box shows it's working.
+    placeholderData: keepPreviousData,
   });
   const { data, refetch, dataUpdatedAt, isRefetchError } = fleetQuery;
   // Failed (or failing and retrying) with nothing to show: say so, never "No vehicles yet".
   const failed = loadFailed(fleetQuery);
   const loading = fleetQuery.isLoading && !failed;
 
-  // Cached data drives the view; defaults keep the first render safe.
-  // vehicleTypes/drivers are fetched here too, but only AddVehicleDrawer /
-  // EditVehicleDrawer need them, and each self-fetches its own copy — nothing
-  // in this page reads data.vehicleTypes/data.drivers directly.
-  const vehicles = data?.vehicles ?? [];
+  // This page of trucks (sorted by delivered revenue on the server); the
+  // tiles count every truck matching the search.
+  const rows: FleetRow[] = data?.results ?? [];
+  const summary = data?.summary;
+  const fleetTotal = summary?.total ?? 0;
+  const matchCount = data?.count ?? rows.length;
+  // A delete can empty the last page: step back to the new last page.
+  useEffect(() => {
+    if (data && page > 1 && (page - 1) * PAGE_SIZE >= data.count) setPage(Math.max(1, Math.ceil(data.count / PAGE_SIZE)));
+  }, [data, page]);
 
   // Mirror the typed-search value into the debounced value (300ms) used by the query key.
   const handleSearchChange = (val: string) => {
     setSearch(val);
+    setPage(1);
     clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => setDebouncedSearch(val), 300);
   };
 
   useAutoRefresh(refetch);
 
-  // Filter vehicles
-  const activeLoadByVehicle = data?.activeLoadByVehicle ?? {};
-  const deliveredByVehicle = data?.deliveredByVehicle ?? {};
-  const revenueOf = (v: Vehicle) => deliveredByVehicle[v.id]?.revenue ?? 0;
-  // A status the open orders contradict: marked in use with no order, or free / in the workshop while on one.
-  // Current work only: an order left open (stale, src/lib/staleWork.ts) is
-  // not a job, so it counts neither as current work nor as a reason to be out.
-  const currentLoad = (v: Vehicle) => { const l = activeLoadByVehicle[v.id]; return l && !staleWork(l) ? l : null; };
-  const mismatch = (v: Vehicle) => (currentLoad(v) != null) !== TILE_MATCH.job(v.status);
-  const filtered = tileFilter === 'mismatch' ? vehicles.filter(mismatch) : tileFilter ? vehicles.filter(v => TILE_MATCH[tileFilter](v.status)) : vehicles;
-
-  // Sort vehicles
-  const sorted = [...filtered].sort((a, b) => {
-    if (sortBy === 'revenue') {
-      return revenueOf(b) - revenueOf(a);
-    }
-    return 0;
-  });
+  const activeLoadByVehicle: Record<number, ActiveLoad> = {};
+  for (const v of rows) if (v.active_load) activeLoadByVehicle[v.id] = v.active_load;
+  // Filtered (tile) and sorted (delivered revenue) on the server.
+  const sorted = rows;
 
   // Cartrack polls every ~20s; treat anything older than 60s as stale so a
   // vehicle that's gone offline doesn't silently look "live" forever.
@@ -345,36 +290,35 @@ export default function Vehicles() {
     <StatusChip status={v.status} size="sm" tone={staleWork(activeLoadByVehicle[v.id]) ? 'neutral' : undefined} />
   );
 
-  // Summary figures: only what changes a decision today.
-  const onJob = vehicles.filter(v => TILE_MATCH.job(v.status));
-  const free = vehicles.filter(v => TILE_MATCH.free(v.status));
-  const shop = vehicles.filter(v => TILE_MATCH.shop(v.status));
-  const hasOrder = (v: Vehicle) => currentLoad(v) != null;
-  const onJobNoOrder = onJob.filter(v => !hasOrder(v)).length;
-  const freeOnOrder = free.filter(hasOrder).length;
+  // Summary figures: only what changes a decision today (server-side, over
+  // every truck matching the search).
+  const onJobCount = summary?.job ?? 0;
+  const freeCount = summary?.free ?? 0;
+  const shopCount = summary?.shop ?? 0;
+  const onJobNoOrder = summary?.job_no_order ?? 0;
+  const freeOnOrder = summary?.free_on_order ?? 0;
   // Available but still holding an order left open (stale, src/lib/staleWork.ts):
   // not free to take a load in practice. The same count as Home's idle row
   // ("3 hold an order left open", overview/signals.ts idleSignal).
-  const openByVehicle = data?.openByVehicle ?? {};
-  const freeHolding = free.filter(v => openByVehicle[v.id] && !openByVehicle[v.id].current).length;
-  const holdingText = freeHolding === 0 ? '' : freeHolding === free.length
+  const freeHolding = summary?.free_holding ?? 0;
+  const holdingText = freeHolding === 0 ? '' : freeHolding === freeCount
     ? (freeHolding === 1 ? 'It holds an order left open' : 'All hold an order left open')
     : `${freeHolding} ${freeHolding === 1 ? 'holds' : 'hold'} an order left open`;
-  const freeNoteText = !free.length ? 'Every truck is busy' : [
+  const freeNoteText = !freeCount ? 'Every truck is busy' : [
     freeOnOrder > 0 ? `${freeOnOrder} on a current order` : '',
     holdingText,
   ].filter(Boolean).join(' · ') || 'Free to take a load';
   // Phones keep the short form ("3 left open", the rows' own words) so the
   // note never ends in an ellipsis; the full sentence is the tooltip.
-  const freeNote = freeOnOrder === 0 && freeHolding > 0 && freeHolding < free.length
+  const freeNote = freeOnOrder === 0 && freeHolding > 0 && freeHolding < freeCount
     ? <span title={freeNoteText}>{freeHolding} <span className="fleet-kpi-long">{freeHolding === 1 ? 'holds' : 'hold'} an order </span>left open</span>
     : freeNoteText;
-  const outOfService = shop.filter(v => v.status === 'OUT_OF_SERVICE').length;
-  const shopOnOrder = shop.filter(hasOrder).length;
+  const outOfService = summary?.out_of_service ?? 0;
+  const shopOnOrder = summary?.shop_on_order ?? 0;
   const mismatchCount = onJobNoOrder + freeOnOrder + shopOnOrder;
-  const deliveredRevenue = data?.delivered.revenue ?? 0;
-  const deliveredLoads = data?.delivered.loads ?? 0;
-  const noVehicleLoads = data?.delivered.noVehicleLoads ?? 0;
+  const deliveredRevenue = summary?.delivered.revenue ?? 0;
+  const deliveredLoads = summary?.delivered.loads ?? 0;
+  const noVehicleLoads = summary?.delivered.no_vehicle_loads ?? 0;
   const reviewing = tileFilter === 'mismatch';
 
   // What the truck is doing, from the open order that names it. A status that
@@ -442,7 +386,7 @@ export default function Vehicles() {
   };
 
   const tileProps = (key: TileKey) => ({
-    onClick: () => setTileFilter(f => (f === key ? null : key)),
+    onClick: () => { setTileFilter(f => (f === key ? null : key)); setPage(1); },
     className: tileFilter === key ? 'is-selected' : undefined,
     'aria-label': `${TILE_LABEL[key]}: ${tileFilter === key ? 'showing only these, press to show all' : 'show only these'}`,
   });
@@ -477,30 +421,30 @@ export default function Vehicles() {
       {/* Fleet summary: separate tiles, same geometry as Drivers so switching
           tabs never moves the page. Hidden when there is no fleet yet; the
           table's empty state carries the next action instead of zeros. */}
-      {!failed && (loading || vehicles.length > 0) && (
+      {!failed && (loading || fleetTotal > 0) && (
         <KpiRow className="fleet-kpis fleet-kpis--filter">
           <KpiTile
             {...tileProps('job')}
             label="Marked in use"
-            figure={loading ? skelFigure : <>{onJob.length}<span className="tw-kpi__of"> of {vehicles.length}</span></>}
-            note={loading ? 'Loading' : !onJob.length ? 'None marked in use' : onJobNoOrder === onJob.length ? 'None on a current order' : onJobNoOrder > 0 ? `${onJob.length - onJobNoOrder} on a current order, ${onJobNoOrder} not` : 'All on a current order'}
+            figure={loading ? skelFigure : <>{onJobCount}<span className="tw-kpi__of"> of {fleetTotal}</span></>}
+            note={loading ? 'Loading' : !onJobCount ? 'None marked in use' : onJobNoOrder === onJobCount ? 'None on a current order' : onJobNoOrder > 0 ? `${onJobCount - onJobNoOrder} on a current order, ${onJobNoOrder} not` : 'All on a current order'}
           />
           <KpiTile
             {...tileProps('free')}
             label="Available"
-            figure={loading ? skelFigure : free.length}
+            figure={loading ? skelFigure : freeCount}
             note={loading ? 'Loading' : freeNote}
           />
           <KpiTile
             {...tileProps('shop')}
             label="In maintenance"
-            figure={loading ? skelFigure : shop.length}
-            note={loading ? 'Loading' : shop.length ? (outOfService ? `${outOfService} out of service` : 'In the workshop') : 'None in the workshop'}
+            figure={loading ? skelFigure : shopCount}
+            note={loading ? 'Loading' : shopCount ? (outOfService ? `${outOfService} out of service` : 'In the workshop') : 'None in the workshop'}
           />
           <KpiTile
             aria-label="Delivered revenue"
             label="Delivered revenue"
-            aside={<InfoTip align="end">Order value of every delivered or invoiced load, all time: the same total as History and Reports. {noVehicleLoads > 0 ? `${noVehicleLoads} of them (${formatZAR(data?.delivered.noVehicleRevenue ?? 0)}) have no vehicle recorded, so they are in this total but in no row below.` : 'Every one has a vehicle, so the rows add up to it.'}</InfoTip>}
+            aside={<InfoTip align="end">Order value of every delivered or invoiced load, all time: the same total as History and Reports. {noVehicleLoads > 0 ? `${noVehicleLoads} of them (${formatZAR(summary?.delivered.no_vehicle_revenue ?? 0)}) have no vehicle recorded, so they are in this total but in no row below.` : 'Every one has a vehicle, so the rows add up to it.'}</InfoTip>}
             figure={loading ? skelFigure : formatZAR(deliveredRevenue)}
             note={loading ? 'Loading' : `${deliveredLoads} ${deliveredLoads === 1 ? 'load' : 'loads'}${noVehicleLoads ? ` · ${noVehicleLoads} no truck` : ', all time'}`}
           />
@@ -516,7 +460,7 @@ export default function Vehicles() {
             <span className="fleet-review" title={[onJobNoOrder ? `${onJobNoOrder} marked in use with no current order` : '', freeOnOrder ? `${freeOnOrder} available but on a current order` : '', shopOnOrder ? `${shopOnOrder} in maintenance but on a current order` : ''].filter(Boolean).join(', ')}>
               <i className="fleet-review__dot" aria-hidden="true" />
               <span className="fleet-review__text">{mismatchCount} don’t match their orders</span>
-              <button type="button" className="fleet-review__btn" aria-pressed={reviewing} onClick={() => setTileFilter(f => (f === 'mismatch' ? null : 'mismatch'))}>
+              <button type="button" className="fleet-review__btn" aria-pressed={reviewing} onClick={() => { setTileFilter(f => (f === 'mismatch' ? null : 'mismatch')); setPage(1); }}>
                 {reviewing ? 'Show all' : 'Review'}
               </button>
             </span>
@@ -525,14 +469,15 @@ export default function Vehicles() {
             {/* A non-empty line while loading, so the count never pushes the table down on phones. */}
             {loading ? 'Loading vehicles' : tileFilter ? (
               <>
-                {sorted.length} {tileFilter === 'mismatch' ? 'to review' : TILE_LABEL[tileFilter].toLowerCase()} of {vehicles.length}
-                {tileFilter !== 'mismatch' && <button type="button" className="fleet-toolbar__clear" onClick={() => setTileFilter(null)}>Show all</button>}
+                {matchCount} {tileFilter === 'mismatch' ? 'to review' : TILE_LABEL[tileFilter].toLowerCase()} of {fleetTotal}
+                {tileFilter !== 'mismatch' && <button type="button" className="fleet-toolbar__clear" onClick={() => { setTileFilter(null); setPage(1); }}>Show all</button>}
               </>
-            ) : `${vehicles.length} ${vehicles.length === 1 ? 'vehicle' : 'vehicles'}`}
+            ) : `${fleetTotal} ${fleetTotal === 1 ? 'vehicle' : 'vehicles'}`}
           </span>
       </>}>
         <SearchInput
           aria-label="Search vehicles"
+          busy={search !== debouncedSearch || (fleetQuery.isFetching && fleetQuery.isPlaceholderData)}
           placeholder="Search VIN, plate, make or model"
           value={search}
           onChange={e => handleSearchChange(e.target.value)}
@@ -580,7 +525,7 @@ export default function Vehicles() {
             {loading ? (
               <SkeletonRows rows={10} cols={COLUMNS.length + 1} skipFirst />
             ) : sorted.length === 0 ? (
-              vehicles.length === 0 ? (
+              fleetTotal === 0 && !debouncedSearch ? (
                 <tr>
                   <td colSpan={10} className="fleet-table__state-cell">
                     <div className="fleet-empty">
@@ -616,7 +561,7 @@ export default function Vehicles() {
               const vehicleName = [v.make, v.model].filter(Boolean).join(' ');
               const lastSeen = formatLastSeen(v);
               const tonnes = capacityTonnes(v);
-              const done = deliveredByVehicle[v.id];
+              const done = v.delivered_revenue ? { revenue: v.delivered_revenue, loads: v.delivered_loads ?? 0 } : undefined;
               return (
                 <tr
                   key={v.id}
@@ -696,6 +641,8 @@ export default function Vehicles() {
             })}
           </tbody>
         </table>
+        <TablePager page={page} pageSize={PAGE_SIZE} count={matchCount} onPage={setPage}
+          busy={fleetQuery.isFetching && fleetQuery.isPlaceholderData} />
       </div>
       )}
 

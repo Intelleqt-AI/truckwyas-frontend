@@ -19,6 +19,7 @@ import { HOME_LIVE, useAllQuotes, useAllVehicles, useHomeLedger } from "@/compon
 import { FitText } from "@/components/ui/FitText";
 import { Segmented } from "@/components/ui/Segmented";
 import { BASIS_LABEL, type RevenueBasis } from "@/components/reports/data";
+import { priceInclVat } from "@/lib/vat";
 
 const BASIS_KEY = "tw-home-revenue-basis";
 function readBasis(): RevenueBasis {
@@ -587,7 +588,7 @@ export default function Overview() {
                         <td><Link className="ov-id" to={`/bookings/quotes/${quote.id}`} onClick={(e) => e.stopPropagation()}>{quote.quote_number}</Link><div className="td-sub">{quote.customer_name || "—"}</div></td>
                         <td className="td-ellipsis td-hide-sm">{quote.customer_name || "—"}</td>
                         <td className="ov-muted td-hide-sm">{shortPlace(quote.pickup_location)} to {shortPlace(quote.delivery_location)}</td>
-                        <td className="num">{wholeRand(parseFloat(quote.total_amount || "0"))}</td>
+                        <td className="num" title="Incl. VAT">{wholeRand(priceInclVat(quote))}</td>
                         <td><StatusChip status={boardStage(quote) === 'EXPIRED' ? 'EXPIRED' : quote.status} /></td>
                       </tr>
                     ))}

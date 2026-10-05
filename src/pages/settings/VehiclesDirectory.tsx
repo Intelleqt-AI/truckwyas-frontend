@@ -2,7 +2,9 @@ import '@/pages/table-heading-roles.css';
 import { formatDistance } from '@/lib/formatters';
 import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import '@/pages/settings/settings-brand.css';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { TablePager } from "@/components/ui/TablePager";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { fetchData, deleteData } from "@/lib/Api";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
 import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
@@ -62,6 +64,8 @@ const statusColor = (s: string) =>
 const sectionStyle: React.CSSProperties = { ...settingsCardStyle, marginBottom: 0 };
 
 
+const PAGE_SIZE = 20;
+
 export function VehiclesDirectory() {
   const { user: authUser } = useAuth();
   // Shared public demo account — creation/edit/delete controls are fixed off,
@@ -79,21 +83,33 @@ export function VehiclesDirectory() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
 
+  // Server-side: search and page go to the API, so the directory reaches
+  // every vehicle, not just the first page.
+  const [page, setPage] = useState(1);
+  const [count, setCount] = useState(0);
+  const q = useDebouncedValue(search.trim());
+  const latest = useRef(0);
   const load = () => {
-    setLoading(true);
-    fetchData('api/v1/vehicles/').then((d: any) => {
-      setVehicles(Array.isArray(d) ? d : (d?.results || []));
-    }).catch(() => setVehicles([])).finally(() => setLoading(false));
+    const ticket = ++latest.current;
+    const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+    if (q) params.set('search', q);
+    fetchData(`api/v1/vehicles/?${params}`).then((d: any) => {
+      if (ticket !== latest.current) return;   // a newer search or page won
+      const rows: Vehicle[] = Array.isArray(d) ? d : (d?.results || []);
+      const total = Array.isArray(d) ? rows.length : (d?.count ?? rows.length);
+      // A delete can empty the last page: step back to the new last page.
+      if (!rows.length && page > 1 && total > 0) { setPage(Math.max(1, Math.ceil(total / PAGE_SIZE))); return; }
+      setVehicles(rows);
+      setCount(total);
+    }).catch(() => { if (ticket === latest.current) { setVehicles([]); setCount(0); } })
+      .finally(() => { if (ticket === latest.current) setLoading(false); });
   };
 
-  useEffect(() => { load(); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [page, q]);
 
-  const filtered = vehicles.filter(v =>
-    v.plate?.toLowerCase().includes(search.toLowerCase()) ||
-    v.make?.toLowerCase().includes(search.toLowerCase()) ||
-    v.model?.toLowerCase().includes(search.toLowerCase()) ||
-    v.vehicle_type_name?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Searched and paged on the server.
+  const filtered = vehicles;
 
   const handleDelete = async (id: number) => {
     await deleteData({ url: `api/v1/vehicles/${id}/` }).catch(() => {});
@@ -110,13 +126,13 @@ export function VehiclesDirectory() {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <h2 style={settingsCardTitleStyle}>
-            Vehicles <span style={{ fontWeight: 400, color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>({vehicles.length})</span>
+            Vehicles <span style={{ fontWeight: 400, color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>({count})</span>
           </h2>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <input
               className="settings-control"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
               placeholder="Search…"
               aria-label="Search vehicles"
               style={{ ...settingsInputStyle, width: 180, maxWidth: '100%' }}
@@ -227,6 +243,7 @@ export function VehiclesDirectory() {
               ))}
             </tbody>
           </table>
+          <TablePager page={page} pageSize={PAGE_SIZE} count={count} onPage={setPage} />
           </div>
         )}
       </div>

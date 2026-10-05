@@ -3,7 +3,7 @@ import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { formatDateTime } from '@/lib/formatters';
 import '@/pages/admin/admin-brand.css';
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { Loader } from '@/components/Loader';
 import PaginationControls from '@/pages/admin/PaginationControls';
@@ -73,6 +73,8 @@ export default function AuditLogPanel() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-audit-log', debouncedSearch, page],
+    // New search or page: keep the current rows until the new ones land.
+    placeholderData: keepPreviousData,
     queryFn: () =>
       fetchData(
         `api/v1/admin/audit-log/?search=${encodeURIComponent(debouncedSearch)}&page=${page}&page_size=${PAGE_SIZE}`

@@ -1,7 +1,7 @@
 import '@/pages/table-heading-roles.css';
 import '@/pages/admin/admin-brand.css';
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { Loader } from '@/components/Loader';
 import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
@@ -80,6 +80,8 @@ export default function SearchPanel() {
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['admin-search', debouncedQuery],
+    // New search or page: keep the current rows until the new ones land.
+    placeholderData: keepPreviousData,
     queryFn: () => fetchData(`api/v1/admin/search/?q=${encodeURIComponent(debouncedQuery)}`),
     enabled: debouncedQuery.length > 0,
   });

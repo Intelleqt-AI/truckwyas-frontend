@@ -132,3 +132,20 @@
 .fl-inline-add__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .fl-field-row { display: flex; gap: 8px; align-items: center; }
 .fl-field-row > :first-child { flex: 1 1 auto; min-width: 0; }
+
+/* Supplier picker (SupplierPicker): a select-style trigger that opens a
+   server-searched list. */
+.sp-combo__trigger { display: flex; text-align: left; }
+.sp-combo__trigger > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sp-combo__placeholder { color: var(--text-secondary); }
+.sp-combo__pop { width: var(--radix-popover-trigger-width); min-width: 240px; padding: 8px; }
+.sp-combo__search { width: 100%; margin-bottom: 4px; }
+.sp-combo__list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.sp-combo__opt {
+  padding: 8px 10px; min-height: 36px; box-sizing: border-box; font-size: 14px; line-height: 20px;
+  border-radius: var(--radius-chip); cursor: pointer; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sp-combo__opt.is-active { background: var(--surface-tint-active); }
+.sp-combo__opt--add { border-top: 1px solid var(--border-subtle); margin-top: 4px; color: var(--text-primary); }
+.sp-combo__note { margin: 6px 10px 2px; font-size: 13px; line-height: 20px; color: var(--text-tertiary); }

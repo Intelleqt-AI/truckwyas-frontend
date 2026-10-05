@@ -198,6 +198,7 @@ export function invalidateCapital(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: capitalKeys.all });
   qc.invalidateQueries({ queryKey: ['invoice'] });
   qc.invalidateQueries({ queryKey: ['invoices-page'] });
+  qc.invalidateQueries({ queryKey: ['invoices-summary'] });
 }
 
 export function useUpdateApplication() {

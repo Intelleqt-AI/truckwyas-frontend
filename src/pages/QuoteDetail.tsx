@@ -66,6 +66,20 @@ function toWhatsAppNumber(raw?: string): string | null {
   return digits;
 }
 
+// The WhatsApp text: price excl. VAT, the VAT and the total incl. VAT
+// (backend customer_price, the same figures as the PDF and email), then the link.
+function whatsAppQuoteMessage(quote: { customer_name?: string; quote_number?: string; total_amount?: string; customer_price?: { vat_registered: boolean; vat_label?: string; vat_rate_percent: string | null; subtotal_excl_vat: string; vat_amount: string; total_incl_vat: string } }, link: string): string {
+  const hello = `Hi${quote.customer_name ? ` ${quote.customer_name}` : ''}, here's your freight quote${quote.quote_number ? ` (${quote.quote_number})` : ''} from TruckWys.`;
+  const p = quote.customer_price;
+  const money = (v?: string) => formatCurrency(parseFloat(v || '0'));
+  const price = !p
+    ? `Price: ${money(quote.total_amount)} excl. VAT`
+    : p.vat_registered
+      ? [`Price: ${money(p.subtotal_excl_vat)} excl. VAT`, `${p.vat_label || `VAT (${Number(p.vat_rate_percent)}%)`}: ${money(p.vat_amount)}`, `Total: ${money(p.total_incl_vat)} incl. VAT`].join('\n')
+      : `Total: ${money(p.total_incl_vat)} (no VAT charged)`;
+  return `${hello}\n\n${price}\n\nView and respond: ${link}`;
+}
+
 function buildWhatsAppShareUrl(phone: string | undefined, message: string): string {
   const number = toWhatsAppNumber(phone);
   const text = encodeURIComponent(message);
@@ -350,6 +364,7 @@ export default function QuoteDetail() {
 
   // One figure system: "R 28 662,00", "55,0%", "12 000 kg", "1 234 km".
   const total = parseFloat(quote.total_amount || '0');
+  const vat = quote.customer_price as { vat_registered: boolean; vat_label: string; vat_amount: string; total_incl_vat: string } | undefined;
   const isRound = quote.trip_type === 'ROUND_TRIP';
   // Company first; the contact name only when it is a different person.
   const company = (quote.customer_company || '').trim() || quote.customer_name || '';
@@ -616,7 +631,7 @@ export default function QuoteDetail() {
         {/* RIGHT: the price (the only place the total appears), then tools. */}
         <div ref={railRef} className="quote-detail-rail">
           <section className="bk-card" aria-labelledby="qd-price-title">
-            <h2 className="bk-fact__label" id="qd-price-title" style={{ margin: 0 }}>{isRound ? 'Total, both legs' : 'Total'}</h2>
+            <h2 className="bk-fact__label" id="qd-price-title" style={{ margin: 0 }}>{isRound ? 'Total, both legs' : 'Total'}{vat?.vat_registered ? ' excl. VAT' : ''}</h2>
             <div className="qd-total">{formatMoney(total)}</div>
             <div className="qd-sub">
               {marginText && <span>{marginText} margin</span>}
@@ -661,6 +676,20 @@ export default function QuoteDetail() {
                 <div className="bk-kv"><span className="bk-kv__label">Not itemised <InfoTip label="About this line">Set on the quote; its total includes charges not broken down here.</InfoTip></span><span className="bk-kv__value">{formatMoney(notItemised)}</span></div>
               )}
             </div>
+            {/* VAT and the total incl. VAT: what the customer is sent (same
+                figures as the PDF, email and quote page; backend quote_vat). */}
+            {vat && (
+              <div className="qd-price-rows">
+                {vat.vat_registered ? (
+                  <>
+                    <div className="bk-kv"><span className="bk-kv__label">{vat.vat_label}</span><span className="bk-kv__value">{formatMoney(parseFloat(vat.vat_amount))}</span></div>
+                    <div className="bk-kv bk-kv--total"><span className="bk-kv__label">Total incl. VAT</span><span className="bk-kv__value">{formatMoney(parseFloat(vat.total_incl_vat))}</span></div>
+                  </>
+                ) : (
+                  <div className="bk-kv"><span className="bk-kv__label">VAT</span><span className="bk-kv__value bk-muted">Not charged (not VAT-registered)</span></div>
+                )}
+              </div>
+            )}
             <div className="qd-price-rows">
               {quote.valid_until && (
                 <div className="bk-kv">
@@ -716,7 +745,7 @@ export default function QuoteDetail() {
                     <a
                       href={buildWhatsAppShareUrl(
                         quote.customer_phone,
-                        `Hi${quote.customer_name ? ` ${quote.customer_name}` : ''}, here's your freight quote${quote.quote_number ? ` (${quote.quote_number})` : ''} from TruckWys: ${effectiveShareUrl}`
+                        whatsAppQuoteMessage(quote, effectiveShareUrl)
                       )}
                       target="_blank"
                       rel="noopener noreferrer"

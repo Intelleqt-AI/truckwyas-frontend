@@ -1125,6 +1125,28 @@ export default function QuoteBuilder() {
   // digits and gets rejected outright ("no more than 12 digits in total").
   // 6dp (~11cm precision) is far more than a freight quote needs.
   const round6 = (n?: number) => (n == null ? n : Math.round(n * 1e6) / 1e6);
+  // The trip leaves South Africa: the route crossed a border, or the pickup,
+  // delivery or a stop is outside SA. Known once a route or a point's country
+  // is in hand; until then the saved quote keeps whatever it had.
+  const pointCountries = [pickupCoords?.country_code, deliveryCoords?.country_code, ...stops.map(st => st.coords?.country_code)];
+  const internationalKnown = !!routeData || pointCountries.some(Boolean);
+  const isInternational = !!routeData?.cross_border
+    || (routeData?.countries || []).some(c => isForeignCountry(c))
+    || pointCountries.some(c => isForeignCountry(c));
+  // The send preview's VAT for this unsaved quote: the backend rule
+  // (core/services/quote_vat.py) on the figures on screen, so the preview
+  // matches the email the save then sends.
+  const previewVat = (() => {
+    const excl = Math.round(total * 100) / 100;
+    if (companyProfile?.vat_registered === false) return { vat_registered: false, vat_amount: 0, total_incl_vat: excl };
+    const vatAmt = isInternational ? 0 : Math.round(excl * 0.15 * 100) / 100;
+    return {
+      vat_registered: true,
+      vat_label: isInternational ? 'VAT 0% (zero-rated international transport)' : 'VAT (15%)',
+      vat_amount: vatAmt,
+      total_incl_vat: Math.round((excl + vatAmt) * 100) / 100,
+    };
+  })();
   // The route response kept on the quote for ML training, without the map
   // paths: every alternative's full point list made a long trip's snapshot
   // ~870 KB, over the backend's 200 KB cap (the save failed). The priced
@@ -1170,6 +1192,9 @@ export default function QuoteBuilder() {
     cargo_description: cargo || `${weight || 0}t ${vehicleType}`.trim(), weight: weightKg, distance,
     estimated_duration_minutes: route?.duration_min ? Math.round(route.duration_min) : (routeData?.duration_minutes || null),
     vehicle_type: vehicleType, base_rate: round2(baseCost), fuel_surcharge: round2(fuelCost), toll_charges: round2(tollCost),
+    // International transport is zero-rated for VAT (the customer sees VAT 0%):
+    // sent only when the route or a point's country says so either way.
+    ...(internationalKnown ? { is_international: isInternational } : {}),
     driver_allowance: round2(driverAllowance), additional_charges: round2(crossBorderCost + serviceCharge),
     total_amount: round2(total),
     // The markup share, as on main. An applied market price has no markup and
@@ -2126,6 +2151,7 @@ export default function QuoteBuilder() {
               delivery_location: delivery,
               pickup_date: pickupDate || null,
               total_amount: round2(total),
+              customer_price: previewVat,
               valid_until: validUntil,
             }}
             sending={saving}

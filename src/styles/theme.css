@@ -1284,6 +1284,16 @@ code, pre, kbd, samp, .tw-code {
   font: 400 14px/20px var(--font-sans);
 }
 .tw-search-wrap > .tw-search { padding-left: 34px; }
+/* New results loading: a small ring at the end of the box (the list keeps the
+   previous results meanwhile). Drawn in CSS: every svg in the wrap is the
+   leading search icon. */
+.tw-search-wrap.is-busy > .tw-search { padding-right: 34px; }
+.tw-search__busy {
+  position: absolute; right: 12px; width: 14px; height: 14px; box-sizing: border-box; pointer-events: none;
+  border: 2px solid var(--border-default); border-top-color: var(--text-secondary); border-radius: 50%;
+  animation: tw-loader-spin 0.7s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .tw-search__busy { animation-duration: 2s; } }
 .tw-search::placeholder { color: var(--text-tertiary); }
 .tw-search:hover:not(:disabled) { border-color: var(--border-control-hover); }
 .tw-search:focus { outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--focus-ring); }
@@ -1570,3 +1580,19 @@ textarea,
    renders in its own portal at z-50, behind the z-10000 dialog. Lift popper
    layers above an open dialog; outside dialogs nothing changes. */
 body:has([role="dialog"][data-state="open"]) [data-radix-popper-content-wrapper] { z-index: 10001 !important; }
+
+/* Footer under a server-paginated table (components/ui/TablePager). */
+.tw-pager {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px var(--card-pad, 20px);
+  border-top: 1px solid var(--border-subtle);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-tertiary);
+}
+.tw-pager__nav { display: flex; gap: 8px; }
+@media (max-width: 640px) { .tw-pager { padding: 12px 16px; } }

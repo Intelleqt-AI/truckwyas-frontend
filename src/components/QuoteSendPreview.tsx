@@ -15,8 +15,11 @@ export interface QuotePreviewData {
   delivery_location?: string | null;
   origin?: string | null;
   destination?: string | null;
-  /** The price the customer will see (excl. VAT). */
+  /** The price excl. VAT. */
   total_amount?: number | string | null;
+  /** VAT and total incl. VAT the customer is sent (backend quote_vat, or the
+   *  builder's own figure for an unsaved quote). */
+  customer_price?: { vat_registered: boolean; vat_label?: string; vat_amount: string | number; total_incl_vat: string | number } | null;
   valid_until?: string | null;
   pickup_date?: string | null;
 }
@@ -45,6 +48,7 @@ export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send 
   const company = (user?.company_name as string | undefined) || 'TruckWys';
   const email = quote.customer_email === undefined ? undefined : (quote.customer_email ? String(quote.customer_email) : null);
   const amount = quote.total_amount == null || quote.total_amount === '' ? null : Number(quote.total_amount);
+  const vat = quote.customer_price || null;
   const from = quote.pickup_location || quote.origin;
   const to = quote.delivery_location || quote.destination;
 
@@ -63,7 +67,18 @@ export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send 
     ...(quote.quote_number ? [{ label: 'Quote', value: quote.quote_number }] : []),
     ...(from || to ? [{ label: 'Route', value: `${from || '—'} to ${to || '—'}` }] : []),
     ...(quote.pickup_date ? [{ label: 'Collection', value: safeDate(quote.pickup_date) }] : []),
-    { label: 'Price', value: amount == null || Number.isNaN(amount) ? '—' : `${formatCurrency(amount)} excl. VAT` },
+    // As in the email: price excl. VAT, the VAT, then the total incl. VAT.
+    ...(amount == null || Number.isNaN(amount)
+      ? [{ label: 'Price', value: '—' }]
+      : !vat
+        ? [{ label: 'Price', value: `${formatCurrency(amount)} excl. VAT` }]
+        : vat.vat_registered
+          ? [
+              { label: 'Price excl. VAT', value: formatCurrency(amount) },
+              { label: vat.vat_label || 'VAT', value: formatCurrency(Number(vat.vat_amount)) },
+              { label: 'Total incl. VAT', value: <strong>{formatCurrency(Number(vat.total_incl_vat))}</strong> },
+            ]
+          : [{ label: 'Total', value: `${formatCurrency(Number(vat.total_incl_vat))} (no VAT charged)` }]),
     ...(quote.valid_until ? [{ label: 'Valid until', value: expired
       ? <>{safeDate(quote.valid_until)} <span className="send-preview__warn">· expired</span></>
       : safeDate(quote.valid_until) }] : []),

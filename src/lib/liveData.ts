@@ -19,13 +19,13 @@ export type LiveTopic =
 // every topic.
 const KEYS: Record<LiveTopic, { roots: string[]; sources: string[] }> = {
   invoice: {
-    roots: ['invoices', 'invoices-page', 'invoice', 'invoice-aging', 'invoice-payments', 'capital-eligible',
-      'capital-page', 'capital', 'eligible-invoices-risk', 'customer', 'customer-risk', 'risk-scores', 'load'],
+    roots: ['invoices', 'invoices-page', 'invoices-summary', 'invoice', 'invoice-aging', 'invoice-payments', 'capital-eligible',
+      'capital-page', 'capital', 'eligible-invoices-risk', 'customer', 'customers-page', 'customer-risk', 'risk-scores', 'load'],
     sources: ['invoices'],
   },
   payment: {
-    roots: ['invoices', 'invoices-page', 'invoice', 'invoice-aging', 'invoice-payments', 'capital-eligible',
-      'capital', 'customer', 'customer-risk', 'risk-scores'],
+    roots: ['invoices', 'invoices-page', 'invoices-summary', 'invoice', 'invoice-aging', 'invoice-payments', 'capital-eligible',
+      'capital', 'customer', 'customers-page', 'customer-risk', 'risk-scores'],
     sources: ['payments', 'invoices'],
   },
   expense: {
@@ -61,7 +61,7 @@ const KEYS: Record<LiveTopic, { roots: string[]; sources: string[] }> = {
     sources: ['customers'],
   },
   advance: {
-    roots: ['capital-eligible', 'capital-page', 'capital', 'capital-desk', 'eligible-invoices-risk', 'invoice', 'invoices-page'],
+    roots: ['capital-eligible', 'capital-page', 'capital', 'capital-desk', 'eligible-invoices-risk', 'invoice', 'invoices-page', 'invoices-summary'],
     sources: [],
   },
 };

@@ -5,7 +5,7 @@ import type { Offer } from '@/lib/capital/types';
 import "./finance-brand.css";
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDate, formatNumber, formatPercent } from "@/lib/formatters";
 import { fetchData, postData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -21,9 +21,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
 import LoadError, { loadFailed } from "@/components/data/LoadError";
 import InvoiceSendPreview, { type InvoiceMessageKind } from "@/components/finance/InvoiceSendPreview";
-import { canSendReminder, invoiceBalance, isInvoiceOverdue } from "@/lib/invoiceStatus";
+import { canSendReminder, invoiceBalance } from "@/lib/invoiceStatus";
 import { rowLink } from "@/lib/rowLink";
-import { daysBetween, isIssued, paidInvoiceTiming, todayISO, type Invoice as LedgerInvoice } from "@/components/reports/data";
+import { daysBetween, todayISO } from "@/components/reports/data";
 
 // External Fast Pay application link. The applied-state key is unchanged so
 // invoices already marked "Applied" stay marked.
@@ -73,54 +73,22 @@ function financeTabsFor(pathname: string) {
     : FINANCE_TABS;
 }
 
-// Fetches invoices + stats. Lives in the queryFn so the result is cached by
-// TanStack Query (keyed below) and survives navigation — revisiting the page
-// no longer refires these requests until the cache goes stale.
-// Filters, chip counts and the tiles must agree, so the whole ledger is loaded:
-// 100 rows a page (`?page_size=`, clamped to 100 by the API; an API that
-// ignores it returns 20 and the page count follows), the remaining pages in
-// small parallel batches to stay well under the per-user read rate limit.
-// The bound matches the Reports ledger (fetchAllPages: 1 000 rows at 20 a
-// page); a tenant above it gets a list labelled "latest N of M" and chip
-// counts from the server's status counts, so chips still match the tiles.
-// A later page that fails leaves the list partial (and labelled so), never
-// failing the whole page.
-const INVOICE_PAGE_SIZE = 100;
-const MAX_INVOICE_ROWS = 1000;
-const PAGE_BATCH = 4;
-const invoicesUrl = (page: number) =>
-  `/api/v1/invoices/?page_size=${INVOICE_PAGE_SIZE}${page > 1 ? `&page=${page}` : ""}`;
-
-async function loadInvoicesPage() {
-  const [data, statsData] = await Promise.all([
-    fetchData(invoicesUrl(1)),
-    fetchData("/api/v1/invoices/stats/").catch(() => null),
-  ]);
-  // API returns paginated {count, results} — extract results
-  const invoices = Array.isArray(data) ? [...data] : [...(data?.results || [])];
-  const pageSize = invoices.length;
-  if (!Array.isArray(data) && data?.next && typeof data?.count === "number" && pageSize > 0) {
-    const pages = Math.min(Math.ceil(data.count / pageSize), Math.ceil(MAX_INVOICE_ROWS / pageSize));
-    const rest: number[] = Array.from({ length: Math.max(0, pages - 1) }, (_, i) => i + 2);
-    let gap = false;
-    for (let b = 0; b < rest.length && !gap; b += PAGE_BATCH) {
-      const batch = await Promise.all(
-        rest.slice(b, b + PAGE_BATCH).map((n) => fetchData(invoicesUrl(n)).catch(() => null)),
-      );
-      for (const pageData of batch) {
-        if (!pageData) { gap = true; break; } // keep pages in order; stop at the first gap
-        invoices.push(...(Array.isArray(pageData) ? pageData : pageData?.results || []));
-      }
-    }
-  }
-  return {
-    invoices,
-    // The list endpoint is paginated; `count` is the tenant's full total, so
-    // the page can say how much of it the table is based on.
-    total: typeof data?.count === "number" ? data.count : invoices.length,
-    stats: statsData,
-  };
-}
+// Server-side list: one page of rows for the chosen status and search (the
+// API filters, sorts newest-first and pages), plus the summary for the tiles
+// and chip counts over every invoice (GET invoices/summary/, the same rules
+// the page used to apply to its full download).
+type InvoiceSummary = {
+  month: string; invoiced_mtd: number; collected_mtd: number; collection_rate: number;
+  invoiced_last_month: number; overdue_count: number; overdue_amount: number;
+  paid_count: number; avg_days_to_pay: number | null; draft_count: number; draft_amount: number;
+  status_counts: Record<string, number>;
+};
+const invoicesUrl = (status: string, search: string, page: number) => {
+  const q = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+  if (status !== "All") q.set("status", status);
+  if (search.trim()) q.set("search", search.trim());
+  return `/api/v1/invoices/?${q.toString()}`;
+};
 
 export default function Invoices() {
   const navigate = useNavigate();
@@ -143,19 +111,34 @@ export default function Invoices() {
   const [preview, setPreview] = useState<{ kind: InvoiceMessageKind; invoice: any } | null>(null);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
 
-  // Invoices + stats, cached across navigations.
+  // Search waits for a pause in typing before asking the server.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // One server page; the previous page stays on screen while the next loads.
   const invoicesQuery = useQuery({
-    queryKey: ["invoices-page"],
-    queryFn: loadInvoicesPage,
+    queryKey: ["invoices-page", statusFilter, debouncedSearch, page],
+    queryFn: () => fetchData(invoicesUrl(statusFilter, debouncedSearch, page)),
+    placeholderData: keepPreviousData,
   });
-  const { data: invoicesData, refetch: refetchInvoices } = invoicesQuery;
+  const summaryQuery = useQuery<InvoiceSummary>({
+    queryKey: ["invoices-summary"],
+    queryFn: () => fetchData("/api/v1/invoices/summary/"),
+  });
+  const refetchInvoices = () => { invoicesQuery.refetch(); summaryQuery.refetch(); };
   // Nothing to show because the request failed (or is failing and retrying):
   // the page says so instead of spinning or showing an empty list.
   const failed = loadFailed(invoicesQuery);
   const loading = invoicesQuery.isLoading && !failed;
-  const invoices: any[] = invoicesData?.invoices ?? [];
-  const stats: any = invoicesData?.stats ?? null;
-  const totalInvoices: number = invoicesData?.total ?? invoices.length;
+  const listData = invoicesQuery.data;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: any[] = Array.isArray(listData) ? listData : (listData?.results ?? []);
+  const matchCount: number = typeof listData?.count === "number" ? listData.count : rows.length;
+  const summary = summaryQuery.data ?? null;
+  const searching = search !== debouncedSearch || (invoicesQuery.isFetching && invoicesQuery.isPlaceholderData);
 
   // Capital-eligible invoices — fetched once, cached; silently ignored if no facility
   const { data: capitalData } = useQuery({
@@ -242,99 +225,33 @@ export default function Invoices() {
     }
   };
 
-  // Never fall back to mock data — show empty state if API returns nothing
-  const allInvoices = invoices;
+  const totalPages = Math.max(1, Math.ceil(matchCount / PAGE_SIZE));
 
-  // "Overdue" uses the one shared definition (unpaid, sent, past due),
-  // whatever the status string says, so it matches the Overdue tile.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const statusMatches = (inv: any, status: string) =>
-    status === "All" ||
-    (status === "OVERDUE" ? isInvoiceOverdue(inv) : inv.status?.toUpperCase() === status);
-
-  // Newest first by issue date (the date the list shows), then by number.
-  const byIssued = [...allInvoices].sort((a, b) =>
-    String(b.issue_date || b.created_at || "").localeCompare(String(a.issue_date || a.created_at || "")) ||
-    Number(b.id) - Number(a.id));
-
-  const filtered = byIssued.filter((inv) => {
-    const matchStatus = statusMatches(inv, statusFilter);
-    const invNumber = inv.invoice_number || inv.invoiceNumber || "";
-    const custName = inv.customer_name || inv.customerName || "";
-    const matchSearch =
-      !search ||
-      invNumber.toLowerCase().includes(search.toLowerCase()) ||
-      custName.toLowerCase().includes(search.toLowerCase());
-    return matchStatus && matchSearch;
-  });
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  // Headline figures are counted from the full invoice list with the Reports
-  // ledger rules (components/reports/data.ts), so they agree with the filter
-  // counts below and with Reports and Fast Pay. The stats endpoint is only a
-  // fallback when the list could not be loaded in full (it misses some paid
-  // invoices, e.g. INV-20260615-96400). Bases:
+  // Headline figures and chip counts come from the server's summary over every
+  // invoice (core/services/invoice_list.py: the Reports ledger rules), so they
+  // don't depend on which page or filter is showing. Bases:
   //   invoiced this month  issued invoices incl. VAT, by issue date since the 1st
   //   collected this month paid amount of those invoices
   //   overdue              unpaid balance incl. VAT, due date passed
   //   time to get paid     issue date to paid date, all paid invoices
   const now = new Date();
   const monthName = MONTH_NAMES[now.getMonth()];
-  const byStatus = stats?.by_status ?? {};
-  const draftCount: number = byStatus.DRAFT ?? 0;
-  const truncatedList = totalInvoices > invoices.length;
-  const ymNowText = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const issuedThisMonth = invoices.filter(
-    (i) => isIssued(i as LedgerInvoice) && String(i.issue_date || "").slice(0, 7) === ymNowText,
-  );
-  const invoicedMtd: number = truncatedList
-    ? (stats?.total_invoiced_mtd ?? 0)
-    : issuedThisMonth.reduce((s, i) => s + (parseFloat(i.total_amount) || 0), 0);
-  const collectedMtd: number = truncatedList
-    ? (stats?.total_collected_mtd ?? 0)
-    : issuedThisMonth.reduce((s, i) => s + (parseFloat(i.paid_amount) || 0), 0);
-  const collectionRate = invoicedMtd > 0 ? collectedMtd / invoicedMtd : 0;
+  const invoicedMtd = summary?.invoiced_mtd ?? 0;
+  const collectedMtd = summary?.collected_mtd ?? 0;
+  const collectionRate = summary?.collection_rate ?? 0;
   const monthActive = invoicedMtd > 0 || collectedMtd > 0;
-  // Overdue tile: when every invoice is loaded, count them with the same
-  // definition the filter uses so the two always agree. Only when the list is
-  // partial (the API pages at 20) does it fall back to the server's figure.
-  const overdueList = invoices.filter((i) => isInvoiceOverdue(i));
-  const overdueFromList = !truncatedList;
-  const overdueCount: number = overdueFromList ? overdueList.length : (stats?.overdue_count ?? 0);
-  const overdueAmount: number = overdueFromList
-    ? overdueList.reduce((sum, i) => sum + invoiceBalance(i), 0)
-    : (stats?.overdue_amount ?? 0);
-  // Time to get paid: the shared ledger definition (same count as "Paid").
-  const timing = paidInvoiceTiming(invoices);
-  const paidCount: number = truncatedList ? (byStatus.PAID ?? 0) : timing.count;
-  const avgDays: number | null = truncatedList
-    ? (paidCount > 0 && stats?.avg_days_to_pay ? stats.avg_days_to_pay : null)
-    : timing.avgDays;
-  const truncated = truncatedList;
-  // Drafts waiting to be sent: a decision (send them), counted from the list
-  // when it is complete, otherwise from the server's status counts.
-  const draftList = invoices.filter((i) => (i.status || "").toUpperCase() === "DRAFT");
-  const draftsCount: number = truncatedList ? draftCount : draftList.length;
+  const overdueCount = summary?.overdue_count ?? 0;
+  const overdueAmount = summary?.overdue_amount ?? 0;
+  const paidCount = summary?.paid_count ?? 0;
+  const avgDays: number | null = summary?.avg_days_to_pay ?? null;
+  const draftsCount = summary?.draft_count ?? 0;
+  const draftAmount: number | null = summary ? summary.draft_amount : null;
   // At most four tiles: the drafts tile only fills a row that has room.
   const showDrafts = draftsCount > 0 && (monthActive ? 2 : 0) + (overdueCount > 0 ? 1 : 0) + (avgDays != null ? 1 : 0) < 4;
-  const draftAmount: number | null = truncatedList
-    ? null
-    : draftList.reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
+  const totalInvoices = summary?.status_counts?.All ?? null;
 
-  // Previous-month comparison only when every invoice is loaded; a partial
-  // page would understate last month.
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const invoicedLastMonth = truncated
-    ? null
-    : allInvoices
-        .filter((i) => {
-          const d = new Date(i.issue_date || i.created_at);
-          return d >= lastMonthStart && d < monthStart;
-        })
-        .reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
+  const invoicedLastMonth = summary ? summary.invoiced_last_month : null;
   const lastMonthName = MONTH_NAMES[lastMonthStart.getMonth()];
   const invoicedDelta = (() => {
     if (invoicedLastMonth == null) return null;
@@ -343,21 +260,10 @@ export default function Invoices() {
     return `${pct >= 0 ? "+" : "−"}${formatPercent(Math.abs(pct), 0)} vs ${lastMonthName}`;
   })();
 
-  // Counts with the same rules as the filter, over the full list. Only when the
-  // list is partial (above the row bound) do they come from the server's
-  // counts, the same source the tiles then use, so chips and tiles agree.
-  const serverCount = (st: string): number | undefined => {
-    if (!stats) return undefined;
-    if (st === "All") return totalInvoices;
-    if (st === "OVERDUE") return overdueCount;
-    return typeof byStatus[st] === "number" ? byStatus[st] : undefined;
-  };
   const statusOptions = STATUSES.map((st) => ({
     value: st,
     label: st === "All" ? "All" : formatStatus(st),
-    count: loading
-      ? undefined
-      : (truncatedList ? serverCount(st) : undefined) ?? allInvoices.filter((inv) => statusMatches(inv, st)).length,
+    count: summary?.status_counts?.[st],
   }));
 
   const showStatus = (s: string) => {
@@ -413,7 +319,7 @@ export default function Invoices() {
         <div className="tw-kpi-row fin-kpi-row" aria-busy="true" aria-label="Loading totals">
           {[0, 1, 2].map((i) => <div key={i} className="tw-kpi fin-skel-tile" aria-hidden="true" />)}
         </div>
-      ) : !stats && truncatedList ? (
+      ) : summaryQuery.isError && !summary ? (
         <div className="card fin-summary">
           <div className="fin-summary__text">
             <p className="fin-summary__title">Invoice totals are unavailable</p>
@@ -443,7 +349,7 @@ export default function Invoices() {
                 label="Collected"
                 aside={<InfoTip>{`Paid amount of invoices issued in ${monthName}. Covers all invoices.`}</InfoTip>}
                 figure={<span title={formatCurrency(collectedMtd)}>{wholeRand(collectedMtd)}</span>}
-                note={invoicedMtd > 0 ? `${Math.round((truncatedList ? (stats?.collection_rate ?? 0) : collectionRate) * 100)}% of ${monthName} invoiced` : `On ${monthName} invoices`}
+                note={invoicedMtd > 0 ? `${Math.round(collectionRate * 100)}% of ${monthName} invoiced` : `On ${monthName} invoices`}
               />
           )}
 
@@ -452,9 +358,7 @@ export default function Invoices() {
               label="Overdue"
               aside={
                 <InfoTip>
-                  {overdueFromList
-                    ? "Unpaid balance incl. VAT on sent invoices past their due date, including part-paid ones. Covers all invoices. Select to show them."
-                    : "Unpaid balance incl. VAT on invoices past their due date, from the server's count of all invoices. Select to show them."}
+                  Unpaid balance incl. VAT on sent invoices past their due date, including part-paid ones. Covers all invoices. Select to show them.
                 </InfoTip>
               }
               figure={<span title={formatCurrency(overdueAmount)}>{wholeRand(overdueAmount)}</span>}
@@ -494,16 +398,7 @@ export default function Invoices() {
         aria-label="Filter invoices"
         meta={
           <>
-            {filtered.length} {filtered.length === 1 ? "invoice" : "invoices"}
-            {!loading && truncated && (
-              <>
-                {` · latest ${allInvoices.length} of ${totalInvoices}`}
-                <InfoTip align="end">
-                  This list holds the {allInvoices.length} most recent of {totalInvoices} invoices; search and filters apply to
-                  these. The figures above cover all {totalInvoices}.
-                </InfoTip>
-              </>
-            )}
+            {matchCount} {matchCount === 1 ? "invoice" : "invoices"}
           </>
         }
       >
@@ -511,6 +406,7 @@ export default function Invoices() {
           wrapClassName="inv-search"
           placeholder="Search invoices"
           aria-label="Search invoices by number or customer"
+          busy={searching}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -568,7 +464,7 @@ export default function Invoices() {
                   <td colSpan={6} style={{ padding: 0 }}>
                     {loading ? (
                       <div className="fin-empty fin-empty--compact">Loading invoices…</div>
-                    ) : allInvoices.length === 0 ? (
+                    ) : totalInvoices === 0 ? (
                       <div className="fin-empty">
                         <p className="fin-empty__title">No invoices yet</p>
                         <p className="fin-empty__body">Invoices are generated from completed bookings.</p>
@@ -720,7 +616,7 @@ export default function Invoices() {
         {totalPages > 1 && (
           <div className="fin-table-foot">
             <span>
-              {(page - 1) * PAGE_SIZE + 1} to {(page - 1) * PAGE_SIZE + rows.length} of {filtered.length}
+              {(page - 1) * PAGE_SIZE + 1} to {(page - 1) * PAGE_SIZE + rows.length} of {matchCount}
             </span>
             <div className="fin-table-foot__nav">
               <button

@@ -6,10 +6,13 @@ import { Info } from 'lucide-react';
  * behind this icon, never as body text in the card. Opens on hover, focus
  * and tap (a click pins it); Escape, a second click or a tap elsewhere closes it.
  */
-export function InfoTip({ children, label = 'How this is calculated', align = 'start' }: {
+export function InfoTip({ children, label = 'How this is calculated', align = 'start', trigger = 'hover' }: {
   children: ReactNode;
   label?: string;
   align?: 'start' | 'end';
+  /** 'click': opens and closes on click (or Enter/Space) only; hovering never
+   *  opens or closes it. 'hover' (default): hover previews, a click pins. */
+  trigger?: 'hover' | 'click';
 }) {
   // Three ways in, one way out: a mouse hover previews it, keyboard focus
   // shows it, and a click or tap pins it open; a second click, Escape, a tap
@@ -40,9 +43,9 @@ export function InfoTip({ children, label = 'How this is calculated', align = 's
       aria-label={label}
       aria-expanded={open}
       aria-describedby={open ? id : undefined}
-      onPointerEnter={(e) => { if (e.pointerType === 'mouse') setHover(true); }}
-      onPointerLeave={(e) => { if (e.pointerType === 'mouse') setHover(false); }}
-      onFocus={(e) => { if (e.currentTarget.matches(':focus-visible')) setFocused(true); }}
+      onPointerEnter={(e) => { if (trigger === 'hover' && e.pointerType === 'mouse') setHover(true); }}
+      onPointerLeave={(e) => { if (trigger === 'hover' && e.pointerType === 'mouse') setHover(false); }}
+      onFocus={(e) => { if (trigger === 'hover' && e.currentTarget.matches(':focus-visible')) setFocused(true); }}
       onBlur={() => { setFocused(false); setPinned(false); }}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (pinned) close(); else setPinned(true); }}
     >

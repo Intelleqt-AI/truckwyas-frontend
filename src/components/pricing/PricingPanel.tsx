@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronRight, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
-import { formatDate, formatMoney, formatMoneyWhole, formatNumber } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatMoneyWhole, formatNumber } from "@/lib/formatters";
 import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { MarketRange } from "./MarketRange";
 import { LikelihoodCurve } from "./LikelihoodCurve";
+import { NumberField } from "./NumberField";
 import { readPrice, rowLikelihoods } from "./evaluate";
 import type { PricingState } from "./usePricingAnalysis";
-import { BAND_LABEL, type Choice, type ChoiceKey, type FloorLine, type Likelihood, type PricingAnalysis, type SourceKind } from "./types";
+import { BAND_LABEL, type Band, type Choice, type ChoiceKey, type FloorLine, type Likelihood, type PricingAnalysis, type SourceKind } from "./types";
 import { likelihoodShort as sharedShort, MARKET_RANGE_LABEL } from "@/lib/pricing";
 import "./pricing-panel.css";
 
@@ -21,10 +22,13 @@ export interface PricingPanelProps {
   /** Inputs the builder still needs before anything can be priced. */
   needs: string[];
   customerName: string | null;
-  /** The price in the bar, excl. VAT. */
+  /** The settled price in the bar, excl. VAT (not each keystroke). */
   price: number;
   onApplyPrice: (price: number, key: ChoiceKey) => void;
   driver: { value: string; edited: boolean; onChange: (v: string) => void; onReset: () => void };
+  /** The driver allowance in the build-up (R), and a one-tap way to set it to the floor's figure. */
+  buildUpDriver?: number;
+  onAddDriverToBuildUp?: (amount: number) => void;
   includeReturn: boolean | null;
   onIncludeReturn: (v: boolean) => void;
   /** One-way trips only: a round trip already prices the way home. */
@@ -34,6 +38,10 @@ export interface PricingPanelProps {
   buildUp?: number;
   /** Where "Set yours" (operating cost per km) goes. */
   settingsHref?: string;
+  /** The reveal plays once per input key (origin, destination, vehicle, trip type, customer), never on resize. */
+  revealKey?: string;
+  /** The bar shows the build-up (its own "Use Balanced" is the next step there). */
+  atBuildUp?: boolean;
 }
 
 const SOURCE_CHIP: Record<SourceKind, { tone: StatusTone; label: string }> = {
@@ -52,55 +60,59 @@ const OUTCOME: Record<string, { tone: StatusTone; label: string }> = {
 };
 const RISK_TONE: Record<string, StatusTone> = { low: "success", medium: "warning", high: "danger", unknown: "neutral" };
 const MINUS = "−";
+const NBSP = " ";
 
-/** Whole-number percent with a true minus sign. */
-export const signedPct = (n: number) => `${n < 0 ? MINUS : ""}${Math.abs(Math.round(n))}%`;
+/** Whole-number percent with a true minus sign; half away from zero. */
+export const signedPct = (n: number) => `${n < 0 && Math.round(Math.abs(n)) !== 0 ? MINUS : ""}${Math.round(Math.abs(n))}%`;
 /** Dot shade only (the words carry the meaning): a model % shades like its band. */
 export const lkTone = (l: { level: "model"; pct: number } | { level: "rules"; band: string | null }) =>
   l.level === "model" ? (l.pct >= 60 ? "likely" : l.pct >= 35 ? "even" : "less_likely") : (l.band ?? "none");
 /** One vocabulary: "chance to win", short form "72% to win". */
 export const likelihoodShort = (l: { level: "model"; pct: number } | { level: "rules"; label: string } | null) =>
   !l ? null : l.level === "model" ? sharedShort("model", l.pct) : l.label;
-/** House style for server sentences: median not "middle", and money never
- *  splits across lines (NBSP in figures). Rates are never rewritten: a
- *  "607 km \u00d7 R 13,99/km" line must still multiply out to its amount. */
+/** Money never splits across lines: NBSP inside figures. Nothing else is rewritten. */
 const tidy = (t: string) => t
-  .replace(/\bmiddle\b/g, "median")
-  .replace(/R (?=\d)/g, "R\u00a0")
-  .replace(/(\d) (?=\d{3}\b)/g, "$1\u00a0");
-/** The likelihood level in plain words for the panel header (no "Bands" jargon). */
-const BAND_WORDS = "Likely / Even / Less likely";
-function plainShort(short: string): string {
-  const s = short.replace(/\.$/, "");
-  if (!/^bands\b/i.test(s)) return s;
-  const rest = s.replace(/^bands\s*\u00b7?\s*/i, "");
-  const cnt = rest.match(/(\d+)\s+of\s+(\d+)/);
-  if (cnt) return `Chance to win shown as ${BAND_WORDS} until you have ${cnt[2]} closed quotes (${cnt[1]} so far)`;
-  if (/outside/i.test(rest)) return "Outside the prices your model has seen, so no %";
-  if (/trains tonight/i.test(rest)) return `Chance to win shown as ${BAND_WORDS} until your model trains tonight`;
-  if (/won and lost/i.test(rest)) return `Chance to win shown as ${BAND_WORDS} until you have won and lost quotes`;
-  return `Chance to win shown as ${BAND_WORDS}`;
-}
-/** A choice within \u00b11% of the lane median is "at the lane median", never "lower half". */
-function summaryFor(c: Choice, m: PricingAnalysis["market"]): string | null {
-  if (!c.summary) return null;
-  if (m?.available && !m.isEstimate && m.median && Math.abs(c.price - m.median) / m.median <= 0.01) {
-    return c.summary.replace(/^(In|At) the (lower|upper) half of what this lane pays\.|^Around the middle of what this lane pays\./i, "At the lane median.");
-  }
-  return c.summary;
-}
-/** "12 of 40" out of a reason like "Not enough closed quotes yet: 12 of 40". */
-const closedCount = (reason: string | null | undefined) => reason?.match(/(\d+)\s+of\s+(\d+)/)?.slice(1, 3).join(" of ") ?? null;
+  .replace(/R (?=\d)/g, `R${NBSP}`)
+  .replace(/(\d) (?=\d{3}\b)/g, `$1${NBSP}`);
 /** "R 21k" for axis-style labels. */
-export const randK = (v: number) => `R ${formatNumber(Math.round(v / 1000))}k`;
+export const randK = (v: number) => `R${NBSP}${formatNumber(Math.round(v / 1000))}k`;
+const plural = (n: number, one: string, many = `${one}s`) => `${formatNumber(n)} ${n === 1 ? one : many}`;
+/** "a, b and c" */
+const listAnd = (xs: string[]) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 
 /** Steps the analysis builds, in order (also the empty-state explainer). */
 const STEPS = [
   { key: "route", title: "Route and costs", text: "Fuel, tolls, driver and your running costs." },
   { key: "floor", title: "Cost floor", text: "What the job costs you to run." },
-  { key: "market", title: "Market range", text: "What this lane has been paid." },
+  { key: "market", title: "Market", text: "What this lane has been paid." },
   { key: "choices", title: "Three prices", text: "Each with margin and chance to win." },
 ];
+
+const BANDS_WORDS = "Chance to win as Likely, Even chance or Less likely";
+/**
+ * The panel subtitle. The server sends it ready to show (`likelihood.headline`);
+ * an older server gets the same sentences built from its structured fields.
+ */
+function headlineOf(d: PricingAnalysis): string {
+  const lk = d.likelihood;
+  if (lk?.headline) return lk.headline;
+  if (!lk) return "Cost floor, market and three prices";
+  if (lk.level === "model" && lk.model) return `Chance to win from ${lk.model.basisLabel || plural(lk.model.nClosed, "closed quote")}.`;
+  const noThresholds = !lk.rules || lk.rules.likelyMax == null || lk.rules.evenMax == null;
+  if (noThresholds) return "No chance to win yet: no real quotes on this lane.";
+  const s = `${lk.short ?? ""} ${lk.reason ?? ""}`;
+  if (/outside|only seen prices/i.test(s)) return `${BANDS_WORDS}: these prices are outside what your model has learned from.`;
+  if (/trains tonight/i.test(s)) return `${BANDS_WORDS} until your model trains tonight.`;
+  const cnt = (lk.short ?? "").match(/(\d+)\s+of\s+(\d+)/) ?? (lk.reason ?? "").match(/needs (\d+)[^;]*; you have (\d+)/);
+  if (cnt) {
+    const [have, need] = /needs/.test(cnt[0]) ? [cnt[2], cnt[1]] : [cnt[1], cnt[2]];
+    return `${BANDS_WORDS}. A % needs ${need} closed quotes (you have ${have}).`;
+  }
+  return `${BANDS_WORDS}.`;
+}
+
+/** Plays once per input key, per page load: a resize or a re-render never replays it. */
+const REVEALED = new Set<string>();
 
 export function PricingPanel(p: PricingPanelProps) {
   const { state, phase } = p;
@@ -108,11 +120,10 @@ export function PricingPanel(p: PricingPanelProps) {
   const loading = state.status === "loading";
   const refreshing = state.status === "refreshing";
   const titleId = useId();
-  // The step-by-step reveal plays once, for the first result after inputs
-  // become ready; later updates swap in place.
-  const [revealed, setRevealed] = useState(false);
-  useEffect(() => { if (phase !== "ready") setRevealed(false); }, [phase]);
-  const onRevealed = useCallback(() => setRevealed(true), []);
+  const key = p.revealKey ?? "";
+  const [, force] = useState(0);
+  const revealed = REVEALED.has(key);
+  const onRevealed = useCallback(() => { REVEALED.add(key); force((n) => n + 1); }, [key]);
 
   // One polite live region: a fresh result, and crossing below the floor.
   // Never per keystroke.
@@ -125,9 +136,7 @@ export function PricingPanel(p: PricingPanelProps) {
     if (msg !== lastAnnounced.current) { lastAnnounced.current = msg; setAnnounce(msg); }
   }, [state.status, data]);
   const floor = data?.costFloor?.total ?? null;
-  const belowFloor = floor != null && p.price > 0 && p.price < floor;
-  // The builder passes the settled price (not each keystroke), so this
-  // announces once per real crossing, either way.
+  const belowFloor = floor != null && p.price > 0 && p.price < floor - 0.005;
   const wasBelow = useRef(false);
   useEffect(() => {
     if (belowFloor === wasBelow.current) return;
@@ -135,34 +144,18 @@ export function PricingPanel(p: PricingPanelProps) {
     setAnnounce(belowFloor ? "Price is below your cost floor." : "Price is above your cost floor again.");
   }, [belowFloor]);
 
-  let sub = "Cost floor, market range and three prices";
-  const lk = data?.likelihood;
-  if (lk?.level === "model" && lk.model) sub = `Chance to win from ${lk.model.basisLabel || `${formatNumber(lk.model.nClosed)} closed quotes`}`;
-  else if (lk) {
-    const cnt = closedCount(lk.reason);
-    const noBands = !!data && data.choices.length > 0 && data.choices.every((c) => !c.likelihood || (c.likelihood.level === "rules" && c.likelihood.band == null));
-    const cntShort = closedCount(lk.short) ?? cnt;
-    sub = noBands
-      ? (lk.short && !/^bands\b/i.test(lk.short) ? lk.short.replace(/\.$/, "")
-        : cntShort ? `No chance to win yet: no real quotes on this lane, and ${cntShort.split(" of ")[0]} of the ${cntShort.split(" of ")[1]} closed quotes needed for a %`
-        : lk.reason ? lk.reason.replace(/\.$/, "") : "Chance to win needs closed quotes or market data")
-      : lk.short ? plainShort(lk.short)
-        : cnt ? `Chance to win shown as ${BAND_WORDS} until you have ${cnt.split(" of ")[1]} closed quotes (${cnt.split(" of ")[0]} so far)`
-        : lk.reason ? lk.reason.replace(/\.$/, "") : `Chance to win shown as ${BAND_WORDS}`;
-  }
+  const showResult = phase === "ready" && !!data && revealed;
+  const sub = showResult ? headlineOf(data!) : "Cost floor, market and three prices";
   const busy = loading || refreshing || phase === "route";
 
   return (
     <section className="pa" aria-labelledby={titleId} aria-busy={busy || undefined}>
       <header className="pa__head">
-        {/* The status sits beside the title, out of the subtitle's width, so
-            it never re-wraps the header (no jump while typing). */}
-        <div className="pa__titlerow">
-          <h2 id={titleId} className="pa__title">Pricing analysis</h2>
-          <span className={`pa__status${busy ? "" : " is-idle"}`} aria-hidden={!busy}>
-            <i className="pa-pulse" aria-hidden="true" />{loading || phase === "route" ? "Analysing" : "Updating"}
-          </span>
-        </div>
+        <h2 id={titleId} className="pa__title">Pricing analysis</h2>
+        {/* Out of the flow: appearing never moves or re-wraps anything. */}
+        <span className={`pa__status${busy ? "" : " is-idle"}`} aria-hidden={!busy}>
+          <i className="pa-pulse" aria-hidden="true" />{loading || phase === "route" ? "Analysing" : "Updating"}
+        </span>
         <p className="pa__sub">{sub}</p>
       </header>
       <div className="pa-sr" aria-live="polite" role="status">{announce}</div>
@@ -217,21 +210,21 @@ function Explainer() {
   );
 }
 
-/** Steps advance on their own (~280 ms) while the request is in flight; once
- *  the result is in, each step says what it found, then the result shows. */
+/** Steps advance while the request is in flight; once the result is in, each
+ *  step says what it found (200 ms apart, ≤ 1 s in all), then the result shows. */
 function Analysing({ start, facts, done, onDone }: { start: number; facts: (string | null)[]; done?: boolean; onDone?: () => void }) {
   const [stage, setStage] = useState(start);
   useEffect(() => { setStage((s) => Math.max(s, start)); }, [start]);
   useEffect(() => {
     if (start === 0 && !done) return; // waiting on the route itself
-    // Until the answer is in, nothing past "Cost floor" is ticked off: a
-    // step only shows done once it has a real figure to say.
-    const id = setInterval(() => setStage((s) => Math.min(s + 1, done ? STEPS.length : 1)), done ? 220 : 280);
+    // Until the answer is in, nothing past "Route and costs" is ticked off:
+    // a step only shows done once it has a real figure to say.
+    const id = setInterval(() => setStage((s) => Math.min(s + 1, done ? STEPS.length : 1)), done ? 200 : 280);
     return () => clearInterval(id);
   }, [start, done]);
   useEffect(() => {
     if (!done || stage < STEPS.length) return;
-    const t = setTimeout(() => onDone?.(), 180);
+    const t = setTimeout(() => onDone?.(), 160);
     return () => clearTimeout(t);
   }, [done, stage, onDone]);
   return (
@@ -241,7 +234,7 @@ function Analysing({ start, facts, done, onDone }: { start: number; facts: (stri
           <li key={s.key} className={`pa-step${i < stage ? " is-done" : i === stage ? " is-active" : ""}`}>
             <span className="pa-step__num" aria-hidden="true">{i < stage ? <Check size={11} strokeWidth={2.5} /> : i + 1}</span>
             <span className="pa-step__text"><b>{s.title}</b>
-              {i === stage ? <i className="pa-skel" style={{ width: "70%" }} /> : <span>{i < stage ? (facts[i] || "Done") : "\u00a0"}</span>}
+              {i === stage || (i < stage && !facts[i]) ? <i className="pa-skel" style={{ width: "70%" }} /> : <span>{i < stage ? facts[i] : NBSP}</span>}
             </span>
           </li>
         ))}
@@ -256,10 +249,11 @@ function stepFacts(p: PricingPanelProps): (string | null)[] {
   const rec = d?.choices.find((c) => c.recommended);
   return [
     p.distanceKm ? `${formatNumber(Math.round(p.distanceKm))} km` : null,
+    // Facts from the answer only: never the build-up standing in for the floor.
     d?.costFloor ? `${formatMoneyWhole(d.costFloor.total)} floor` : null,
     !d ? null : !m || !m.available ? "No quotes on this lane yet" : m.isEstimate ? "Rough estimate only, no real quotes"
-      : `${formatNumber(m.n)} accepted quote${m.n === 1 ? "" : "s"} · median ${formatMoneyWhole(m.median)}`,
-    !d ? null : rec ? `Recommended ${formatMoneyWhole(rec.price)}` : d.choices.length ? `${d.choices.length} prices` : "Needs the missing costs first",
+      : `${plural(m.n, "accepted quote")} · median ${formatMoneyWhole(m.median)}`,
+    !d ? null : rec ? `Recommended: ${rec.label} ${formatMoneyWhole(rec.price)}` : d.choices.length ? `${d.choices.length} prices` : "Needs the missing costs first",
   ];
 }
 
@@ -268,13 +262,15 @@ function stepFacts(p: PricingPanelProps): (string | null)[] {
 function Result(p: BodyProps & { data: PricingAnalysis }) {
   const { data, state } = p;
   const failedRefresh = state.status === "error" || state.status === "offline" || state.status === "unavailable";
-  // Said elsewhere already: the top alerts, the floor, the market card or the
-  // header (outside the model's range). Each fact is shown once.
-  const HIDDEN = [...TOP_CODES, "below_floor", "below_target", "estimate_market", "estimate_fixed_cost", "no_driver_allowance", "driver_needs_input", "outside_model_range"];
+  // Said elsewhere already: the alerts, the floor row, the market section or
+  // the header. Each fact is shown once.
+  const HIDDEN = [...LANE_CODES, "below_floor", "below_target", "estimate_market", "estimate_fixed_cost", "no_driver_allowance",
+    "driver_needs_input", "outside_model_range", "estimate_below_floor", "price_sensitive", "lane_below_floor", "market_below_cost"];
   const attentionText = data.attention.map((a) => a.message);
   const notes = [...new Set(missingNotes(data.missing).concat(data.warnings
-    .filter((w) => !HIDDEN.includes(w.code) && !/payment/.test(w.code) && !attentionText.includes(w.message))
+    .filter((w) => !HIDDEN.includes(w.code) && !/payment/.test(w.code) && !/market.*(below|under)/.test(w.code) && !attentionText.includes(w.message))
     .map((w) => w.message)))];
+  const includeReturn = p.includeReturn ?? data.costFloor?.includeReturn ?? false;
   return (
     <div className={`pa__result${state.status === "refreshing" ? " is-refreshing" : ""}`}>
       {failedRefresh && (
@@ -283,9 +279,10 @@ function Result(p: BodyProps & { data: PricingAnalysis }) {
           <button type="button" className="pa-link" onClick={state.retry}>Try again</button>
         </div>
       )}
-      <TopAlerts data={data} customerName={p.customerName} />
+      <Alerts data={data} customerName={p.customerName} onOneWay={p.returnApplicable ? () => p.onIncludeReturn(false) : null} includeReturn={includeReturn} />
       {data.costFloor && <FloorSection {...p} />}
-      {data.choices.length > 0 && <ChoicesSection data={data} price={p.price} onApply={p.onApplyPrice} includeReturn={p.includeReturn ?? data.costFloor?.includeReturn ?? false} returnApplicable={p.returnApplicable} />}
+      {data.choices.length > 0 && <ChoicesSection data={data} price={p.price} onApply={p.onApplyPrice} includeReturn={includeReturn}
+        returnApplicable={p.returnApplicable} onIncludeReturn={p.onIncludeReturn} />}
       <MarketSection data={data} price={p.price} />
       <WhySection data={data} price={p.price} />
       <EvidenceSection data={data} customerName={p.customerName} />
@@ -298,37 +295,64 @@ function Result(p: BodyProps & { data: PricingAnalysis }) {
   );
 }
 
-/** Warnings that change the decision go to the top of the panel. */
-const TOP_CODES = ["market_below_floor", "lane_below_floor", "market_below_cost"];
-const isTopWarning = (code: string) => TOP_CODES.includes(code) || /market.*(below|under)/.test(code);
+// ---- alerts: at most two, lane first, then the customer
+const LANE_CODES = ["empty_return_unpaid", "market_below_floor"];
+type Alert = { key: string; tone: "danger" | "warning" | "info"; message: string; action?: ReactNode };
 
-function TopAlerts({ data, customerName }: { data: PricingAnalysis; customerName: string | null }) {
-  const risk = data.customer?.paymentRisk;
-  const riskAttention = data.attention.find((a) => /payment/.test(a.code));
-  const riskWarning = data.warnings.find((w) => /payment/.test(w.code));
-  // Lane-level notices (e.g. "This lane pays less than your full cost when the
-  // truck returns empty …"), from `attention` and the matching warnings.
-  const lane = [
-    ...data.attention.filter((a) => !/payment/.test(a.code)).map((a) => ({ key: a.code, level: a.level === "high" ? "high" : "medium", message: a.message })),
-    // "Pays less than your full cost when it returns empty" already says what
-    // the generic lane-below-cost warning would: one notice, not two.
-    ...(data.attention.some((a) => a.code === "empty_return_unpaid") ? [] : data.warnings.filter((w) => isTopWarning(w.code)))
-      .map((w) => ({ key: w.code, level: "medium", message: w.message })),
-  ].filter((x, i, all) => all.findIndex((y) => y.message === x.message) === i);
+/** "{name} accepted 2 of their last 10 quotes on this lane. Declined at R 26 600 and R 28 700."
+ *  Built only for an older server that doesn't send `price_sensitive` itself (same rule as K-4). */
+function derivedPriceSensitive(d: PricingAnalysis, name: string): string | null {
+  const c = d.customer;
+  if (!c) return null;
+  const la = c.laneAcceptance;
+  const decided = c.recentLaneQuotes.filter((q) => q.outcome === "accepted" || q.outcome === "rejected");
+  const median = d.market?.available && !d.market.isEstimate ? d.market.median : null;
+  const declinedAbove = decided.slice(0, 4).filter((q) => q.outcome === "rejected" && median != null && q.price > median).length;
+  if (!((la && la.decided >= 5 && (la.ratePct ?? 100) <= 30) || declinedAbove >= 2)) return null;
+  const declined = decided.filter((q) => q.outcome === "rejected").slice(0, 2).map((q) => q.price).sort((a, b) => b - a);
+  const won = la?.won ?? decided.filter((q) => q.outcome === "accepted").length;
+  const of = la?.decided ?? decided.length;
+  return `${name} accepted ${won} of their last ${of} quotes on this lane.${declined.length ? ` Declined at ${listAnd(declined.map((x) => formatMoneyWhole(x)))}.` : ""}`;
+}
+
+function alertsFor(data: PricingAnalysis, customerName: string | null): Alert[] {
   const name = data.customer?.name || customerName || "This client";
-  if (!risk?.attention && !riskAttention && !lane.length) return null;
-  // Payment risk is said once, here: the basis plus the deposit advice.
-  const riskText = riskAttention?.message || riskWarning?.message || [risk?.basis, "Consider a deposit."].filter(Boolean).join(". ").replace(/\.\./g, ".");
-  const riskBand = risk?.band ?? (riskAttention?.level === "high" ? "high" : "medium");
+  const lane = data.attention.find((a) => LANE_CODES.includes(a.code))
+    ?? data.warnings.find((w) => w.code === "market_below_floor" || w.code === "lane_below_floor" || w.code === "market_below_cost");
+  const risk = data.customer?.paymentRisk;
+  const riskAtt = data.attention.find((a) => /payment/.test(a.code)) ?? data.warnings.find((w) => /payment/.test(w.code));
+  const sens = data.attention.find((a) => a.code === "price_sensitive");
+  const out: Alert[] = [];
+  if (lane) out.push({ key: lane.code, tone: "warning", message: lane.message });
+  if (riskAtt || risk?.attention) {
+    const band = risk?.band ?? ((riskAtt as { level?: string })?.level === "high" ? "high" : "medium");
+    const msg = riskAtt?.message || `${name} ${risk!.label.charAt(0).toLowerCase()}${risk!.label.slice(1)}: ${risk!.basis ?? ""}`.trim();
+    out.push({ key: "payment_risk", tone: band === "high" ? "danger" : "warning", message: msg });
+  } else if (sens) {
+    out.push({ key: "price_sensitive", tone: "info", message: sens.message });
+  } else if (!data.r5) {
+    const m = derivedPriceSensitive(data, name);
+    if (m) out.push({ key: "price_sensitive", tone: "info", message: m });
+  }
+  return out;
+}
+
+function Alerts({ data, customerName, onOneWay, includeReturn }: { data: PricingAnalysis; customerName: string | null; onOneWay: (() => void) | null; includeReturn: boolean }) {
+  const alerts = alertsFor(data, customerName);
+  if (!alerts.length) return null;
   return (
     <div className="pa-alerts pa-reveal" style={{ ["--d" as string]: "0" }}>
-      {lane.map((w) => <p key={w.key} className={`pa-risk pa-risk--${w.level}`}><b>{w.message}</b></p>)}
-      {(risk?.attention || riskAttention) && (
-        <p className={`pa-risk pa-risk--${riskBand}`}>
-          {risk && !riskText.startsWith(name) && <><b>{name} {risk.label.charAt(0).toLowerCase() + risk.label.slice(1)}.</b>{" "}</>}
-          {riskText.startsWith(name) ? <><b>{riskText.split(":")[0]}{riskText.includes(":") ? ":" : ""}</b>{riskText.includes(":") ? riskText.slice(riskText.indexOf(":") + 1) : ""}</> : riskText}
-        </p>
-      )}
+      {alerts.map((a) => {
+        const i = a.message.indexOf(":");
+        return (
+          <p key={a.key} className={`pa-alert pa-alert--${a.tone}`}>
+            {i > 0 ? <><b>{tidy(a.message.slice(0, i + 1))}</b>{tidy(a.message.slice(i + 1))}</> : tidy(a.message)}
+            {a.key === "empty_return_unpaid" && onOneWay && includeReturn && (
+              <> <button type="button" className="pa-link pa-link--inline pa-link--strong" onClick={onOneWay}>Price one-way (load back)</button></>
+            )}
+          </p>
+        );
+      })}
     </div>
   );
 }
@@ -340,11 +364,11 @@ const MISSING_COPY: Record<string, string> = {
 };
 const missingNotes = (m: string[]) => m.filter((k) => k !== "route").map((k) => MISSING_COPY[k]).filter((s): s is string => !!s);
 
-function Section({ title, aside, children, delay, label, titleExtra }: { title: string; aside?: ReactNode; children: ReactNode; delay: number; label?: string; titleExtra?: ReactNode }) {
+function Section({ title, aside, children, delay, label, className }: { title: string; aside?: ReactNode; children: ReactNode; delay: number; label?: string; className?: string }) {
   return (
-    <section className="pa-sec pa-reveal" style={{ ["--d" as string]: String(delay) }} aria-label={label || title}>
+    <section className={`pa-sec pa-reveal${className ? ` ${className}` : ""}`} style={{ ["--d" as string]: String(delay) }} aria-label={label || title}>
       <div className="pa-sec__head">
-        <h3 className="pa-sec__title">{title}{titleExtra}</h3>
+        <h3 className="pa-sec__title">{title}</h3>
         {aside}
       </div>
       {children}
@@ -353,106 +377,147 @@ function Section({ title, aside, children, delay, label, titleExtra }: { title: 
 }
 
 // ---- choices
-/** A short descriptor that is true of each card by construction (prices are ordered). */
-const DESCRIPTOR: Record<ChoiceKey, string> = { safe: "Lowest price", balanced: "Middle price", stretch: "Highest margin" };
+const ORDER: ChoiceKey[] = ["safe", "balanced", "stretch"];
+const sortChoices = (cs: Choice[]) => [...cs].sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key));
 
-function ChoicesSection({ data, price, onApply, includeReturn, returnApplicable }: {
-  data: PricingAnalysis; price: number; onApply: PricingPanelProps["onApplyPrice"]; includeReturn: boolean; returnApplicable: boolean;
+function ChoicesSection({ data, price, onApply, includeReturn, returnApplicable, onIncludeReturn }: {
+  data: PricingAnalysis; price: number; onApply: PricingPanelProps["onApplyPrice"]; includeReturn: boolean; returnApplicable: boolean; onIncludeReturn: (v: boolean) => void;
 }) {
   const applied = readPrice(data, price).matchedChoice;
-  const order: ChoiceKey[] = ["safe", "balanced", "stretch"];
-  const choices = [...data.choices].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+  const choices = sortChoices(data.choices);
   const m = data.market;
-  const floorBased = !m || !m.available || m.isEstimate;
+  const realMarket = !!m && m.available && !m.isEstimate;
   // One format per row: all % or all bands.
   const lks = rowLikelihoods(data, choices);
-  // No band anywhere: the subtitle already says why; cards don't repeat it.
-  const noJudgement = choices.every((c) => { const l = lks.get(c.key); return !l || (l.level === "rules" && l.band == null); });
-  // One-way and the floor leaves the empty run home out: each card also says
-  // what its margin is if the truck comes back empty.
-  const showEmpty = !includeReturn && returnApplicable && choices.every((c) => c.marginPctIfEmptyReturn != null);
-  const returnCost = data.costFloor?.returnLegAmount ?? (data.floorWithReturn != null && data.costFloor ? data.floorWithReturn - data.costFloor.total : null);
+  const bands = choices.map((c) => { const l = lks.get(c.key); return l && l.level === "rules" ? l.band : undefined; });
+  // Every row the same band: say it once, above the rows.
+  const sameBand: Band | null = bands.every((b) => b != null && b === bands[0]) ? (bands[0] as Band) : null;
+  const target = data.targetMarginPct != null ? Math.round(data.targetMarginPct) : null;
+  const rec = choices.find((c) => c.recommended) ?? null;
+  const why = rec ? whyShort(data, rec) : null;
+  // The empty run home: one neutral line under the rows (one-way trips only).
+  const returnCost = data.costFloor?.lines.find((l) => l.key === "return_leg")?.amount
+    ?? data.costFloor?.returnLegAmount
+    ?? (data.floorWithReturn != null && data.costFloor ? data.floorWithReturn - data.costFloor.total : null);
+  const showIfEmpty = returnApplicable && !includeReturn && choices.every((c) => c.marginPctIfEmptyReturn != null);
+  const showIncluded = returnApplicable && includeReturn && returnCost != null && returnCost > 0;
   return (
-    <Section title="Choose a price" delay={1}
-      aside={data.targetMarginPct != null ? <span className="pa-sec__hint">Target margin {Math.round(data.targetMarginPct)}%</span> : null}>
-      {floorBased && (
-        <p className="pa-choices__lead">Built from your cost floor and {data.targetMarginPct != null ? `${Math.round(data.targetMarginPct)}% ` : ""}target margin.</p>
+    <Section title="Choose a price" delay={1} className="pa-choose"
+      aside={target != null ? <span className="pa-sec__hint">Your target {target}%</span> : null}>
+      {!realMarket && (
+        <p className="pa-choices__lead">Built from your cost floor{target != null ? ` and ${target}% target` : ""}, with no market data for this lane.</p>
+      )}
+      {sameBand && (
+        <p className="pa-choices__band">Chance to win: <span className={`pa-lk pa-lk--${sameBand}`}>{BAND_LABEL[sameBand]}</span> at all three prices</p>
       )}
       <div className="pa-choices" role="group" aria-label="Price choices">
-        {choices.map((c) => <ChoiceCard key={c.key} c={c} lk={noJudgement ? null : lks.get(c.key) ?? null} summary={summaryFor(c, m)}
-          emptyPct={showEmpty ? c.marginPctIfEmptyReturn : null} applied={applied === c.key} onApply={() => onApply(c.price, c.key)} />)}
+        {choices.map((c) => {
+          const l = lks.get(c.key) ?? null;
+          const shown = sameBand || !l || (l.level === "rules" && l.band == null) ? null : l;
+          return <ChoiceRow key={c.key} c={c} lk={shown} ariaLk={l && !(l.level === "rules" && l.band == null) ? l : null}
+            applied={applied === c.key} onApply={() => onApply(c.price, c.key)} />;
+        })}
       </div>
-      {showEmpty && (
-        <p className="pa-note pa-ifempty">
-          Empty return: the margin if the truck drives home empty{returnCost != null && returnCost > 0 ? <>, which costs <span className="pa-nowrap">{formatMoneyWhole(returnCost)}</span> more</> : ""}. Margins above assume a load back.
+      {rec && why && <p className="pa-whyline"><b>Why {rec.label}:</b> {tidy(why)}</p>}
+      {showIfEmpty && (
+        <p className="pa-ifempty">
+          If it returns empty{returnCost != null && returnCost > 0 ? <> (+{formatMoneyWhole(returnCost)})</> : null}:{" "}
+          {choices.map((c, i) => (
+            <span key={c.key}><span className="pa-nowrap">{c.label} {signedPct(c.marginPctIfEmptyReturn!)}</span>{i < choices.length - 1 ? " · " : ""}</span>
+          ))}
+          {" "}<button type="button" className="pa-link pa-link--inline" onClick={() => onIncludeReturn(true)}>Include in floor</button>
+        </p>
+      )}
+      {showIncluded && (
+        <p className="pa-ifempty">
+          Margins include the empty run home (+{formatMoneyWhole(returnCost!)}).{" "}
+          <button type="button" className="pa-link pa-link--inline" onClick={() => onIncludeReturn(false)}>Leave out</button>
         </p>
       )}
     </Section>
   );
 }
 
-function ChoiceCard({ c, lk, summary, emptyPct, applied, onApply }: { c: Choice; lk: Likelihood | null; summary: string | null; emptyPct: number | null; applied: boolean; onApply: () => void }) {
+/** K-14 for an older server: what the empty-return hold actually tested (the
+ *  market's top against the full cost), never "misses the target margin". */
+function emptyReturnShort(d: PricingAnalysis, rec: Choice): string | null {
+  const m = d.market;
+  if (!m?.available || m.isEstimate || m.p75 == null || rec.price <= m.p75) return null;
+  const gap = Math.round((rec.price - m.p75) / 100) * 100;
+  return `with the empty run home included, even this price is ${formatMoneyWhole(gap)} above the top of the market; price one-way if a load back is likely.`;
+}
+
+/** The recommendation in one short clause (server K-2), e.g. "at the lane median, with …". */
+function whyShort(d: PricingAnalysis, rec: Choice): string | null {
+  if (d.recommendation?.short) return d.recommendation.short;
+  if (d.r5) return null;
+  // Older server: its full sentence, minus the "Balanced is recommended:" lead
+  // and the curve-peak sentence (one "best" concept: the best of the three).
+  const r = d.recommendation?.reason;
+  if (!r) return null;
+  if (/empty run home/i.test(r)) return emptyReturnShort(d, rec);
+  let s = r.replace(new RegExp(`^${rec.label} is (recommended|kept)[:,]?\\s*`, "i"), "")
+    .replace(/\s*The model's best expected profit[^.]*\./i, "").replace(/\s*\([^)]*\)/g, "").trim();
+  if (/middle of what this lane pays/i.test(s)) {
+    const realMarket = d.market?.available && !d.market.isEstimate;
+    s = realMarket ? `in the middle half of the market, with a ${Math.round(rec.marginPct)}% margin after all costs.`
+      : `a ${Math.round(rec.marginPct)}% margin, a buffer above your ${Math.round(d.targetMarginPct ?? 0)}% target while this lane has no market data.`;
+  }
+  return s ? s.charAt(0).toLowerCase() + s.slice(1) : null;
+}
+
+function ChoiceRow({ c, lk, ariaLk, applied, onApply }: { c: Choice; lk: Likelihood | null; ariaLk: Likelihood | null; applied: boolean; onApply: () => void }) {
+  const chance = ariaLk ? (ariaLk.level === "model" ? `${Math.round(ariaLk.pct)}% chance to win` : `${ariaLk.label} to win`) : null;
   return (
     <button type="button" className={`pa-choice${c.recommended ? " is-rec" : ""}${applied ? " is-applied" : ""}`}
       aria-pressed={applied} onClick={onApply}
-      aria-label={`${c.label}${c.recommended ? ", recommended" : ""}: ${formatMoneyWhole(c.price)}, margin ${formatMoneyWhole(c.margin)} or ${signedPct(c.marginPct)}${emptyPct != null ? `, ${signedPct(emptyPct)} if it returns empty` : ""}${lk ? `, ${likelihoodShort(lk)}` : ""}.${applied ? " In your quote." : " Use this price."}`}>
-      <span className="pa-choice__top">
-        <span className="pa-choice__label">{c.label}{c.recommended && <span className="pa-choice__rec">Recommended</span>}</span>
-        <span className="pa-choice__price">{formatMoneyWhole(c.price)}</span>
+      aria-label={`${c.label}${c.recommended ? ", recommended" : ""}: ${formatMoneyWhole(c.price)}, margin ${formatMoneyWhole(c.margin)} or ${signedPct(c.marginPct)}${chance ? `, ${chance}` : ""}. ${applied ? "In your quote." : "Use this price."}`}>
+      <span className="pa-choice__label">
+        {applied && <Check size={12} strokeWidth={2.75} className="pa-choice__check" aria-hidden="true" />}
+        {c.label}{c.recommended && <span className="pa-choice__rec">Recommended</span>}
       </span>
-      <span className="pa-choice__meta">
-        <span>Margin {formatMoneyWhole(c.margin)} · {signedPct(c.marginPct)}</span>
-        {lk && <span className={`pa-lk pa-lk--${lkTone(lk)}`}>{likelihoodShort(lk)}</span>}
-      </span>
-      {emptyPct != null && (
-        <span className={`pa-choice__empty${emptyPct < 0 ? " is-neg" : ""}`}>Empty return: <b>{emptyPct > 0 ? "+" : ""}{signedPct(emptyPct)}</b></span>
-      )}
-      <span className="pa-choice__sum"><span className="pa-choice__desc">{DESCRIPTOR[c.key]}</span>{summary ? ` · ${tidy(summary)}` : ""}</span>
-      <span className="pa-choice__state" aria-hidden="true">
-        {applied ? <><Check size={12} strokeWidth={2.5} /> In your quote</> : "Use this price"}
-      </span>
+      <span className="pa-choice__price">{formatMoneyWhole(c.price)}</span>
+      <span className="pa-choice__margin">Margin {formatMoneyWhole(c.margin)} · {signedPct(c.marginPct)}</span>
+      {lk ? <span className={`pa-lk pa-lk--${lkTone(lk)}`}>{likelihoodShort(lk)}</span> : <span aria-hidden="true" />}
     </button>
   );
 }
 
-/** The one way out of a loss, the same in the panel and the bar: the
- *  recommended price when it clears the floor, else the lowest one that does. */
+/** The one way out of a loss, the same in the panel and the bar: the lowest
+ *  choice whose price clears the floor (normally Safe). */
 export function wayOutChoice(choices: Choice[], floor: number | null): Choice | null {
   if (floor == null) return null;
-  const rec = choices.find((c) => c.recommended && c.price >= floor);
-  return rec ?? [...choices].sort((a, b) => a.price - b.price).find((c) => c.price >= floor) ?? null;
+  return [...choices].sort((a, b) => a.price - b.price).find((c) => c.price >= floor) ?? null;
 }
 
-// ---- 2. cost floor: one summary row, lines inside
+// ---- cost floor: one summary row, hints, lines inside
 function FloorSection(p: BodyProps & { data: PricingAnalysis }) {
   const f = p.data.costFloor!;
   const driverLine = f.lines.find((l) => l.key === "driver_allowance");
   const driverMissing = !!driverLine?.needsInput && !p.driver.edited;
   const [expanded, setExpanded] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
-  // Missing driver figure: open straight onto it the first time it shows.
-  const openedForDriver = useRef(false);
-  useEffect(() => {
-    if (driverMissing && !openedForDriver.current) { openedForDriver.current = true; setOpen("driver_allowance"); }
-  }, [driverMissing]);
+  const [focusDriver, setFocusDriver] = useState(0);
   const includeReturn = p.includeReturn ?? f.includeReturn;
-  // With the empty return in the floor, a per-km figure must divide by the km
-  // actually driven (both legs); never "all-in" over one-way km.
   // The server's figure and label (total ÷ km actually driven), in whole rand —
-  // the same figure the reasons state ("R 31/km driven").
-  const bothLegs = f.kmDriven != null && f.distanceKm != null && f.kmDriven > f.distanceKm + 0.5;
+  // the same figure the reasons state ("R 31 per km driven").
+  const bothLegs = f.kmDriven != null && f.distanceKm != null && f.kmDriven > f.distanceKm + 0.5 && includeReturn;
   const perKmText = f.perKm == null ? null
-    : `${formatMoneyWhole(f.perKm)} ${f.perKmLabel || "per km driven"}${f.kmDriven ? ` (${formatNumber(Math.round(f.kmDriven))} km${bothLegs ? ", there and back" : ""})` : ""}, incl. fuel and tolls`;
+    : `${formatMoneyWhole(f.perKm)} ${f.perKmLabel || "per km driven"}${f.kmDriven ? ` (${formatNumber(Math.round(f.kmDriven))} km${bothLegs ? ", there and back" : ""})` : ""}`;
   const id = useId();
   const under = p.belowFloor ? f.total - p.price : 0;
-  // The way out of a loss: the lowest choice that clears the floor.
   const wayOut = p.belowFloor ? wayOutChoice(p.data.choices, f.total) : null;
+  const fixedEstimate = f.fixedCostPerKm?.source === "vehicle_default" ? f.fixedCostPerKm.value : null;
+  // The floor carries a driver allowance the build-up doesn't (e.g. a round trip's night away).
+  const floorDriver = driverLine && !driverMissing && !p.driver.edited && driverLine.amount > 0 ? driverLine.amount : 0;
+  const driverGap = floorDriver > 0 && (p.buildUpDriver ?? 0) < floorDriver - 0.5;
+  const nights = driverLine?.nights ?? null;
   return (
     <section className={`pa-sec pa-reveal pa-floor${p.belowFloor ? " is-below" : ""}`} style={{ ["--d" as string]: "1" }} aria-label="Cost floor">
       <div className="pa-floor__head">
         <h3 className="pa-sec__title">
           Cost floor
-          <InfoTip label="What the cost floor is">What this job costs you to run, before any profit: fuel, tolls, driver, border fees and your operating costs per km.</InfoTip>
+          <InfoTip label="What the cost floor is" trigger="click">What this job costs you to run, before any profit: fuel, tolls, driver allowance, border fees and your operating costs per km.</InfoTip>
         </h3>
         <button type="button" className="pa-floor__toggle" aria-expanded={expanded} aria-controls={id} onClick={() => setExpanded((v) => !v)}>
           <span className="pa-floor__fig">{formatMoneyWhole(f.total)}</span>
@@ -460,18 +525,28 @@ function FloorSection(p: BodyProps & { data: PricingAnalysis }) {
           <span className="pa-sr">{expanded ? "Hide the cost lines" : "Show the cost lines"}</span>
         </button>
       </div>
-      {f.fixedCostPerKm?.source === "vehicle_default" && (
-        <p className="pa-floor__est">
-          Operating cost is an estimate ({formatMoney(f.fixedCostPerKm.value)}/km)
-          {p.settingsHref && <> · <Link to={p.settingsHref} className="pa-link pa-link--inline">Set yours</Link></>}
+      {p.belowFloor && !p.atBuildUp && (
+        <p className="pa-hint">
+          <span className="pa-floor__under">{formatMoneyWhole(under)} below floor.</span>
+          {wayOut && <> <button type="button" className="pa-link pa-link--inline pa-link--strong" onClick={() => p.onApplyPrice(wayOut.price, wayOut.key)}>Use {wayOut.label} {formatMoneyWhole(wayOut.price)}</button></>}
         </p>
       )}
-      {(driverMissing || p.belowFloor) && (
-        <p className="pa-floor__hint">
-          {p.belowFloor && <span className="pa-floor__under">{formatMoneyWhole(under)} below floor.</span>}
-          {wayOut && <button type="button" className="pa-link pa-link--inline pa-wayout" onClick={() => p.onApplyPrice(wayOut.price, wayOut.key)}>Use {wayOut.label} {formatMoneyWhole(wayOut.price)}</button>}
-          {p.belowFloor && driverMissing ? " " : ""}
-          {driverMissing && <span>Excludes driver allowance{driverLine?.nights ? ` for ${driverLine.nights} night${driverLine.nights === 1 ? "" : "s"}` : ""}: not set yet. <button type="button" className="pa-link pa-link--inline" onClick={() => { setExpanded(true); setOpen("driver_allowance"); }}>Add one</button></span>}
+      {fixedEstimate != null && (
+        <p className="pa-hint">
+          Operating costs estimated at{" "}
+          <span className="pa-nowrap">{formatCurrency(fixedEstimate)}/km.{p.settingsHref && <> <Link to={p.settingsHref} className="pa-link pa-link--inline">Set yours</Link></>}</span>
+        </p>
+      )}
+      {driverMissing && (
+        <p className="pa-hint">
+          Excludes driver allowance <span className="pa-nowrap">{nights ? `for ${plural(nights, "night")}.` : "."}{" "}
+            <button type="button" className="pa-link pa-link--inline" onClick={() => { setExpanded(true); setOpen("driver_allowance"); setFocusDriver((n) => n + 1); }}>Add it</button></span>
+        </p>
+      )}
+      {driverGap && p.onAddDriverToBuildUp && (
+        <p className="pa-hint">
+          Includes {formatMoneyWhole(floorDriver)} driver allowance{nights ? ` (${plural(nights, "night")})` : ""} <span className="pa-nowrap">not in your build-up.{" "}
+            <button type="button" className="pa-link pa-link--inline" onClick={() => p.onAddDriverToBuildUp!(driverLine!.suggested ?? floorDriver)}>Add to build-up</button></span>
         </p>
       )}
       {expanded && (
@@ -481,6 +556,7 @@ function FloorSection(p: BodyProps & { data: PricingAnalysis }) {
             {f.lines.map((l) => (
               <FloorRow key={l.key} line={l} open={open === l.key} onToggle={() => setOpen(open === l.key ? null : l.key)}
                 driver={l.key === "driver_allowance" ? p.driver : null} missing={l.key === "driver_allowance" && driverMissing}
+                focusToken={l.key === "driver_allowance" ? focusDriver : 0}
                 fixed={l.key === "fixed_cost" ? f.fixedCostPerKm : null} />
             ))}
           </ul>
@@ -499,25 +575,30 @@ function FloorSection(p: BodyProps & { data: PricingAnalysis }) {
   );
 }
 
-function FloorRow({ line, open, onToggle, driver, fixed, missing }: {
+function FloorRow({ line, open, onToggle, driver, fixed, missing, focusToken }: {
   line: FloorLine; open: boolean; onToggle: () => void;
   driver: PricingPanelProps["driver"] | null;
   fixed: NonNullable<PricingAnalysis["costFloor"]>["fixedCostPerKm"];
-  missing: boolean;
+  missing: boolean; focusToken: number;
 }) {
   const detailId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  // "Add it": open onto the allowance field, focused with its text selected.
+  useEffect(() => {
+    if (!focusToken || !open) return;
+    const t = requestAnimationFrame(() => { inputRef.current?.focus(); inputRef.current?.select(); inputRef.current?.scrollIntoView({ block: "nearest" }); });
+    return () => cancelAnimationFrame(t);
+  }, [focusToken, open]);
   const kind: SourceKind = driver?.edited ? "user" : line.source.kind;
   const isFixedEstimate = !!fixed && fixed.source === "vehicle_default";
   const chip = missing
-    ? { tone: "warning" as StatusTone, label: "Not set · Add" }
+    ? { tone: "warning" as StatusTone, label: "Not set" }
     : line.key === "driver_allowance" && driver?.edited
       ? { tone: "neutral" as StatusTone, label: "Your figure" }
       : line.key === "driver_allowance" && line.amount === 0 && line.nights === 0
         ? { tone: "neutral" as StatusTone, label: "None due (same day)" }
         : line.key === "driver_allowance" && kind === "user"
           ? { tone: "neutral" as StatusTone, label: "Your setting" }
-        : line.key === "fuel" && kind === "official"
-          ? { tone: "success" as StatusTone, label: "Official R/L" }
           : { ...SOURCE_CHIP[kind], label: isFixedEstimate ? "Estimate" : SOURCE_CHIP[kind].label };
   return (
     <li className={`pa-line${open ? " is-open" : ""}`}>
@@ -530,15 +611,15 @@ function FloorRow({ line, open, onToggle, driver, fixed, missing }: {
       </button>
       {open && (
         <div id={detailId} className="pa-line__detail">
-          {line.key === "fuel" && kind === "official" && <p className="pa-line__basis">Official price per litre × your truck's consumption.</p>}
           {missing
-            ? <p className="pa-line__basis">{line.nights ? `${line.nights} night${line.nights === 1 ? "" : "s"} away. ` : ""}No approved allowance on record. Add the figure you pay so the floor is complete.</p>
+            ? <p className="pa-line__basis">{line.nights ? `${plural(line.nights, "night")} away. ` : ""}No approved allowance on record. Add the figure you pay so the floor is complete.</p>
             : line.basis && !(line.key === "driver_allowance" && driver?.edited) && <p className="pa-line__basis">{tidy(line.basis)}</p>}
           {driver && (
             <div className="pa-line__edit">
               <label className="pa-field">
                 <span>Allowance for this trip (R)</span>
-                <input type="number" inputMode="decimal" min={0} value={driver.value} onChange={(e) => driver.onChange(e.target.value)} />
+                <NumberField ref={inputRef} value={driver.value === "" ? null : Number(driver.value) || 0}
+                  onValue={(n) => driver.onChange(n == null ? "" : String(n))} />
               </label>
               {driver.edited && line.suggested != null && <button type="button" className="pa-link" onClick={driver.onReset}>{line.source.kind === "user" ? `Use your setting (${formatMoneyWhole(line.suggested)})` : `Use the approved figure (${formatMoneyWhole(line.suggested)})`}</button>}
             </div>
@@ -547,11 +628,11 @@ function FloorRow({ line, open, onToggle, driver, fixed, missing }: {
             <p className="pa-line__basis">Estimate from defaults. Once trips with recorded costs come in, your own figure is used instead.</p>
           )}
           {fixed && !isFixedEstimate && fixed.trips != null && fixed.trips > 0 && (
-            <p className="pa-line__basis">From {formatNumber(fixed.trips)} trips{fixed.window ? `, ${fixed.window}` : ""}.</p>
+            <p className="pa-line__basis">From {plural(fixed.trips, "trip")}{fixed.window ? `, ${fixed.window}` : ""}.</p>
           )}
           {line.details.length > 0 && !missing && (
             <dl className="pa-dl">
-              {line.details.map((d) => (<div key={d.label}><dt>{d.label}</dt><dd>{d.value}</dd></div>))}
+              {line.details.map((d) => (<div key={d.label}><dt>{d.label}</dt><dd>{tidy(d.value)}</dd></div>))}
             </dl>
           )}
           {(line.source.label || line.source.asOf || line.source.url) && !missing && (
@@ -570,51 +651,53 @@ function FloorRow({ line, open, onToggle, driver, fixed, missing }: {
   );
 }
 
-/**
- * The market source line, from the API's own label (never rebuilt from n and
- * days, which dropped "one-way", "×2" and "<vehicle> only"). A return trip
- * priced from one-way quotes says so in plain words.
- */
-function tierLine(m: NonNullable<PricingAnalysis["market"]>): string | null {
+/** The market source line as received; each part keeps together and the line
+ *  wraps only at the " · " separators (sibling text nodes). */
+function TierLine({ m }: { m: NonNullable<PricingAnalysis["market"]> }) {
   let label = m.tierLabel;
   if (!label) {
     const who = m.tier === "platform" ? "TruckWys platform" : m.tier === "company" ? "Your own quotes" : null;
-    label = [who, m.n > 0 ? `${formatNumber(m.n)} accepted quote${m.n === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ") || null;
+    label = [who, m.n > 0 ? plural(m.n, "accepted quote") : null].filter(Boolean).join(" · ") || null;
   }
   if (!label) return null;
-  // The ×2 is said on its own line (see MarketSection), not buried here.
+  // The ×2 is said on its own line (the return-trip line), not buried here.
   if (m.oneWayX2) label = label.replace(/\s*·\s*×\s?2 for a return trip/i, "");
-  if (m.vehicleSpecific && m.vehicleName && !label.toLowerCase().includes(`${m.vehicleName.toLowerCase()} only`)) {
-    label += ` · ${m.vehicleName} only`;
-  }
-  return tidy(label);
+  const parts = label.split(/\s+·\s+/);
+  return (
+    <p className="pa-tier">
+      {parts.map((pt, i) => <span key={i}><span className="pa-nowrap">{tidy(pt)}</span>{i < parts.length - 1 ? " · " : ""}</span>)}
+    </p>
+  );
 }
 
-// ---- 3. market
+// ---- market
 function MarketSection({ data, price }: { data: PricingAnalysis; price: number }) {
   const m = data.market;
   const floor = data.costFloor?.total ?? null;
   if (m?.isEstimate && m.p25 != null && m.p75 != null) {
-    // An estimate is never drawn as a market band.
+    const range = `R${NBSP}${formatNumber(Math.round(m.p25 / 1000))}–${formatNumber(Math.round(m.p75 / 1000))}k`;
+    // The server flags an estimate that sits low against the floor (K-12);
+    // an older server gets the same test here.
+    const low = data.warnings.some((w) => w.code === "estimate_below_floor") || (!data.r5 && floor != null && m.p75 < 1.1 * floor);
     return (
-      <Section title="Market range" delay={2}>
-        <p className="pa-quiet">Rough SA estimate R {formatNumber(Math.round(m.p25 / 1000))}–{formatNumber(Math.round(m.p75 / 1000))}k · no real quotes on this lane yet, not used for these prices.</p>
+      <Section title="Market" delay={2}>
+        <p className="pa-quiet">{low
+          ? <>Rough SA estimate {range} looks low against your cost floor ({formatMoneyWhole(floor)}), so it isn't used. Price from your floor.</>
+          : <>Rough SA estimate {range}. No real quotes on this lane yet, so it isn't used for these prices.</>}</p>
       </Section>
     );
   }
   return (
-    <Section title="Market range" delay={2}>
+    <Section title="Market" delay={2}>
       {!m || !m.available ? (
-        <p className="pa-quiet">No quotes on this lane yet, so the prices above work from your cost floor and target margin.</p>
+        <p className="pa-quiet">No accepted quotes on this lane yet, so the prices work from your cost floor and target.</p>
       ) : (
         <>
-          <p className="pa-tier">{tierLine(m)}</p>
-          {m.oneWayX2 && (
-            <p className="pa-tier pa-tier--x2">Return trip: {m.basisLabel ? m.basisLabel.replace(/^./, (ch) => ch.toLowerCase()) : "one-way quotes ×2"}, not real return-trip quotes</p>
-          )}
+          <TierLine m={m} />
+          {m.oneWayX2 && <p className="pa-tier pa-tier--x2">Return trip: one-way quotes ×2, not real return-trip quotes.</p>}
           <MarketRange market={m} floor={floor} price={price > 0 ? price : null} />
           <p className="pa-range-legend">
-            <span><i className="pa-key pa-key--band" aria-hidden="true" />{MARKET_RANGE_LABEL} {formatMoneyWhole(m.p25)} to {formatMoneyWhole(m.p75)}</span>
+            <span><i className="pa-key pa-key--band" aria-hidden="true" />{MARKET_RANGE_LABEL} <span className="pa-nowrap">{formatMoneyWhole(m.p25)} to {formatMoneyWhole(m.p75)}</span></span>
             <span><i className="pa-key pa-key--median" aria-hidden="true" />Median {formatMoneyWhole(m.median)}</span>
           </p>
         </>
@@ -623,22 +706,32 @@ function MarketSection({ data, price }: { data: PricingAnalysis; price: number }
   );
 }
 
-// ---- 4. why
+// ---- why these prices
+const WHY_CODES = ["cost", "market", "margin", "recommendation"];
+function whyReasons(d: PricingAnalysis): string[] {
+  if (d.reasoningItems.length) return d.reasoningItems.filter((r) => WHY_CODES.includes(r.code)).map((r) => tidy(r.text)).slice(0, 4);
+  // Older server: the cost, market and margin sentences (its first three),
+  // in the house words, then the recommendation without the curve-peak sentence.
+  const name = d.customer?.name;
+  const base = d.reasoning
+    .filter((r) => !(name && r.includes(name)) && !/^Last quote|likelihood|payment/i.test(r))
+    .slice(0, 3)
+    .map((r) => r.replace(/\(middle (R)/g, "(median $1").replace(/\bmiddle\b(?! half)/g, "median"));
+  const rec = d.recommendation?.reason?.replace(/\s*The model's best expected profit[^.]*\./i, "").trim();
+  return [...base, ...(rec && !/middle of what|empty run home/i.test(rec) ? [rec] : [])].map(tidy).slice(0, 4);
+}
 
 function WhySection({ data, price }: { data: PricingAnalysis; price: number }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   const lk = data.likelihood;
   const model = lk?.level === "model" ? lk.model : null;
-  if (!data.reasoning.length && !lk) return null;
-  const reasons = [...new Set(data.reasoning.map(tidy))];
-  const said = (t: string | null | undefined) => !!t && reasons.some((r) => r.includes(t.replace(/\.$/, "")));
-  // One best-expected-profit figure: when the reasons already state it, the
-  // chart doesn't repeat it (with a different rounding).
-  const peak = model?.best ?? model?.curve.reduce<null | { price: number; expectedProfit: number | null }>((best, c) =>
-    c.expectedProfit != null && (!best || (best.expectedProfit ?? -Infinity) < c.expectedProfit) ? c : best, null) ?? null;
-  const reasonsStateBest = reasons.some((r) => /best expected profit/i.test(r));
-  const lks = rowLikelihoods(data, data.choices);
+  const reasons = whyReasons(data);
+  if (!reasons.length && !lk) return null;
+  // "You" only when the bar price is not one of the three.
+  const atChoice = data.choices.some((c) => Math.abs(c.price - price) < 0.005);
+  const t = lk?.rules;
+  const hasBands = !model && t && t.likelyMax != null && t.evenMax != null;
   return (
     <div className="pa-sec pa-reveal" style={{ ["--d" as string]: "3" }}>
       <button type="button" className="pa-why" aria-expanded={open} aria-controls={id} onClick={() => setOpen((v) => !v)}>
@@ -650,51 +743,29 @@ function WhySection({ data, price }: { data: PricingAnalysis; price: number }) {
           {reasons.length > 0 && <ul className="pa-reasons">{reasons.map((r) => <li key={r}>{r}</li>)}</ul>}
           {model && (
             <figure className="pa-fig">
-              <LikelihoodCurve curve={model.curve} range={model.range} choices={data.choices} price={price > 0 ? price : null}
+              <LikelihoodCurve curve={model.curve} range={model.range} choices={data.choices} price={!atChoice && price > 0 ? price : null}
                 median={data.market?.available && !data.market.isEstimate ? data.market.median : null} />
-              <figcaption className="pa-fig__cap">
-                <span><i className="pa-key pa-key--line" aria-hidden="true" />Chance to win by price</span>
-                <span><i className="pa-key pa-key--you" aria-hidden="true" />Your price</span>
-              </figcaption>
-              {!reasonsStateBest && peak && peak.expectedProfit != null && (
-                <p className="pa-basis">Best expected profit ≈ {formatMoneyWhole(Math.round(peak.expectedProfit / 100) * 100)} per quote, near {formatMoneyWhole(Math.round(peak.price / 100) * 100)}.</p>
-              )}
-              <table className="pa-twin">
-                <caption className="pa-sr">Choices on the curve</caption>
-                <tbody>
-                  {data.choices.map((c) => (
-                    <tr key={c.key}><th scope="row">{c.label}</th><td>{formatMoneyWhole(c.price)}</td><td>{likelihoodShort(lks.get(c.key) ?? null) ?? "—"}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-              {!said(model.basisLabel) && <p className="pa-basis">Based on {model.basisLabel || `${formatNumber(model.nClosed)} closed quotes`}</p>}
+              <figcaption className="pa-fig__cap">Chance to win by price, from {model.basisLabel || plural(model.nClosed, "closed quote")}.</figcaption>
             </figure>
           )}
-          {!model && lk?.rules && (
+          {hasBands && (
             <>
-              {lk.rules.likelyMax != null && lk.rules.evenMax != null && (
-                <dl className="pa-dl pa-bands">
-                  <div><dt>{BAND_LABEL.likely}</dt><dd>up to {formatMoneyWhole(lk.rules.likelyMax)}</dd></div>
-                  {lk.rules.evenMax > lk.rules.likelyMax && <div><dt>{BAND_LABEL.even}</dt><dd>{formatMoneyWhole(lk.rules.likelyMax)} to {formatMoneyWhole(lk.rules.evenMax)}</dd></div>}
-                  <div><dt>{BAND_LABEL.less_likely}</dt><dd>above {formatMoneyWhole(lk.rules.evenMax)}</dd></div>
-                </dl>
-              )}
-              {lk.rules.basis.length > 0 && (
-                <>
-                  <p className="pa-basis">The bands come from:</p>
-                  <ul className="pa-reasons pa-reasons--small">{lk.rules.basis.map((b) => <li key={b}>{b}</li>)}</ul>
-                </>
-              )}
+              <dl className="pa-dl pa-bands">
+                <div><dt><span className="pa-lk pa-lk--likely">{BAND_LABEL.likely}</span></dt><dd>up to {formatMoneyWhole(t!.likelyMax)}</dd></div>
+                {t!.evenMax! > t!.likelyMax! && <div><dt><span className="pa-lk pa-lk--even">{BAND_LABEL.even}</span></dt><dd>{formatMoneyWhole(t!.likelyMax)} to {formatMoneyWhole(t!.evenMax)}</dd></div>}
+                <div><dt><span className="pa-lk pa-lk--less_likely">{BAND_LABEL.less_likely}</span></dt><dd>above {formatMoneyWhole(t!.evenMax)}</dd></div>
+              </dl>
+              {t!.basis.length > 0 && <p className="pa-basis">From: {t!.basis.map(tidy).join(" · ")}</p>}
             </>
           )}
-          {lk?.reason && !said(lk.reason) && <p className="pa-basis">{lk.reason}</p>}
+          {!model && !hasBands && <p className="pa-basis">Not enough data to judge the chance to win yet.</p>}
         </div>
       )}
     </div>
   );
 }
 
-// ---- 5. customer & lane evidence
+// ---- customer
 function EvidenceSection({ data, customerName }: { data: PricingAnalysis; customerName: string | null }) {
   const c = data.customer;
   // A return trip compares against one-way history: say so on the table.
@@ -702,13 +773,19 @@ function EvidenceSection({ data, customerName }: { data: PricingAnalysis; custom
   if (!c) return null;
   const name = c.name || customerName || "This client";
   const acc = c.acceptance;
-  const quotes = c.recentLaneQuotes.filter((q) => q.outcome !== "draft");
+  const la = c.laneAcceptance;
+  const quotes = c.recentLaneQuotes.filter((q) => q.outcome !== "draft").slice(0, 5);
+  // Payment advice is said once, in the alert; here only the chip (and the
+  // basis when there is no alert).
+  const inAlert = alertsFor(data, customerName).some((a) => a.key === "payment_risk");
   return (
     <Section title={name} delay={4} label="Client history">
       <div className="pa-facts">
         <div className="pa-fact">
-          <span className="pa-fact__k">Accepts{acc?.scope === "lane" ? " (this lane)" : " (all lanes)"}</span>
-          <span className="pa-fact__v">{acc && acc.decided > 0 ? `${acc.won} of ${acc.decided} quotes` : "No decided quotes yet"}</span>
+          <span className="pa-fact__k">Accepts</span>
+          <span className="pa-fact__v">{acc && acc.decided > 0
+            ? <><span className="pa-nowrap">{`${acc.won} of ${acc.decided} quotes`}</span>{la ? <>{" · "}<span className="pa-nowrap">{`${la.won} of ${la.decided} on this lane`}</span></> : null}</>
+            : "No decided quotes yet"}</span>
         </div>
         <div className="pa-fact">
           <span className="pa-fact__k">Payment</span>
@@ -716,8 +793,8 @@ function EvidenceSection({ data, customerName }: { data: PricingAnalysis; custom
             ? <StatusChip tone={RISK_TONE[c.paymentRisk.band]} label={c.paymentRisk.label} />
             : "No payment history yet"}</span>
         </div>
-        {c.paymentRisk?.basis && !c.paymentRisk.attention && c.paymentRisk.basis.toLowerCase() !== c.paymentRisk.label.toLowerCase()
-          && !/^no invoices/i.test(c.paymentRisk.basis) && <p className="pa-fact__basis">{c.paymentRisk.basis}</p>}
+        {c.paymentRisk?.basis && !inAlert && c.paymentRisk.basis.toLowerCase() !== c.paymentRisk.label.toLowerCase()
+          && !/^no invoices/i.test(c.paymentRisk.basis) && <p className="pa-fact__basis">{tidy(c.paymentRisk.basis)}</p>}
       </div>
       <h4 className="pa-sub">On this lane{oneWay ? <span className="pa-sub__note"> · one-way quotes</span> : null}</h4>
       {quotes.length > 0 ? (

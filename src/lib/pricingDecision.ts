@@ -42,7 +42,7 @@ const SOURCE_LABEL: Record<string, string> = {
   calculated: 'Calculated',
   company_actuals: 'Your actuals',
   estimate: 'Estimate',
-  user: 'You',
+  user: 'Your figure',
 };
 
 type QuoteLines = { fuel_surcharge?: unknown; toll_charges?: unknown; driver_allowance?: unknown; additional_charges?: unknown; estimated_duration_minutes?: unknown; trip_type?: unknown };
@@ -82,7 +82,9 @@ function floorLinesOf(d: PricingDecision, quote: QuoteLines, floor: number | nul
         return {
           label: (l.key && FLOOR_LABEL[l.key]) || String(l.label || ''),
           amount,
-          source: noneDue || missing ? null : SOURCE_LABEL[kind] ?? null,
+          // The builder's chip words: a driver figure of the user's own is
+          // the company setting ("Your setting"); any other user line is theirs.
+          source: noneDue || missing ? null : kind === 'user' ? (l.key === 'driver_allowance' ? 'Your setting' : 'Your figure') : SOURCE_LABEL[kind] ?? null,
           missing,
           note: noneDue ? 'None due (same day)' : null,
         };
@@ -125,7 +127,9 @@ export function pricingDecisionOf(quote: ({ total_amount?: unknown; pricing_deci
   if (finalPrice === null) return null;
   const floor = num(d.floor);
   const margin = marginOf(finalPrice, floor);
-  const picked = d.picked_choice && d.picked_choice in CHOICE_LABEL ? CHOICE_LABEL[d.picked_choice as PickedChoice] : null;
+  // A typed price reads "Your price", as in the builder's bar.
+  const picked = d.picked_choice === 'custom' ? 'Your price'
+    : d.picked_choice && d.picked_choice in CHOICE_LABEL ? CHOICE_LABEL[d.picked_choice as PickedChoice] : null;
   const shown = Array.isArray(d.shown_choices) ? (d.shown_choices as { key?: string; recommended?: boolean }[]) : [];
   const recKey = shown.find((c) => c && c.recommended === true)?.key;
   const recommended = recKey && recKey in CHOICE_LABEL ? CHOICE_LABEL[recKey as PickedChoice] : null;
@@ -142,11 +146,11 @@ export function pricingDecisionOf(quote: ({ total_amount?: unknown; pricing_deci
   if (d.likelihood_level === 'model' && pct !== null) {
     // The basis count, when the saved decision carries it.
     const n = num(d.n_closed ?? (d as Record<string, unknown>).model_n_closed);
-    likelihood = { text: `${Math.round(pct)}%`, basis: typeof d.basis_label === 'string' && d.basis_label ? `Based on ${d.basis_label}` : n ? `Based on ${n} won and lost quotes` : 'From your win model', model: true };
+    likelihood = { text: `${Math.round(pct)}%`, basis: typeof d.basis_label === 'string' && d.basis_label ? `From ${d.basis_label}.` : n ? `From ${n} closed quotes.` : 'From your win model.', model: true };
   } else if (band) {
     likelihood = {
       text: band,
-      basis: d.likelihood_level === 'model' ? 'Outside your usual prices, so a rough band' : 'A rough band, not a prediction',
+      basis: d.likelihood_level === 'model' ? 'This price was outside what your model has learned from.' : 'A rough guide from the market and this customer, not a prediction.',
       model: false,
     };
   }
@@ -183,4 +187,16 @@ export function agreedPriceOf(quote: Record<string, unknown> | null | undefined)
   const total = num(quote.total_amount);
   if (agreed === null || agreed <= 0 || total === null) return null;
   return Math.abs(agreed - total) >= 0.005 ? agreed : null;
+}
+
+/**
+ * The margin at the agreed price, as the server works it out (agreed price
+ * less the stored cost floor; K-8 `agreed_margin` / `agreed_margin_pct`).
+ * Never computed here: null until the API sends both figures.
+ */
+export function agreedMarginOf(quote: Record<string, unknown> | null | undefined): { amount: number; pct: number | null } | null {
+  if (!quote) return null;
+  const amount = num(quote.agreed_margin);
+  if (amount === null) return null;
+  return { amount: Math.round(amount), pct: num(quote.agreed_margin_pct) === null ? null : Math.round(num(quote.agreed_margin_pct)!) };
 }

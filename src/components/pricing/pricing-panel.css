@@ -15,11 +15,12 @@
 .pa-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* ---- head ---------------------------------------------------------------- */
-.pa__head { padding: var(--card-pad, 20px) var(--card-pad, 20px) 8px; }
-.pa__titlerow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pa__head { position: relative; padding: var(--card-pad, 20px) var(--card-pad, 20px) 8px; }
 .pa__title { margin: 0; font: 600 15px/22px var(--font-sans); letter-spacing: -0.01em; color: var(--text-primary); }
 .pa__sub { margin: 2px 0 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+/* Out of the flow (top-right): showing it never shifts or re-wraps anything. */
 .pa__status {
+  position: absolute; top: calc(var(--card-pad, 20px) + 3px); right: var(--card-pad, 20px);
   display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
   font: 500 12px/16px var(--font-sans); color: var(--text-tertiary);
   transition: opacity 160ms ease;
@@ -34,7 +35,7 @@
 .pa__body { padding: 16px var(--card-pad, 20px) var(--card-pad, 20px); }
 .pa__result { padding: 0 0 4px; transition: opacity 160ms ease; }
 .pa__result.is-refreshing .pa-sec__fig,
-.pa__result.is-refreshing .pa-choice__price { opacity: 0.72; transition: opacity 160ms ease; }
+.pa__result.is-refreshing .pa-choice__price, .pa__result.is-refreshing .pa-floor__fig { opacity: 0.72; transition: opacity 160ms ease; }
 
 /* ---- messages -------------------------------------------------------------- */
 .pa-msg { margin: 0; color: var(--text-secondary); }
@@ -73,10 +74,12 @@
 .pa-step__text span { font: 400 12px/18px var(--font-sans); color: var(--text-tertiary); }
 .pa-steps.is-live .pa-step.is-done .pa-step__num { color: var(--text-primary); }
 .pa-steps.is-live .pa-step.is-active .pa-step__num { background: var(--accent-dim); color: var(--accent-primary); box-shadow: inset 0 0 0 1.5px var(--accent-primary); }
-.pa-skel { display: block; height: 10px; margin-top: 4px; margin-bottom: 4px; border-radius: 4px; background: var(--bg-raised); animation: pa-pulse 1.4s ease-in-out infinite; }
+.pa-skel { display: block; height: 10px; margin-top: 4px; margin-bottom: 4px; border-radius: 4px; background: var(--border-strong); animation: pa-skel 1.4s ease-in-out infinite; }
+@keyframes pa-skel { 50% { opacity: 0.85; } }
 
 /* ---- sections -------------------------------------------------------------- */
-.pa-sec { padding: 16px var(--card-pad, 20px); border-top: 1px solid var(--border-row); }
+.pa-sec { padding: 14px var(--card-pad, 20px); border-top: 1px solid var(--border-row); }
+@media (max-width: 1279px) { .pa-sec { padding-top: 12px; padding-bottom: 12px; } }
 .pa-sec:first-child { border-top: 0; }
 .pa-sec__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .pa-sec__title { margin: 0; font: 600 13px/20px var(--font-sans); color: var(--text-primary); }
@@ -152,8 +155,7 @@
 .pa-floor__chev { align-self: center; color: var(--text-tertiary); transition: transform 160ms ease; }
 .pa-floor__toggle[aria-expanded="true"] .pa-floor__chev { transform: rotate(90deg); }
 .pa-floor.is-below .pa-floor__fig { color: var(--status-danger-text); }
-.pa-floor__hint { margin: 6px 0 0; font: 400 12px/18px var(--font-sans); color: var(--text-secondary); }
-.pa-floor__under { color: var(--status-danger-text); font-weight: 500; }
+.pa-floor__under { color: var(--text-primary); font-weight: 500; }
 .pa-floor__body { margin-top: 8px; }
 .pa-link--inline { margin-left: 2px; }
 
@@ -161,9 +163,9 @@
 .pa-tier { margin: 0 0 4px; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
 .pa-tier.is-estimate { color: var(--status-warning-text); font-weight: 500; }
 .pa-range { margin: 2px 0 0; }
-.pa-fig__cap { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 4px 0 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.pa-fig__cap { margin: 4px 0 0; font: 400 12px/18px var(--font-sans); color: var(--text-tertiary); }
 .pa-range-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 2px 0 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
-.pa-range-legend span, .pa-fig__cap span { display: inline-flex; align-items: center; gap: 6px; }
+.pa-range-legend > span { display: inline-flex; align-items: center; gap: 6px; }
 .pa-key { display: inline-block; flex-shrink: 0; }
 .pa-key--band { width: 12px; height: 8px; border-radius: 2px; background: var(--pa-band); box-shadow: inset 0 0 0 1px var(--pa-band-edge); }
 .pa-key--band.is-estimate { background: repeating-linear-gradient(45deg, var(--chart-hatch) 0 1.5px, transparent 1.5px 4px); box-shadow: inset 0 0 0 1px var(--chart-hatch); }
@@ -175,43 +177,42 @@
 .pa-key--dot.is-rec { background: var(--text-primary); }
 .pa-key--peak { width: 0; height: 10px; border-left: 1px dashed var(--chart-series-1); }
 
-/* ---- choices ---------------------------------------------------------------- */
-.pa-choices { display: grid; gap: 8px; }
+/* ---- choices: compact 2-line rows (D1) --------------------------------------- */
+.pa-choices { display: grid; gap: 6px; }
 .pa-choice {
-  display: grid; gap: 2px; width: 100%; padding: 12px 14px; text-align: left; cursor: pointer;
-  border: 1px solid var(--border-default); border-radius: var(--radius-nested, 8px);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; column-gap: 12px; align-items: center;
+  width: 100%; min-height: 60px; box-sizing: border-box; padding: 9px 12px; text-align: left; cursor: pointer;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-nested, 8px);
   background: var(--bg-surface); color: inherit; font: inherit; position: relative;
-  transition: border-color 120ms ease, background 120ms ease;
+  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
 }
-@media (hover: hover) { .pa-choice:hover { border-color: var(--border-strong); background: var(--bg-surface-hover); } }
+@media (hover: hover) { .pa-choice:hover { background: var(--bg-surface-hover); } }
 .pa-choice:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
 .pa-choice.is-rec { border-color: var(--border-strong); }
-.pa-choice.is-applied { border-color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--text-primary); }
-.pa-choice__top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.pa-choice__label { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-primary); min-width: 0; }
+/* Applied: 1.5px in the text colour, drawn as border + inset so nothing moves. */
+.pa-choice.is-applied { border-color: var(--text-primary); box-shadow: inset 0 0 0 0.5px var(--text-primary); }
+.pa-choice__label { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font: 600 13px/20px var(--font-sans); color: var(--text-primary); }
+.pa-choice__check { flex-shrink: 0; color: var(--text-primary); }
 .pa-choice__rec {
-  font: 500 11px/16px var(--font-sans); padding: 0 6px; border-radius: var(--radius-chip, 6px);
+  margin-left: 2px; font: 500 11px/16px var(--font-sans); padding: 0 6px; border-radius: var(--radius-chip, 6px);
   color: var(--accent-primary); background: var(--accent-dim);
 }
-.pa-choice__price { font: 600 17px/24px var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; color: var(--text-primary); white-space: nowrap; }
-.pa-choice__meta { display: flex; justify-content: space-between; gap: 8px; font: 400 12px/16px var(--font-sans); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
-.pa-choice__sum { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); margin-top: 2px; }
-.pa-choice__state { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font: 500 12px/16px var(--font-sans); color: var(--link); }
-/* "Use this price" on every card: quiet on the alternatives, link colour on
-   the recommended one; the applied card says "In your quote". */
-/* Round 4: the recommended card no longer looks applied before it is: its
-   "Use this price" is as quiet as the others (the pill and the bar's button
-   carry the recommendation). */
-.pa-choice:not(.is-applied) .pa-choice__state { color: var(--text-tertiary); }
-.pa-choice:not(.is-applied):focus-visible .pa-choice__state { color: var(--link); }
-@media (hover: hover) { .pa-choice:not(.is-applied):hover .pa-choice__state { color: var(--link); } }
-.pa-choice.is-applied .pa-choice__state { color: var(--text-primary); }
-/* Likelihood words: one neutral voice, the band only shades the dot. */
-.pa-lk { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; color: var(--text-primary); font-weight: 500; }
-.pa-lk::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--status-neutral-dot); }
+.pa-choice__price { font: 600 15px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; text-align: right; }
+.pa-choice__margin { font: 400 12px/18px var(--font-sans); color: var(--text-secondary); font-variant-numeric: tabular-nums; min-width: 0; }
+.pa-choice > .pa-lk { font: 500 12px/18px var(--font-sans); justify-self: end; }
+/* Chance to win: one neutral voice, the band only shades the dot. */
+.pa-lk { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; color: var(--text-primary); font-weight: 500; font-variant-numeric: tabular-nums; }
+.pa-lk::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--status-neutral-dot); flex-shrink: 0; }
 .pa-lk--likely::before { background: var(--status-success-dot); }
 .pa-lk--even::before { background: var(--status-warning-dot); }
 .pa-lk--less_likely::before { background: var(--status-neutral-dot); }
+.pa-choices__lead { margin: -4px 0 8px; font: 400 12px/18px var(--font-sans); color: var(--text-tertiary); }
+.pa-choices__band { margin: -4px 0 8px; font: 400 12px/18px var(--font-sans); color: var(--text-secondary); }
+.pa-choices__band .pa-lk { margin: 0 2px; }
+.pa-whyline { margin: 8px 0 0; font: 400 12px/18px var(--font-sans); color: var(--text-secondary); text-wrap: pretty; }
+.pa-whyline b { font-weight: 600; color: var(--text-primary); }
+.pa-ifempty { margin: 6px 0 0; font: 400 12px/18px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.pa-ifempty .pa-link { font-size: 12px; line-height: 18px; }
 
 /* ---- why -------------------------------------------------------------------- */
 .pa-why {
@@ -225,9 +226,6 @@
 .pa-reasons { margin: 0 0 10px; padding-left: 16px; color: var(--text-secondary); }
 .pa-reasons li + li { margin-top: 4px; }
 .pa-fig { margin: 4px 0 0; }
-.pa-twin { width: 100%; margin-top: 8px; border-collapse: collapse; font: 400 12px/18px var(--font-sans); font-variant-numeric: tabular-nums; }
-.pa-twin th { text-align: left; font-weight: 500; color: var(--text-secondary); padding: 3px 0; border-top: 1px solid var(--border-row); }
-.pa-twin td { text-align: right; color: var(--text-primary); padding: 3px 0 3px 12px; border-top: 1px solid var(--border-row); }
 .pa-basis { margin: 8px 0 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
 .pa-bands { margin-top: 4px; }
 
@@ -271,12 +269,8 @@
 .pa-line__row .tw-status { justify-self: end; white-space: nowrap; }
 
 /* ---- round 3 ---------------------------------------------------------------- */
-.pa-alerts { display: grid; gap: 8px; padding: 0 var(--card-pad, 20px) 8px; }
-.pa-alerts .pa-risk { margin: 0; }
-.pa-choice__desc { font-weight: 500; color: var(--text-secondary); }
-.pa-floor__est { margin: 2px 0 0; font: 400 12px/18px var(--font-sans); color: var(--text-tertiary); }
+
 .pa-floor__perkm { margin: 0 0 4px; font: 400 12px/18px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
-.pa-ifempty { margin-top: 8px; }
 .pa .tw-info { position: relative; }
 .pa .tw-info::after { content: ""; position: absolute; inset: -12px; }
 .pa-reasons li, .pa-basis, .pa-dl dd { overflow-wrap: normal; }
@@ -288,9 +282,49 @@
 
 /* ---- round 4 ---------------------------------------------------------------- */
 .pa-nowrap { white-space: nowrap; }
-.pa-choice__empty { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
-.pa-choice__empty b { font-weight: 500; color: var(--text-secondary); }
-.pa-choice__empty.is-neg b { color: var(--status-danger-text); }
 .pa-tier--x2 { color: var(--text-secondary); font-weight: 500; }
 .pa-sub__note { font-weight: 400; color: var(--text-tertiary); }
-.pa-floor__hint .pa-wayout { margin-left: 6px; font-weight: 600; }
+
+/* ---- round 5 ------------------------------------------------------------------ */
+/* Alerts: at most two, 12/18, first clause (to the ":") in 600. */
+.pa-alerts { display: grid; gap: 8px; padding: 2px var(--card-pad, 20px) 12px; }
+.pa-alert {
+  margin: 0; padding: 8px 10px; border-radius: var(--radius-nested, 8px);
+  font: 400 12px/18px var(--font-sans); text-wrap: pretty;
+}
+.pa-alert b { font-weight: 600; }
+.pa-alert--danger { background: var(--status-danger-bg); color: var(--status-danger-text); }
+.pa-alert--warning { background: var(--status-warning-bg); color: var(--status-warning-text); }
+.pa-alert--info { background: var(--status-info-bg); color: var(--status-info-text); }
+.pa-alert .pa-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; font-size: 12px; line-height: 18px; }
+/* Cost floor: one 40px row, then one-line hints. */
+.pa-sec.pa-floor { padding-top: 4px; padding-bottom: 4px; }
+.pa-sec.pa-floor:has(.pa-hint), .pa-sec.pa-floor:has(.pa-floor__body) { padding-bottom: 12px; }
+.pa-floor__head { min-height: 40px; }
+.pa-floor__toggle { min-height: 40px; }
+.pa-hint { margin: 0; font: 400 12px/18px var(--font-sans); color: var(--text-secondary); }
+.pa-floor__head + .pa-hint { margin-top: 8px; }
+.pa-floor__under { color: var(--text-primary); font-weight: 500; }
+.pa-link--strong { font-weight: 600; }
+.pa-hint .pa-link, .pa-ifempty .pa-link, .pa-alert .pa-link { margin-left: 0; display: inline; }
+.pa-floor.is-below .pa-floor__fig { color: var(--status-danger-text); }
+/* Market: the source line wraps only between its parts. */
+.pa-tier { overflow-wrap: anywhere; }
+.pa-tier--x2 { margin-top: 0; }
+.pa-bands { margin: 4px 0 0; }
+.pa-bands dt { display: inline-flex; }
+.pa-bands dt .pa-lk { color: var(--text-secondary); font-weight: 400; }
+.pa-fact__v { min-width: 0; }
+/* 1024–1279: the same anatomy, tighter air, so all three rows sit above the fold. */
+@media (max-width: 1279px) {
+  .pa__head { padding-top: 14px; padding-bottom: 6px; }
+  .pa__status { top: 17px; }
+  .pa-alert { padding-top: 6px; padding-bottom: 6px; }
+  .pa-alerts { padding-bottom: 8px; }
+  .pa-sec__head { margin-bottom: 6px; }
+  .pa-choices__lead, .pa-choices__band { margin: -2px 0 5px; }
+  .pa-sec.pa-choose { padding-top: 10px; }
+  .pa-sec.pa-floor { padding-top: 2px; padding-bottom: 2px; }
+  .pa-sec.pa-floor:has(.pa-hint), .pa-sec.pa-floor:has(.pa-floor__body) { padding-bottom: 10px; }
+  .pa-alerts { padding-top: 0; }
+}

@@ -24,7 +24,8 @@ import { MessageCircle, Map, Info, Maximize2, Mic, Square, X, Plus, GripVertical
 import { formatRand } from "@/lib/pricing";
 import { PricingPanel, lkTone, likelihoodShort, signedPct, wayOutChoice, type PricingPhase } from "@/components/pricing/PricingPanel";
 import { usePricingAnalysis } from "@/components/pricing/usePricingAnalysis";
-import { readPrice, pricingDecision } from "@/components/pricing/evaluate";
+import { readPrice, pricingDecision, rowLikelihoods } from "@/components/pricing/evaluate";
+import { NumberField } from "@/components/pricing/NumberField";
 import type { ChoiceKey, PricingInputs } from "@/components/pricing/types";
 import "@/components/pricing/quote-builder-pricing.css";
 import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -1163,23 +1164,67 @@ export default function QuoteBuilder() {
     return () => { ro.disconnect(); el.removeEventListener("scroll", upd); };
   }, []);
 
-  // Price bar input: free text while focused, formatted otherwise.
-  const [priceDraft, setPriceDraft] = useState<string | null>(null);
-  // While the price is being typed it isn't judged: no red, no "below
-  // floor", until it has been still for ~400 ms (or the field is left).
+  // Desktop geometry (≥1024): the price bar is fixed to the window's foot,
+  // spanning the main column (its edges from .qb-controls), and the sticky
+  // aside is clamped to sit 16px under the top bar and 16px above the bar at
+  // every scroll position.
+  const controlsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = controlsRef.current;
+    if (!root) return;
+    let raf = 0;
+    const desk = () => window.matchMedia("(min-width: 1024px)").matches;
+    const place = () => {
+      raf = 0;
+      const r = root.getBoundingClientRect();
+      root.style.setProperty("--qb-main-left", `${Math.round(r.left)}px`);
+      root.style.setProperty("--qb-main-right", `${Math.max(0, Math.round(window.innerWidth - r.right))}px`);
+      const aside = asideRef.current;
+      if (!aside) return;
+      if (!desk()) { aside.style.maxHeight = ""; return; }
+      const scroller = root.closest(".os-app-main") as HTMLElement | null;
+      const topbarBottom = scroller ? scroller.getBoundingClientRect().top : 0;
+      const bar = priceBarRef.current;
+      const vh = window.innerHeight;
+      const barTop = bar ? bar.getBoundingClientRect().top : vh;
+      const barH = bar ? bar.getBoundingClientRect().height + 12 : 0;
+      const asideTop = aside.getBoundingClientRect().top;
+      const max = Math.min(vh - topbarBottom - 16 - 16 - barH, barTop - 16 - asideTop);
+      aside.style.maxHeight = `${Math.max(160, Math.floor(max))}px`;
+    };
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(place); };
+    place();
+    const ro = new ResizeObserver(schedule);
+    ro.observe(root);
+    if (priceBarRef.current) ro.observe(priceBarRef.current);
+    window.addEventListener("resize", schedule);
+    document.addEventListener("scroll", schedule, { capture: true, passive: true });
+    return () => {
+      ro.disconnect(); if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("resize", schedule);
+      document.removeEventListener("scroll", schedule, { capture: true } as EventListenerOptions);
+    };
+  }, [priceBarEl]);
+
+  // While the price is being typed it isn't judged: no colour, no "below
+  // floor", until it is settled: blur, Enter, or 900 ms without a keystroke,
+  // AND the analysis for that exact price has landed (B-2.4). Settled figures
+  // are the server's own (`your_price`), or the choice's at a choice price.
   const [priceTyping, setPriceTyping] = useState(false);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settlePrice = () => { if (typingTimerRef.current) clearTimeout(typingTimerRef.current); setPriceTyping(false); };
+  const serverAtPrice = pricing.data?.yourPrice && pricing.status === "ready" && Math.abs(pricing.data.yourPrice.price - total) <= 0.005
+    ? pricing.data.yourPrice : null;
+  const barSettled = !priceTyping && (!!appliedChoice || !!serverAtPrice);
   const [settledTotal, setSettledTotal] = useState(total);
-  useEffect(() => { if (!priceTyping) setSettledTotal(total); }, [total, priceTyping]);
-  const onPriceInput = (text: string) => {
-    setPriceDraft(text);
+  useEffect(() => { if (barSettled || !pricing.data) setSettledTotal(total); }, [total, barSettled, pricing.data]);
+  const onPriceInput = (n: number | null) => {
     setPriceTyping(true);
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    typingTimerRef.current = setTimeout(() => setPriceTyping(false), 400);
-    const n = Number(text.replace(/[\sR\u00a0]/g, "").replace(",", "."));
-    if (text.trim() !== "" && Number.isFinite(n) && n >= 0) applyPrice(n);
+    typingTimerRef.current = setTimeout(() => setPriceTyping(false), 900);
+    if (n != null && Number.isFinite(n) && n >= 0) applyPrice(n);
   };
+  useEffect(() => () => { if (typingTimerRef.current) clearTimeout(typingTimerRef.current); }, []);
 
   // A price set in the bar is a change to what the haulage (base rate) line
   // charges, so it is saved there: the line items still add up to the total,
@@ -1488,7 +1533,7 @@ export default function QuoteBuilder() {
   const showPriceBar = !billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0;
 
   return (
-    <div className={`qi-form qb-controls${showPriceBar ? " qb-has-pricebar" : ""}`}>
+    <div ref={controlsRef} className={`qi-form qb-controls${showPriceBar ? " qb-has-pricebar" : ""}`}>
       {/* header */}
       {/* Same page head as every page (layout only): H1 on the title row,
           one grey line under it, actions on the right. */}
@@ -1827,7 +1872,8 @@ export default function QuoteBuilder() {
                     )}
                     {r.key === "base" && (
                       <span className="qb-cost__rate">
-                        <input type="number" inputMode="decimal" value={baseRatePerKm} onChange={e => setBaseRatePerKm(e.target.value)}
+                        <NumberField decimals={2} value={baseRatePerKm === "" ? null : Number(baseRatePerKm)}
+                          onValue={(n) => setBaseRatePerKm(n == null ? "" : String(n))}
                           aria-label="Base rate per km" className="qb-mini qb-cost__input qb-cost__input--rate"
                           title={baseRateSource || undefined} />
                         <span aria-hidden="true">/km</span>
@@ -2033,12 +2079,12 @@ export default function QuoteBuilder() {
                     })()}
                   </span>
                   {r.key === "tolls" ? (
-                    <input type="number" inputMode="decimal" value={tollManuallyEdited ? editableTollCost : String(tollCost)}
-                      onChange={e => { setEditableTollCost(e.target.value); setTollManuallyEdited(true); }}
+                    <NumberField value={tollManuallyEdited ? (editableTollCost === "" ? null : Number(editableTollCost)) : tollCost}
+                      onValue={(n) => { setEditableTollCost(n == null ? "" : String(n)); setTollManuallyEdited(true); }}
                       aria-label="Tolls (R)" className="qb-mini qb-cost__input" />
                   ) : r.key === "driver" ? (
-                    <input type="number" inputMode="decimal" value={driverAllowanceInput}
-                      onChange={e => { setDriverAllowanceInput(e.target.value); setDriverEdited(true); }}
+                    <NumberField value={driverAllowanceInput === "" ? null : Number(driverAllowanceInput) || 0}
+                      onValue={(n) => { setDriverAllowanceInput(n == null ? "" : String(n)); setDriverEdited(true); }}
                       aria-label="Driver allowance (R)" className="qb-mini qb-cost__input" />
                   ) : (
                     <span className="qb-cost__value">{formatMoneyWhole(r.v)}</span>
@@ -2088,9 +2134,13 @@ export default function QuoteBuilder() {
             onChange: (v) => { setDriverAllowanceInput(v); setDriverEdited(true); },
             onReset: () => { if (driverSuggested != null) { setDriverAllowanceInput(String(driverSuggested)); setDriverEdited(true); } else setDriverEdited(false); },
           }}
+          buildUpDriver={driverAllowance}
+          onAddDriverToBuildUp={(amount) => { setDriverAllowanceInput(String(amount)); setDriverEdited(true); }}
           includeReturn={includeReturn}
           onIncludeReturn={setIncludeReturn}
           returnApplicable={legs === 1}
+          revealKey={`${pickup}|${delivery}|${selectedVT?.id ?? vehicleType}|${tripType}|${customerId}`}
+          atBuildUp={atBuildUp}
         />
       </aside>
 
@@ -2100,113 +2150,114 @@ export default function QuoteBuilder() {
       </div>
       </div>
 
-      {/* One price, next to Send. Sticky so Send stays in reach while scrolling. */}
-      {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 && (
-        <section ref={priceBarRef} className={`qb-pricebar${barCompact ? " is-compact" : ""}`} aria-label="Quote price and send"
+      {/* One price, next to Send. Fixed to the window's foot on desktop
+          (sticky on narrower screens) so Send stays in reach. */}
+      {showPriceBar && (() => {
+        const data = pricing.data;
+        const ready = liveReading.margin != null;
+        const waiting = !ready && (pricing.status === "loading" || pricing.status === "refreshing" || pricing.status === "idle" || pricingPhase === "route");
+        const failed = !ready && !waiting;
+        // The bar's figures: the choice's own at a choice price (the row says
+        // the same), the server's at a settled custom price, else a neutral
+        // client reading while typing or waiting (never coloured).
+        const rowLk = appliedChoice && data ? rowLikelihoods(data, data.choices).get(appliedChoice.key) ?? null : null;
+        const settled = barSettled && ready;
+        const margin = settled && appliedChoice ? appliedChoice.margin
+          : settled && serverAtPrice?.margin != null ? serverAtPrice.margin : liveReading.margin;
+        const marginPct = settled && appliedChoice ? appliedChoice.marginPct
+          : settled && serverAtPrice?.marginPct != null ? serverAtPrice.marginPct : liveReading.marginPct;
+        const below = margin != null && margin < 0;
+        const lk = !settled || below ? null : appliedChoice ? rowLk : serverAtPrice?.likelihood ?? null;
+        const showLk = lk && !(lk.level === "rules" && lk.band == null);
+        const loss = settled && below;
+        const wayOut = loss ? wayOutChoice(data?.choices ?? [], liveReading.floor) : null;
+        const sendPrimary = !useRec && !waiting;
+        // Where the price comes from: the build-up's rate and what it adds.
+        const adds = ["fuel", "tolls", ...(crossBorderCost > 0 ? ["border"] : []), ...(driverAllowance > 0 ? ["driver"] : [])].slice(0, 3);
+        const addsText = adds.length > 1 ? `${adds.slice(0, -1).join(", ")} and ${adds[adds.length - 1]}` : adds[0];
+        return (
+        <section ref={priceBarRef} className={`qb-pricebar${barCompact ? " is-compact" : ""}${atBuildUp && !priceTyping ? " is-buildup" : ""}`} aria-label="Quote price and send"
           onClick={() => { if (barCompact) setBarCompact(false); }}>
           <div className="qb-pricebar__price">
-            <label className="qb-pricebar__label" htmlFor="qb-price-input">{atBuildUp ? "Your build-up excl. VAT" : "Quote price excl. VAT"}</label>
+            <label className="qb-pricebar__label" htmlFor="qb-price-input">Quote price · excl. VAT</label>
             <span className="qb-pricebar__field">
               <span className="qb-pricebar__cur" aria-hidden="true">R</span>
-              <input id="qb-price-input" className="qb-pricebar__input" inputMode="decimal" autoComplete="off"
-                aria-describedby="qb-price-read"
-                value={priceDraft ?? formatNumber(total, Math.abs(total - Math.round(total)) < 0.005
-                  ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                onFocus={(e) => { setBarCompact(false); setPriceDraft(String(round2(total))); requestAnimationFrame(() => e.target.select()); }}
-                onBlur={() => { setPriceDraft(null); settlePrice(); }}
+              <NumberField id="qb-price-input" className="qb-pricebar__input" aria-describedby="qb-price-read"
+                value={total}
+                onFocus={() => setBarCompact(false)}
+                onBlur={() => settlePrice()}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
-                onChange={(e) => onPriceInput(e.target.value)} />
+                onValue={(n) => onPriceInput(n)} />
             </span>
-            {atBuildUp ? (
-              <span className="qb-pricebar__sub">
-                {chargeDistance > 0 && Number(baseRatePerKm) > 0
-                  ? <>{formatCurrency(Number(baseRatePerKm))}/km × {formatNumber(Math.round(chargeDistance))} km, plus fuel and tolls</>
-                  : "Sum of the cost lines"} · type to change it
+            {atBuildUp && !priceTyping ? (
+              <span className="qb-pricebar__sub qb-pricebar__src">
+                <span className="qb-pricebar__chip">Build-up</span>
+                <span className="qb-pricebar__rate">
+                  {chargeDistance > 0 && Number(baseRatePerKm) > 0
+                    ? <>{formatCurrency(Number(baseRatePerKm))}/km × {formatNumber(Math.round(chargeDistance))} km{legs === 2 ? " (return)" : ""} + {addsText}</>
+                    : "Sum of the cost lines"}
+                </span>
               </span>
             ) : (
               <span className="qb-pricebar__sub qb-pricebar__src">
-                <span className="qb-pricebar__chip">{appliedChoice ? appliedChoice.label : "Your price"}</span>
+                <span className="qb-pricebar__chip">{appliedChoice && !priceTyping ? appliedChoice.label : "Your price"}</span>
                 <button type="button" className="qb-linkbtn" onClick={() => applyPrice(costSum)}>
                   Back to build-up {formatMoneyWhole(costSum)}
                 </button>
               </span>
             )}
           </div>
-          <div className="qb-pricebar__read" id="qb-price-read">
-            {liveReading.margin != null ? (() => {
-              const settled = !priceTyping;
-              const loss = settled && liveReading.belowFloor;
-              const wayOut = wayOutChoice(pricing.data?.choices ?? [], liveReading.floor);
-              return (
-                <>
-                  <span className="qb-pricebar__line">
-                    {liveReading.belowFloor ? (
-                      // One sentence, one colour; never a % below −100.
-                      <span className={loss ? "qb-pricebar__loss" : undefined}>
-                        Loss of <span className="qb-pricebar__num">{formatMoneyWhole(-liveReading.margin)}</span>
-                        {loss && <> · below your cost floor of <span className="qb-pricebar__num">{formatMoneyWhole(liveReading.floor)}</span></>}
-                      </span>
-                    ) : (
-                      <span>Margin <span className="qb-pricebar__num">{formatMoneyWhole(liveReading.margin)} · {signedPct(liveReading.marginPct ?? 0)}</span></span>
-                    )}
-                    {settled && !liveReading.belowFloor && liveReading.likelihood && !(liveReading.likelihood.level === "rules" && liveReading.likelihood.band == null) && (
-                      <span className={`qb-pricebar__lk qb-pricebar__lk--${lkTone(liveReading.likelihood)}`}>
-                        <span>{likelihoodShort(liveReading.likelihood)}
-                          {liveReading.likelihood.level === "rules" && liveReading.likelihood.note && <span className="qb-pricebar__lknote"> · {liveReading.likelihood.note.toLowerCase()}</span>}</span>
-                      </span>
-                    )}
-                  </span>
-                  {/* One price story: the bar's number, plus ONE reference — the
-                      recommended choice as a button until a price is applied. */}
-                  {useRec ? (
-                    <span className="qb-pricebar__next">
-                      <button type="button" className="tw-btn tw-btn--primary tw-btn--sm qb-pricebar__use" onClick={() => applyPrice(recChoice!.price)}>
-                        Use {recChoice!.label} {formatMoneyWhole(recChoice!.price)}
-                      </button>
-                      {!liveReading.belowFloor && <span className="qb-pricebar__muted">Floor {formatMoneyWhole(liveReading.floor)}</span>}
-                    </span>
-                  ) : loss && wayOut ? (
-                    <span className="qb-pricebar__next">
-                      <button type="button" className="qb-linkbtn qb-linkbtn--strong" onClick={() => applyPrice(wayOut.price)}>
-                        Use {wayOut.label} {formatMoneyWhole(wayOut.price)}
-                      </button>
-                    </span>
-                  ) : !liveReading.belowFloor ? (
-                    <span className="qb-pricebar__muted">Floor {formatMoneyWhole(liveReading.floor)}</span>
-                  ) : null}
-                </>
-              );
-            })() : null}
-            {liveReading.margin == null && (
-              <span className="qb-pricebar__muted">
-                {pricing.status === "loading" || pricingPhase === "route" ? "Working out margin and chance to win…"
-                  : pricing.status === "error" || pricing.status === "offline" || pricing.status === "unavailable" ? "Margin and chance to win unavailable right now"
-                  : "Margin and chance to win follow the pricing analysis"}
+          <div className="qb-pricebar__read" id="qb-price-read" aria-live="off">
+            <span className={`qb-pricebar__line${settled ? "" : " is-neutral"}${loss ? " qb-pricebar__loss" : ""}`}>
+              {!ready ? (
+                <span className="qb-pricebar__muted">{failed ? "Margin and chance to win unavailable right now" : "Working out margin and chance to win…"}</span>
+              ) : below ? (
+                <span>Loss of <span className="qb-pricebar__num">{formatMoneyWhole(-margin!)}</span>
+                  {loss && <> · below your cost floor of <span className="qb-pricebar__num">{formatMoneyWhole(liveReading.floor)}</span></>}</span>
+              ) : (
+                <span>Margin <span className="qb-pricebar__num">{formatMoneyWhole(margin)} · {signedPct(marginPct ?? 0)}</span></span>
+              )}
+              {ready && showLk && (
+                <span className={`qb-pricebar__lk qb-pricebar__lk--${lkTone(lk!)}`}>{likelihoodShort(lk!)}</span>
+              )}
+            </span>
+            {useRec && ready && !priceTyping ? (
+              <span className="qb-pricebar__next">
+                <button type="button" className="tw-btn tw-btn--primary tw-btn--sm qb-pricebar__use" onClick={() => applyPrice(recChoice!.price)}>
+                  Use {recChoice!.label} {formatMoneyWhole(recChoice!.price)}
+                </button>
               </span>
-            )}
-            {/* No truck: the price runs on the company default rate. Say so
-                before it is sent, and offer the truck that fits. */}
-            {!hasVehicleType && (
-              <span className="qb-pricebar__nudge">
-                No truck picked, so this uses the company default {formatCurrency(baseRatePerKm)}/km.
+            ) : wayOut ? (
+              <span className="qb-pricebar__next">
+                <button type="button" className="qb-linkbtn qb-linkbtn--strong" onClick={() => applyPrice(wayOut.price)}>
+                  Use {wayOut.label} {formatMoneyWhole(wayOut.price)}
+                </button>
+              </span>
+            ) : !hasVehicleType && !priceTyping ? (
+              /* No truck: the price runs on the company default rate. */
+              <span className="qb-pricebar__next qb-pricebar__nudge">
+                No truck picked: company default rate.
                 {suggestions.length > 0 && (
                   <button type="button" className="qb-linkbtn" onClick={() => applyVehicleType(suggestions[0].vt.name)}>
                     Use {sentenceCaseLabel(suggestions[0].vt.name)}
                   </button>
                 )}
               </span>
-            )}
+            ) : null}
           </div>
           <div className="qb-pricebar__actions">
-            <button type="button" className="tw-btn" onClick={() => save(false)} disabled={saving}>Save as draft</button>
+            <button type="button" className="tw-btn" onClick={() => save(false)} disabled={saving}>
+              <span className="qb-lbl-long">Save as draft</span><span className="qb-lbl-short">Save draft</span>
+            </button>
             {/* One primary action at a time: while the recommended price is
                 on offer that button leads; once a price is set, Send does. */}
-            <button type="button" className={`tw-btn${useRec ? "" : " tw-btn--primary"}`} onClick={openSendPreview} disabled={saving}>Send quote</button>
+            <button type="button" className={`tw-btn${sendPrimary ? " tw-btn--primary" : ""}`} onClick={openSendPreview} disabled={saving}>Send quote</button>
             {/* Assistant launcher slot while the bar shows (see nlChatSlotRef). */}
             <span ref={barChatSlotRef} className="qb-chatslot" />
           </div>
         </section>
-      )}
+        );
+      })()}
 
       {sendPreviewOpen && (() => {
         const client = customers.find((c: any) => String(c.id) === String(customerId));

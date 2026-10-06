@@ -1,17 +1,18 @@
+import { Fragment } from 'react';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { formatMoneyWhole } from '@/lib/formatters';
-import { MARKET_RANGE_LABEL } from '@/lib/pricing';
+import { MARKET_RANGE_LABEL, formatRand } from '@/lib/pricing';
 import type { DecisionView } from '@/lib/pricingDecision';
 
 // "R 34–46k": a rough estimate is shown as roughly as it is known.
 const roughRange = (low: number, high: number) => `R ${Math.round(low / 1000)}–${Math.round(high / 1000)}k`;
 // "TruckWys platform, 16 accepted quotes, last 180 days" -> "TruckWys platform · 16 accepted quotes · 180 days".
 const round100 = (v: number) => Math.round(v / 100) * 100;
-// Each part stays whole on one line ("last 180 days" never splits), so the
-// line wraps only between parts.
+// The line breaks only between parts: each part is its own span and the
+// " · " separator is a sibling text node, so it can wrap after any part.
 const sourceParts = (s: string) => s.split(/\s*[,·]\s*/).filter(Boolean);
 const sourceLine = (s: string) => sourceParts(s).map((p, i, all) => (
-  <span key={i} className="qd-decision__part">{p}{i < all.length - 1 ? ' · ' : ''}</span>
+  <Fragment key={i}><span className="qd-decision__part">{p}</span>{i < all.length - 1 ? ' · ' : ''}</Fragment>
 ));
 
 /**
@@ -31,9 +32,11 @@ export default function PricingDecisionRows({ decision, marginInHeader = false, 
   const d = decision;
   const money = formatMoneyWhole;
   const lower = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
+  // "Your price · Balanced was recommended": it wraps after the "·", never inside a part.
+  const nw = (t: string) => <span style={{ whiteSpace: 'nowrap' }}>{t}</span>;
   const pickedText = d.picked
     ? d.recommended && d.recommended !== d.picked
-      ? `${d.picked} · ${d.recommended} was recommended`
+      ? <>{nw(d.picked)} · {nw(`${d.recommended} was recommended`)}</>
       : d.recommended === d.picked ? `${d.picked} (recommended)` : d.picked
     : null;
   return (
@@ -45,7 +48,7 @@ export default function PricingDecisionRows({ decision, marginInHeader = false, 
         </p>
       )}
       {pickedText && (
-        <div className="bk-kv"><span className="bk-kv__label">Price picked</span><span className="bk-kv__value">{pickedText}</span></div>
+        <div className="bk-kv qd-decision__picked"><span className="bk-kv__label">Price picked</span><span className="bk-kv__value">{pickedText}</span></div>
       )}
       {d.floor !== null && (
         <>
@@ -68,7 +71,7 @@ export default function PricingDecisionRows({ decision, marginInHeader = false, 
       )}
       {d.margin && marginInHeader && d.floor !== null && (
         // The figure is in the card's header; here only how it is made.
-        <p className="qd-decision__src">Margin = {money(d.finalPrice)} price − {money(d.floor)} floor{d.belowFloor ? ': below the cost floor' : ''}</p>
+        <p className="qd-decision__src qd-decision__src--formula">Margin = {formatRand(d.finalPrice)} price − {money(d.floor)} cost floor</p>
       )}
       {d.margin && !marginInHeader && (
         <>
@@ -80,7 +83,7 @@ export default function PricingDecisionRows({ decision, marginInHeader = false, 
           </div>
           {d.floor !== null && (
             <p className="qd-decision__src">
-              {money(d.finalPrice)} price less {money(d.floor)} floor{d.belowFloor ? ': below the cost floor' : ''}
+              Margin = {formatRand(d.finalPrice)} price − {money(d.floor)} cost floor
             </p>
           )}
         </>
@@ -93,7 +96,7 @@ export default function PricingDecisionRows({ decision, marginInHeader = false, 
               <span className="bk-kv__label">Rough SA estimate</span>
               <span className="bk-kv__value">{roughRange(d.market.low, d.market.high)}</span>
             </div>
-            <p className="qd-decision__src">Not market data</p>
+            <p className="qd-decision__src">Not market data. It wasn't used for the prices.</p>
           </>
         ) : (
           <>
@@ -107,12 +110,12 @@ export default function PricingDecisionRows({ decision, marginInHeader = false, 
         )
       )}
       {d.likelihood && likelihoodInHeader && d.likelihood.basis && (
-        <p className="qd-decision__src qd-decision__src--solo">Chance to win: {lower(d.likelihood.basis)}</p>
+        <p className="qd-decision__src qd-decision__src--solo">{d.likelihood.model ? `Chance to win ${lower(d.likelihood.basis)}` : d.likelihood.basis}</p>
       )}
       {d.likelihood && !likelihoodInHeader && (
         <>
           <div className="bk-kv">
-            <span className="bk-kv__label">Chance to win (when priced)</span>
+            <span className="bk-kv__label">Chance to win when priced</span>
             <span className="bk-kv__value">{d.likelihood.text}</span>
           </div>
           {d.likelihood.basis && <p className="qd-decision__src">{d.likelihood.basis}</p>}

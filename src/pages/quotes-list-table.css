@@ -1,0 +1,48 @@
+/* Quotes list (List view), pricing round 5 (F-2.1).
+   Fixed layout with set column widths (widths include the cell padding), so
+   the table always fits its card: no horizontal scroll at 1024 or 1440, and
+   Amount and Action are always in view. Route takes the rest and truncates.
+   Widths sit on the header cells (not <col>), so hidden columns drop out
+   cleanly at narrower widths. */
+.bk-table--quotes { table-layout: fixed; width: 100%; }
+.bk-table--quotes th, .bk-table--quotes td { overflow: hidden; text-overflow: ellipsis; padding-left: 12px; padding-right: 12px; }
+.bk-table--quotes th:first-child, .bk-table--quotes td:first-child { padding-left: var(--card-pad, 20px); }
+.bk-table--quotes th:last-child, .bk-table--quotes td:last-child { padding-right: var(--card-pad, 20px); }
+.bk-table--quotes th.bk-col-load { width: 176px; }
+.bk-table--quotes th.bk-col-customer { width: 220px; }
+.bk-table--quotes th.bk-col-route { width: auto; }
+.bk-table--quotes th.bk-col-status { width: 108px; }
+.bk-table--quotes th.bk-col-created { width: 104px; }
+.bk-table--quotes th.bk-col-margin { width: 76px; }
+.bk-table--quotes th.bk-col-amount { width: 140px; }
+.bk-table--quotes th.bk-col-action { width: 132px; }
+/* Free text truncates inside its column; the full text is the cell's title. */
+.bk-table--quotes .bk-col-customer,
+.bk-table--quotes .bk-col-route { max-width: none; white-space: nowrap; }
+/* Money, status and the action never clip: their columns are sized to fit. */
+.bk-table--quotes .bk-col-amount,
+.bk-table--quotes .bk-col-status,
+.bk-table--quotes .bk-col-margin,
+.bk-table--quotes .bk-col-action { text-overflow: clip; }
+.bk-table--quotes td.bk-col-action, .bk-table--quotes th.bk-col-action { padding-left: 4px; }
+
+/* 1024–1279 (card ≈ 894 px): Quote # and Created step aside; the quote
+   number rides under the customer (RecordNo), 12/16 tertiary. */
+@container (min-width: 521px) and (max-width: 1040px) {
+  .bk-table--quotes .bk-col-load,
+  .bk-table--quotes .bk-col-created { display: none; }
+  .bk-table--quotes th.bk-col-customer { width: 224px; }
+  .bk-table--quotes .bk-col-customer { padding-left: var(--card-pad, 20px); }
+  .bk-table--quotes .bk-phone-sub { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; }
+  .bk-table--quotes .bk-phone-sub .bk-id-long { display: inline; }
+  .bk-table--quotes .bk-phone-sub .bk-id-short { display: none; }
+}
+/* Phones keep the shared rules (who, status, money). */
+@container (max-width: 700px) {
+  .bk-table--quotes { table-layout: auto; }
+  .bk-table--quotes th { width: auto !important; }
+  .bk-table--quotes .bk-col-customer { max-width: 17ch; }
+}
+@container (max-width: 520px) {
+  .bk-table--quotes .bk-col-customer { max-width: 14ch; }
+}

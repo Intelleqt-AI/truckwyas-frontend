@@ -27,8 +27,8 @@ import { loadsQuery, mapLoadsByQuoteId } from './QuotesList';
 import { InfoTip } from '@/components/ui/InfoTip';
 import LossReasonDialog from '@/components/LossReasonDialog';
 import PricingDecisionRows from '@/components/PricingDecisionRows';
-import { LOSS_REASONS, formatRand, lossReasonPayload, type LossReason } from '@/lib/pricing';
-import { agreedPriceOf, pricingDecisionOf } from '@/lib/pricingDecision';
+import { LOSS_REASONS, formatPct, formatRand, lossReasonPayload, type LossReason } from '@/lib/pricing';
+import { agreedMarginOf, agreedPriceOf, pricingDecisionOf } from '@/lib/pricingDecision';
 import { cargoText } from '@/lib/cargo';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
@@ -417,6 +417,9 @@ export default function QuoteDetail() {
   // What the customer agreed when it differs from the quote (display only:
   // the booking and invoice bill the quote total).
   const agreed = agreedPriceOf(quote);
+  const agreedMargin = agreed !== null ? agreedMarginOf(quote) : null;
+  // A draft that has never gone out (was_sent is server-owned; DRAFT is enough).
+  const neverSent = quote.status === 'DRAFT';
   const routeSummary = routeFrom && routeTo ? `${routeFrom} → ${routeTo}` : '';
   const contact = (quote.customer_name || '').trim();
   const showContact = !!contact && contact.toLowerCase() !== company.toLowerCase();
@@ -504,6 +507,11 @@ export default function QuoteDetail() {
   // No chance to win on a dead offer (R9), nor once decided: then it shows
   // once, as "when priced", under How it was priced.
   const showChance = !!decision?.likelihood && openStatus && !lapsed && undecided;
+  // "51% chance to win" (model) or "Likely to win" / "Even chance" / "Less likely to win" (rules).
+  const chanceText = showChance && decision?.likelihood
+    ? decision.likelihood.model ? `${decision.likelihood.text} chance to win`
+      : decision.likelihood.text === 'Even chance' ? decision.likelihood.text : `${decision.likelihood.text} to win`
+    : null;
   // Each cost once per card (R3): with a current decision that breaks the
   // floor into its parts, "How it was priced" carries fuel, tolls and the rest,
   // so the build-up lines (Base rate, Fuel, …) are not listed a second time.
@@ -688,22 +696,31 @@ export default function QuoteDetail() {
             <h2 className="bk-fact__label" id="qd-price-title" style={{ margin: 0 }}>{isRound ? 'Total, both legs' : 'Total'}{vat?.vat_registered ? ' excl. VAT' : ''}</h2>
             {/* Whole rand when the cents are zero, as in the builder's price bar. */}
             <div className="qd-total">{formatRand(total)}</div>
-            <div className="qd-sub">
-              {marginNow && (
-                <span className={decision?.belowFloor ? 'qd-decision__neg' : undefined}>
-                  {/* One margin format everywhere: "Margin R 8 989 · 36%". */}
-                  Margin {formatMoneyWhole(marginNow.amount)}{marginNow.pct !== null ? ` · ${marginNow.pct}%` : ''}{decision?.belowFloor ? ', below the cost floor' : ''}
-                </span>
-              )}
-              {showChance && decision?.likelihood && (
-                <span>{decision.likelihood.model ? `${decision.likelihood.text} chance to win` : `${decision.likelihood.text} to win`}</span>
-              )}
-            </div>
-            {agreed !== null && (
-              <p className="qd-agreed">
-                Agreed {formatRand(agreed)} <span className="qd-agreed__quoted">(quoted {formatRand(total)})</span>
-                <InfoTip label="About the agreed price">The price the customer agreed when they accepted, excl. VAT. The booking and invoice use the quoted total.</InfoTip>
+            {/* One readout line: "Margin R 4 688 · 20% · 51% chance to win".
+                The chance part is one unbreakable span, so a wrap comes before it. */}
+            {(marginNow || chanceText) && (
+              <p className="qd-readout">
+                {marginNow && (
+                  <span className={decision?.belowFloor ? 'qd-decision__neg' : undefined}>
+                    Margin {formatMoneyWhole(marginNow.amount)}{marginNow.pct !== null ? ` · ${formatPct(marginNow.pct)}` : ''}{decision?.belowFloor ? ', below the cost floor' : ''}
+                  </span>
+                )}
+                {chanceText && <>{marginNow ? ' ' : ''}<span className="qd-readout__chance">{marginNow ? '· ' : ''}{chanceText}</span></>}
               </p>
+            )}
+            {agreed !== null && (
+              <div className="qd-agreed">
+                <span className="qd-agreed__line">
+                  Agreed {formatRand(agreed)} <span className="qd-agreed__quoted">(quoted {formatRand(total)})</span>
+                  <InfoTip label="About the agreed price">The price the customer agreed when they accepted, excl. VAT. The booking and invoice use the quoted total.</InfoTip>
+                </span>
+                {/* Worked out by the server (agreed price − stored cost floor). */}
+                {agreedMargin && (
+                  <span className="qd-agreed__margin">
+                    Margin at the agreed price: {formatMoneyWhole(agreedMargin.amount)}{agreedMargin.pct !== null ? ` · ${formatPct(agreedMargin.pct)}` : ''}
+                  </span>
+                )}
+              </div>
             )}
             {booked && (
               <p className="qd-booked">
@@ -774,9 +791,11 @@ export default function QuoteDetail() {
             </div>
           </section>
 
-          {!booked && (effectiveShareUrl || ((quote.status === 'SENT' || quote.status === 'DRAFT') && undecided)) && (
+          {!booked && !declined && (effectiveShareUrl || ((quote.status === 'SENT' || quote.status === 'DRAFT') && undecided)) && (
             <section className="bk-card" aria-labelledby="qd-customer-title">
-              <h2 className="bk-card__title" id="qd-customer-title" style={{ marginBottom: 12 }}>With the customer</h2>
+              {/* A never-sent draft has nobody to be "with" yet: the card only records an answer that came another way. */}
+              <h2 className="bk-card__title" id="qd-customer-title" style={{ marginBottom: 12 }}>{neverSent ? 'Record the answer' : 'With the customer'}</h2>
+              {neverSent && <p className="qd-answer-sub">Got an answer another way? Record it here.</p>}
               {effectiveShareUrl && lapsed && (
                 // The public link still opens after the valid-until date, but
                 // shows the quote as expired (ClientQuoteView), so there is
@@ -827,7 +846,7 @@ export default function QuoteDetail() {
               )}
               {(quote.status === 'SENT' || quote.status === 'DRAFT') && undecided && (
                 <>
-                  <div className="bk-fact__label" style={{ marginBottom: 8 }}>Record their answer</div>
+                  {!neverSent && <div className="bk-fact__label" style={{ marginBottom: 8 }}>Record their answer</div>}
                   <div className="qd-btn-row">
                     <button
                       type="button"

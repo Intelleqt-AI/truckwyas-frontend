@@ -73,11 +73,15 @@ export interface LikelihoodInfo {
   reason: string | null;
   /** One-line, server-worded description of the level ("Chance to win as bands · 16 of 40 closed quotes"). */
   short: string | null;
+  /** R5 (K-1): the display-ready panel subtitle, rendered as received. */
+  headline: string | null;
 }
 export interface LaneQuote { id: number | null; number: string | null; date: string | null; price: number; outcome: "accepted" | "rejected" | "open" | "expired" | string }
 export interface CustomerEvidence {
   id: number | null; name: string | null;
   acceptance: { won: number; decided: number; ratePct: number | null; scope: "lane" | "all" } | null;
+  /** This customer on this lane only (null when they have no decided quotes here). */
+  laneAcceptance: { won: number; decided: number; ratePct: number | null } | null;
   recentLaneQuotes: LaneQuote[];
   paymentRisk: { band: "low" | "medium" | "high" | "unknown"; label: string; basis: string | null; attention: boolean } | null;
 }
@@ -92,13 +96,17 @@ export interface PricingAnalysis {
   likelihood: LikelihoodInfo | null;
   customer: CustomerEvidence | null;
   reasoning: string[];
+  /** R5 (K-3): reasons with a code, so the panel can pick which to show. Empty from an older server. */
+  reasoningItems: { code: string; text: string }[];
   warnings: { code: string; message: string }[];
   /** Decision-changing notices for the top of the panel (payment risk, lane under cost …). */
   attention: { code: string; level: string; message: string }[];
   /** Why the recommended choice is recommended (server sentence). */
-  recommendation: { key: string | null; reason: string | null } | null;
+  recommendation: { key: string | null; reason: string | null; short: string | null } | null;
   /** The server's own reading of the price that was sent (authoritative at that price). */
-  yourPrice: { price: number; likelihood: Likelihood | null } | null;
+  yourPrice: { price: number; margin: number | null; marginPct: number | null; belowFloor: boolean; likelihood: Likelihood | null } | null;
+  /** True when the server sends the round-5 display strings (headline …). */
+  r5: boolean;
   /** Floor including the empty return, when the floor itself excludes it. */
   floorWithReturn: number | null;
 }
@@ -305,6 +313,7 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
     } : null,
     reason: str(lk.reason),
     short: str(lk.short),
+    headline: str(lk.headline),
   } : null;
 
   const cu = obj(r.customer);
@@ -315,6 +324,9 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
     acceptance: acc && num(acc.decided) != null ? {
       won: num(acc.won) ?? 0, decided: num(acc.decided) ?? 0, ratePct: num(acc.rate_pct),
       scope: acc.scope === "lane" ? "lane" : "all",
+    } : null,
+    laneAcceptance: obj(cu.lane_acceptance) && (num(obj(cu.lane_acceptance)!.decided) ?? 0) > 0 ? {
+      won: num(obj(cu.lane_acceptance)!.won) ?? 0, decided: num(obj(cu.lane_acceptance)!.decided) ?? 0, ratePct: num(obj(cu.lane_acceptance)!.rate_pct),
     } : null,
     recentLaneQuotes: arr(cu.recent_lane_quotes).map(obj).filter(Boolean).map((q) => ({
       id: num(q!.id), number: str(q!.number), date: str(q!.date), price: num(q!.price) ?? 0, outcome: String(q!.outcome ?? "open"),
@@ -338,11 +350,17 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
     likelihood,
     customer,
     reasoning: arr(r.reasoning).map(str).filter((s): s is string => !!s),
-    yourPrice: obj(r.your_price) && num(obj(r.your_price)!.price) != null
-      ? { price: num(obj(r.your_price)!.price)!, likelihood: adaptLikelihood(obj(r.your_price)!.likelihood) } : null,
+    reasoningItems: arr(r.reasoning_items).map(obj).filter(Boolean)
+      .map((i) => ({ code: String(i!.code ?? ""), text: str(i!.text) || "" })).filter((i) => i.text),
+    yourPrice: (() => {
+      const y = obj(r.your_price);
+      if (!y || num(y.price) == null) return null;
+      return { price: num(y.price)!, margin: num(y.margin), marginPct: num(y.margin_pct), belowFloor: y.below_floor === true, likelihood: adaptLikelihood(y.likelihood) };
+    })(),
+    r5: !!str(lk?.headline),
     floorWithReturn: num(cf?.floor_with_return ?? r.floor_with_return),
     attention: arr(r.attention).map(obj).filter(Boolean).map((a) => ({ code: String(a!.code ?? ""), level: String(a!.level ?? "medium"), message: str(a!.message) || "" })).filter((a) => a.message),
-    recommendation: obj(r.recommendation) ? { key: str(obj(r.recommendation)!.key), reason: str(obj(r.recommendation)!.reason) } : null,
+    recommendation: obj(r.recommendation) ? { key: str(obj(r.recommendation)!.key), reason: str(obj(r.recommendation)!.reason), short: str(obj(r.recommendation)!.short) } : null,
     warnings: arr(r.warnings).map(obj).filter(Boolean).map((w) => ({ code: String(w!.code ?? ""), message: str(w!.message) || "" })).filter((w) => w.message),
   };
 }

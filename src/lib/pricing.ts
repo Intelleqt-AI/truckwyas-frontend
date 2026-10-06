@@ -28,13 +28,24 @@ const num = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+/** Whole number, half away from zero (as the server's ROUND_HALF_UP): 2.5 -> 3, −2.5 -> −3. */
+export function roundHalfAway(n: number): number {
+  return Math.sign(n) * Math.round(Math.abs(n));
+}
+
+/** "20%", "−4%" (U+2212 minus), whole number. */
+export function formatPct(n: number): string {
+  const r = roundHalfAway(n);
+  return `${r < 0 ? '\u2212' : ''}${Math.abs(r)}%`;
+}
+
 /** Margin in rand and whole-number %, or null when either side is unknown. */
 export function marginOf(price: unknown, floor: unknown): { amount: number; pct: number | null } | null {
   const p = num(price);
   const f = num(floor);
   if (p === null || f === null) return null;
-  const amount = Math.round(p - f);
-  return { amount, pct: p > 0 ? Math.round(((p - f) / p) * 100) : null };
+  const amount = roundHalfAway(p - f);
+  return { amount, pct: p > 0 ? roundHalfAway(((p - f) / p) * 100) : null };
 }
 
 /** "R 25 100" when the cents are zero, else "R 1 448,78". U+2212 minus. */
@@ -55,7 +66,7 @@ export function formatSignedRand(value: unknown): string {
 /** "R 6 550 · 26%" (whole rand, whole %). */
 export function formatMargin(m: { amount: number; pct: number | null } | null): string {
   if (!m) return '—';
-  return m.pct === null ? formatMoneyWhole(m.amount) : `${formatMoneyWhole(m.amount)} · ${m.pct}%`;
+  return m.pct === null ? formatMoneyWhole(m.amount) : `${formatMoneyWhole(m.amount)} · ${formatPct(m.pct)}`;
 }
 
 const BAND_LABEL: Record<LikelihoodBand, string> = {

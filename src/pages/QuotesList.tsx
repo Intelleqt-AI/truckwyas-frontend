@@ -1,6 +1,7 @@
 import './bookings-typography.css';
 import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import './table-heading-roles.css';
+import './quotes-list-table.css';
 import './bookings-section.css';
 import { useState, useEffect, useMemo, useRef } from "react";
 import { BoardScrollbar } from "@/components/BoardScrollbar";
@@ -38,7 +39,7 @@ import { CSS } from "@dnd-kit/utilities";
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
 import LossReasonDialog from '@/components/LossReasonDialog';
-import { lossReasonPayload } from '@/lib/pricing';
+import { formatPct, lossReasonPayload, roundHalfAway } from '@/lib/pricing';
 import { rowLink } from '@/lib/rowLink';
 import { StatusChip, statusTone } from '@/components/ui/StatusChip';
 import { Segmented } from '@/components/ui/Segmented';
@@ -878,7 +879,6 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           ) : (
           (() => {
           // Columns with nothing in them on any row step aside (R9).
-          const anyOutcome = listItems.some((q: any) => q.outcome === 'accepted' || q.outcome === 'rejected');
           const anyAction = listItems.some((q: any) => q.status === 'ACCEPTED' || !!bookedLoadOf(q));
           // Margin from the stored pricing decision (price − full cost floor,
           // on the price excl. VAT); older quotes have none and show a dash.
@@ -886,22 +886,23 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
             const v = q.pricing_margin_pct;
             if (v === null || v === undefined || v === '') return null;
             const n = Number(v);
-            return Number.isFinite(n) ? Math.round(n) : null;
+            return Number.isFinite(n) ? roundHalfAway(n) : null;
           };
           const anyMargin = listItems.some((q: any) => marginPctOf(q) !== null);
           return (
           <div className="bk-table-wrap bk-qlist-fill" style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-            <table className="table-heading-roles bk-table">
+            {/* Fixed layout: every column has its width (quotes-list-table.css), so
+                Amount and Action never leave the card at 1024 or 1440. */}
+            <table className={`table-heading-roles bk-table bk-table--quotes${anyMargin ? ' has-margin' : ''}${anyAction ? ' has-action' : ''}`}>
               <thead>
                 <tr style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                   <th scope="col" className="bk-col-load">Quote #</th>
-                  <th scope="col">Customer</th>
+                  <th scope="col" className="bk-col-customer">Customer</th>
                   <th scope="col" className="bk-col-route">Route</th>
-                  <th scope="col">Status</th>
-                  {anyOutcome && <th scope="col" className="bk-col-phone">Outcome</th>}
-                  <th scope="col" className="bk-col-phone">Created</th>
-                  {anyMargin && <th scope="col" className="is-num bk-col-phone" title="Margin on the price excl. VAT, after the full cost floor">Margin</th>}
-                  <th scope="col" className="is-num">Amount incl. VAT</th>
+                  <th scope="col" className="bk-col-status">Status</th>
+                  <th scope="col" className="bk-col-phone bk-col-created">Created</th>
+                  {anyMargin && <th scope="col" className="is-num bk-col-phone bk-col-margin" title="Margin on the price excl. VAT, after the full cost floor">Margin</th>}
+                  <th scope="col" className="is-num bk-col-amount">Amount incl. VAT</th>
                   {anyAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Action</span></th>}
                 </tr>
               </thead>
@@ -925,36 +926,35 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       <RecordNo value={quote.quote_number} />
                     </td>
                     <td className="is-truncate bk-col-route" title={routeOf(quote)}>{routeOf(quote)}</td>
-                    <td>
-                      {/* The board's stage: a sent quote marked lost reads Declined here too. */}
+                    <td className="bk-col-status">
+                      {/* One chip per row (R5): the board's stage, which follows the
+                          outcome, so Status and Outcome are one column. */}
                       {(() => {
                         // Converted into a load: "Booked", as on the quote page (its tone follows the load).
                         const booked = bookedLoadOf(quote);
                         if (booked || quote.converted) return <StatusChip status={booked?.status || 'BOOKED'} label="Booked" size="sm" />;
-                        const stage = boardStage(quote);
+                        const raw = boardStage(quote);
+                        // Marked won or lost but the status not moved yet: the outcome wins.
+                        const stage = raw && raw !== 'ACCEPTED' && raw !== 'DECLINED' && quote.outcome === 'accepted' ? 'ACCEPTED'
+                          : raw && raw !== 'DECLINED' && raw !== 'ACCEPTED' && quote.outcome === 'rejected' ? 'DECLINED' : raw;
                         return stage
                           ? <StatusChip status={stage} label={COLUMN_LABELS[stage]} size="sm" />
                           : <StatusChip status={quote.status === 'IT' ? 'IN_TRANSIT' : quote.status} label={COLUMN_LABELS[quote.status]} size="sm" />;
                       })()}
                     </td>
-                    {anyOutcome && <td className="bk-col-phone">
-                      {quote.outcome === 'accepted' && <StatusChip status="WON" size="sm" />}
-                      {quote.outcome === 'rejected' && <StatusChip status="LOST" size="sm" />}
-                      {(!quote.outcome || quote.outcome === 'pending') && <span>—</span>}
-                    </td>}
-                    <td className="is-date bk-col-phone">
+                    <td className="is-date bk-col-phone bk-col-created">
                       {quote.created_at ? formatDate(quote.created_at) : '—'}
                     </td>
                     {anyMargin && (() => {
                       const m = marginPctOf(quote);
                       return (
-                        <td className="is-num bk-col-phone" style={m !== null && m < 0 ? { color: 'var(--status-danger-text)' } : undefined}
+                        <td className="is-num bk-col-phone bk-col-margin" style={m !== null && m < 0 ? { color: 'var(--status-danger-text)' } : undefined}
                           title={m === null ? 'Priced before the pricing analysis' : 'Margin on the price excl. VAT, after the full cost floor'}>
-                          {m === null ? <span className="bk-muted">—</span> : `${m < 0 ? '\u2212' : ''}${Math.abs(m)}%`}
+                          {m === null ? <span className="bk-muted">—</span> : formatPct(m)}
                         </td>
                       );
                     })()}
-                    <td className="is-money" title={`${formatCurrency(priceInclVat(quote))} incl. VAT`}>
+                    <td className="is-money bk-col-amount" title={`${formatCurrency(priceInclVat(quote))} incl. VAT`}>
                       {/* Lists show whole rands; the quote itself carries the cents (R7). */}
                       {formatMoneyWhole(priceInclVat(quote))}
                     </td>
@@ -973,8 +973,11 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                           type="button"
                           className="bk-btn bk-btn--secondary bk-btn--sm"
                           onClick={(e) => handleConvertToLoad(e, quote)}
+                          aria-label="Convert to booking"
+                          title="Convert to booking"
                         >
-                          Convert to booking
+                          {/* Short in the table so the column keeps its width (R5). */}
+                          Convert
                         </button>
                       )}
                     </td>}

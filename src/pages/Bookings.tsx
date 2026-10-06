@@ -359,11 +359,15 @@ export default function Bookings() {
     const weight = parseFloat(load.weight || '0');
     const distanceText = distance > 0 ? formatDistance(distance) : 'Not recorded';
     // The builder's "28t <truck>" placeholder names the truck, not the cargo.
-    const cargoText = [weight > 0 ? `${formatNumber(weight)} kg` : '', cargoOf(load.cargo_description) || ''].filter(Boolean).join(', ') || 'Not recorded';
+    // No cargo reads "Not specified", as on the quote (cargo.ts).
+    const cargoName = cargoOf(load.cargo_description);
+    const cargoText = cargoName
+      ? [weight > 0 ? `${formatNumber(weight)} kg` : '', cargoName].filter(Boolean).join(', ')
+      : weight > 0 ? `${formatNumber(weight)} kg, not specified` : 'Not specified';
     if (cls === 'rail') return [{ label: 'Distance', value: distanceText }, { label: 'Cargo', value: cargoText }].map(r => (
       <div key={r.label} className="bk-kv">
         <span className="bk-kv__label">{r.label}</span>
-        <span className={`bk-kv__value${r.value === 'Not recorded' ? ' bk-muted' : ''}`}>{r.value}</span>
+        <span className={`bk-kv__value${r.value === 'Not recorded' || r.value === 'Not specified' ? ' bk-muted' : ''}`}>{r.value}</span>
       </div>
     ));
     return (

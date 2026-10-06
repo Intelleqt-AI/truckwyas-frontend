@@ -192,3 +192,66 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
 .qb-controls input.qb-cost__input--rate::-webkit-inner-spin-button,
 .qb-controls input.qb-cost__input--rate::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 @media (max-width: 640px) { .qb-controls input.qb-cost__input--rate { width: 80px; } }
+
+/* ---- Round 5: page geometry and a one-row price bar (≤ 88px) ------------ */
+.qb-lbl-short { display: none; }
+.qb-pricebar__rate { white-space: nowrap; }
+.qb-pricebar__src { flex-wrap: nowrap; white-space: nowrap; }
+.qb-pricebar__line.is-neutral, .qb-pricebar__line.is-neutral .qb-pricebar__num { color: var(--text-secondary); }
+@media (min-width: 1024px) {
+  /* The aside sticks 16px under the top bar (the scroller adds 8px above the
+     sticky offset); its height is clamped live (QuoteBuilder) so its foot
+     stays 16px above the fixed price bar. */
+  .qb-aside, .qb-has-pricebar .qb-aside { top: 8px; max-height: calc(100dvh - var(--qb-topbar-h, 64px) - 32px); }
+  /* Fixed to the window's foot across the main column, 12px off the edge.
+     One row: price (label, figure, source) | readout | actions; 16+32+18 px
+     rows + 10px padding + 1px borders = 88px. */
+  .qb-controls.qb-has-pricebar .qb-pricebar {
+    position: fixed; left: var(--qb-main-left, 264px); right: var(--qb-main-right, 32px); bottom: 12px; margin: 0;
+    grid-template-columns: 224px minmax(0, 1fr) auto; grid-template-rows: 16px 32px 18px;
+    column-gap: 24px; row-gap: 0; padding: 10px 20px; align-items: center;
+  }
+  /* The page ends with room for the bar, inside the aside's sticky range. */
+  .qb-has-pricebar .qb-after { padding-bottom: calc(var(--pricebar-h, 88px) + 28px); }
+  .qb-has-pricebar .qb-pricebar__price { display: contents; }
+  .qb-has-pricebar .qb-pricebar__label { grid-column: 1; grid-row: 1; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; }
+  .qb-has-pricebar .qb-pricebar__field {
+    grid-column: 1; grid-row: 2;
+    width: 100%; height: 32px; margin: 0; box-sizing: border-box; align-items: center;
+    border-bottom: 1px dashed var(--border-strong);
+  }
+  .qb-has-pricebar .qb-pricebar__field:focus-within { margin: 0; border-bottom: 1px solid var(--accent-primary); box-shadow: 0 1px 0 0 var(--accent-primary); }
+  .qb-has-pricebar .qb-pricebar__cur { font: 600 28px/31px var(--font-sans); }
+  .qb-controls.qb-has-pricebar input.qb-pricebar__input { height: 31px; font: 600 28px/31px var(--font-sans) !important; }
+  /* Source line: under the figure; the build-up's rate text runs on under
+     the readout (which then keeps to the figure's two rows). */
+  .qb-has-pricebar .qb-pricebar__src {
+    grid-column: 1; grid-row: 3; height: 18px; display: flex; align-items: center; gap: 8px; min-width: 0;
+    font: 400 12px/16px var(--font-sans); color: var(--text-tertiary);
+  }
+  .qb-has-pricebar .qb-pricebar.is-buildup .qb-pricebar__src { grid-column: 1 / 3; }
+  .qb-has-pricebar .qb-pricebar__read { grid-column: 2; grid-row: 1 / 4; align-self: center; justify-content: center; gap: 4px; min-width: 0; }
+  .qb-has-pricebar .qb-pricebar.is-buildup .qb-pricebar__read { grid-row: 1 / 3; gap: 0; }
+  .qb-controls.qb-has-pricebar .qb-pricebar__actions { grid-column: 3; grid-row: 1 / 4; align-self: center; gap: 10px; flex-wrap: nowrap; }
+  .qb-has-pricebar .qb-pricebar__line { flex-wrap: wrap; gap: 0 16px; font: 400 13px/20px var(--font-sans); }
+  .qb-has-pricebar .qb-pricebar__next { margin: 0; flex-wrap: nowrap; white-space: nowrap; min-height: 20px; }
+  .qb-has-pricebar .qb-pricebar__next:has(.tw-btn) { min-height: 28px; }
+  .qb-has-pricebar .qb-pricebar__next .qb-linkbtn { font-size: 13px; line-height: 20px; }
+  .qb-has-pricebar .qb-pricebar__nudge { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+  .qb-has-pricebar .qb-pricebar__nudge .qb-linkbtn { margin-left: 6px; font-size: 12px; line-height: 16px; }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .qb-controls.qb-has-pricebar .qb-pricebar { grid-template-columns: 208px minmax(0, 1fr) auto; column-gap: 16px; padding: 10px 16px; }
+  .qb-controls.qb-has-pricebar .qb-pricebar__actions { gap: 8px; }
+  .qb-controls.qb-has-pricebar .qb-pricebar__actions .tw-btn { height: 36px; padding: 0 14px; }
+  .qb-controls.qb-has-pricebar .qb-pricebar__actions .ai-launcher--inline { width: 36px; height: 36px; }
+  .qb-lbl-long { display: none; }
+  .qb-lbl-short { display: inline; }
+  .qb-has-pricebar .qb-pricebar__cur { font-size: 26px; }
+  .qb-controls.qb-has-pricebar input.qb-pricebar__input { font-size: 26px !important; }
+}
+/* Phones: the price keeps its 22px figure (it is ≥16px, so no iOS zoom) over
+   the generic 16px field rule. */
+@media (max-width: 640px) {
+  .qb-controls input.qb-pricebar__input.qb-pricebar__input:not([type="checkbox"]) { font-size: 22px !important; line-height: 28px !important; }
+}

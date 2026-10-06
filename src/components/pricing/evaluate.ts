@@ -7,7 +7,7 @@
  * One margin definition everywhere: margin = price − full cost floor;
  * margin % = margin / price (excl. VAT).
  */
-import { BAND_LABEL, type Band, type ChoiceKey, type PricingAnalysis } from "./types";
+import { BAND_LABEL, type Band, type Choice, type ChoiceKey, type Likelihood, type PricingAnalysis } from "./types";
 
 export type LiveLikelihood =
   | { level: "model"; pct: number }
@@ -59,12 +59,16 @@ export function likelihoodAt(a: PricingAnalysis | null, price: number): LiveLike
 export function readPrice(a: PricingAnalysis | null, price: number): LiveReading {
   const floor = a?.costFloor?.total ?? null;
   const margin = floor != null ? price - floor : null;
-  const matchedChoice = a?.choices.find((c) => Math.abs(c.price - price) < 0.5) ?? null;
+  // A choice only when the price IS that choice's price, to the cent: R 27 999,99
+  // is a custom price, never "Stretch".
+  const matchedChoice = a?.choices.find((c) => Math.abs(c.price - price) < 0.005) ?? null;
   const matched = matchedChoice?.key ?? null;
   // At a choice's own price, say exactly what its card says.
   // The server's reading wins at the exact price it was asked about; the
   // curve is only interpolated while a newer price is being typed.
-  const yp = a?.yourPrice && Math.abs(a.yourPrice.price - price) < 0.5 ? a.yourPrice.likelihood : null;
+  // `<= 0.5` so an older server that echoed whole rand (R 23 322,50 → 23 323)
+  // still counts as an answer for this price; a current one echoes it exactly.
+  const yp = a?.yourPrice && Math.abs(a.yourPrice.price - price) <= 0.5 ? a.yourPrice.likelihood : null;
   const cl = matchedChoice?.likelihood ?? yp;
   const likelihood: LiveLikelihood = cl
     ? (cl.level === "model" ? { level: "model", pct: Math.round(cl.pct) } : { level: "rules", band: cl.band, label: cl.label, note: cl.outsideModelRange ? "Outside the prices we've seen you quote" : null })
@@ -116,4 +120,22 @@ export function pricingDecision(a: PricingAnalysis, finalPrice: number, picked: 
     likelihood_at_final_pct: picked !== "custom" && lk?.level === "model" ? lk.pct : null,
     band_at_final: picked !== "custom" && lk?.level === "rules" ? lk.band : null,
   };
+}
+
+/**
+ * The three cards' chance to win in ONE format: when any choice is a band
+ * (outside the model's range), every choice is shown as its band, read from
+ * the same rules thresholds — never "14% / 11% / Less likely" in one row.
+ */
+export function rowLikelihoods(a: PricingAnalysis | null, choices: Choice[]): Map<ChoiceKey, Likelihood | null> {
+  const out = new Map<ChoiceKey, Likelihood | null>();
+  const mixed = choices.some((c) => c.likelihood?.level === "model") && choices.some((c) => c.likelihood?.level === "rules");
+  for (const c of choices) {
+    if (!mixed || c.likelihood?.level !== "model") { out.set(c.key, c.likelihood); continue; }
+    const t = a?.likelihood?.rules;
+    const band: Band | null = !t || t.likelyMax == null || t.evenMax == null ? null
+      : c.price <= t.likelyMax ? "likely" : c.price <= t.evenMax ? "even" : "less_likely";
+    out.set(c.key, { level: "rules", band, label: band ? BAND_LABEL[band] : NO_BAND, outsideModelRange: false });
+  }
+  return out;
 }

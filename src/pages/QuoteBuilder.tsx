@@ -1081,6 +1081,13 @@ export default function QuoteBuilder() {
   const pricing = usePricingAnalysis(pricingInputs, pricingPhase === "ready");
   // The price in the bar, read live against the last analysis.
   const liveReading = readPrice(pricing.data, total);
+  // The bar's one price story: the build-up until a price is applied, then the
+  // applied price (a choice, or the user's own).
+  const atBuildUp = Math.abs(serviceCharge) < 0.005;
+  const recChoice = pricing.data?.choices.find(c => c.recommended) ?? null;
+  const appliedChoice = liveReading.matchedChoice ? pricing.data?.choices.find(c => c.key === liveReading.matchedChoice) ?? null : null;
+  // "Use Balanced R 25 100" sits in the bar until a price is applied.
+  const useRec = atBuildUp && !!recChoice && liveReading.margin != null && Math.abs(recChoice.price - total) >= 0.005;
 
   // Driver allowance: the approved allowance × nights from the analysis is
   // OFFERED next to the Driver input (one tap applies it). The builder's own
@@ -1103,7 +1110,9 @@ export default function QuoteBuilder() {
     const saved = savedFinalPriceRef.current;
     if (saved == null || !routeIsCurrent) return;
     savedFinalPriceRef.current = null;
-    if (Math.abs(saved - total) >= 0.5) applyPrice(saved);
+    // To the cent: a quote saved at R 24 999,99 reopens at R 24 999,99, and a
+    // no-change re-save stores the same total.
+    if (Math.abs(saved - total) >= 0.005) applyPrice(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeIsCurrent]);
 
@@ -2094,7 +2103,7 @@ export default function QuoteBuilder() {
         <section ref={priceBarRef} className={`qb-pricebar${barCompact ? " is-compact" : ""}`} aria-label="Quote price and send"
           onClick={() => { if (barCompact) setBarCompact(false); }}>
           <div className="qb-pricebar__price">
-            <label className="qb-pricebar__label" htmlFor="qb-price-input">Quote price excl. VAT</label>
+            <label className="qb-pricebar__label" htmlFor="qb-price-input">{atBuildUp ? "Your build-up excl. VAT" : "Quote price excl. VAT"}</label>
             <span className="qb-pricebar__field">
               <span className="qb-pricebar__cur" aria-hidden="true">R</span>
               <input id="qb-price-input" className="qb-pricebar__input" inputMode="decimal" autoComplete="off"
@@ -2106,15 +2115,26 @@ export default function QuoteBuilder() {
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
                 onChange={(e) => onPriceInput(e.target.value)} />
             </span>
-            <span className="qb-pricebar__sub">What the client is sent · type to change it</span>
+            {atBuildUp ? (
+              <span className="qb-pricebar__sub">
+                {chargeDistance > 0 && Number(baseRatePerKm) > 0
+                  ? <>{formatCurrency(Number(baseRatePerKm))}/km × {formatNumber(Math.round(chargeDistance))} km, plus fuel and tolls</>
+                  : "Sum of the cost lines"} · type to change it
+              </span>
+            ) : (
+              <span className="qb-pricebar__sub qb-pricebar__src">
+                <span className="qb-pricebar__chip">{appliedChoice ? appliedChoice.label : "Your price"}</span>
+                <button type="button" className="qb-linkbtn" onClick={() => applyPrice(costSum)}>
+                  Back to build-up {formatMoneyWhole(costSum)}
+                </button>
+              </span>
+            )}
           </div>
           <div className="qb-pricebar__read" id="qb-price-read">
             {liveReading.margin != null ? (() => {
               const settled = !priceTyping;
               const loss = settled && liveReading.belowFloor;
-              const choiceLabel = liveReading.matchedChoice ? pricing.data?.choices.find(c => c.key === liveReading.matchedChoice)?.label : null;
-              const gap = round2(serviceCharge);
-              const rec = pricing.data?.choices.find(c => c.recommended);
+              const wayOut = [...(pricing.data?.choices ?? [])].sort((a, b) => a.price - b.price).find(c => liveReading.floor != null && c.price >= liveReading.floor) ?? null;
               return (
                 <>
                   <span className="qb-pricebar__line">
@@ -2127,23 +2147,31 @@ export default function QuoteBuilder() {
                     ) : (
                       <span>Margin <span className="qb-pricebar__num">{formatMoneyWhole(liveReading.margin)} · {signedPct(liveReading.marginPct ?? 0)}</span></span>
                     )}
-                    {settled && !liveReading.belowFloor && liveReading.likelihood && (
+                    {settled && !liveReading.belowFloor && liveReading.likelihood && !(liveReading.likelihood.level === "rules" && liveReading.likelihood.band == null) && (
                       <span className={`qb-pricebar__lk qb-pricebar__lk--${lkTone(liveReading.likelihood)}`}>
                         <span>{likelihoodShort(liveReading.likelihood)}
                           {liveReading.likelihood.level === "rules" && liveReading.likelihood.note && <span className="qb-pricebar__lknote"> · {liveReading.likelihood.note.toLowerCase()}</span>}</span>
                       </span>
                     )}
                   </span>
-                  {!liveReading.belowFloor && (
-                    <span className="qb-pricebar__muted">
-                      {[
-                        choiceLabel ? `${choiceLabel} price` : Math.abs(gap) >= 0.5 ? "Your own price" : "Sum of the build-up",
-                        Math.abs(gap) >= 0.5 ? `${formatMoneyWhole(Math.abs(gap))} ${gap > 0 ? "above" : "below"} your build-up of ${formatMoneyWhole(costSum)}`
-                          : !choiceLabel && rec && total > 0 && Math.abs(rec.price - total) / total > 0.15 ? `recommended ${formatMoneyWhole(rec.price)}` : null,
-                        `floor ${formatMoneyWhole(liveReading.floor)}`,
-                      ].filter(Boolean).join(" · ")}
+                  {/* One price story: the bar's number, plus ONE reference — the
+                      recommended choice as a button until a price is applied. */}
+                  {useRec ? (
+                    <span className="qb-pricebar__next">
+                      <button type="button" className="tw-btn tw-btn--primary tw-btn--sm qb-pricebar__use" onClick={() => applyPrice(recChoice!.price)}>
+                        Use {recChoice!.label} {formatMoneyWhole(recChoice!.price)}
+                      </button>
+                      {!liveReading.belowFloor && <span className="qb-pricebar__muted">Floor {formatMoneyWhole(liveReading.floor)}</span>}
                     </span>
-                  )}
+                  ) : loss && wayOut ? (
+                    <span className="qb-pricebar__next">
+                      <button type="button" className="qb-linkbtn qb-linkbtn--strong" onClick={() => applyPrice(wayOut.price)}>
+                        Use {wayOut.label} {formatMoneyWhole(wayOut.price)}
+                      </button>
+                    </span>
+                  ) : !liveReading.belowFloor ? (
+                    <span className="qb-pricebar__muted">Floor {formatMoneyWhole(liveReading.floor)}</span>
+                  ) : null}
                 </>
               );
             })() : null}
@@ -2169,7 +2197,9 @@ export default function QuoteBuilder() {
           </div>
           <div className="qb-pricebar__actions">
             <button type="button" className="tw-btn" onClick={() => save(false)} disabled={saving}>Save as draft</button>
-            <button type="button" className="tw-btn tw-btn--primary" onClick={openSendPreview} disabled={saving}>Send quote</button>
+            {/* One primary action at a time: while the recommended price is
+                on offer that button leads; once a price is set, Send does. */}
+            <button type="button" className={`tw-btn${useRec ? "" : " tw-btn--primary"}`} onClick={openSendPreview} disabled={saving}>Send quote</button>
             {/* Assistant launcher slot while the bar shows (see nlChatSlotRef). */}
             <span ref={barChatSlotRef} className="qb-chatslot" />
           </div>

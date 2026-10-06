@@ -8,6 +8,8 @@ const num = (v: unknown): number | null => {
 
 export interface DecisionView {
   picked: string | null;
+  /** The choice the panel recommended when this was priced (shown_choices), if stored. */
+  recommended: string | null;
   finalPrice: number;
   floor: number | null;
   margin: { amount: number; pct: number | null } | null;
@@ -18,7 +20,8 @@ export interface DecisionView {
   stale: boolean;
   /** What the floor is made of, so the margin can be traced; null if unknown. */
   /** source: a short provenance label when the decision stored one; missing: no figure on record. */
-  floorLines: { label: string; amount: number; source?: string | null; missing?: boolean }[] | null;
+  /** note: words shown in place of the amount ("None due (same day)"). */
+  floorLines: { label: string; amount: number; source?: string | null; missing?: boolean; note?: string | null }[] | null;
   /** True when the lines were worked out from the quote's own lines (no stored breakdown). */
   floorLinesDerived: boolean;
 }
@@ -28,7 +31,7 @@ const FLOOR_LABEL: Record<string, string> = {
   tolls: 'Tolls',
   driver_allowance: 'Driver allowance',
   border: 'Border fees',
-  fixed_cost: 'Operating costs (in base rate)',
+  fixed_cost: 'Operating costs',
   return_leg: 'Empty return',
 };
 
@@ -37,12 +40,24 @@ const FLOOR_LABEL: Record<string, string> = {
 const SOURCE_LABEL: Record<string, string> = {
   official: 'Official',
   calculated: 'Calculated',
-  company_actuals: 'Your costs',
+  company_actuals: 'Your actuals',
   estimate: 'Estimate',
   user: 'You',
 };
 
-type QuoteLines = { fuel_surcharge?: unknown; toll_charges?: unknown; driver_allowance?: unknown; additional_charges?: unknown };
+type QuoteLines = { fuel_surcharge?: unknown; toll_charges?: unknown; driver_allowance?: unknown; additional_charges?: unknown; estimated_duration_minutes?: unknown; trip_type?: unknown };
+
+/**
+ * Nights away, the cost floor's own rule: driving days = ceil(driving hours /
+ * 9), nights = days − 1, both legs for a round trip. Null when the driving
+ * time is not on the quote.
+ */
+function nightsAway(quote: QuoteLines): number | null {
+  const minutes = num(quote.estimated_duration_minutes);
+  if (minutes === null || minutes <= 0) return null;
+  const legs = quote.trip_type === 'ROUND_TRIP' ? 2 : 1;
+  return Math.max(Math.ceil((minutes * legs) / 60 / 9) - 1, 0);
+}
 
 /**
  * The floor's components. Prefers the breakdown saved with the decision
@@ -53,17 +68,26 @@ type QuoteLines = { fuel_surcharge?: unknown; toll_charges?: unknown; driver_all
 function floorLinesOf(d: PricingDecision, quote: QuoteLines, floor: number | null, stale: boolean): { lines: DecisionView['floorLines']; derived: boolean } {
   const stored = (d as Record<string, unknown>).floor_lines;
   if (Array.isArray(stored) && stored.length) {
+    const nights = nightsAway(quote);
     const lines = stored
       .map((l: { key?: string; label?: string; amount?: unknown; source_kind?: string }) => {
         const kind = String(l.source_kind || '');
+        const amount = kind === 'missing' ? 0 : num(l.amount);
+        // As the builder: a driver line of R 0 is "None due (same day)" when
+        // the trip has no night away, and "Not set" when it has one and the
+        // figure was not the user's own (older decisions saved that gap as R 0).
+        const zeroDriver = l.key === 'driver_allowance' && kind !== 'missing' && amount === 0;
+        const noneDue = zeroDriver && nights === 0;
+        const missing = kind === 'missing' || (zeroDriver && kind !== 'user' && nights !== null && nights > 0);
         return {
           label: (l.key && FLOOR_LABEL[l.key]) || String(l.label || ''),
-          amount: kind === 'missing' ? 0 : num(l.amount),
-          source: SOURCE_LABEL[kind] ?? null,
-          missing: kind === 'missing',
+          amount,
+          source: noneDue || missing ? null : SOURCE_LABEL[kind] ?? null,
+          missing,
+          note: noneDue ? 'None due (same day)' : null,
         };
       })
-      .filter((l): l is { label: string; amount: number; source: string | null; missing: boolean } => !!l.label && l.amount !== null);
+      .filter((l): l is { label: string; amount: number; source: string | null; missing: boolean; note: string | null } => !!l.label && l.amount !== null);
     return { lines: lines.length ? lines : null, derived: false };
   }
   if (floor === null || stale) return { lines: null, derived: false };
@@ -75,7 +99,7 @@ function floorLinesOf(d: PricingDecision, quote: QuoteLines, floor: number | nul
   ].filter((p) => p.amount > 0);
   const rest = Math.round((floor - parts.reduce((a, p) => a + p.amount, 0)) * 100) / 100;
   if (rest < 0) return { lines: null, derived: false };
-  return { lines: [...parts, ...(rest > 0 ? [{ label: 'Operating costs (in base rate)', amount: rest }] : [])], derived: true };
+  return { lines: [...parts, ...(rest > 0 ? [{ label: 'Operating costs', amount: rest }] : [])], derived: true };
 }
 
 function marketLabel(m: NonNullable<PricingDecision['market']>): { label: string; estimate: boolean } {
@@ -102,6 +126,9 @@ export function pricingDecisionOf(quote: ({ total_amount?: unknown; pricing_deci
   const floor = num(d.floor);
   const margin = marginOf(finalPrice, floor);
   const picked = d.picked_choice && d.picked_choice in CHOICE_LABEL ? CHOICE_LABEL[d.picked_choice as PickedChoice] : null;
+  const shown = Array.isArray(d.shown_choices) ? (d.shown_choices as { key?: string; recommended?: boolean }[]) : [];
+  const recKey = shown.find((c) => c && c.recommended === true)?.key;
+  const recommended = recKey && recKey in CHOICE_LABEL ? CHOICE_LABEL[recKey as PickedChoice] : null;
 
   let market: DecisionView['market'] = null;
   const m = d.market;
@@ -131,6 +158,7 @@ export function pricingDecisionOf(quote: ({ total_amount?: unknown; pricing_deci
     floorLines: fl.lines,
     floorLinesDerived: fl.derived,
     picked,
+    recommended,
     finalPrice,
     floor,
     margin,
@@ -141,3 +169,18 @@ export function pricingDecisionOf(quote: ({ total_amount?: unknown; pricing_deci
   };
 }
 
+
+/**
+ * The price the customer agreed when the quote was won, when it differs from
+ * the quoted total (read-only, kept with the outcome; billing still uses the
+ * quote total). Accepts the field under the names the API may use; null when
+ * absent, not won, or equal to the quote (to the cent).
+ */
+export function agreedPriceOf(quote: Record<string, unknown> | null | undefined): number | null {
+  if (!quote || quote.outcome !== 'accepted') return null;
+  const nested = quote.outcome_detail && typeof quote.outcome_detail === 'object' ? (quote.outcome_detail as Record<string, unknown>).final_price : undefined;
+  const agreed = num(quote.agreed_price ?? quote.final_price ?? quote.outcome_final_price ?? nested);
+  const total = num(quote.total_amount);
+  if (agreed === null || agreed <= 0 || total === null) return null;
+  return Math.abs(agreed - total) >= 0.005 ? agreed : null;
+}

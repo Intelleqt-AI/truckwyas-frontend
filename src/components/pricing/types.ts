@@ -31,6 +31,10 @@ export interface FloorLine {
 }
 export interface CostFloor {
   total: number; perKm: number | null; includeReturn: boolean;
+  /** "per km driven" when the per-km figure divides by both legs (empty return in the floor). */
+  perKmDriven: boolean;
+  /** The empty run home (one-way trips): its cost, and the floor including it. */
+  returnLegAmount: number | null; floorWithReturn: number | null;
   /** Whether the empty-return toggle means anything for this trip. */
   returnAvailable: boolean;
   lines: FloorLine[];
@@ -39,6 +43,12 @@ export interface CostFloor {
 export interface Market {
   available: boolean; p25: number | null; median: number | null; p75: number | null; n: number;
   tier: MarketTier | null; tierLabel: string | null; isEstimate: boolean; yourPosition: Position | null;
+  /** Round trip priced from one-way quotes ×2 (`legs_scaled` / `basis: "one_way_x2"`). */
+  oneWayX2: boolean;
+  /** Short server label for the basis, e.g. "one-way quotes ×2". */
+  basisLabel: string | null;
+  /** The sample was narrowed to the vehicle type; its name when known. */
+  vehicleSpecific: boolean; vehicleName: string | null;
 }
 export type Likelihood =
   | { level: "model"; pct: number }
@@ -53,7 +63,9 @@ export interface Choice {
 export interface CurvePoint { price: number; pct: number; expectedProfit: number | null }
 export interface LikelihoodInfo {
   level: "model" | "rules";
-  model: { version: string; scope: string | null; nClosed: number; basisLabel: string; range: [number, number]; curve: CurvePoint[] } | null;
+  model: { version: string; scope: string | null; nClosed: number; basisLabel: string; range: [number, number]; curve: CurvePoint[];
+    /** The curve's peak expected profit (server). */
+    best: { price: number; pct: number | null; expectedProfit: number | null } | null } | null;
   rules: { likelyMax: number | null; evenMax: number | null; basis: string[] } | null;
   reason: string | null;
   /** One-line, server-worded description of the level ("Chance to win as bands · 16 of 40 closed quotes"). */
@@ -78,6 +90,10 @@ export interface PricingAnalysis {
   customer: CustomerEvidence | null;
   reasoning: string[];
   warnings: { code: string; message: string }[];
+  /** Decision-changing notices for the top of the panel (payment risk, lane under cost …). */
+  attention: { code: string; level: string; message: string }[];
+  /** Why the recommended choice is recommended (server sentence). */
+  recommendation: { key: string | null; reason: string | null } | null;
   /** The server's own reading of the price that was sent (authoritative at that price). */
   yourPrice: { price: number; likelihood: Likelihood | null } | null;
   /** Floor including the empty return, when the floor itself excludes it. */
@@ -190,8 +206,11 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
   const fx = obj(cf?.fixed_cost_per_km);
   const costFloor: CostFloor | null = cf && num(cf.total) != null ? {
     total: num(cf.total)!,
-    perKm: num(cf.per_km),
+    perKm: num(cf.per_km_driven) ?? num(cf.per_km),
     includeReturn: cf.include_return === true,
+    perKmDriven: num(cf.per_km_driven) != null || cf.per_km_basis === "driven" || /driven/i.test(String(cf.per_km_label ?? "")),
+    returnLegAmount: num(cf.return_leg_amount),
+    floorWithReturn: num(cf.floor_with_return),
     returnAvailable: cf.return_available !== false,
     lines: arr(cf.lines).map(obj).filter(Boolean).map((l) => {
       const s = obj(l!.source) || {};
@@ -234,6 +253,10 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
     // Belt and braces: an estimate tier is always an estimate, whatever the flag says.
     isEstimate: m.is_estimate === true || tier === "estimate",
     yourPosition: (["below", "within", "above"] as const).find((p) => p === m.your_position) ?? null,
+    oneWayX2: m.legs_scaled === true || m.basis === "one_way_x2",
+    basisLabel: str(m.basis_label) ?? str(m.basis_short),
+    vehicleSpecific: m.vehicle_specific === true,
+    vehicleName: str(m.vehicle_type) ?? str(m.vehicle_type_name) ?? (str(m.tier_label)?.match(/·\s*([^·]+?)\s+only\b/)?.[1] ?? null),
   } : null;
 
   const choices: Choice[] = arr(r.choices).map(obj).filter(Boolean).map((c) => ({
@@ -264,6 +287,8 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
     basisLabel: str(lm.basis_label) || "",
     range: (range.length === 2 && range[0] != null && range[1] != null ? [range[0], range[1]] : [curve[0].price, curve[curve.length - 1].price]) as [number, number],
     curve,
+    best: obj(lm.best) && num(obj(lm.best)!.price) != null
+      ? { price: num(obj(lm.best)!.price)!, pct: num(obj(lm.best)!.pct), expectedProfit: num(obj(lm.best)!.expected_profit) } : null,
   } : null;
   const likelihood: LikelihoodInfo | null = lk ? {
     // Model level only counts when there really is a curve to read.
@@ -312,6 +337,8 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
     yourPrice: obj(r.your_price) && num(obj(r.your_price)!.price) != null
       ? { price: num(obj(r.your_price)!.price)!, likelihood: adaptLikelihood(obj(r.your_price)!.likelihood) } : null,
     floorWithReturn: num(cf?.floor_with_return ?? r.floor_with_return),
+    attention: arr(r.attention).map(obj).filter(Boolean).map((a) => ({ code: String(a!.code ?? ""), level: String(a!.level ?? "medium"), message: str(a!.message) || "" })).filter((a) => a.message),
+    recommendation: obj(r.recommendation) ? { key: str(obj(r.recommendation)!.key), reason: str(obj(r.recommendation)!.reason) } : null,
     warnings: arr(r.warnings).map(obj).filter(Boolean).map((w) => ({ code: String(w!.code ?? ""), message: str(w!.message) || "" })).filter((w) => w.message),
   };
 }

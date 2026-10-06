@@ -28,7 +28,7 @@ import { InfoTip } from '@/components/ui/InfoTip';
 import LossReasonDialog from '@/components/LossReasonDialog';
 import PricingDecisionRows from '@/components/PricingDecisionRows';
 import { LOSS_REASONS, formatRand, lossReasonPayload, type LossReason } from '@/lib/pricing';
-import { pricingDecisionOf } from '@/lib/pricingDecision';
+import { agreedPriceOf, pricingDecisionOf } from '@/lib/pricingDecision';
 import { cargoText } from '@/lib/cargo';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
@@ -411,6 +411,11 @@ export default function QuoteDetail() {
   // Every quote starts with outcome "pending" (the model default), so the
   // answer is still open unless it reads accepted or rejected.
   const undecided = quote.outcome !== 'accepted' && quote.outcome !== 'rejected';
+  // A declined quote is a closed offer: nothing to send (Edit stays).
+  const declined = quote.status === 'DECLINED' || quote.outcome === 'rejected';
+  // What the customer agreed when it differs from the quote (display only:
+  // the booking and invoice bill the quote total).
+  const agreed = agreedPriceOf(quote);
   const routeSummary = routeFrom && routeTo ? `${routeFrom} → ${routeTo}` : '';
   const contact = (quote.customer_name || '').trim();
   const showContact = !!contact && contact.toLowerCase() !== company.toLowerCase();
@@ -495,6 +500,9 @@ export default function QuoteDetail() {
   // decision only. The legacy margin_percentage is the markup share of the
   // price, a different figure, so it is not shown as the margin.
   const marginNow = decision && !decision.stale ? decision.margin : null;
+  // No chance to win on a dead offer (R9), nor once decided: then it shows
+  // once, as "when priced", under How it was priced.
+  const showChance = !!decision?.likelihood && openStatus && !lapsed && undecided;
   // Each cost once per card (R3): with a current decision that breaks the
   // floor into its parts, "How it was priced" carries fuel, tolls and the rest,
   // so the build-up lines (Base rate, Fuel, …) are not listed a second time.
@@ -562,7 +570,7 @@ export default function QuoteDetail() {
             Edit quote
           </button>
           )}
-          {needsEdit || loadStateOnly ? null : booked ? (
+          {needsEdit || loadStateOnly || (declined && !booked) ? null : booked ? (
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate(`/bookings/${booking!.id}`)} aria-label="View booking">
               <span className="qd-label-long" data-short="Booking">View booking</span>
             </button>
@@ -686,11 +694,16 @@ export default function QuoteDetail() {
                   Margin {formatMoneyWhole(marginNow.amount)}{marginNow.pct !== null ? ` · ${marginNow.pct}%` : ''}{decision?.belowFloor ? ', below the cost floor' : ''}
                 </span>
               )}
-              {/* No chance to win on a dead offer (R9), nor once decided. */}
-              {decision?.likelihood && openStatus && !lapsed && undecided && (
+              {showChance && decision?.likelihood && (
                 <span>{decision.likelihood.model ? `${decision.likelihood.text} chance to win` : `${decision.likelihood.text} to win`}</span>
               )}
             </div>
+            {agreed !== null && (
+              <p className="qd-agreed">
+                Agreed {formatRand(agreed)} <span className="qd-agreed__quoted">(quoted {formatRand(total)})</span>
+                <InfoTip label="About the agreed price">The price the customer agreed when they accepted, excl. VAT. The booking and invoice use the quoted total.</InfoTip>
+              </p>
+            )}
             {booked && (
               <p className="qd-booked">
                 Booked as{' '}
@@ -715,7 +728,7 @@ export default function QuoteDetail() {
               </p>
             )}
             {showBuildUp && <div className="qd-price-rows">
-              {/* Lines in whole rand; only VAT and the total incl. VAT carry cents. */}
+              {/* Lines in whole rand. */}
               {priceRows.map(r => (
                 <div key={r.label} className="bk-kv"><span className="bk-kv__label">{r.label}</span><span className="bk-kv__value">{formatMoneyWhole(r.value)}</span></div>
               ))}
@@ -731,15 +744,16 @@ export default function QuoteDetail() {
               <div className="qd-price-rows">
                 {vat.vat_registered ? (
                   <>
-                    <div className="bk-kv"><span className="bk-kv__label">{vat.vat_label}</span><span className="bk-kv__value">{formatMoney(parseFloat(vat.vat_amount))}</span></div>
-                    <div className="bk-kv bk-kv--total"><span className="bk-kv__label">Total incl. VAT</span><span className="bk-kv__value">{formatMoney(parseFloat(vat.total_incl_vat))}</span></div>
+                    {/* Whole rand like the price; cents only when there are some. */}
+                    <div className="bk-kv"><span className="bk-kv__label">{vat.vat_label}</span><span className="bk-kv__value">{formatRand(vat.vat_amount)}</span></div>
+                    <div className="bk-kv bk-kv--total"><span className="bk-kv__label">Total incl. VAT</span><span className="bk-kv__value">{formatRand(vat.total_incl_vat)}</span></div>
                   </>
                 ) : (
                   <div className="bk-kv"><span className="bk-kv__label">VAT</span><span className="bk-kv__value bk-muted">Not charged (not VAT-registered)</span></div>
                 )}
               </div>
             )}
-            {decision && <PricingDecisionRows decision={decision} />}
+            {decision && <PricingDecisionRows decision={decision} marginInHeader={!!marginNow} likelihoodInHeader={showChance} />}
             <div className="qd-price-rows">
               {quote.valid_until && (
                 <div className="bk-kv">
@@ -918,7 +932,7 @@ export default function QuoteDetail() {
                   {/* The agreed price is kept with the outcome only (pricing
                       insights): convert_to_load and the invoice bill the
                       quote total, so say so rather than imply otherwise. */}
-                  Kept with the outcome for pricing insights. The booking and invoice use the quote total, {formatMoney(parseFloat(quote?.total_amount || '0'))} excl. VAT; edit the quote to change it.
+                  Kept with the outcome for pricing insights. The booking and invoice use the quote total, {formatRand(quote?.total_amount)} excl. VAT; edit the quote to change it.
                 </div>
               </div>
             )}
@@ -1002,6 +1016,7 @@ export default function QuoteDetail() {
           busy={convertToLoadMutation.isPending}
           pickupDate={quote?.pickup_date}
           deliveryDate={quote?.delivery_date}
+          distanceKm={quote?.distance ? parseFloat(quote.distance) : null}
           onConfirm={(driverId, vehicleId, dates) => convertToLoadMutation.mutate({ driverId, vehicleId, dates })}
           onCancel={() => setShowConvertModal(false)}
         />

@@ -8,7 +8,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader } from '@/components/Loader';
 import { toast } from '@/lib/toast';
 import { useAuth } from '@/lib/AuthContext';
-import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from './settingsUi';
+import { useLocation } from 'react-router-dom';
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle, settingsErrorStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from './settingsUi';
 
 const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 const resolveLogoUrl = (url?: string) => {
@@ -34,8 +35,10 @@ const labelTipStyle: React.CSSProperties = { ...settingsLabelStyle, display: 'fl
    exactly what was loaded; only while typing does the field hold the text
    the user typed, accepted with a comma or a dot. */
 const toRaw = (text: string) => text.replace(/[\s\u00A0\u202F]/g, '').replace(',', '.');
-function DecimalInput({ id, value, onChange, placeholder, decimals = 2 }: {
+function DecimalInput({ id, value, onChange, placeholder, decimals = 2, onBlur, error, describedBy }: {
   id: string; value: string; onChange: (raw: string) => void; placeholder?: string; decimals?: number;
+  /** Inline validation: runs on blur; an error turns the border red. */
+  onBlur?: () => void; error?: string | null; describedBy?: string;
 }) {
   const [text, setText] = useState<string | null>(null);
   const n = parseFloat(value);
@@ -44,17 +47,63 @@ function DecimalInput({ id, value, onChange, placeholder, decimals = 2 }: {
     <input
       id={id}
       className="settings-control"
-      style={inputStyle}
+      style={error ? { ...inputStyle, borderColor: 'var(--status-danger)' } : inputStyle}
       type="text"
       inputMode="decimal"
       autoComplete="off"
       placeholder={placeholder}
       value={shown}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={describedBy}
       onFocus={() => setText(shown)}
       onChange={e => { setText(e.target.value); onChange(toRaw(e.target.value)); }}
-      onBlur={() => setText(null)}
+      onBlur={() => { setText(null); onBlur?.(); }}
     />
   );
+}
+
+// Pricing fields: plain ranges, checked on blur and again on save.
+type PricingField = 'margin_target_pct' | 'operating_cost_per_km' | 'driver_allowance_per_night';
+function pricingError(field: PricingField, raw: string): string | null {
+  const t = raw.trim();
+  if (field === 'margin_target_pct') {
+    if (!t) return 'Enter a target margin between 1% and 50%.';
+    const n = Number(t);
+    return Number.isFinite(n) && n >= 1 && n <= 50 ? null : 'Enter a target margin between 1% and 50%.';
+  }
+  if (!t) return null;
+  const n = Number(t);
+  if (field === 'operating_cost_per_km') {
+    return Number.isFinite(n) && n >= 1 && n <= 200 ? null : 'Enter between R1 and R200 per km, or leave it blank.';
+  }
+  return Number.isFinite(n) && n >= 1 && n <= 5000 ? null : 'Enter between R1 and R5 000 per night, or leave it blank.';
+}
+
+/** The operating cost the cost floor uses now (company profile, read-only). */
+interface CostInUse { value: number | null; source: string | null; trips: number | null; minTrips: number | null; window: string | null; label: string | null; superlink: number | null }
+function costInUseOf(v: unknown): CostInUse | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const n = (x: unknown) => (x === null || x === undefined || x === '' || !Number.isFinite(Number(x)) ? null : Number(x));
+  const value = n(o.value);
+  if (value === null) return null;
+  const est = o.estimates && typeof o.estimates === 'object' ? (o.estimates as Record<string, unknown>) : {};
+  return { value, source: o.source ? String(o.source) : null, trips: n(o.trips), minTrips: n(o.min_trips), window: o.window ? String(o.window) : null, label: o.label ? String(o.label) : null, superlink: n(est.superlink) };
+}
+// "Now using R 13,99/km from 37 trips (last 12 months)." / "Now using the
+// R 12,50/km superlink estimate." The saved figure needs no line: it is in the field.
+function costInUseText(c: CostInUse | null): string | null {
+  if (!c || c.value === null || c.source === 'company_setting') return null;
+  const rate = `${formatMoney(c.value)}/km`;
+  if (c.source === 'company_actuals') {
+    const trips = c.trips ? ` from ${formatNumber(c.trips)} trip${c.trips === 1 ? '' : 's'}` : '';
+    return `Now using ${rate}${trips}${c.window ? ` (${c.window})` : ''}.`;
+  }
+  // An estimate: it follows each quote's vehicle type, so name the
+  // superlink figure (the common long-haul truck) as the example.
+  const eg = c.superlink !== null ? ` (${formatMoney(c.superlink)}/km superlink)` : '';
+  const until = c.minTrips ? ` until ${formatNumber(c.minTrips)} trips have costs` : '';
+  return `Now using typical estimates${eg}${until}.`;
 }
 
 export function CompanySettings() {
@@ -79,7 +128,18 @@ export function CompanySettings() {
     bank_account_type: '', payment_reference_hint: '',
     // Pricing analysis (company profile, additive fields).
     operating_cost_per_km: '', pricing_include_empty_return: 'no', pool_pricing_data: 'no',
+    margin_target_pct: '10', driver_allowance_per_night: '',
   });
+  // Round 4 fields arrive from the API as they are added: a field the
+  // profile does not return is not shown (and not saved).
+  const [hasDriverField, setHasDriverField] = useState(false);
+  const [hasTargetField, setHasTargetField] = useState(false);
+  const [costInUse, setCostInUse] = useState<CostInUse | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [pricingErrors, setPricingErrors] = useState<Partial<Record<PricingField, string | null>>>({});
+  const checkPricing = (field: PricingField, raw?: string) =>
+    setPricingErrors(p => ({ ...p, [field]: pricingError(field, raw ?? (form as Record<string, string>)[field] ?? '') }));
+  const location = useLocation();
   const [logoUrl, setLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -177,16 +237,33 @@ export function CompanySettings() {
           operating_cost_per_km: d.operating_cost_per_km != null ? String(d.operating_cost_per_km) : '',
           pricing_include_empty_return: d.pricing_include_empty_return === true ? 'yes' : 'no',
           pool_pricing_data: d.pool_pricing_data === true ? 'yes' : 'no',
+          // "10.00" -> "10" (whole %, as everywhere in pricing).
+          margin_target_pct: d.margin_target_pct != null && d.margin_target_pct !== '' ? String(Number(d.margin_target_pct)) : '10',
+          driver_allowance_per_night: d.driver_allowance_per_night != null ? String(d.driver_allowance_per_night) : '',
         });
+        setHasTargetField('margin_target_pct' in d);
+        setHasDriverField('driver_allowance_per_night' in d);
+        setCostInUse(costInUseOf(d.operating_cost_in_use));
         // Only show a real uploaded logo, not the backend's default placeholder
         if (d.logo_url && !d.logo_url.endsWith('/brand/logo.svg')) setLogoUrl(d.logo_url);
       }
+      setLoaded(true);
     }).catch(() => { toast.error('Failed to load company details'); })
       // Chained, not parallel: the live-price nudge below reads the current
       // Diesel field to decide whether it looks untouched, so it must run
       // after the real saved value has actually landed in form state.
       .finally(() => loadLivePrice(false));
   }, []);
+
+  // /settings/company#pricing (the quote builder's "Set yours" link) lands on
+  // the Pricing card once the form has its values (so the layout is final).
+  useEffect(() => {
+    if (!loaded || location.hash !== '#pricing') return;
+    const el = document.getElementById('pricing');
+    if (!el) return;
+    const raf = requestAnimationFrame(() => el.scrollIntoView({ block: 'start' }));
+    return () => cancelAnimationFrame(raf);
+  }, [loaded, location.hash]);
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
@@ -237,12 +314,16 @@ export function CompanySettings() {
         return;
       }
     }
-    // Operating cost: optional; when set, a plausible R/km (the API's own range).
-    const opCost = form.operating_cost_per_km ? parseFloat(form.operating_cost_per_km) : null;
-    if (opCost !== null && (isNaN(opCost) || opCost < 1 || opCost > 200)) {
-      toast.error('Operating cost must be between R1 and R200 per km, or left blank');
+    // Pricing: target margin, operating cost and driver allowance, inline.
+    const pricingFields: PricingField[] = ['operating_cost_per_km', ...(hasTargetField ? ['margin_target_pct' as const] : []), ...(hasDriverField ? ['driver_allowance_per_night' as const] : [])];
+    const errs = Object.fromEntries(pricingFields.map(f => [f, pricingError(f, (form as Record<string, string>)[f] ?? '')]));
+    setPricingErrors(errs);
+    if (Object.values(errs).some(Boolean)) {
+      toast.error('Check the Pricing fields');
+      document.getElementById('pricing')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
       return;
     }
+    const opCost = form.operating_cost_per_km ? parseFloat(form.operating_cost_per_km) : null;
     // Blank is allowed (falls back to the model default on save); a value that
     // is present must be a sane whole number of hours.
     const slaHours = form.default_sla_hours ? parseInt(form.default_sla_hours, 10) : null;
@@ -304,6 +385,8 @@ export function CompanySettings() {
         bank_account_type: form.bank_account_type || null,
         payment_reference_hint: form.payment_reference_hint.trim() || null,
         operating_cost_per_km: opCost,
+        ...(hasTargetField ? { margin_target_pct: Math.round(Number(form.margin_target_pct) * 100) / 100 } : {}),
+        ...(hasDriverField ? { driver_allowance_per_night: form.driver_allowance_per_night ? parseFloat(form.driver_allowance_per_night) : null } : {}),
         pricing_include_empty_return: form.pricing_include_empty_return === 'yes',
         pool_pricing_data: form.pool_pricing_data === 'yes',
       } });
@@ -320,6 +403,25 @@ export function CompanySettings() {
     }
     setSaving(false);
   };
+
+  const poolField = (
+    <div>
+      <label htmlFor="company-pool-pricing-data" style={labelTipStyle}>
+        Share anonymised win/loss data
+        <InfoTip label="About sharing win/loss data">With Yes, whether your quotes were won or lost (price, lane, truck type and timing; never customer names, contacts or documents) helps train a shared pricing model, and you can use that model's chance to win while you have too few closed quotes of your own. With No, your outcomes only ever train your own model. You can switch it off at any time.</InfoTip>
+      </label>
+      <Select value={form.pool_pricing_data} onValueChange={val => set('pool_pricing_data', val)}>
+        <SelectTrigger style={inputStyle} className="cs-select" id="company-pool-pricing-data">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="no">No, keep it to us</SelectItem>
+          <SelectItem value="yes">Yes, share outcomes</SelectItem>
+        </SelectContent>
+      </Select>
+      <div style={helpTextStyle}>Outcomes only, never customer names. Off by default.</div>
+    </div>
+  );
 
   return (
     <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
@@ -643,18 +745,60 @@ export function CompanySettings() {
       </div>
 
       {/* Pricing: what the quote builder's cost floor and chance to win use. */}
-      <div style={sectionStyle} id="pricing">
+      <div style={{ ...sectionStyle, scrollMarginTop: 16 }} id="pricing">
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Pricing</h2></div>
         <div style={bodyStyle}>
           <div className="cs-grid cs-grid--2">
+            {hasTargetField && (
+              <div>
+                <label htmlFor="company-margin-target" style={labelTipStyle}>
+                  Target margin (%)
+                  <InfoTip label="About the target margin">The margin you aim for on every quote: price less the full cost floor, as a share of the price excl. VAT. The suggested prices never go below it, and go above it when the market pays more.</InfoTip>
+                </label>
+                <DecimalInput id="company-margin-target" decimals={Number.isInteger(Number(form.margin_target_pct)) ? 0 : 2}placeholder="e.g. 10" value={form.margin_target_pct}
+                  onChange={v => { set('margin_target_pct', v); if (pricingErrors.margin_target_pct) checkPricing('margin_target_pct', v); }}
+                  onBlur={() => checkPricing('margin_target_pct')} error={pricingErrors.margin_target_pct} describedBy="company-margin-target-help" />
+                <div id="company-margin-target-help" role={pricingErrors.margin_target_pct ? 'alert' : undefined} style={pricingErrors.margin_target_pct ? settingsErrorStyle : helpTextStyle}>
+                  {pricingErrors.margin_target_pct || 'Safe, Balanced and Stretch start from it.'}
+                </div>
+              </div>
+            )}
             <div>
               <label htmlFor="company-operating-cost-per-km" style={labelTipStyle}>
-                Operating cost per km (excl. fuel & tolls)
+                Operating cost per km
                 <InfoTip label="About the operating cost per km">Driver wages, vehicle finance, insurance, licences, tyres, maintenance and overheads, per km. It goes into every quote's cost floor. Leave it blank and we use your costs from the last 12 months, or a typical figure for the vehicle type until you have enough costed trips.</InfoTip>
               </label>
-              <DecimalInput id="company-operating-cost-per-km" placeholder="e.g. 12,50" value={form.operating_cost_per_km} onChange={v => set('operating_cost_per_km', v)} />
-              <div style={helpTextStyle}>Optional, R1 to R200. Blank uses your last 12 months of costs or an estimate.</div>
+              <DecimalInput id="company-operating-cost-per-km"
+                placeholder={costInUse && costInUse.value !== null && costInUse.source === 'company_actuals' ? formatNumber(costInUse.value, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'e.g. 12,50'}
+                value={form.operating_cost_per_km}
+                onChange={v => { set('operating_cost_per_km', v); if (pricingErrors.operating_cost_per_km) checkPricing('operating_cost_per_km', v); }}
+                onBlur={() => checkPricing('operating_cost_per_km')} error={pricingErrors.operating_cost_per_km} describedBy="company-operating-cost-help" />
+              <div id="company-operating-cost-help">
+                {pricingErrors.operating_cost_per_km
+                  ? <div role="alert" style={settingsErrorStyle}>{pricingErrors.operating_cost_per_km}</div>
+                  : <div style={helpTextStyle}>Excludes fuel, tolls, driver allowance and border fees.</div>}
+                {/* What the floor uses while the field is blank. */}
+                {!form.operating_cost_per_km && costInUseText(costInUse) && (
+                  <div style={{ ...helpTextStyle, marginTop: 2, color: 'var(--text-secondary)' }}>{costInUseText(costInUse)}</div>
+                )}
+              </div>
             </div>
+          </div>
+          <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
+            {hasDriverField && (
+              <div>
+                <label htmlFor="company-driver-allowance" style={labelTipStyle}>
+                  Driver allowance per night (R)
+                  <InfoTip label="About the driver allowance">What you pay a driver for each night away from base. Quotes use it for trips with nights away when no approved rate is on record; each quote can still change it.</InfoTip>
+                </label>
+                <DecimalInput id="company-driver-allowance" placeholder="Not set" value={form.driver_allowance_per_night}
+                  onChange={v => { set('driver_allowance_per_night', v); if (pricingErrors.driver_allowance_per_night) checkPricing('driver_allowance_per_night', v); }}
+                  onBlur={() => checkPricing('driver_allowance_per_night')} error={pricingErrors.driver_allowance_per_night} describedBy="company-driver-allowance-help" />
+                <div id="company-driver-allowance-help" role={pricingErrors.driver_allowance_per_night ? 'alert' : undefined} style={pricingErrors.driver_allowance_per_night ? settingsErrorStyle : helpTextStyle}>
+                  {pricingErrors.driver_allowance_per_night || (form.driver_allowance_per_night ? 'Per night away. Same-day trips have none.' : 'Blank: left out of the floor unless a quote sets it.')}
+                </div>
+              </div>
+            )}
             <div>
               <label htmlFor="company-include-empty-return" style={labelTipStyle}>
                 Empty return in the cost floor
@@ -669,27 +813,15 @@ export function CompanySettings() {
                   <SelectItem value="yes">Yes, include it by default</SelectItem>
                 </SelectContent>
               </Select>
-              <div style={helpTextStyle}>Include the empty return in the cost floor by default.</div>
+              <div style={helpTextStyle}>Each quote can still switch it.</div>
             </div>
+            {!hasDriverField && poolField}
           </div>
-          <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
-            <div>
-              <label htmlFor="company-pool-pricing-data" style={labelTipStyle}>
-                Share anonymised win/loss data
-                <InfoTip label="About sharing win/loss data">With Yes, whether your quotes were won or lost (price, lane, truck type and timing; never customer names, contacts or documents) helps train a shared pricing model, and you can use that model's chance to win while you have too few closed quotes of your own. With No, your outcomes only ever train your own model. You can switch it off at any time.</InfoTip>
-              </label>
-              <Select value={form.pool_pricing_data} onValueChange={val => set('pool_pricing_data', val)}>
-                <SelectTrigger style={inputStyle} className="cs-select" id="company-pool-pricing-data">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="no">No, keep it to us</SelectItem>
-                  <SelectItem value="yes">Yes, share to improve pricing</SelectItem>
-                </SelectContent>
-              </Select>
-              <div style={helpTextStyle}>Off by default. Improves pricing for everyone.</div>
+          {hasDriverField && (
+            <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
+              {poolField}
             </div>
-          </div>
+          )}
         </div>
       </div>
 

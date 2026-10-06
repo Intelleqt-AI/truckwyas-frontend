@@ -145,13 +145,15 @@
 .qd-decision .bk-kv__label { white-space: nowrap; }
 .qd-decision .bk-kv__value { white-space: nowrap; }
 .qd-decision .bk-kv:has(+ .qd-decision__src) { border-bottom: 0; padding-bottom: 0; }
-.qd-decision__src { margin: 0; padding: 0 0 6px; border-bottom: 1px solid var(--border-row); font: 400 12px/18px var(--font-sans); color: var(--text-secondary); text-align: right; }
+.qd-decision__src { margin: 0; padding: 0 0 6px; border-bottom: 1px solid var(--border-row); font: 400 12px/18px var(--font-sans); color: var(--text-secondary); text-align: left; text-wrap: pretty; }
+/* A basis line with no row above it (the figure is in the card's header). */
+.qd-decision__src--solo { padding-top: 6px; }
+.qd-decision__parts:has(+ .qd-decision__src) { border-bottom: 0; padding-bottom: 2px; }
 .qd-decision__src:last-child { border-bottom: 0; }
 /* Phones: two-column rows stack (label over value) instead of squeezing. */
 @media (max-width: 480px) {
   .qd-decision .bk-kv { flex-direction: column; align-items: flex-start; gap: 0; }
   .qd-decision .bk-kv__value { text-align: left; }
-  .qd-decision__src { text-align: left; }
 }
 /* Touch: the head's Send and "…" buttons are drawn at 44px here (the shared
    head draws 36px with a 44px ::after hit area; R3 asked for the drawn size). */
@@ -168,3 +170,9 @@
 /* Floor part provenance (stored source_kind) and "Not set" parts. */
 .qd-decision__kind { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--bg-raised); color: var(--text-secondary); font: 500 11px/16px var(--font-sans); white-space: nowrap; }
 .qd-decision__parts li.is-missing > span:last-child { color: var(--text-secondary); font-style: italic; }
+
+/* ---- Pricing round 4 ---- */
+/* Won at a different price: "Agreed R 24 500 (quoted R 25 100)" under the total. */
+.qd-agreed { display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; margin: 8px 0 0; font: 500 13px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.qd-agreed__quoted { font-weight: 400; color: var(--text-secondary); }
+.qd-agreed .tw-info { margin-left: -2px; }

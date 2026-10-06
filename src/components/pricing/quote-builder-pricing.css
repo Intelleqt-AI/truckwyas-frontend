@@ -28,8 +28,11 @@
             mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
   }
   .qb-aside > .pa { padding-bottom: 12px; }
-  /* top bar − 16 (sticky top) − bar − 12 (bar off the edge) − 12 (gap). */
-  .qb-has-pricebar .qb-aside { max-height: calc(100dvh - var(--qb-topbar-h, 64px) - 16px - var(--pricebar-h, 98px) - 12px - 12px); }
+  /* Even air at both ends while stuck: 16px under the top bar and 16px above
+     the price bar. The scroller adds 8px above the sticky offset, so top: 8px
+     lands 16px below the top bar; height = viewport − top bar − 16 − 16 −
+     bar − 12 (the bar sits 12px off the window edge). */
+  .qb-has-pricebar .qb-aside { top: 8px; max-height: calc(100dvh - var(--qb-topbar-h, 64px) - 16px - 16px - var(--pricebar-h, 98px) - 12px); }
 }
 @media (min-width: 1280px) {
   .qb-layout { grid-template-columns: minmax(0, 1fr) 360px; }
@@ -48,7 +51,7 @@
   display: inline-flex; align-items: baseline; gap: 6px; width: 220px; max-width: 100%;
   border-bottom: 1px dashed var(--border-strong); transition: border-color 120ms ease;
 }
-.qb-pricebar__field:hover { border-bottom-color: var(--border-control-hover); }
+@media (hover: hover) { .qb-pricebar__field:hover { border-bottom-color: var(--border-control-hover); } }
 .qb-pricebar__field:focus-within { border-bottom: 1px solid var(--accent-primary); }
 .qb-pricebar__cur { font: 600 28px/36px var(--font-sans); color: var(--text-primary); letter-spacing: -0.02em; }
 .qb-controls input.qb-pricebar__input {
@@ -164,3 +167,28 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
   body:has(#qb-price-input:focus) .ai-launcher { display: none !important; }
 }
 .qb-pricebar__num, .qb-cost__value, .qb-pricebar__figure { white-space: nowrap; }
+
+/* ---- Round 4: one price story ------------------------------------------ */
+/* Under the price: where it came from (build-up R/km × km) or which choice it
+   is, with a quiet way back to the build-up. */
+.qb-pricebar__src { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; }
+.qb-pricebar__src .qb-linkbtn { margin-left: 0; }
+.qb-pricebar__chip {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--radius-chip, 6px);
+  font: 500 11px/16px var(--font-sans); color: var(--text-primary); background: var(--bg-raised);
+}
+.qb-pricebar__next { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; margin-top: 2px; }
+.qb-pricebar__next .qb-pricebar__muted { font-size: 12px; line-height: 16px; }
+.qb-pricebar .qb-pricebar__use { height: 28px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.qb-linkbtn--strong { margin-left: 0; font-weight: 600; }
+/* The applied/your-price chip and the way back stay on phones (they ARE the story). */
+@media (max-width: 640px) {
+  .qb-pricebar .qb-pricebar__sub.qb-pricebar__src { display: inline-flex; }
+}
+/* Focused fields never hide under the sticky price bar (keyboard and scroll-into-view). */
+.os-app-main:has(.qb-has-pricebar) { scroll-padding-bottom: calc(var(--pricebar-h, 98px) + 32px); scroll-padding-top: 16px; }
+/* Phones: the R/km input shows its whole value (no spinner eating the digits). */
+.qb-controls input.qb-cost__input--rate { -moz-appearance: textfield; appearance: textfield; }
+.qb-controls input.qb-cost__input--rate::-webkit-inner-spin-button,
+.qb-controls input.qb-cost__input--rate::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+@media (max-width: 640px) { .qb-controls input.qb-cost__input--rate { width: 80px; } }

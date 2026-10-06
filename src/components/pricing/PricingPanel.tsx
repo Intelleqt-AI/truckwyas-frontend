@@ -6,7 +6,7 @@ import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { MarketRange } from "./MarketRange";
 import { LikelihoodCurve } from "./LikelihoodCurve";
-import { readPrice } from "./evaluate";
+import { readPrice, rowLikelihoods } from "./evaluate";
 import type { PricingState } from "./usePricingAnalysis";
 import { BAND_LABEL, type Choice, type ChoiceKey, type FloorLine, type Likelihood, type PricingAnalysis, type SourceKind } from "./types";
 import { likelihoodShort as sharedShort, MARKET_RANGE_LABEL } from "@/lib/pricing";
@@ -61,13 +61,34 @@ export const lkTone = (l: { level: "model"; pct: number } | { level: "rules"; ba
 /** One vocabulary: "chance to win", short form "72% to win". */
 export const likelihoodShort = (l: { level: "model"; pct: number } | { level: "rules"; label: string } | null) =>
   !l ? null : l.level === "model" ? sharedShort("model", l.pct) : l.label;
-/** House style for server sentences: median not "middle", whole rand per km,
- *  and money never splits across lines (NBSP in figures). */
+/** House style for server sentences: median not "middle", and money never
+ *  splits across lines (NBSP in figures). Rates are never rewritten: a
+ *  "607 km \u00d7 R 13,99/km" line must still multiply out to its amount. */
 const tidy = (t: string) => t
   .replace(/\bmiddle\b/g, "median")
-  .replace(/R\s?(\d+)[.,](\d{2})\/km/g, (_m, r, c) => `R\u00a0${Math.round(Number(`${r}.${c}`))}/km`)
   .replace(/R (?=\d)/g, "R\u00a0")
-  .replace(/(\d)[ ,](?=\d{3}\b)/g, "$1\u00a0");
+  .replace(/(\d) (?=\d{3}\b)/g, "$1\u00a0");
+/** The likelihood level in plain words for the panel header (no "Bands" jargon). */
+const BAND_WORDS = "Likely / Even / Less likely";
+function plainShort(short: string): string {
+  const s = short.replace(/\.$/, "");
+  if (!/^bands\b/i.test(s)) return s;
+  const rest = s.replace(/^bands\s*\u00b7?\s*/i, "");
+  const cnt = rest.match(/(\d+)\s+of\s+(\d+)/);
+  if (cnt) return `Chance to win shown as ${BAND_WORDS}: ${cnt[1]} of ${cnt[2]} closed quotes needed for a %`;
+  if (/outside/i.test(rest)) return "Outside the prices your model has seen, so no %";
+  if (/trains tonight/i.test(rest)) return `Chance to win shown as ${BAND_WORDS} until your model trains tonight`;
+  if (/won and lost/i.test(rest)) return `Chance to win shown as ${BAND_WORDS} until you have won and lost quotes`;
+  return `Chance to win shown as ${BAND_WORDS}`;
+}
+/** A choice within \u00b11% of the lane median is "at the lane median", never "lower half". */
+function summaryFor(c: Choice, m: PricingAnalysis["market"]): string | null {
+  if (!c.summary) return null;
+  if (m?.available && !m.isEstimate && m.median && Math.abs(c.price - m.median) / m.median <= 0.01) {
+    return c.summary.replace(/^(In|At) the (lower|upper) half of what this lane pays\.|^Around the middle of what this lane pays\./i, "At the lane median.");
+  }
+  return c.summary;
+}
 /** "12 of 40" out of a reason like "Not enough closed quotes yet: 12 of 40". */
 const closedCount = (reason: string | null | undefined) => reason?.match(/(\d+)\s+of\s+(\d+)/)?.slice(1, 3).join(" of ") ?? null;
 /** "R 21k" for axis-style labels. */
@@ -120,22 +141,29 @@ export function PricingPanel(p: PricingPanelProps) {
   else if (lk) {
     const cnt = closedCount(lk.reason);
     const noBands = !!data && data.choices.length > 0 && data.choices.every((c) => !c.likelihood || (c.likelihood.level === "rules" && c.likelihood.band == null));
-    sub = lk.short
-      ?? (noBands ? (lk.reason ? lk.reason.replace(/\.$/, "") : "Chance to win needs closed quotes or market data")
-        : cnt ? `Chance to win as bands · ${cnt} closed quotes for a %`
-        : lk.reason ? lk.reason.replace(/\.$/, "") : "Chance to win as bands");
+    const cntShort = closedCount(lk.short) ?? cnt;
+    sub = noBands
+      ? (lk.short && !/^bands\b/i.test(lk.short) ? lk.short.replace(/\.$/, "")
+        : cntShort ? `No chance to win yet: no real quotes on this lane, and ${cntShort} closed quotes for a %`
+        : lk.reason ? lk.reason.replace(/\.$/, "") : "Chance to win needs closed quotes or market data")
+      : lk.short ? plainShort(lk.short)
+        : cnt ? `Chance to win shown as ${BAND_WORDS}: ${cnt} closed quotes needed for a %`
+        : lk.reason ? lk.reason.replace(/\.$/, "") : `Chance to win shown as ${BAND_WORDS}`;
   }
+  const busy = loading || refreshing || phase === "route";
 
   return (
-    <section className="pa" aria-labelledby={titleId} aria-busy={loading || refreshing || undefined}>
+    <section className="pa" aria-labelledby={titleId} aria-busy={busy || undefined}>
       <header className="pa__head">
-        <div className="pa__titles">
+        {/* The status sits beside the title, out of the subtitle's width, so
+            it never re-wraps the header (no jump while typing). */}
+        <div className="pa__titlerow">
           <h2 id={titleId} className="pa__title">Pricing analysis</h2>
-          <p className="pa__sub">{sub}</p>
+          <span className={`pa__status${busy ? "" : " is-idle"}`} aria-hidden={!busy}>
+            <i className="pa-pulse" aria-hidden="true" />{loading || phase === "route" ? "Analysing" : "Updating"}
+          </span>
         </div>
-        {(loading || refreshing || phase === "route") && (
-          <span className="pa__status"><i className="pa-pulse" aria-hidden="true" />{loading || phase === "route" ? "Analysing" : "Updating"}</span>
-        )}
+        <p className="pa__sub">{sub}</p>
       </header>
       <div className="pa-sr" aria-live="polite" role="status">{announce}</div>
       <Body {...p} belowFloor={belowFloor} revealed={revealed} onRevealed={onRevealed} />
@@ -196,7 +224,9 @@ function Analysing({ start, facts, done, onDone }: { start: number; facts: (stri
   useEffect(() => { setStage((s) => Math.max(s, start)); }, [start]);
   useEffect(() => {
     if (start === 0 && !done) return; // waiting on the route itself
-    const id = setInterval(() => setStage((s) => Math.min(s + 1, done ? STEPS.length : STEPS.length - 1)), done ? 160 : 280);
+    // Until the answer is in, nothing past "Cost floor" is ticked off: a
+    // step only shows done once it has a real figure to say.
+    const id = setInterval(() => setStage((s) => Math.min(s + 1, done ? STEPS.length : 1)), done ? 220 : 280);
     return () => clearInterval(id);
   }, [start, done]);
   useEffect(() => {
@@ -223,11 +253,13 @@ function Analysing({ start, facts, done, onDone }: { start: number; facts: (stri
 function stepFacts(p: PricingPanelProps): (string | null)[] {
   const d = p.state.data;
   const m = d?.market;
+  const rec = d?.choices.find((c) => c.recommended);
   return [
     p.distanceKm ? `${formatNumber(Math.round(p.distanceKm))} km` : null,
-    d?.costFloor ? `Floor ${formatMoneyWhole(d.costFloor.total)}` : p.buildUp ? `Build-up ${formatMoneyWhole(p.buildUp)}` : null,
-    !d ? null : !m || !m.available ? "No quotes on this lane yet" : m.isEstimate ? "Rough estimate only" : `${formatNumber(m.n)} accepted quotes`,
-    d ? `${d.choices.length} prices` : null,
+    d?.costFloor ? `${formatMoneyWhole(d.costFloor.total)} floor` : null,
+    !d ? null : !m || !m.available ? "No quotes on this lane yet" : m.isEstimate ? "Rough estimate only, no real quotes"
+      : `${formatNumber(m.n)} accepted quote${m.n === 1 ? "" : "s"} · median ${formatMoneyWhole(m.median)}`,
+    !d ? null : rec ? `Recommended ${formatMoneyWhole(rec.price)}` : d.choices.length ? `${d.choices.length} prices` : "Needs the missing costs first",
   ];
 }
 
@@ -236,8 +268,13 @@ function stepFacts(p: PricingPanelProps): (string | null)[] {
 function Result(p: BodyProps & { data: PricingAnalysis }) {
   const { data, state } = p;
   const failedRefresh = state.status === "error" || state.status === "offline" || state.status === "unavailable";
-  const HIDDEN = [...TOP_CODES, "below_floor", "estimate_market", "estimate_fixed_cost", "no_driver_allowance", "driver_needs_input", "payment_risk", "payment_attention"];
-  const notes = [...new Set(missingNotes(data.missing).concat(data.warnings.filter((w) => !HIDDEN.includes(w.code) && !w.code.startsWith("payment")).map((w) => w.message)))];
+  // Said elsewhere already: the top alerts, the floor, the market card or the
+  // header (outside the model's range). Each fact is shown once.
+  const HIDDEN = [...TOP_CODES, "below_floor", "below_target", "estimate_market", "estimate_fixed_cost", "no_driver_allowance", "driver_needs_input", "outside_model_range"];
+  const attentionText = data.attention.map((a) => a.message);
+  const notes = [...new Set(missingNotes(data.missing).concat(data.warnings
+    .filter((w) => !HIDDEN.includes(w.code) && !/payment/.test(w.code) && !attentionText.includes(w.message))
+    .map((w) => w.message)))];
   return (
     <div className={`pa__result${state.status === "refreshing" ? " is-refreshing" : ""}`}>
       {failedRefresh && (
@@ -267,17 +304,29 @@ const isTopWarning = (code: string) => TOP_CODES.includes(code) || /market.*(bel
 
 function TopAlerts({ data, customerName }: { data: PricingAnalysis; customerName: string | null }) {
   const risk = data.customer?.paymentRisk;
-  const riskWarning = data.warnings.find((w) => w.code.startsWith("payment"));
-  const lane = data.warnings.filter((w) => isTopWarning(w.code));
+  const riskAttention = data.attention.find((a) => /payment/.test(a.code));
+  const riskWarning = data.warnings.find((w) => /payment/.test(w.code));
+  // Lane-level notices (e.g. "This lane pays less than your full cost when the
+  // truck returns empty …"), from `attention` and the matching warnings.
+  const lane = [
+    ...data.attention.filter((a) => !/payment/.test(a.code)).map((a) => ({ key: a.code, level: a.level === "high" ? "high" : "medium", message: a.message })),
+    // "Pays less than your full cost when it returns empty" already says what
+    // the generic lane-below-cost warning would: one notice, not two.
+    ...(data.attention.some((a) => a.code === "empty_return_unpaid") ? [] : data.warnings.filter((w) => isTopWarning(w.code)))
+      .map((w) => ({ key: w.code, level: "medium", message: w.message })),
+  ].filter((x, i, all) => all.findIndex((y) => y.message === x.message) === i);
   const name = data.customer?.name || customerName || "This client";
-  if (!risk?.attention && !lane.length) return null;
+  if (!risk?.attention && !riskAttention && !lane.length) return null;
+  // Payment risk is said once, here: the basis plus the deposit advice.
+  const riskText = riskAttention?.message || riskWarning?.message || [risk?.basis, "Consider a deposit."].filter(Boolean).join(". ").replace(/\.\./g, ".");
+  const riskBand = risk?.band ?? (riskAttention?.level === "high" ? "high" : "medium");
   return (
     <div className="pa-alerts pa-reveal" style={{ ["--d" as string]: "0" }}>
-      {lane.map((w) => <p key={w.code} className="pa-risk pa-risk--medium"><b>{w.message}</b></p>)}
-      {risk?.attention && (
-        <p className={`pa-risk pa-risk--${risk.band}`}>
-          <b>{name} {risk.label.charAt(0).toLowerCase() + risk.label.slice(1)}.</b>{" "}
-          {riskWarning?.message || [risk.basis, "Consider a deposit."].filter(Boolean).join(". ").replace(/\.\./g, ".")}
+      {lane.map((w) => <p key={w.key} className={`pa-risk pa-risk--${w.level}`}><b>{w.message}</b></p>)}
+      {(risk?.attention || riskAttention) && (
+        <p className={`pa-risk pa-risk--${riskBand}`}>
+          {risk && !riskText.startsWith(name) && <><b>{name} {risk.label.charAt(0).toLowerCase() + risk.label.slice(1)}.</b>{" "}</>}
+          {riskText.startsWith(name) ? <><b>{riskText.split(":")[0]}{riskText.includes(":") ? ":" : ""}</b>{riskText.includes(":") ? riskText.slice(riskText.indexOf(":") + 1) : ""}</> : riskText}
         </p>
       )}
     </div>
@@ -315,10 +364,14 @@ function ChoicesSection({ data, price, onApply, includeReturn, returnApplicable 
   const choices = [...data.choices].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
   const m = data.market;
   const floorBased = !m || !m.available || m.isEstimate;
+  // One format per row: all % or all bands.
+  const lks = rowLikelihoods(data, choices);
   // No band anywhere: the subtitle already says why; cards don't repeat it.
-  const noJudgement = choices.every((c) => !c.likelihood || (c.likelihood.level === "rules" && c.likelihood.band == null));
-  const ifEmpty = !includeReturn && returnApplicable && choices.every((c) => c.marginPctIfEmptyReturn != null)
-    ? choices.map((c) => signedPct(c.marginPctIfEmptyReturn!)).join(" / ") : null;
+  const noJudgement = choices.every((c) => { const l = lks.get(c.key); return !l || (l.level === "rules" && l.band == null); });
+  // One-way and the floor leaves the empty run home out: each card also says
+  // what its margin is if the truck comes back empty.
+  const showEmpty = !includeReturn && returnApplicable && choices.every((c) => c.marginPctIfEmptyReturn != null);
+  const returnCost = data.costFloor?.returnLegAmount ?? (data.floorWithReturn != null && data.costFloor ? data.floorWithReturn - data.costFloor.total : null);
   return (
     <Section title="Choose a price" delay={1}
       aside={data.targetMarginPct != null ? <span className="pa-sec__hint">Target margin {Math.round(data.targetMarginPct)}%</span> : null}>
@@ -326,19 +379,23 @@ function ChoicesSection({ data, price, onApply, includeReturn, returnApplicable 
         <p className="pa-choices__lead">Built from your cost floor and {data.targetMarginPct != null ? `${Math.round(data.targetMarginPct)}% ` : ""}target margin.</p>
       )}
       <div className="pa-choices" role="group" aria-label="Price choices">
-        {choices.map((c) => <ChoiceCard key={c.key} c={c} applied={applied === c.key} hideLikelihood={noJudgement} onApply={() => onApply(c.price, c.key)} />)}
+        {choices.map((c) => <ChoiceCard key={c.key} c={c} lk={noJudgement ? null : lks.get(c.key) ?? null} summary={summaryFor(c, m)}
+          emptyPct={showEmpty ? c.marginPctIfEmptyReturn : null} applied={applied === c.key} onApply={() => onApply(c.price, c.key)} />)}
       </div>
-      {ifEmpty && <p className="pa-note pa-ifempty">If the truck returns empty: margins {ifEmpty}</p>}
+      {showEmpty && (
+        <p className="pa-note pa-ifempty">
+          Empty return: the margin if the truck drives home empty{returnCost != null && returnCost > 0 ? <>, which costs <span className="pa-nowrap">{formatMoneyWhole(returnCost)}</span> more</> : ""}. Margins above assume a load back.
+        </p>
+      )}
     </Section>
   );
 }
 
-function ChoiceCard({ c, applied, hideLikelihood, onApply }: { c: Choice; applied: boolean; hideLikelihood: boolean; onApply: () => void }) {
-  const lk = hideLikelihood ? null : c.likelihood;
+function ChoiceCard({ c, lk, summary, emptyPct, applied, onApply }: { c: Choice; lk: Likelihood | null; summary: string | null; emptyPct: number | null; applied: boolean; onApply: () => void }) {
   return (
     <button type="button" className={`pa-choice${c.recommended ? " is-rec" : ""}${applied ? " is-applied" : ""}`}
       aria-pressed={applied} onClick={onApply}
-      aria-label={`${c.label}${c.recommended ? ", recommended" : ""}: ${formatMoneyWhole(c.price)}, margin ${formatMoneyWhole(c.margin)} or ${signedPct(c.marginPct)}${lk ? `, ${likelihoodShort(lk)}` : ""}.${applied ? " In your quote." : " Use this price."}`}>
+      aria-label={`${c.label}${c.recommended ? ", recommended" : ""}: ${formatMoneyWhole(c.price)}, margin ${formatMoneyWhole(c.margin)} or ${signedPct(c.marginPct)}${emptyPct != null ? `, ${signedPct(emptyPct)} if it returns empty` : ""}${lk ? `, ${likelihoodShort(lk)}` : ""}.${applied ? " In your quote." : " Use this price."}`}>
       <span className="pa-choice__top">
         <span className="pa-choice__label">{c.label}{c.recommended && <span className="pa-choice__rec">Recommended</span>}</span>
         <span className="pa-choice__price">{formatMoneyWhole(c.price)}</span>
@@ -347,7 +404,10 @@ function ChoiceCard({ c, applied, hideLikelihood, onApply }: { c: Choice; applie
         <span>Margin {formatMoneyWhole(c.margin)} · {signedPct(c.marginPct)}</span>
         {lk && <span className={`pa-lk pa-lk--${lkTone(lk)}`}>{likelihoodShort(lk)}</span>}
       </span>
-      <span className="pa-choice__sum"><span className="pa-choice__desc">{DESCRIPTOR[c.key]}</span>{c.summary ? ` · ${tidy(c.summary)}` : ""}</span>
+      {emptyPct != null && (
+        <span className={`pa-choice__empty${emptyPct < 0 ? " is-neg" : ""}`}>Empty return: <b>{emptyPct > 0 ? "+" : ""}{signedPct(emptyPct)}</b></span>
+      )}
+      <span className="pa-choice__sum"><span className="pa-choice__desc">{DESCRIPTOR[c.key]}</span>{summary ? ` · ${tidy(summary)}` : ""}</span>
       <span className="pa-choice__state" aria-hidden="true">
         {applied ? <><Check size={12} strokeWidth={2.5} /> In your quote</> : "Use this price"}
       </span>
@@ -368,8 +428,15 @@ function FloorSection(p: BodyProps & { data: PricingAnalysis }) {
     if (driverMissing && !openedForDriver.current) { openedForDriver.current = true; setOpen("driver_allowance"); }
   }, [driverMissing]);
   const includeReturn = p.includeReturn ?? f.includeReturn;
+  // With the empty return in the floor, a per-km figure must divide by the km
+  // actually driven (both legs); never "all-in" over one-way km.
+  const perKmText = f.perKm == null ? null
+    : f.includeReturn ? (f.perKmDriven ? `${formatMoneyWhole(f.perKm)} per km driven (there and back), incl. fuel and tolls` : null)
+    : `${formatMoneyWhole(f.perKm)}/km all-in, incl. fuel and tolls`;
   const id = useId();
   const under = p.belowFloor ? f.total - p.price : 0;
+  // The way out of a loss: the lowest choice that clears the floor.
+  const wayOut = p.belowFloor ? [...p.data.choices].sort((a, b) => a.price - b.price).find((c) => c.price >= f.total) ?? null : null;
   return (
     <section className={`pa-sec pa-reveal pa-floor${p.belowFloor ? " is-below" : ""}`} style={{ ["--d" as string]: "1" }} aria-label="Cost floor">
       <div className="pa-floor__head">
@@ -392,13 +459,14 @@ function FloorSection(p: BodyProps & { data: PricingAnalysis }) {
       {(driverMissing || p.belowFloor) && (
         <p className="pa-floor__hint">
           {p.belowFloor && <span className="pa-floor__under">{formatMoneyWhole(under)} below floor.</span>}
+          {wayOut && <button type="button" className="pa-link pa-link--inline pa-wayout" onClick={() => p.onApplyPrice(wayOut.price, wayOut.key)}>Use {wayOut.label} {formatMoneyWhole(wayOut.price)}</button>}
           {p.belowFloor && driverMissing ? " " : ""}
           {driverMissing && <span>Excludes driver allowance{driverLine?.nights ? ` for ${driverLine.nights} night${driverLine.nights === 1 ? "" : "s"}` : ""}: not set yet. <button type="button" className="pa-link pa-link--inline" onClick={() => { setExpanded(true); setOpen("driver_allowance"); }}>Add one</button></span>}
         </p>
       )}
       {expanded && (
         <div id={id} className="pa-floor__body">
-          {f.perKm != null && <p className="pa-floor__perkm">{formatMoneyWhole(f.perKm)}/km all-in, incl. fuel and tolls</p>}
+          {perKmText && <p className="pa-floor__perkm">{perKmText}</p>}
           <ul className="pa-lines">
             {f.lines.map((l) => (
               <FloorRow key={l.key} line={l} open={open === l.key} onToggle={() => setOpen(open === l.key ? null : l.key)}
@@ -490,12 +558,24 @@ function FloorRow({ line, open, onToggle, driver, fixed, missing }: {
   );
 }
 
-/** "TruckWys platform · 16 quotes · 180 days" from the structured fields. */
-function tierShort(m: NonNullable<PricingAnalysis["market"]>): string | null {
-  const days = m.tierLabel?.match(/(\d+)\s*days/)?.[1];
-  const who = m.tier === "platform" ? "TruckWys platform" : m.tier === "company" ? "Your own quotes" : null;
-  if (!who) return m.tierLabel;
-  return [who, m.n > 0 ? `${formatNumber(m.n)} accepted quote${m.n === 1 ? "" : "s"}` : null, days ? `${days} days` : null].filter(Boolean).join(" · ");
+/**
+ * The market source line, from the API's own label (never rebuilt from n and
+ * days, which dropped "one-way", "×2" and "<vehicle> only"). A return trip
+ * priced from one-way quotes says so in plain words.
+ */
+function tierLine(m: NonNullable<PricingAnalysis["market"]>): string | null {
+  let label = m.tierLabel;
+  if (!label) {
+    const who = m.tier === "platform" ? "TruckWys platform" : m.tier === "company" ? "Your own quotes" : null;
+    label = [who, m.n > 0 ? `${formatNumber(m.n)} accepted quote${m.n === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ") || null;
+  }
+  if (!label) return null;
+  // The ×2 is said on its own line (see MarketSection), not buried here.
+  if (m.oneWayX2) label = label.replace(/\s*·\s*×\s?2 for a return trip/i, "");
+  if (m.vehicleSpecific && m.vehicleName && !label.toLowerCase().includes(`${m.vehicleName.toLowerCase()} only`)) {
+    label += ` · ${m.vehicleName} only`;
+  }
+  return tidy(label);
 }
 
 // ---- 3. market
@@ -516,7 +596,10 @@ function MarketSection({ data, price }: { data: PricingAnalysis; price: number }
         <p className="pa-quiet">No quotes on this lane yet, so the prices above work from your cost floor and target margin.</p>
       ) : (
         <>
-          <p className="pa-tier">{tierShort(m)}</p>
+          <p className="pa-tier">{tierLine(m)}</p>
+          {m.oneWayX2 && (
+            <p className="pa-tier pa-tier--x2">Return trip: {m.basisLabel ? m.basisLabel.replace(/^./, (ch) => ch.toLowerCase()) : "one-way quotes ×2"}, not real return-trip quotes</p>
+          )}
           <MarketRange market={m} floor={floor} price={price > 0 ? price : null} />
           <p className="pa-range-legend">
             <span><i className="pa-key pa-key--band" aria-hidden="true" />{MARKET_RANGE_LABEL} {formatMoneyWhole(m.p25)} to {formatMoneyWhole(m.p75)}</span>
@@ -529,6 +612,7 @@ function MarketSection({ data, price }: { data: PricingAnalysis; price: number }
 }
 
 // ---- 4. why
+
 function WhySection({ data, price }: { data: PricingAnalysis; price: number }) {
   const [open, setOpen] = useState(false);
   const id = useId();
@@ -537,8 +621,12 @@ function WhySection({ data, price }: { data: PricingAnalysis; price: number }) {
   if (!data.reasoning.length && !lk) return null;
   const reasons = [...new Set(data.reasoning.map(tidy))];
   const said = (t: string | null | undefined) => !!t && reasons.some((r) => r.includes(t.replace(/\.$/, "")));
-  const peak = model?.curve.reduce<null | { price: number; expectedProfit: number | null }>((best, c) =>
-    c.expectedProfit != null && (!best || (best.expectedProfit ?? -Infinity) < c.expectedProfit) ? c : best, null);
+  // One best-expected-profit figure: when the reasons already state it, the
+  // chart doesn't repeat it (with a different rounding).
+  const peak = model?.best ?? model?.curve.reduce<null | { price: number; expectedProfit: number | null }>((best, c) =>
+    c.expectedProfit != null && (!best || (best.expectedProfit ?? -Infinity) < c.expectedProfit) ? c : best, null) ?? null;
+  const reasonsStateBest = reasons.some((r) => /best expected profit/i.test(r));
+  const lks = rowLikelihoods(data, data.choices);
   return (
     <div className="pa-sec pa-reveal" style={{ ["--d" as string]: "3" }}>
       <button type="button" className="pa-why" aria-expanded={open} aria-controls={id} onClick={() => setOpen((v) => !v)}>
@@ -550,20 +638,20 @@ function WhySection({ data, price }: { data: PricingAnalysis; price: number }) {
           {reasons.length > 0 && <ul className="pa-reasons">{reasons.map((r) => <li key={r}>{r}</li>)}</ul>}
           {model && (
             <figure className="pa-fig">
-              <LikelihoodCurve curve={model.curve} range={model.range} choices={data.choices} price={price > 0 ? price : null} />
+              <LikelihoodCurve curve={model.curve} range={model.range} choices={data.choices} price={price > 0 ? price : null}
+                median={data.market?.available && !data.market.isEstimate ? data.market.median : null} />
               <figcaption className="pa-fig__cap">
-                <span><i className="pa-key pa-key--line" aria-hidden="true" />Chance to win</span>
-                <span><i className="pa-key pa-key--wash" aria-hidden="true" />Expected profit</span>
+                <span><i className="pa-key pa-key--line" aria-hidden="true" />Chance to win by price</span>
                 <span><i className="pa-key pa-key--you" aria-hidden="true" />Your price</span>
               </figcaption>
-              {peak && peak.expectedProfit != null && (
-                <p className="pa-basis">Best expected profit ≈ {formatMoneyWhole(Math.round(peak.expectedProfit / 100) * 100)}, near {formatMoneyWhole(Math.round(peak.price / 100) * 100)}.</p>
+              {!reasonsStateBest && peak && peak.expectedProfit != null && (
+                <p className="pa-basis">Best expected profit ≈ {formatMoneyWhole(Math.round(peak.expectedProfit / 100) * 100)} per quote, near {formatMoneyWhole(Math.round(peak.price / 100) * 100)}.</p>
               )}
               <table className="pa-twin">
                 <caption className="pa-sr">Choices on the curve</caption>
                 <tbody>
                   {data.choices.map((c) => (
-                    <tr key={c.key}><th scope="row">{c.label}</th><td>{formatMoneyWhole(c.price)}</td><td>{likelihoodShort(c.likelihood) ?? "—"}</td></tr>
+                    <tr key={c.key}><th scope="row">{c.label}</th><td>{formatMoneyWhole(c.price)}</td><td>{likelihoodShort(lks.get(c.key) ?? null) ?? "—"}</td></tr>
                   ))}
                 </tbody>
               </table>
@@ -597,6 +685,8 @@ function WhySection({ data, price }: { data: PricingAnalysis; price: number }) {
 // ---- 5. customer & lane evidence
 function EvidenceSection({ data, customerName }: { data: PricingAnalysis; customerName: string | null }) {
   const c = data.customer;
+  // A return trip compares against one-way history: say so on the table.
+  const oneWay = !!data.market?.oneWayX2;
   if (!c) return null;
   const name = c.name || customerName || "This client";
   const acc = c.acceptance;
@@ -617,7 +707,7 @@ function EvidenceSection({ data, customerName }: { data: PricingAnalysis; custom
         {c.paymentRisk?.basis && !c.paymentRisk.attention && c.paymentRisk.basis.toLowerCase() !== c.paymentRisk.label.toLowerCase()
           && !/^no invoices/i.test(c.paymentRisk.basis) && <p className="pa-fact__basis">{c.paymentRisk.basis}</p>}
       </div>
-      <h4 className="pa-sub">On this lane</h4>
+      <h4 className="pa-sub">On this lane{oneWay ? <span className="pa-sub__note"> · one-way quotes</span> : null}</h4>
       {quotes.length > 0 ? (
         <table className="pa-hist">
           <caption className="pa-sr">Last quotes to {name} on this lane</caption>

@@ -10,6 +10,8 @@ interface Props {
   /** The quote's own dates (YYYY-MM-DD), when it has them. */
   pickupDate?: string | null;
   deliveryDate?: string | null;
+  /** The quote's distance (km), so a suggested delivery date fits the run. */
+  distanceKm?: number | null;
   /** dates: only when the quote lacks them and the suggested dates are shown. */
   onConfirm: (driverId: string, vehicleId: string, dates?: { pickup_date: string; delivery_date: string }) => void;
   onCancel: () => void;
@@ -88,13 +90,23 @@ const isoInDays = (n: number) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, pickupDate, deliveryDate, onConfirm, onCancel }: Props) {
+// The date n days after a YYYY-MM-DD date (local calendar).
+const addDays = (iso: string, n: number) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  const t = new Date(y, (m || 1) - 1, d || 1); t.setDate(t.getDate() + n);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+};
+// Days on the road for a suggestion: about 700 km a day, so a 600 km run is
+// delivered the same day and Johannesburg to Cape Town in two.
+const roadDays = (km?: number | null) => (km && km > 0 ? Math.floor(km / 700) : 2);
+
+export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, pickupDate, deliveryDate, distanceKm, onConfirm, onCancel }: Props) {
   useFocusTrap(latestModal, true);
   // A booking needs dates. When the quote has none, the suggested ones are
   // shown and editable here, never filled in silently.
   const needsDates = !pickupDate || !deliveryDate;
   const [pickup, setPickup] = useState(pickupDate || isoInDays(2));
-  const [delivery, setDelivery] = useState(deliveryDate || isoInDays(4));
+  const [delivery, setDelivery] = useState(deliveryDate || addDays(pickupDate || isoInDays(2), roadDays(distanceKm)));
   const datesBad = needsDates && (!pickup || !delivery || delivery < pickup);
   const [showAssign, setShowAssign] = useState(false);
   const [driverId, setDriverId] = useState('');

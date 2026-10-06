@@ -15,14 +15,19 @@
 .pa-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* ---- head ---------------------------------------------------------------- */
-.pa__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: var(--card-pad, 20px) var(--card-pad, 20px) 8px; }
-.pa__titles { min-width: 0; }
+.pa__head { padding: var(--card-pad, 20px) var(--card-pad, 20px) 8px; }
+.pa__titlerow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .pa__title { margin: 0; font: 600 15px/22px var(--font-sans); letter-spacing: -0.01em; color: var(--text-primary); }
 .pa__sub { margin: 2px 0 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
 .pa__status {
-  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; margin-top: 2px;
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
   font: 500 12px/16px var(--font-sans); color: var(--text-tertiary);
+  transition: opacity 160ms ease;
 }
+/* Always in the layout (beside the title), only shown while working: the
+   header never re-wraps or moves when it appears. */
+.pa__status.is-idle { opacity: 0; visibility: hidden; }
+.pa__sub { text-wrap: pretty; }
 .pa-pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-primary); animation: pa-pulse 1.2s ease-in-out infinite; }
 @keyframes pa-pulse { 50% { opacity: 0.35; } }
 
@@ -49,7 +54,9 @@
   display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0; border: 0; background: none; cursor: pointer;
   font: 500 12px/16px var(--font-sans); color: var(--link); text-decoration: none;
 }
-.pa-link:hover { color: var(--accent-primary-hover); text-decoration: underline; text-underline-offset: 2px; }
+@media (hover: hover) {
+  .pa-link:hover { color: var(--accent-primary-hover); text-decoration: underline; text-underline-offset: 2px; }
+}
 .pa-link:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
 
 /* ---- steps (explainer + analysing) ---------------------------------------- */
@@ -84,15 +91,15 @@
 .pa-line { border-bottom: 1px solid var(--border-row); }
 .pa-line:last-child { border-bottom: 0; }
 .pa-line__row {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto 14px; align-items: center; gap: 8px;
+  display: grid; grid-template-columns: minmax(min-content, 1fr) auto auto 14px; align-items: center; gap: 6px;
   width: 100%; min-height: 36px; padding: 6px 0; border: 0; background: none; cursor: pointer; text-align: left;
   font: inherit; color: inherit; position: relative;
 }
-.pa-line__row:hover .pa-line__label { color: var(--text-primary); }
+@media (hover: hover) { .pa-line__row:hover .pa-line__label { color: var(--text-primary); } }
 .pa-line__row:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
-.pa-line__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); }
+.pa-line__label { min-width: 0; color: var(--text-secondary); }
 .pa-line__row .tw-status { font-size: 11px; line-height: 16px; padding-top: 1px; padding-bottom: 1px; }
-.pa-line__amt { font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; min-width: 64px; text-align: right; }
+.pa-line__amt { font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; text-align: right; }
 .pa-line__chev { color: var(--text-tertiary); transition: transform 160ms ease; }
 .pa-line.is-open .pa-line__chev { transform: rotate(90deg); }
 .pa-line__detail { padding: 0 0 10px; }
@@ -176,7 +183,7 @@
   background: var(--bg-surface); color: inherit; font: inherit; position: relative;
   transition: border-color 120ms ease, background 120ms ease;
 }
-.pa-choice:hover { border-color: var(--border-strong); background: var(--bg-surface-hover); }
+@media (hover: hover) { .pa-choice:hover { border-color: var(--border-strong); background: var(--bg-surface-hover); } }
 .pa-choice:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
 .pa-choice.is-rec { border-color: var(--border-strong); }
 .pa-choice.is-applied { border-color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--text-primary); }
@@ -192,9 +199,12 @@
 .pa-choice__state { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font: 500 12px/16px var(--font-sans); color: var(--link); }
 /* "Use this price" on every card: quiet on the alternatives, link colour on
    the recommended one; the applied card says "In your quote". */
-.pa-choice:not(.is-rec):not(.is-applied) .pa-choice__state { color: var(--text-tertiary); }
-.pa-choice:not(.is-rec):not(.is-applied):hover .pa-choice__state,
-.pa-choice:not(.is-rec):not(.is-applied):focus-visible .pa-choice__state { color: var(--link); }
+/* Round 4: the recommended card no longer looks applied before it is: its
+   "Use this price" is as quiet as the others (the pill and the bar's button
+   carry the recommendation). */
+.pa-choice:not(.is-applied) .pa-choice__state { color: var(--text-tertiary); }
+.pa-choice:not(.is-applied):focus-visible .pa-choice__state { color: var(--link); }
+@media (hover: hover) { .pa-choice:not(.is-applied):hover .pa-choice__state { color: var(--link); } }
 .pa-choice.is-applied .pa-choice__state { color: var(--text-primary); }
 /* Likelihood words: one neutral voice, the band only shades the dot. */
 .pa-lk { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; color: var(--text-primary); font-weight: 500; }
@@ -256,9 +266,9 @@
 .pa-risk--high { background: var(--status-danger-bg); }
 .pa-risk--high b { color: var(--status-danger-text); }
 .pa-sub { margin: 10px 0 2px; font: 500 12px/16px var(--font-sans); color: var(--text-secondary); }
-.pa-fact__basis { margin: 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); text-align: right; }
+.pa-fact__basis { margin: 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); text-align: left; }
 .pa-reasons--small { margin-top: 4px; font-size: 12px; line-height: 18px; }
-.pa-line__row .tw-status { justify-self: end; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pa-line__row .tw-status { justify-self: end; white-space: nowrap; }
 
 /* ---- round 3 ---------------------------------------------------------------- */
 .pa-alerts { display: grid; gap: 8px; padding: 0 var(--card-pad, 20px) 8px; }
@@ -275,3 +285,12 @@
   .pa-dl > div { flex-direction: column; gap: 0; }
   .pa-dl dd { text-align: left; }
 }
+
+/* ---- round 4 ---------------------------------------------------------------- */
+.pa-nowrap { white-space: nowrap; }
+.pa-choice__empty { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.pa-choice__empty b { font-weight: 500; color: var(--text-secondary); }
+.pa-choice__empty.is-neg b { color: var(--status-danger-text); }
+.pa-tier--x2 { color: var(--text-secondary); font-weight: 500; }
+.pa-sub__note { font-weight: 400; color: var(--text-tertiary); }
+.pa-floor__hint .pa-wayout { margin-left: 6px; font-weight: 600; }

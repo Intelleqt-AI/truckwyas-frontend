@@ -880,6 +880,15 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           // Columns with nothing in them on any row step aside (R9).
           const anyOutcome = listItems.some((q: any) => q.outcome === 'accepted' || q.outcome === 'rejected');
           const anyAction = listItems.some((q: any) => q.status === 'ACCEPTED' || !!bookedLoadOf(q));
+          // Margin from the stored pricing decision (price − full cost floor,
+          // on the price excl. VAT); older quotes have none and show a dash.
+          const marginPctOf = (q: any): number | null => {
+            const v = q.pricing_margin_pct;
+            if (v === null || v === undefined || v === '') return null;
+            const n = Number(v);
+            return Number.isFinite(n) ? Math.round(n) : null;
+          };
+          const anyMargin = listItems.some((q: any) => marginPctOf(q) !== null);
           return (
           <div className="bk-table-wrap bk-qlist-fill" style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
             <table className="table-heading-roles bk-table">
@@ -891,6 +900,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                   <th scope="col">Status</th>
                   {anyOutcome && <th scope="col" className="bk-col-phone">Outcome</th>}
                   <th scope="col" className="bk-col-phone">Created</th>
+                  {anyMargin && <th scope="col" className="is-num bk-col-phone" title="Margin on the price excl. VAT, after the full cost floor">Margin</th>}
                   <th scope="col" className="is-num">Amount incl. VAT</th>
                   {anyAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Action</span></th>}
                 </tr>
@@ -935,6 +945,15 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                     <td className="is-date bk-col-phone">
                       {quote.created_at ? formatDate(quote.created_at) : '—'}
                     </td>
+                    {anyMargin && (() => {
+                      const m = marginPctOf(quote);
+                      return (
+                        <td className="is-num bk-col-phone" style={m !== null && m < 0 ? { color: 'var(--status-danger-text)' } : undefined}
+                          title={m === null ? 'Priced before the pricing analysis' : 'Margin on the price excl. VAT, after the full cost floor'}>
+                          {m === null ? <span className="bk-muted">—</span> : `${m < 0 ? '\u2212' : ''}${Math.abs(m)}%`}
+                        </td>
+                      );
+                    })()}
                     <td className="is-money" title={`${formatCurrency(priceInclVat(quote))} incl. VAT`}>
                       {/* Lists show whole rands; the quote itself carries the cents (R7). */}
                       {formatMoneyWhole(priceInclVat(quote))}
@@ -1029,6 +1048,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           busy={convertToLoadMutation.isPending}
           pickupDate={pendingConvertQuote?.pickup_date}
           deliveryDate={pendingConvertQuote?.delivery_date}
+          distanceKm={pendingConvertQuote?.distance ? parseFloat(pendingConvertQuote.distance) : null}
           onConfirm={(driverId, vehicleId, dates) => convertToLoadMutation.mutate({ quote: pendingConvertQuote, driverId, vehicleId, dates })}
           onCancel={() => setPendingConvertQuote(null)}
         />

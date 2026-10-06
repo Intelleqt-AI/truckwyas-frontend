@@ -67,9 +67,9 @@ type PricingField = 'margin_target_pct' | 'operating_cost_per_km' | 'driver_allo
 function pricingError(field: PricingField, raw: string): string | null {
   const t = raw.trim();
   if (field === 'margin_target_pct') {
-    if (!t) return 'Enter a target margin between 1% and 50%.';
+    if (!t) return 'Enter a target margin between 1% and 40%.';
     const n = Number(t);
-    return Number.isFinite(n) && n >= 1 && n <= 50 ? null : 'Enter a target margin between 1% and 50%.';
+    return Number.isFinite(n) && n >= 1 && n <= 40 ? null : 'Enter a target margin between 1% and 40%.';
   }
   if (!t) return null;
   const n = Number(t);
@@ -93,7 +93,7 @@ function costInUseOf(v: unknown): CostInUse | null {
 // "Now using R 13,99/km from 37 trips (last 12 months)." / "Now using the
 // R 12,50/km superlink estimate." The saved figure needs no line: it is in the field.
 function costInUseText(c: CostInUse | null): string | null {
-  if (!c || c.value === null || c.source === 'company_setting') return null;
+  if (!c || c.value === null || c.source === 'setting' || c.source === 'company_setting') return null;
   const rate = `${formatMoney(c.value)}/km`;
   if (c.source === 'company_actuals') {
     const trips = c.trips ? ` from ${formatNumber(c.trips)} trip${c.trips === 1 ? '' : 's'}` : '';
@@ -101,9 +101,11 @@ function costInUseText(c: CostInUse | null): string | null {
   }
   // An estimate: it follows each quote's vehicle type, so name the
   // superlink figure (the common long-haul truck) as the example.
-  const eg = c.superlink !== null ? ` (${formatMoney(c.superlink)}/km superlink)` : '';
-  const until = c.minTrips ? ` until ${formatNumber(c.minTrips)} trips have costs` : '';
-  return `Now using typical estimates${eg}${until}.`;
+  const eg = c.superlink !== null ? ` (${formatMoney(c.superlink)}/km for a superlink)` : '';
+  const until = c.minTrips
+    ? ` until ${formatNumber(c.minTrips)} completed trips have costs${c.trips !== null ? ` (you have ${formatNumber(c.trips)})` : ''}`
+    : '';
+  return `Now using the typical estimate per truck type${eg}${until}.`;
 }
 
 export function CompanySettings() {
@@ -755,7 +757,7 @@ export function CompanySettings() {
                   Target margin (%)
                   <InfoTip label="About the target margin">The margin you aim for on every quote: price less the full cost floor, as a share of the price excl. VAT. The suggested prices never go below it, and go above it when the market pays more.</InfoTip>
                 </label>
-                <DecimalInput id="company-margin-target" decimals={Number.isInteger(Number(form.margin_target_pct)) ? 0 : 2}placeholder="e.g. 10" value={form.margin_target_pct}
+                <DecimalInput id="company-margin-target" decimals={Number.isInteger(Number(form.margin_target_pct)) ? 0 : 2} placeholder="e.g. 10" value={form.margin_target_pct}
                   onChange={v => { set('margin_target_pct', v); if (pricingErrors.margin_target_pct) checkPricing('margin_target_pct', v); }}
                   onBlur={() => checkPricing('margin_target_pct')} error={pricingErrors.margin_target_pct} describedBy="company-margin-target-help" />
                 <div id="company-margin-target-help" role={pricingErrors.margin_target_pct ? 'alert' : undefined} style={pricingErrors.margin_target_pct ? settingsErrorStyle : helpTextStyle}>
@@ -769,7 +771,7 @@ export function CompanySettings() {
                 <InfoTip label="About the operating cost per km">Driver wages, vehicle finance, insurance, licences, tyres, maintenance and overheads, per km. It goes into every quote's cost floor. Leave it blank and we use your costs from the last 12 months, or a typical figure for the vehicle type until you have enough costed trips.</InfoTip>
               </label>
               <DecimalInput id="company-operating-cost-per-km"
-                placeholder={costInUse && costInUse.value !== null && costInUse.source === 'company_actuals' ? formatNumber(costInUse.value, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'e.g. 12,50'}
+                placeholder={costInUse && costInUse.value !== null && costInUse.source === 'company_actuals' ? formatNumber(costInUse.value, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'By truck type'}
                 value={form.operating_cost_per_km}
                 onChange={v => { set('operating_cost_per_km', v); if (pricingErrors.operating_cost_per_km) checkPricing('operating_cost_per_km', v); }}
                 onBlur={() => checkPricing('operating_cost_per_km')} error={pricingErrors.operating_cost_per_km} describedBy="company-operating-cost-help" />
@@ -791,7 +793,7 @@ export function CompanySettings() {
                   Driver allowance per night (R)
                   <InfoTip label="About the driver allowance">What you pay a driver for each night away from base. Quotes use it for trips with nights away when no approved rate is on record; each quote can still change it.</InfoTip>
                 </label>
-                <DecimalInput id="company-driver-allowance" placeholder="Not set" value={form.driver_allowance_per_night}
+                <DecimalInput id="company-driver-allowance" placeholder="Not set" decimals={form.driver_allowance_per_night && !Number.isInteger(Number(form.driver_allowance_per_night)) ? 2 : 0} value={form.driver_allowance_per_night}
                   onChange={v => { set('driver_allowance_per_night', v); if (pricingErrors.driver_allowance_per_night) checkPricing('driver_allowance_per_night', v); }}
                   onBlur={() => checkPricing('driver_allowance_per_night')} error={pricingErrors.driver_allowance_per_night} describedBy="company-driver-allowance-help" />
                 <div id="company-driver-allowance-help" role={pricingErrors.driver_allowance_per_night ? 'alert' : undefined} style={pricingErrors.driver_allowance_per_night ? settingsErrorStyle : helpTextStyle}>

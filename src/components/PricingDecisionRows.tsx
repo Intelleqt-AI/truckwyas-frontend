@@ -7,7 +7,12 @@ import type { DecisionView } from '@/lib/pricingDecision';
 const roughRange = (low: number, high: number) => `R ${Math.round(low / 1000)}–${Math.round(high / 1000)}k`;
 // "TruckWys platform, 16 accepted quotes, last 180 days" -> "TruckWys platform · 16 accepted quotes · 180 days".
 const round100 = (v: number) => Math.round(v / 100) * 100;
-const sourceLine = (s: string) => s.split(/,\s*/).map((p) => p.replace(/^last\s+/i, '')).join(' · ');
+// Each part stays whole on one line ("last 180 days" never splits), so the
+// line wraps only between parts.
+const sourceParts = (s: string) => s.split(/\s*[,·]\s*/).filter(Boolean);
+const sourceLine = (s: string) => sourceParts(s).map((p, i, all) => (
+  <span key={i} className="qd-decision__part">{p}{i < all.length - 1 ? ' · ' : ''}</span>
+));
 
 /**
  * The price card's "How it was priced" block: the cost floor and its parts
@@ -54,7 +59,7 @@ export default function PricingDecisionRows({ decision, marginInHeader = false, 
                 <li key={l.label} className={l.missing ? 'is-missing' : undefined}>
                   <span>{l.label}{l.source && <span className="qd-decision__kind">{l.source}</span>}</span>
                   {/* A cost with no figure on record reads "Not set" (the floor leaves it out), never "R 0". */}
-                  <span>{l.missing ? 'Not set · excluded' : l.note || money(l.amount)}</span>
+                  <span>{l.missing ? 'Not set' : l.note || money(l.amount)}</span>
                 </li>
               ))}
             </ul>

@@ -93,8 +93,9 @@ function buildWhatsAppShareUrl(phone: string | undefined, message: string): stri
 function lossReasonText(quote: { loss_reason?: { reason?: string; note?: string } | null; rejection_reason?: string | null }): string {
   const lr = quote.loss_reason;
   const label = LOSS_REASONS.find((r) => r.code === lr?.reason)?.label;
-  if (label) return [label, (lr?.note || '').trim()].filter(Boolean).join(': ');
-  return String(quote.rejection_reason || '');
+  const text = label ? [label, (lr?.note || '').trim()].filter(Boolean).join(': ') : String(quote.rejection_reason || '');
+  // Amounts typed in a note ("R 21 500") never split across lines.
+  return text.replace(/\bR (?=\d)/g, 'R\u00A0').replace(/(\d) (?=\d{3}\b)/g, '$1\u00A0');
 }
 
 export default function QuoteDetail() {
@@ -766,7 +767,7 @@ export default function QuoteDetail() {
               )}
               {quote.created_at && <div className="bk-kv"><span className="bk-kv__label">Created</span><span className="bk-kv__value">{formatDate(quote.created_at)}</span></div>}
               {(quote.status === 'DECLINED' || quote.outcome === 'rejected') && (quote.rejection_reason || quote.loss_reason?.reason) && (
-                <div className="bk-kv"><span className="bk-kv__label">Why it was lost</span><span className="bk-kv__value">{lossReasonText(quote)}</span></div>
+                <div className="bk-kv qd-kv-stack"><span className="bk-kv__label">Why it was lost</span><span className="bk-kv__value">{lossReasonText(quote)}</span></div>
               )}
               {/* No "Price confidence" row: the builder saves a fixed MEDIUM, so it
                   carried no signal. The stored pricing decision is the one signal. */}

@@ -75,7 +75,7 @@ function plainShort(short: string): string {
   if (!/^bands\b/i.test(s)) return s;
   const rest = s.replace(/^bands\s*\u00b7?\s*/i, "");
   const cnt = rest.match(/(\d+)\s+of\s+(\d+)/);
-  if (cnt) return `Chance to win shown as ${BAND_WORDS}: ${cnt[1]} of ${cnt[2]} closed quotes needed for a %`;
+  if (cnt) return `Chance to win shown as ${BAND_WORDS} until you have ${cnt[2]} closed quotes (${cnt[1]} so far)`;
   if (/outside/i.test(rest)) return "Outside the prices your model has seen, so no %";
   if (/trains tonight/i.test(rest)) return `Chance to win shown as ${BAND_WORDS} until your model trains tonight`;
   if (/won and lost/i.test(rest)) return `Chance to win shown as ${BAND_WORDS} until you have won and lost quotes`;
@@ -144,10 +144,10 @@ export function PricingPanel(p: PricingPanelProps) {
     const cntShort = closedCount(lk.short) ?? cnt;
     sub = noBands
       ? (lk.short && !/^bands\b/i.test(lk.short) ? lk.short.replace(/\.$/, "")
-        : cntShort ? `No chance to win yet: no real quotes on this lane, and ${cntShort} closed quotes for a %`
+        : cntShort ? `No chance to win yet: no real quotes on this lane, and ${cntShort.split(" of ")[0]} of the ${cntShort.split(" of ")[1]} closed quotes needed for a %`
         : lk.reason ? lk.reason.replace(/\.$/, "") : "Chance to win needs closed quotes or market data")
       : lk.short ? plainShort(lk.short)
-        : cnt ? `Chance to win shown as ${BAND_WORDS}: ${cnt} closed quotes needed for a %`
+        : cnt ? `Chance to win shown as ${BAND_WORDS} until you have ${cnt.split(" of ")[1]} closed quotes (${cnt.split(" of ")[0]} so far)`
         : lk.reason ? lk.reason.replace(/\.$/, "") : `Chance to win shown as ${BAND_WORDS}`;
   }
   const busy = loading || refreshing || phase === "route";
@@ -415,6 +415,14 @@ function ChoiceCard({ c, lk, summary, emptyPct, applied, onApply }: { c: Choice;
   );
 }
 
+/** The one way out of a loss, the same in the panel and the bar: the
+ *  recommended price when it clears the floor, else the lowest one that does. */
+export function wayOutChoice(choices: Choice[], floor: number | null): Choice | null {
+  if (floor == null) return null;
+  const rec = choices.find((c) => c.recommended && c.price >= floor);
+  return rec ?? [...choices].sort((a, b) => a.price - b.price).find((c) => c.price >= floor) ?? null;
+}
+
 // ---- 2. cost floor: one summary row, lines inside
 function FloorSection(p: BodyProps & { data: PricingAnalysis }) {
   const f = p.data.costFloor!;
@@ -430,13 +438,15 @@ function FloorSection(p: BodyProps & { data: PricingAnalysis }) {
   const includeReturn = p.includeReturn ?? f.includeReturn;
   // With the empty return in the floor, a per-km figure must divide by the km
   // actually driven (both legs); never "all-in" over one-way km.
+  // The server's figure and label (total ÷ km actually driven), in whole rand —
+  // the same figure the reasons state ("R 31/km driven").
+  const bothLegs = f.kmDriven != null && f.distanceKm != null && f.kmDriven > f.distanceKm + 0.5;
   const perKmText = f.perKm == null ? null
-    : f.includeReturn ? (f.perKmDriven ? `${formatMoneyWhole(f.perKm)} per km driven (there and back), incl. fuel and tolls` : null)
-    : `${formatMoneyWhole(f.perKm)}/km all-in, incl. fuel and tolls`;
+    : `${formatMoneyWhole(f.perKm)} ${f.perKmLabel || "per km driven"}${f.kmDriven ? ` (${formatNumber(Math.round(f.kmDriven))} km${bothLegs ? ", there and back" : ""})` : ""}, incl. fuel and tolls`;
   const id = useId();
   const under = p.belowFloor ? f.total - p.price : 0;
   // The way out of a loss: the lowest choice that clears the floor.
-  const wayOut = p.belowFloor ? [...p.data.choices].sort((a, b) => a.price - b.price).find((c) => c.price >= f.total) ?? null : null;
+  const wayOut = p.belowFloor ? wayOutChoice(p.data.choices, f.total) : null;
   return (
     <section className={`pa-sec pa-reveal pa-floor${p.belowFloor ? " is-below" : ""}`} style={{ ["--d" as string]: "1" }} aria-label="Cost floor">
       <div className="pa-floor__head">
@@ -504,6 +514,8 @@ function FloorRow({ line, open, onToggle, driver, fixed, missing }: {
       ? { tone: "neutral" as StatusTone, label: "Your figure" }
       : line.key === "driver_allowance" && line.amount === 0 && line.nights === 0
         ? { tone: "neutral" as StatusTone, label: "None due (same day)" }
+        : line.key === "driver_allowance" && kind === "user"
+          ? { tone: "neutral" as StatusTone, label: "Your setting" }
         : line.key === "fuel" && kind === "official"
           ? { tone: "success" as StatusTone, label: "Official R/L" }
           : { ...SOURCE_CHIP[kind], label: isFixedEstimate ? "Estimate" : SOURCE_CHIP[kind].label };
@@ -528,7 +540,7 @@ function FloorRow({ line, open, onToggle, driver, fixed, missing }: {
                 <span>Allowance for this trip (R)</span>
                 <input type="number" inputMode="decimal" min={0} value={driver.value} onChange={(e) => driver.onChange(e.target.value)} />
               </label>
-              {driver.edited && line.suggested != null && <button type="button" className="pa-link" onClick={driver.onReset}>Use the approved figure</button>}
+              {driver.edited && line.suggested != null && <button type="button" className="pa-link" onClick={driver.onReset}>{line.source.kind === "user" ? `Use your setting (${formatMoneyWhole(line.suggested)})` : `Use the approved figure (${formatMoneyWhole(line.suggested)})`}</button>}
             </div>
           )}
           {isFixedEstimate && (

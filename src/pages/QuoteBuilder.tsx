@@ -22,7 +22,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { isSubscriptionBlocked, subscriptionStatusDetail } from "@/lib/subscriptionStatus";
 import { MessageCircle, Map, Info, Maximize2, Mic, Square, X, Plus, GripVertical, ChevronDown, ChevronUp, Check, AlertTriangle } from "lucide-react";
 import { formatRand } from "@/lib/pricing";
-import { PricingPanel, lkTone, likelihoodShort, signedPct, type PricingPhase } from "@/components/pricing/PricingPanel";
+import { PricingPanel, lkTone, likelihoodShort, signedPct, wayOutChoice, type PricingPhase } from "@/components/pricing/PricingPanel";
 import { usePricingAnalysis } from "@/components/pricing/usePricingAnalysis";
 import { readPrice, pricingDecision } from "@/components/pricing/evaluate";
 import type { ChoiceKey, PricingInputs } from "@/components/pricing/types";
@@ -1094,7 +1094,9 @@ export default function QuoteBuilder() {
   // total never changes on its own.
   const driverLine = pricing.data?.costFloor?.lines.find(l => l.key === "driver_allowance") ?? null;
   const driverSuggested = driverLine?.suggested ?? null;
-  const driverNights = driverLine?.details.find(d => /night/i.test(d.label))?.value?.match(/^\d+/)?.[0] ?? null;
+  const driverNights = driverLine?.details.find(d => /night/i.test(d.label))?.value?.match(/^\d+/)?.[0] ?? (driverLine?.nights ? String(driverLine.nights) : null);
+  // Priced from the company's own "allowance per night" setting (no approved rate).
+  const driverFromSetting = driverLine?.source.kind === "user";
 
   // Put a price in the bar: the cost lines stay exactly as calculated and the
   // difference is the price adjustment (serviceCharge), so total === price.
@@ -1816,8 +1818,8 @@ export default function QuoteBuilder() {
                     ) : r.l}
                     {r.key === "driver" && driverSuggested != null && Math.abs(driverSuggested - driverAllowance) >= 0.5 && (
                       <button type="button" className="qb-linkbtn" onClick={() => { setDriverAllowanceInput(String(driverSuggested)); setDriverEdited(true); }}
-                        title="The approved allowance for the nights this trip keeps the driver away">
-                        Use {formatMoneyWhole(driverSuggested)} (approved{driverNights ? ` × ${driverNights} night${driverNights === "1" ? "" : "s"}` : ""})
+                        title={driverFromSetting ? "Your allowance per night (company settings) for the nights this trip keeps the driver away" : "The approved allowance for the nights this trip keeps the driver away"}>
+                        Use {formatMoneyWhole(driverSuggested)} ({driverFromSetting ? "your setting" : "approved"}{driverNights ? ` × ${driverNights} night${driverNights === "1" ? "" : "s"}` : ""})
                       </button>
                     )}
                     {r.key === "driver" && driverLine && driverSuggested == null && !driverEdited && (
@@ -2134,7 +2136,7 @@ export default function QuoteBuilder() {
             {liveReading.margin != null ? (() => {
               const settled = !priceTyping;
               const loss = settled && liveReading.belowFloor;
-              const wayOut = [...(pricing.data?.choices ?? [])].sort((a, b) => a.price - b.price).find(c => liveReading.floor != null && c.price >= liveReading.floor) ?? null;
+              const wayOut = wayOutChoice(pricing.data?.choices ?? [], liveReading.floor);
               return (
                 <>
                   <span className="qb-pricebar__line">

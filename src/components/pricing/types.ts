@@ -31,8 +31,11 @@ export interface FloorLine {
 }
 export interface CostFloor {
   total: number; perKm: number | null; includeReturn: boolean;
-  /** "per km driven" when the per-km figure divides by both legs (empty return in the floor). */
-  perKmDriven: boolean;
+  /** Server label for perKm ("per km driven": total ÷ the km actually driven,
+   *  both legs when the empty return or a round trip is in the floor). */
+  perKmLabel: string | null;
+  /** Km the floor is spread over (both legs when the return is in it). */
+  kmDriven: number | null; distanceKm: number | null;
   /** The empty run home (one-way trips): its cost, and the floor including it. */
   returnLegAmount: number | null; floorWithReturn: number | null;
   /** Whether the empty-return toggle means anything for this trip. */
@@ -206,9 +209,10 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
   const fx = obj(cf?.fixed_cost_per_km);
   const costFloor: CostFloor | null = cf && num(cf.total) != null ? {
     total: num(cf.total)!,
-    perKm: num(cf.per_km_driven) ?? num(cf.per_km),
+    perKm: num(cf.per_km),
     includeReturn: cf.include_return === true,
-    perKmDriven: num(cf.per_km_driven) != null || cf.per_km_basis === "driven" || /driven/i.test(String(cf.per_km_label ?? "")),
+    perKmLabel: str(cf.per_km_label),
+    kmDriven: num(cf.km_driven), distanceKm: num(cf.distance_km),
     returnLegAmount: num(cf.return_leg_amount),
     floorWithReturn: num(cf.floor_with_return),
     returnAvailable: cf.return_available !== false,

@@ -47,6 +47,8 @@ export type Likelihood =
 export interface Choice {
   key: ChoiceKey; label: string; price: number; margin: number; marginPct: number;
   recommended: boolean; summary: string | null; likelihood: Likelihood | null;
+  /** Margin % if the truck comes back empty (when the floor excludes the return). */
+  marginPctIfEmptyReturn: number | null;
 }
 export interface CurvePoint { price: number; pct: number; expectedProfit: number | null }
 export interface LikelihoodInfo {
@@ -54,6 +56,8 @@ export interface LikelihoodInfo {
   model: { version: string; scope: string | null; nClosed: number; basisLabel: string; range: [number, number]; curve: CurvePoint[] } | null;
   rules: { likelyMax: number | null; evenMax: number | null; basis: string[] } | null;
   reason: string | null;
+  /** One-line, server-worded description of the level ("Chance to win as bands · 16 of 40 closed quotes"). */
+  short: string | null;
 }
 export interface LaneQuote { id: number | null; number: string | null; date: string | null; price: number; outcome: "accepted" | "rejected" | "open" | "expired" | string }
 export interface CustomerEvidence {
@@ -74,6 +78,10 @@ export interface PricingAnalysis {
   customer: CustomerEvidence | null;
   reasoning: string[];
   warnings: { code: string; message: string }[];
+  /** The server's own reading of the price that was sent (authoritative at that price). */
+  yourPrice: { price: number; likelihood: Likelihood | null } | null;
+  /** Floor including the empty return, when the floor itself excludes it. */
+  floorWithReturn: number | null;
 }
 
 /** What the builder sends. Field names follow the brief; the backend's
@@ -169,7 +177,7 @@ function adaptLikelihood(v: unknown): Likelihood | null {
   const band = BANDS.includes(o.band as Band) ? (o.band as Band) : null;
   return {
     level: "rules", band,
-    label: band ? BAND_LABEL[band] : "Not enough data to judge",
+    label: band ? BAND_LABEL[band] : "Not enough data yet",
     outsideModelRange: o.outside_model_range === true,
   };
 }
@@ -237,6 +245,7 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
     recommended: c!.recommended === true,
     summary: str(c!.summary),
     likelihood: adaptLikelihood(c!.likelihood),
+    marginPctIfEmptyReturn: num(c!.margin_pct_if_empty_return),
   })).filter((c) => ["safe", "balanced", "stretch"].includes(c.key) && c.price > 0);
 
   const lk = obj(r.likelihood);
@@ -266,6 +275,7 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
       basis: arr(lr.basis).map(str).filter((s): s is string => !!s),
     } : null,
     reason: str(lk.reason),
+    short: str(lk.short),
   } : null;
 
   const cu = obj(r.customer);
@@ -299,6 +309,9 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
     likelihood,
     customer,
     reasoning: arr(r.reasoning).map(str).filter((s): s is string => !!s),
+    yourPrice: obj(r.your_price) && num(obj(r.your_price)!.price) != null
+      ? { price: num(obj(r.your_price)!.price)!, likelihood: adaptLikelihood(obj(r.your_price)!.likelihood) } : null,
+    floorWithReturn: num(cf?.floor_with_return ?? r.floor_with_return),
     warnings: arr(r.warnings).map(obj).filter(Boolean).map((w) => ({ code: String(w!.code ?? ""), message: str(w!.message) || "" })).filter((w) => w.message),
   };
 }

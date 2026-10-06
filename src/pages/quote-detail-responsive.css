@@ -140,11 +140,31 @@
 .qd-decision .bk-kv__value { text-align: right; }
 .qd-decision .bk-kv__note { color: var(--text-secondary); }
 .qd-decision__neg { color: var(--status-danger-text); }
-/* Labels stay on one line; when the value doesn't fit beside its label it
-   drops below it (right-aligned) rather than squeezing either. */
-.qd-decision .bk-kv { flex-wrap: wrap; row-gap: 0; }
-.qd-decision .bk-kv__label { flex-shrink: 0; white-space: nowrap; }
-.qd-decision .bk-kv__value { flex: 1 1 150px; min-width: 0; }
+/* R3: one layout for every decision row (label left, value right); the
+   source or basis sits on its own full-width muted line below the row. */
+.qd-decision .bk-kv__label { white-space: nowrap; }
+.qd-decision .bk-kv__value { white-space: nowrap; }
+.qd-decision .bk-kv:has(+ .qd-decision__src) { border-bottom: 0; padding-bottom: 0; }
+.qd-decision__src { margin: 0; padding: 0 0 6px; border-bottom: 1px solid var(--border-row); font: 400 12px/18px var(--font-sans); color: var(--text-secondary); text-align: right; }
+.qd-decision__src:last-child { border-bottom: 0; }
+/* Phones: two-column rows stack (label over value) instead of squeezing. */
+@media (max-width: 480px) {
+  .qd-decision .bk-kv { flex-direction: column; align-items: flex-start; gap: 0; }
+  .qd-decision .bk-kv__value { text-align: left; }
+  .qd-decision__src { text-align: left; }
+}
+/* Touch: the head's Send and "…" buttons are drawn at 44px here (the shared
+   head draws 36px with a 44px ::after hit area; R3 asked for the drawn size). */
+@media (pointer: coarse) and (max-width: 768px) {
+  .qd .section-header__actions { min-height: 44px; top: -5px; }
+  .qd .section-header__actions > *:not([data-sh-hidden]),
+  .qd .section-header__actions [data-sh-primary],
+  .qd .section-header__more-btn { height: 44px !important; min-height: 44px !important; }
+  .qd .section-header__actions [data-sh-icon] { width: 44px; min-width: 44px !important; }
+}
 /* R2: the floor's parts, indented under it, so the margin can be traced. */
 .qd-decision__parts { list-style: none; margin: -2px 0 4px; padding: 0 0 6px 12px; border-bottom: 1px solid var(--border-row); }
 .qd-decision__parts li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; font: 400 12px/18px var(--font-sans); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+/* Floor part provenance (stored source_kind) and "Not set" parts. */
+.qd-decision__kind { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--bg-raised); color: var(--text-secondary); font: 500 11px/16px var(--font-sans); white-space: nowrap; }
+.qd-decision__parts li.is-missing > span:last-child { color: var(--text-secondary); font-style: italic; }

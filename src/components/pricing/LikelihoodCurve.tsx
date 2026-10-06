@@ -26,7 +26,6 @@ export function LikelihoodCurve({ curve, range, choices, price }: {
       pts.map((p) => `L${x(p.price).toFixed(1)},${y(Math.max(0, (p.expectedProfit ?? 0) / epMax) * 100 * 0.9).toFixed(1)}`).join("") +
       `L${x(pts[pts.length - 1].price).toFixed(1)},${y(0)}Z`
     : null;
-  const peak = epMax > 0 ? pts[ep.indexOf(epMax)] : null;
   const pctAt = (pr: number) => {
     let i = pts.findIndex((p) => p.price >= pr);
     if (i <= 0) i = 1;
@@ -46,14 +45,16 @@ export function LikelihoodCurve({ curve, range, choices, price }: {
           </g>
         ))}
         {epArea && <path d={epArea} fill="var(--accent-dim)" stroke="var(--pa-band-edge)" strokeWidth={1} />}
-        {peak && <line x1={x(peak.price)} x2={x(peak.price)} y1={y(0)} y2={y(90)} stroke="var(--viz-accent)" strokeOpacity={0.35} strokeDasharray="2 3" />}
         <path d={line} fill="none" stroke="var(--text-secondary)" strokeWidth={1.75} strokeLinejoin="round" />
         {price != null && inRange(price) && (
           <line x1={x(price)} x2={x(price)} y1={T - 4} y2={y(0)} stroke="var(--viz-accent)" strokeWidth={2} />
         )}
         {choices.filter((c) => inRange(c.price)).map((c) => (
-          <circle key={c.key} cx={x(c.price)} cy={y(pctAt(c.price))} r={c.recommended ? 4.5 : 3.5}
-            fill={c.recommended ? "var(--text-primary)" : "var(--bg-surface)"} stroke="var(--text-primary)" strokeWidth={1.5} />
+          <g key={c.key}>
+            <circle cx={x(c.price)} cy={y(pctAt(c.price))} r={c.recommended ? 4.5 : 3.5}
+              fill={c.recommended ? "var(--text-primary)" : "var(--bg-surface)"} stroke="var(--text-primary)" strokeWidth={1.5} />
+            <text x={x(c.price)} y={y(pctAt(c.price)) - 9} textAnchor="middle" className={c.recommended ? "viz-strong" : undefined} style={{ fontSize: 11 }}>{c.label}</text>
+          </g>
         ))}
         <text x={L} y={H - 4} textAnchor="start" className="viz-muted">{`R\u00a0${Math.round(range[0] / 1000)}k`}</text>
         <text x={w - R} y={H - 4} textAnchor="end" className="viz-muted">{`R\u00a0${Math.round(range[1] / 1000)}k`}</text>

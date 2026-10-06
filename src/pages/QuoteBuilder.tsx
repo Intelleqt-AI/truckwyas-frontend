@@ -21,6 +21,7 @@ import { AIChatPanel, type ChatMessage } from "@/components/AIChatPanel";
 import { useAuth } from "@/lib/AuthContext";
 import { isSubscriptionBlocked, subscriptionStatusDetail } from "@/lib/subscriptionStatus";
 import { MessageCircle, Map, Info, Maximize2, Mic, Square, X, Plus, GripVertical, ChevronDown, ChevronUp, Check, AlertTriangle } from "lucide-react";
+import { formatRand } from "@/lib/pricing";
 import { PricingPanel, lkTone, likelihoodShort, signedPct, type PricingPhase } from "@/components/pricing/PricingPanel";
 import { usePricingAnalysis } from "@/components/pricing/usePricingAnalysis";
 import { readPrice, pricingDecision } from "@/components/pricing/evaluate";
@@ -858,6 +859,14 @@ export default function QuoteBuilder() {
       if (q.valid_until) setValidUntil(q.valid_until);
       if (q.pickup_date) setPickupDate(q.pickup_date);
       if (q.delivery_date) setDeliveryDate(q.delivery_date);
+      // A price set in the bar was saved inside base_rate; split it back out
+      // so the quote reopens explaining itself the same way (rate + adjustment).
+      { const adj = Number(q.pricing_decision?.price_adjustment);
+        if (Number.isFinite(adj) && Math.abs(adj) >= 0.5 && q.distance && q.base_rate) {
+          const loadLegs = q.trip_type === "ROUND_TRIP" ? 2 : 1;
+          setBaseRatePerKm(String(Math.round(((Number(q.base_rate) - adj) / (Number(q.distance) * loadLegs)) * 100) / 100));
+          setServiceCharge(adj);
+        } }
       setSavedQuoteId(Number(editId));
       if (q.distance) setRouteData({ distance_km: Number(q.distance), toll_cost_zar: Number(q.toll_charges) });
     }).catch(() => toast.error("Couldn't load that quote"));
@@ -1129,10 +1138,34 @@ export default function QuoteBuilder() {
     return () => document.removeEventListener("scroll", onScroll, true);
   }, []);
 
+  // The aside's bottom fade only shows while it really scrolls and isn't at the end.
+  const asideRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = asideRef.current;
+    if (!el) return;
+    const upd = () => el.classList.toggle("is-overflowing", el.scrollHeight - el.clientHeight - el.scrollTop > 4);
+    upd();
+    const ro = new ResizeObserver(upd);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    el.addEventListener("scroll", upd, { passive: true });
+    return () => { ro.disconnect(); el.removeEventListener("scroll", upd); };
+  }, []);
+
   // Price bar input: free text while focused, formatted otherwise.
   const [priceDraft, setPriceDraft] = useState<string | null>(null);
+  // While the price is being typed it isn't judged: no red, no "below
+  // floor", until it has been still for ~400 ms (or the field is left).
+  const [priceTyping, setPriceTyping] = useState(false);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settlePrice = () => { if (typingTimerRef.current) clearTimeout(typingTimerRef.current); setPriceTyping(false); };
+  const [settledTotal, setSettledTotal] = useState(total);
+  useEffect(() => { if (!priceTyping) setSettledTotal(total); }, [total, priceTyping]);
   const onPriceInput = (text: string) => {
     setPriceDraft(text);
+    setPriceTyping(true);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => setPriceTyping(false), 400);
     const n = Number(text.replace(/[\sR\u00a0]/g, "").replace(",", "."));
     if (text.trim() !== "" && Number.isFinite(n) && n >= 0) applyPrice(n);
   };
@@ -1389,7 +1422,7 @@ export default function QuoteBuilder() {
                   onClick={() => setSelectedRouteIndex(i)}
                   aria-pressed={i === selectedRouteIndex}
                   className="qb-routeopt">
-                  {r.label || r.summary || `Route ${i + 1}`} · {Math.round(r.distance_km)} km
+                  {/^best routes?$/i.test((r.label || "").trim()) ? "Recommended route" : (r.label || r.summary || `Route ${i + 1}`)} · {Math.round(r.distance_km)} km
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" style={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", fontSize: 13, lineHeight: "20px", padding: "10px 12px", maxWidth: 220, borderRadius: 8 }}>
@@ -1509,7 +1542,7 @@ export default function QuoteBuilder() {
           <>
             <MessageCircle size={16} color="var(--text-tertiary)" aria-hidden="true" className="qb-nl__icon" style={{ flexShrink: 0 }} />
             <input value={nlText} onChange={e => setNlText(e.target.value)} onKeyDown={e => e.key === "Enter" && submitNL()}
-              placeholder={narrowNl ? "Describe the load" : "Describe it, e.g. “20t steel, JHB to Cape Town, flatbed, Tuesday”"} aria-label="Describe the load" style={{ ...inputS, border: "none", background: "transparent", paddingLeft: 4, minWidth: 0 }} />
+              placeholder={narrowNl ? "Describe the load" : "Describe it, e.g. “Move 28 tonnes of steel coils from Johannesburg to Durban”"} aria-label="Describe the load" style={{ ...inputS, border: "none", background: "transparent", paddingLeft: 4, minWidth: 0 }} />
             <button type="button" onClick={voice.start} title="Record voice" aria-label="Record voice"
               className="tw-btn qb-nl__mic">
               <Mic size={16} />
@@ -1778,7 +1811,7 @@ export default function QuoteBuilder() {
                         Use {formatMoneyWhole(driverSuggested)} (approved{driverNights ? ` × ${driverNights} night${driverNights === "1" ? "" : "s"}` : ""})
                       </button>
                     )}
-                    {r.key === "driver" && driverLine && driverSuggested == null && (
+                    {r.key === "driver" && driverLine && driverSuggested == null && !driverEdited && (
                       <span className="qb-cost__hint">No approved allowance on record</span>
                     )}
                     {r.key === "base" && (
@@ -2016,7 +2049,7 @@ export default function QuoteBuilder() {
                   phones, where the bar sits right under it). */}
               <div className="qb-cost__total">
                 <span>Quote price excl. VAT</span>
-                <span className="qb-cost__total-fig">{formatCurrency(total)}</span>
+                <span className="qb-cost__total-fig">{formatRand(total)}</span>
               </div>
               <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 8 }}>{formatNumber(Math.round(distance))} km {legs === 2 ? `one way · ${formatNumber(Math.round(chargeDistance))} km round trip` : "one way"} · {fuelSourceWord} · {hasVehicleType ? `your ${vtLabel} settings` : "your company defaults"}{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
             </>)}
@@ -2026,14 +2059,17 @@ export default function QuoteBuilder() {
       </div>
 
       {/* 3 — pricing analysis */}
-      <aside className="qb-aside" aria-label="Pricing analysis">
+      <aside className="qb-aside" aria-label="Pricing analysis" ref={asideRef}>
         <PricingPanel
           state={pricing}
           phase={pricingPhase}
           blockedReason={pricingBlockedReason}
           needs={pricingNeeds}
           customerName={customers.find((c: any) => String(c.id) === String(customerId))?.name ?? null}
-          price={total}
+          price={settledTotal}
+          distanceKm={distance}
+          buildUp={costSum}
+          settingsHref="/settings/company#pricing"
           onApplyPrice={applyChoice}
           driver={{
             value: driverAllowanceInput,
@@ -2066,50 +2102,51 @@ export default function QuoteBuilder() {
                 value={priceDraft ?? formatNumber(total, Math.abs(total - Math.round(total)) < 0.005
                   ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 onFocus={(e) => { setBarCompact(false); setPriceDraft(String(round2(total))); requestAnimationFrame(() => e.target.select()); }}
-                onBlur={() => setPriceDraft(null)}
+                onBlur={() => { setPriceDraft(null); settlePrice(); }}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
                 onChange={(e) => onPriceInput(e.target.value)} />
             </span>
             <span className="qb-pricebar__sub">What the client is sent · type to change it</span>
           </div>
           <div className="qb-pricebar__read" id="qb-price-read">
-            {liveReading.margin != null ? (
-              <>
-                <span className="qb-pricebar__line">
-                  <span className={liveReading.belowFloor ? "qb-pricebar__loss" : undefined}>Margin <span className="qb-pricebar__num">{formatMoneyWhole(liveReading.margin)}</span>
-                    {" "}<span className="qb-pricebar__num">({signedPct(liveReading.marginPct ?? 0)})</span></span>
-                  {/* Never pair a chance to win with a price that loses money. */}
-                  {liveReading.belowFloor ? (
-                    <span className="qb-pricebar__lk qb-pricebar__lk--loss">Below cost</span>
-                  ) : liveReading.likelihood && (
-                    <span className={`qb-pricebar__lk qb-pricebar__lk--${lkTone(liveReading.likelihood)}`}>
-                      <span>{likelihoodShort(liveReading.likelihood)}
-                        {liveReading.likelihood.level === "rules" && liveReading.likelihood.note && <span className="qb-pricebar__lknote"> · {liveReading.likelihood.note.toLowerCase()}</span>}</span>
+            {liveReading.margin != null ? (() => {
+              const settled = !priceTyping;
+              const loss = settled && liveReading.belowFloor;
+              const choiceLabel = liveReading.matchedChoice ? pricing.data?.choices.find(c => c.key === liveReading.matchedChoice)?.label : null;
+              const gap = round2(serviceCharge);
+              const rec = pricing.data?.choices.find(c => c.recommended);
+              return (
+                <>
+                  <span className="qb-pricebar__line">
+                    {liveReading.belowFloor ? (
+                      // One sentence, one colour; never a % below −100.
+                      <span className={loss ? "qb-pricebar__loss" : undefined}>
+                        Loss of <span className="qb-pricebar__num">{formatMoneyWhole(-liveReading.margin)}</span>
+                        {loss && <> · below your cost floor of <span className="qb-pricebar__num">{formatMoneyWhole(liveReading.floor)}</span></>}
+                      </span>
+                    ) : (
+                      <span>Margin <span className="qb-pricebar__num">{formatMoneyWhole(liveReading.margin)} · {signedPct(liveReading.marginPct ?? 0)}</span></span>
+                    )}
+                    {settled && !liveReading.belowFloor && liveReading.likelihood && (
+                      <span className={`qb-pricebar__lk qb-pricebar__lk--${lkTone(liveReading.likelihood)}`}>
+                        <span>{likelihoodShort(liveReading.likelihood)}
+                          {liveReading.likelihood.level === "rules" && liveReading.likelihood.note && <span className="qb-pricebar__lknote"> · {liveReading.likelihood.note.toLowerCase()}</span>}</span>
+                      </span>
+                    )}
+                  </span>
+                  {!liveReading.belowFloor && (
+                    <span className="qb-pricebar__muted">
+                      {[
+                        choiceLabel ? `${choiceLabel} price` : Math.abs(gap) >= 0.5 ? "Your own price" : "Sum of the build-up",
+                        Math.abs(gap) >= 0.5 ? `${formatMoneyWhole(Math.abs(gap))} ${gap > 0 ? "above" : "below"} your build-up of ${formatMoneyWhole(costSum)}`
+                          : !choiceLabel && rec && total > 0 && Math.abs(rec.price - total) / total > 0.15 ? `recommended ${formatMoneyWhole(rec.price)}` : null,
+                        `floor ${formatMoneyWhole(liveReading.floor)}`,
+                      ].filter(Boolean).join(" · ")}
                     </span>
                   )}
-                </span>
-                {liveReading.belowFloor ? (
-                  <span className="qb-pricebar__warn">
-                    <AlertTriangle size={13} aria-hidden="true" />
-                    {formatMoneyWhole(-liveReading.margin)} below your cost floor of {formatMoneyWhole(liveReading.floor)}
-                  </span>
-                ) : (
-                  <span className="qb-pricebar__muted">
-                    {(() => {
-                      const choiceLabel = liveReading.matchedChoice ? pricing.data?.choices.find(c => c.key === liveReading.matchedChoice)?.label : null;
-                      const gap = round2(serviceCharge);
-                      const rec = pricing.data?.choices.find(c => c.recommended);
-                      const parts: string[] = [];
-                      parts.push(choiceLabel ? `${choiceLabel} price` : Math.abs(gap) >= 0.5 ? "Your own price" : "Sum of the build-up");
-                      if (Math.abs(gap) >= 0.5) parts.push(`${formatMoneyWhole(Math.abs(gap))} ${gap > 0 ? "above" : "below"} your build-up of ${formatMoneyWhole(costSum)}`);
-                      else if (!choiceLabel && rec && total > 0 && Math.abs(rec.price - total) / total > 0.15) parts.push(`recommended ${formatMoneyWhole(rec.price)}`);
-                      parts.push(`floor ${formatMoneyWhole(liveReading.floor)}`);
-                      return parts.join(" · ");
-                    })()}
-                  </span>
-                )}
-              </>
-            ) : null}
+                </>
+              );
+            })() : null}
             {liveReading.margin == null && (
               <span className="qb-pricebar__muted">
                 {pricing.status === "loading" || pricingPhase === "route" ? "Working out margin and chance to win…"

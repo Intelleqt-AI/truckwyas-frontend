@@ -137,16 +137,16 @@
 .pa-floor__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .pa-floor__head .pa-sec__title { display: inline-flex; align-items: center; gap: 4px; }
 .pa-floor__toggle {
-  display: inline-flex; align-items: baseline; gap: 6px; padding: 2px 0; border: 0; background: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 0; flex: 1 1 auto; min-height: 44px; border: 0; background: none; cursor: pointer;
   font: inherit; color: inherit; position: relative; white-space: nowrap;
 }
 .pa-floor__toggle:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 4px; }
 .pa-floor__fig { font: 600 15px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); }
 .pa-floor__chev { align-self: center; color: var(--text-tertiary); transition: transform 160ms ease; }
 .pa-floor__toggle[aria-expanded="true"] .pa-floor__chev { transform: rotate(90deg); }
-.pa-floor.is-below .pa-floor__fig { color: var(--status-warning-text); }
+.pa-floor.is-below .pa-floor__fig { color: var(--status-danger-text); }
 .pa-floor__hint { margin: 6px 0 0; font: 400 12px/18px var(--font-sans); color: var(--text-secondary); }
-.pa-floor__under { color: var(--status-warning-text); font-weight: 500; }
+.pa-floor__under { color: var(--status-danger-text); font-weight: 500; }
 .pa-floor__body { margin-top: 8px; }
 .pa-link--inline { margin-left: 2px; }
 
@@ -190,12 +190,11 @@
 .pa-choice__meta { display: flex; justify-content: space-between; gap: 8px; font: 400 12px/16px var(--font-sans); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .pa-choice__sum { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); margin-top: 2px; }
 .pa-choice__state { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font: 500 12px/16px var(--font-sans); color: var(--link); }
-/* "Use this price" shows on the recommended card, and on hover/focus elsewhere;
-   the applied card always says "In your quote". */
-@media (hover: hover) {
-  .pa-choice:not(.is-rec):not(.is-applied) .pa-choice__state { visibility: hidden; }
-  .pa-choice:hover .pa-choice__state, .pa-choice:focus-visible .pa-choice__state { visibility: visible !important; }
-}
+/* "Use this price" on every card: quiet on the alternatives, link colour on
+   the recommended one; the applied card says "In your quote". */
+.pa-choice:not(.is-rec):not(.is-applied) .pa-choice__state { color: var(--text-tertiary); }
+.pa-choice:not(.is-rec):not(.is-applied):hover .pa-choice__state,
+.pa-choice:not(.is-rec):not(.is-applied):focus-visible .pa-choice__state { color: var(--link); }
 .pa-choice.is-applied .pa-choice__state { color: var(--text-primary); }
 /* Likelihood words: one neutral voice, the band only shades the dot. */
 .pa-lk { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; color: var(--text-primary); font-weight: 500; }
@@ -260,3 +259,19 @@
 .pa-fact__basis { margin: 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); text-align: right; }
 .pa-reasons--small { margin-top: 4px; font-size: 12px; line-height: 18px; }
 .pa-line__row .tw-status { justify-self: end; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- round 3 ---------------------------------------------------------------- */
+.pa-alerts { display: grid; gap: 8px; padding: 0 var(--card-pad, 20px) 8px; }
+.pa-alerts .pa-risk { margin: 0; }
+.pa-choice__desc { font-weight: 500; color: var(--text-secondary); }
+.pa-floor__est { margin: 2px 0 0; font: 400 12px/18px var(--font-sans); color: var(--text-tertiary); }
+.pa-floor__perkm { margin: 0 0 4px; font: 400 12px/18px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.pa-ifempty { margin-top: 8px; }
+.pa .tw-info { position: relative; }
+.pa .tw-info::after { content: ""; position: absolute; inset: -12px; }
+.pa-reasons li, .pa-basis, .pa-dl dd { overflow-wrap: normal; }
+@media (max-width: 480px) {
+  /* Squeezed key/value rows stack: label above, value below. */
+  .pa-dl > div { flex-direction: column; gap: 0; }
+  .pa-dl dd { text-align: left; }
+}

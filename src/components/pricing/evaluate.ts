@@ -26,7 +26,7 @@ export interface LiveReading {
   matchedChoice: ChoiceKey | null;
 }
 
-const NO_BAND = "Not enough data to judge";
+const NO_BAND = "Not enough data yet";
 
 export function likelihoodAt(a: PricingAnalysis | null, price: number): LiveLikelihood {
   const lk = a?.likelihood;
@@ -62,7 +62,10 @@ export function readPrice(a: PricingAnalysis | null, price: number): LiveReading
   const matchedChoice = a?.choices.find((c) => Math.abs(c.price - price) < 0.5) ?? null;
   const matched = matchedChoice?.key ?? null;
   // At a choice's own price, say exactly what its card says.
-  const cl = matchedChoice?.likelihood;
+  // The server's reading wins at the exact price it was asked about; the
+  // curve is only interpolated while a newer price is being typed.
+  const yp = a?.yourPrice && Math.abs(a.yourPrice.price - price) < 0.5 ? a.yourPrice.likelihood : null;
+  const cl = matchedChoice?.likelihood ?? yp;
   const likelihood: LiveLikelihood = cl
     ? (cl.level === "model" ? { level: "model", pct: Math.round(cl.pct) } : { level: "rules", band: cl.band, label: cl.label, note: cl.outsideModelRange ? "Outside the prices we've seen you quote" : null })
     : likelihoodAt(a, price);
@@ -94,7 +97,9 @@ export function pricingDecision(a: PricingAnalysis, finalPrice: number, picked: 
     })),
     picked_choice: picked,
     // So quote detail can reconcile the floor line by line.
-    floor_lines: (a.costFloor?.lines ?? []).map((l) => ({ key: l.key, label: l.label, amount: l.amount })),
+    floor_lines: (a.costFloor?.lines ?? []).map((l) => (l.needsInput
+      ? { key: l.key, label: l.label, amount: 0, source_kind: "missing" }
+      : { key: l.key, label: l.label, amount: l.amount, source_kind: l.source.kind })),
     price_adjustment: Math.round(priceAdjustment * 100) / 100,
     final_price: Math.round(finalPrice * 100) / 100,
     floor: a.costFloor ? Math.round(a.costFloor.total * 100) / 100 : null,

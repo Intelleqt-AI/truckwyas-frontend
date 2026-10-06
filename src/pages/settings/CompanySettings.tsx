@@ -77,6 +77,8 @@ export function CompanySettings() {
     fuel_price_per_litre: '', fuel_price_petrol: '', fuel_price_electric: '', fuel_price_hybrid: '',
     bank_name: '', bank_account_holder: '', bank_account_number: '', bank_branch_code: '',
     bank_account_type: '', payment_reference_hint: '',
+    // Pricing analysis (company profile, additive fields).
+    operating_cost_per_km: '', pricing_include_empty_return: 'no', pool_pricing_data: 'no',
   });
   const [logoUrl, setLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -172,6 +174,9 @@ export function CompanySettings() {
           bank_branch_code: d.bank_branch_code || '',
           bank_account_type: d.bank_account_type || '',
           payment_reference_hint: d.payment_reference_hint || '',
+          operating_cost_per_km: d.operating_cost_per_km != null ? String(d.operating_cost_per_km) : '',
+          pricing_include_empty_return: d.pricing_include_empty_return === true ? 'yes' : 'no',
+          pool_pricing_data: d.pool_pricing_data === true ? 'yes' : 'no',
         });
         // Only show a real uploaded logo, not the backend's default placeholder
         if (d.logo_url && !d.logo_url.endsWith('/brand/logo.svg')) setLogoUrl(d.logo_url);
@@ -231,6 +236,12 @@ export function CompanySettings() {
         toast.error(`${label} must be a positive number`);
         return;
       }
+    }
+    // Operating cost: optional; when set, a plausible R/km (the API's own range).
+    const opCost = form.operating_cost_per_km ? parseFloat(form.operating_cost_per_km) : null;
+    if (opCost !== null && (isNaN(opCost) || opCost < 1 || opCost > 200)) {
+      toast.error('Operating cost must be between R1 and R200 per km, or left blank');
+      return;
     }
     // Blank is allowed (falls back to the model default on save); a value that
     // is present must be a sane whole number of hours.
@@ -292,6 +303,9 @@ export function CompanySettings() {
         bank_branch_code: branchDigits || null,
         bank_account_type: form.bank_account_type || null,
         payment_reference_hint: form.payment_reference_hint.trim() || null,
+        operating_cost_per_km: opCost,
+        pricing_include_empty_return: form.pricing_include_empty_return === 'yes',
+        pool_pricing_data: form.pool_pricing_data === 'yes',
       } });
       // The quote builder reads these defaults through the shared
       // ["company-profile"] query, which has a 5 minute staleTime — so without
@@ -623,6 +637,57 @@ export function CompanySettings() {
                 onChange={e => set('cross_border_crossings_per_year', e.target.value)}
               />
               <div style={helpTextStyle}>Spreads the permit cost over loads.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pricing: what the quote builder's cost floor and chance to win use. */}
+      <div style={sectionStyle} id="pricing">
+        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Pricing</h2></div>
+        <div style={bodyStyle}>
+          <div className="cs-grid cs-grid--2">
+            <div>
+              <label htmlFor="company-operating-cost-per-km" style={labelTipStyle}>
+                Operating cost per km (excl. fuel & tolls)
+                <InfoTip label="About the operating cost per km">Driver wages, vehicle finance, insurance, licences, tyres, maintenance and overheads, per km. It goes into every quote's cost floor. Leave it blank and we use your costs from the last 12 months, or a typical figure for the vehicle type until you have enough costed trips.</InfoTip>
+              </label>
+              <DecimalInput id="company-operating-cost-per-km" placeholder="e.g. 12,50" value={form.operating_cost_per_km} onChange={v => set('operating_cost_per_km', v)} />
+              <div style={helpTextStyle}>Optional, R1 to R200. Blank uses your last 12 months of costs or an estimate.</div>
+            </div>
+            <div>
+              <label htmlFor="company-include-empty-return" style={labelTipStyle}>
+                Empty return in the cost floor
+                <InfoTip label="About the empty return">For one-way quotes: whether the cost floor includes driving home empty. Each quote can still switch it.</InfoTip>
+              </label>
+              <Select value={form.pricing_include_empty_return} onValueChange={val => set('pricing_include_empty_return', val)}>
+                <SelectTrigger style={inputStyle} className="cs-select" id="company-include-empty-return">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no">No, one way only</SelectItem>
+                  <SelectItem value="yes">Yes, include it by default</SelectItem>
+                </SelectContent>
+              </Select>
+              <div style={helpTextStyle}>Include the empty return in the cost floor by default.</div>
+            </div>
+          </div>
+          <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
+            <div>
+              <label htmlFor="company-pool-pricing-data" style={labelTipStyle}>
+                Share anonymised win/loss data
+                <InfoTip label="About sharing win/loss data">With Yes, whether your quotes were won or lost (price, lane, truck type and timing; never customer names, contacts or documents) helps train a shared pricing model, and you can use that model's chance to win while you have too few closed quotes of your own. With No, your outcomes only ever train your own model. You can switch it off at any time.</InfoTip>
+              </label>
+              <Select value={form.pool_pricing_data} onValueChange={val => set('pool_pricing_data', val)}>
+                <SelectTrigger style={inputStyle} className="cs-select" id="company-pool-pricing-data">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no">No, keep it to us</SelectItem>
+                  <SelectItem value="yes">Yes, share to improve pricing</SelectItem>
+                </SelectContent>
+              </Select>
+              <div style={helpTextStyle}>Off by default. Improves pricing for everyone.</div>
             </div>
           </div>
         </div>

@@ -27,8 +27,9 @@ import { loadsQuery, mapLoadsByQuoteId } from './QuotesList';
 import { InfoTip } from '@/components/ui/InfoTip';
 import LossReasonDialog from '@/components/LossReasonDialog';
 import PricingDecisionRows from '@/components/PricingDecisionRows';
-import { LOSS_REASONS, formatRand, formatSignedRand, lossReasonPayload, type LossReason } from '@/lib/pricing';
+import { LOSS_REASONS, formatRand, lossReasonPayload, type LossReason } from '@/lib/pricing';
 import { pricingDecisionOf } from '@/lib/pricingDecision';
+import { cargoText } from '@/lib/cargo';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   DRAFT: 'neutral',
@@ -464,7 +465,7 @@ export default function QuoteDetail() {
   // route on one-leg quotes, under both legs on round trips.
   const loadFacts = (
             <dl className="qd-facts qd-facts--load">
-              {fact('Cargo', quote.cargo_description ? String(quote.cargo_description).replace(/^\s*\S/, (c: string) => c.toUpperCase()) : 'Not recorded')}
+              {fact('Cargo', cargoText(quote.cargo_description, quote.vehicle_type) || 'Not specified')}
               {fact('Truck type', sentenceCaseLabel(quote.vehicle_type) || 'Not recorded')}
               {fact('Weight', quote.weight ? `${formatNumber(parseFloat(quote.weight))} kg` : 'Not recorded')}
               {fact('Distance', quote.distance ? formatDistance(parseFloat(quote.distance)) : 'Not recorded')}
@@ -494,11 +495,10 @@ export default function QuoteDetail() {
   // decision only. The legacy margin_percentage is the markup share of the
   // price, a different figure, so it is not shown as the margin.
   const marginNow = decision && !decision.stale ? decision.margin : null;
-  // The builder folds its price adjustment into the saved base rate; when the
-  // decision records the adjustment, the base rate line names it (as the
-  // builder shows it) so the two screens read the same.
-  const adjustmentRaw = Number(quote.pricing_decision?.price_adjustment);
-  const adjustment = decision && !decision.stale && Number.isFinite(adjustmentRaw) && Math.abs(adjustmentRaw) >= 1 ? adjustmentRaw : null;
+  // Each cost once per card (R3): with a current decision that breaks the
+  // floor into its parts, "How it was priced" carries fuel, tolls and the rest,
+  // so the build-up lines (Base rate, Fuel, …) are not listed a second time.
+  const showBuildUp = !(decision && decision.floorLines && !decision.stale);
   const statusOptions: StatusOption[] = [
     { value: 'DRAFT', label: 'Draft', hint: 'Not offered to the customer yet' },
     // An expired quote can still be marked Sent (the preview warns), but the
@@ -682,7 +682,8 @@ export default function QuoteDetail() {
             <div className="qd-sub">
               {marginNow && (
                 <span className={decision?.belowFloor ? 'qd-decision__neg' : undefined}>
-                  {formatMoneyWhole(marginNow.amount)} margin{marginNow.pct !== null ? ` (${marginNow.pct}%)` : ''}{decision?.belowFloor ? ', below the cost floor' : ''}
+                  {/* One margin format everywhere: "Margin R 8 989 · 36%". */}
+                  Margin {formatMoneyWhole(marginNow.amount)}{marginNow.pct !== null ? ` · ${marginNow.pct}%` : ''}{decision?.belowFloor ? ', below the cost floor' : ''}
                 </span>
               )}
               {/* No chance to win on a dead offer (R9), nor once decided. */}
@@ -713,16 +714,17 @@ export default function QuoteDetail() {
                   : fuelAlert?.action ? ` ${normaliseFigures(fuelAlert.action).replace(/\.?$/, '.')}` : ''}</span>
               </p>
             )}
-            <div className="qd-price-rows">
+            {showBuildUp && <div className="qd-price-rows">
+              {/* Lines in whole rand; only VAT and the total incl. VAT carry cents. */}
               {priceRows.map(r => (
-                <div key={r.label} className="bk-kv"><span className="bk-kv__label">{r.label}</span><span className="bk-kv__value">{formatRand(r.value)}{r.label === 'Base rate' && adjustment ? <span className="bk-kv__note">incl. {formatSignedRand(adjustment)} price adjustment</span> : null}</span></div>
+                <div key={r.label} className="bk-kv"><span className="bk-kv__label">{r.label}</span><span className="bk-kv__value">{formatMoneyWhole(r.value)}</span></div>
               ))}
               {/* Normal weight: when it is a large share of the total it is the
                   line a reader most needs to see (as on Booking detail). */}
               {hasGap && (
-                <div className="bk-kv"><span className="bk-kv__label">Not itemised <InfoTip label="About this line">Set on the quote; its total includes charges not broken down here.</InfoTip></span><span className="bk-kv__value">{formatRand(notItemised)}</span></div>
+                <div className="bk-kv"><span className="bk-kv__label">Not itemised <InfoTip label="About this line">Set on the quote; its total includes charges not broken down here.</InfoTip></span><span className="bk-kv__value">{formatMoneyWhole(notItemised)}</span></div>
               )}
-            </div>
+            </div>}
             {/* VAT and the total incl. VAT: what the customer is sent (same
                 figures as the PDF, email and quote page; backend quote_vat). */}
             {vat && (

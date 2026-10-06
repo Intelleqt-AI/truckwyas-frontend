@@ -17,7 +17,8 @@ export interface DecisionView {
   /** The quote total no longer matches the price this decision was made at. */
   stale: boolean;
   /** What the floor is made of, so the margin can be traced; null if unknown. */
-  floorLines: { label: string; amount: number }[] | null;
+  /** source: a short provenance label when the decision stored one; missing: no figure on record. */
+  floorLines: { label: string; amount: number; source?: string | null; missing?: boolean }[] | null;
   /** True when the lines were worked out from the quote's own lines (no stored breakdown). */
   floorLinesDerived: boolean;
 }
@@ -29,6 +30,16 @@ const FLOOR_LABEL: Record<string, string> = {
   border: 'Border fees',
   fixed_cost: 'Operating costs (in base rate)',
   return_leg: 'Empty return',
+};
+
+// The stored source_kind of a floor line, in plain words. Absent on older
+// decisions (and "" before the builder sent it): no label is shown then.
+const SOURCE_LABEL: Record<string, string> = {
+  official: 'Official',
+  calculated: 'Calculated',
+  company_actuals: 'Your costs',
+  estimate: 'Estimate',
+  user: 'You',
 };
 
 type QuoteLines = { fuel_surcharge?: unknown; toll_charges?: unknown; driver_allowance?: unknown; additional_charges?: unknown };
@@ -43,8 +54,16 @@ function floorLinesOf(d: PricingDecision, quote: QuoteLines, floor: number | nul
   const stored = (d as Record<string, unknown>).floor_lines;
   if (Array.isArray(stored) && stored.length) {
     const lines = stored
-      .map((l: { key?: string; label?: string; amount?: unknown }) => ({ label: (l.key && FLOOR_LABEL[l.key]) || String(l.label || ''), amount: num(l.amount) }))
-      .filter((l): l is { label: string; amount: number } => !!l.label && l.amount !== null);
+      .map((l: { key?: string; label?: string; amount?: unknown; source_kind?: string }) => {
+        const kind = String(l.source_kind || '');
+        return {
+          label: (l.key && FLOOR_LABEL[l.key]) || String(l.label || ''),
+          amount: kind === 'missing' ? 0 : num(l.amount),
+          source: SOURCE_LABEL[kind] ?? null,
+          missing: kind === 'missing',
+        };
+      })
+      .filter((l): l is { label: string; amount: number; source: string | null; missing: boolean } => !!l.label && l.amount !== null);
     return { lines: lines.length ? lines : null, derived: false };
   }
   if (floor === null || stale) return { lines: null, derived: false };

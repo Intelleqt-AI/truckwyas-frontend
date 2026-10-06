@@ -253,8 +253,8 @@ const Signup = () => {
     }}>
       <span style={{ fontSize: 20, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{MONTHLY_FEE}</span>
       <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>/ month</span>
-      <span style={{ flexBasis: '100%', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>+ {TAKE_RATE} of every delivered load's value</span>
-      <span style={{ flexBasis: '100%', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>Cancel anytime, no long-term contract</span>
+      <span style={{ flexBasis: '100%', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>+ {TAKE_RATE} of each delivered load's invoice total</span>
+      <span style={{ flexBasis: '100%', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>Month to month. Cancel with 30 days' written notice.</span>
     </div>
   );
 
@@ -272,10 +272,10 @@ const Signup = () => {
           <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>/ month</span>
         </div>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-          + {TAKE_RATE} of every delivered load's value
+          + {TAKE_RATE} of each delivered load's invoice total
         </div>
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>
-          Cancel anytime, no long-term contract
+          Month to month. Cancel with 30 days' written notice.
         </div>
       </div>
     </>

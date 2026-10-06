@@ -179,7 +179,7 @@ export const EmailVerification = () => {
           <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>/ month</span>
         </div>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-          + {TAKE_RATE} of every delivered load's value
+          + {TAKE_RATE} of each delivered load's invoice total
         </div>
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>
           This is what step 3 will charge. Nothing is charged yet

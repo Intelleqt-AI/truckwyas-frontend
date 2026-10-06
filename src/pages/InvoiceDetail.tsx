@@ -963,7 +963,7 @@ export default function InvoiceDetail() {
                         <span className="fin-paylist__sub">
                           {methodLabel(payment.payment_method || payment.method || 'EFT')}
                           {ref && <> · <span className="fin-id">{ref}</span></>}
-                          {managedHere && <PaymentSourceBadge source={payment.source} managed />}
+                          {managedHere && <PaymentSourceBadge source={payment.source} managed externalId={payment.external_id} providerName={acctName} />}
                         </span>
                         {!managedHere && <PaymentSourceBadge source={payment.source} />}
                       </span>

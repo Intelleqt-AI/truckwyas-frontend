@@ -240,7 +240,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
     const rows = m[section] as Array<{ key: string }>;
     const mapped = rows.filter(r => !!sectionValue(section, r.key)).length;
     const unused = rows.length - mapped;
-    return `All set: ${mapped} mapped${unused ? `, ${unused} not used` : ''}.`;
+    return `All set: ${mapped} mapped${unused ? `, ${unused} not needed` : ''}.`;
   };
   /** A section with nothing to do: one line, and Edit to open it. */
   const folded = (section: MappingSection, title: string) => (
@@ -281,30 +281,34 @@ export function MappingTab({ connection }: { connection: Connection }) {
     <>
       <AcctCard
         title={m.complete && !dirty ? 'Everything required is mapped' : m.missing.length > 0 ? `${m.missing.length} required ${m.missing.length === 1 ? 'line' : 'lines'} still to map` : 'Unsaved changes'}
-        description={<>
-          Nothing is sent to {cfg.short} until every required line is mapped.
-          <span className="acct-refresh-meta acct-refresh-meta--line">
-            {m.options.fetched_at && <span>Account list from {hoursAgo(m.options.fetched_at)}</span>}
-            <button type="button" className="acct-linkbtn acct-refresh-link" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle}>
+        actions={
+          <span className="acct-refresh-meta">
+            {m.options.fetched_at && <span>Fetched {formatRelativeTime(m.options.fetched_at).toLowerCase()}</span>}
+            <button type="button" className="acct-linkbtn acct-refresh-link" onClick={refresh} disabled={!canWrite || refreshing} title={writeTitle ?? `Read accounts, VAT rates and tracking from ${cfg.short} again`}>
               <RefreshCw size={13} aria-hidden="true" className={refreshing ? 'animate-spin' : undefined} />
-              {refreshing ? 'Reading…' : `Refresh from ${cfg.short}`}
+              {refreshing ? 'Reading…' : 'Refresh'}
             </button>
           </span>
+        }
+        description={<>
+          Nothing is sent to {cfg.short} until every required line is mapped.
           {m.missing.length > 0 && !(m.complete && !dirty) && (
             <ul className="acct-jump-list">{m.missing.map(k => (
               <li key={k}><button type="button" className="acct-jumpbtn" onClick={() => jumpTo(k)}>{missingMappingLabel(k)}</button></li>
             ))}</ul>
           )}
           {!canWrite && <> {writeTitle}; you can look but not change anything.</>}
+          {canWrite && pendingSuggestions.length > 0 && (() => {
+          const label = `Use suggestion${pendingSuggestions.length === 1 ? '' : 's'} for ${listJoin(pendingSuggestions.map(p => rowLabel(p.section, p.key)))}`;
+          return (
+            <div className="acct-sum-actions">
+              <button type="button" className="tw-btn tw-btn--primary acct-sugg-btn" onClick={applyAllSuggestions} title={`${label}. Fills in the fields; nothing is saved until you press Save mapping.`}>
+                <span className="acct-sugg-btn__text">{label}</span>
+              </button>
+            </div>
+          );
+        })()}
         </>}
-        actionsBelow
-        actions={canWrite && pendingSuggestions.length > 0 ? <>
-          {canWrite && pendingSuggestions.length > 0 && (
-            <button type="button" className="tw-btn tw-btn--primary" onClick={applyAllSuggestions} title="Fills in the fields; nothing is saved until you press Save mapping">
-              {`Use suggestion${pendingSuggestions.length === 1 ? '' : 's'} for ${listJoin(pendingSuggestions.map(p => rowLabel(p.section, p.key)))}`}
-            </button>
-          )}
-        </> : undefined}
       />
 
       {!isOpen('revenue_types') ? folded('revenue_types', itemsForRevenue ? 'Products and services' : 'Income accounts') : (
@@ -490,7 +494,7 @@ export function MappingTab({ connection }: { connection: Connection }) {
 
       {canWrite && (
         // The same sticky save bar as Company details.
-        <div className="cs-savebar acct-map-savebar">
+        <div className={`cs-savebar acct-map-savebar${dirty ? ' is-dirty' : ''}`}>
           <span className="cs-savebar__note" role={formError ? 'alert' : undefined} style={formError ? { color: 'var(--status-danger-text)' } : undefined}>
             {formError || (dirty ? `${changeCount} unsaved ${changeCount === 1 ? 'change' : 'changes'}` : 'No unsaved changes')}
           </span>

@@ -114,7 +114,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
     if (x.state === 'RUNNING') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : `${x.count.toLocaleString('en-ZA')} so far`;
     if (x.state === 'DONE') return total ? `${x.count.toLocaleString('en-ZA')} of ${total.toLocaleString('en-ZA')}` : 'Done';
     if (x.state === 'SKIPPED') return '';
-    return total ? `0 of ${total.toLocaleString('en-ZA')}` : 'Queued';
+    return total ? `0 of ${total.toLocaleString('en-ZA')}` : 'Waiting';
   };
   // The bar follows the documents (where the preview knows them), not the steps.
   const itemTotal = Object.values(totals).reduce<number>((n, v) => n + (v ?? 0), 0);
@@ -204,7 +204,7 @@ export function BackfillTab({ connection, onOpen }: { connection: Connection; on
             aria-label={itemTotal ? `${itemsDone} of ${itemTotal} documents sent` : `${doneSteps} of ${b.steps.length} steps done`}>
             <div className="acct-progress__bar"><span style={{ width: `${pctDone}%` }} /></div>
             <span className="acct-progress__text">
-              {itemTotal ? `${itemsDone.toLocaleString('en-ZA')} of ${itemTotal.toLocaleString('en-ZA')} sent` : `${doneSteps} of ${b.steps.length} steps`}
+              {itemTotal ? `${itemsDone.toLocaleString('en-ZA')} of ${itemTotal.toLocaleString('en-ZA')} documents sent` : `${doneSteps} of ${b.steps.length} steps`}
             </span>
           </div>
             </>

@@ -22,7 +22,7 @@ const ERROR_META: Record<string, { tone: StatusTone; label: string }> = {
 const LEVEL: Record<string, { tone: StatusTone; label: string }> = {
   INFO: { tone: 'success', label: 'Done' },
   WARNING: { tone: 'warning', label: 'Warning' },
-  ERROR: { tone: 'warning', label: 'Failed' },
+  ERROR: { tone: 'warning', label: 'Needs a fix' },
 };
 const OVERDUE_MS = 2 * 60 * 60 * 1000;
 

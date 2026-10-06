@@ -1036,3 +1036,124 @@
 .acct-step-num.is-warn { background: transparent !important; border: 1px solid var(--status-warning) !important; color: var(--status-warning-text) !important; }
 .acct-check--steps li > .acct-step-done-btn { border-color: var(--border-default) !important; background: var(--bg-surface) !important; justify-self: end; }
 @media (max-width: 560px) { .acct-check--steps li > .acct-step-done-btn { justify-self: start !important; padding-left: 12px !important; } }
+
+/* Final round */
+/* Contacts: the ⋯ menu has its own cell, top right of every row, at every width. */
+.acct-contacts-list > .acct-row--contact { grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto 32px !important; align-items: start !important; }
+.acct-contacts-list > .acct-row--contact > .acct-row__actions { grid-column: 3; grid-row: 1; display: flex !important; justify-self: end; align-self: start !important; }
+.acct-contacts-list > .acct-row--contact > .acct-row__menu--cell { grid-column: 4; grid-row: 1; justify-self: end; align-self: start; width: 32px; display: inline-flex; justify-content: center; margin-top: -4px; }
+.acct-contacts-list > .acct-row--contact > .acct-row__actions:empty { display: none !important; }
+@container (max-width: 760px) {
+  .acct-contacts-list > .acct-row--contact { grid-template-columns: minmax(0, 190px) minmax(0, 1fr) 32px !important; }
+  .acct-contacts-list > .acct-row--contact > .acct-row__actions { grid-column: 2; grid-row: 2; justify-self: start; }
+  .acct-contacts-list > .acct-row--contact > .acct-row__menu--cell { grid-column: 3; }
+}
+@container (max-width: 560px) {
+  .acct-contacts-list > .acct-row--contact { grid-template-columns: minmax(0, 1fr) 40px !important; }
+  .acct-contacts-list > .acct-row--contact > :nth-child(1) { grid-column: 1; grid-row: 1; }
+  .acct-contacts-list > .acct-row--contact > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  .acct-contacts-list > .acct-row--contact > .acct-row__actions { grid-column: 1 / -1; grid-row: 3; justify-self: start; }
+  .acct-contacts-list > .acct-row--contact > .acct-row__menu--cell { grid-column: 2; grid-row: 1; width: 40px; height: 40px; align-items: center; margin-top: -8px; }
+}
+/* Mapping: a lone field's hint uses the full row; "Show all" is a quiet link, not a band. */
+@container (min-width: 560px) {
+  .acct-map-grid > .acct-map-row:last-child:nth-child(odd) > .acct-map-row__field { grid-column: 1 / -1 !important; }
+  .acct-map-grid > .acct-map-row:last-child:nth-child(odd) > .acct-map-row__field > .acct-select { width: calc(50% - 20px) !important; }
+}
+.acct-map-more { border-top: 0 !important; padding: 0 var(--card-pad, 20px) 12px !important; }
+/* Phone save bar: compact until there is something to save. */
+@media (max-width: 640px) { .acct-map-savebar:not(.is-dirty) > .btn-action { flex: 0 0 auto !important; } }
+.acct-map-savebar.is-dirty > .acct-save-btn { background: var(--btn-primary-bg, var(--text-primary)) !important; color: var(--btn-primary-fg, var(--bg-surface)) !important; border-color: transparent !important; }
+/* Signed-out tabs: muted but legible. */
+.acct-utabs .section-header__tab[data-locked] { opacity: 1 !important; color: var(--text-tertiary) !important; }
+/* Status text in a money column reads as a note, not a figure. */
+.acct-diff-word { color: var(--text-secondary) !important; font-weight: 400 !important; }
+/* Sync tiles on phones: no row rule. */
+@media (max-width: 640px) { .acct-tiles:not(.acct-tiles--3) > div:nth-child(n+3) { border-top: 0 !important; } }
+/* Org picker in dark: the chosen row needs a stronger tint. */
+:root[data-theme="dark"] .acct-org.is-selected { background: color-mix(in srgb, var(--text-primary) 10%, var(--bg-surface)) !important; }
+.acct-progress__bar { background: var(--border-strong); }
+
+/* QuickBooks setting step: path muted under the title; a little more air between the phone buttons. */
+.acct-path { font-weight: 400 !important; color: var(--text-secondary) !important; }
+@media (max-width: 560px) { .acct-step-actions--below { gap: 12px; } }
+/* Last tight round */
+/* Mapping summary: refresh meta in the header row; suggestions button truncates with the full list in its tooltip. */
+.acct-refresh-meta { white-space: nowrap; }
+.acct-sum-actions { display: flex; min-width: 0; }
+.acct-sugg-btn { max-width: 100%; min-width: 0; }
+.acct-sugg-btn__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) { .acct-sugg-btn { width: 100%; justify-content: center; } }
+/* Mapping: "Show all" sits right under the last field. */
+.acct-map-gridwrap:has(+ .acct-map-more) .acct-map-grid { padding-bottom: 0; }
+.acct-map-gridwrap:has(+ .acct-map-more) .acct-map-row.is-required { padding-bottom: 6px; }
+.acct-map-more { padding: 0 var(--card-pad, 20px) 10px !important; }
+/* Phone save bar on one line. */
+@media (max-width: 640px) {
+  .acct-map-savebar { flex-wrap: nowrap !important; }
+  .acct-map-savebar .cs-savebar__note { display: block !important; flex: 1 1 auto !important; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .acct-map-savebar > .btn-action, .acct-map-savebar > .tw-btn--ghost { flex: 0 0 auto !important; width: auto !important; }
+}
+/* Reconciliation: text values wrap inside their column, with a gutter. */
+.acct-val-text { display: inline-block; white-space: normal; text-align: right; max-width: 100%; }
+.acct-table--recon td.num { padding-left: 28px; }
+.acct-table--recon td .acct-diff-word { white-space: normal; text-align: right; }
+/* Setup steps: secondary and finished actions are quiet links with a chevron on phones. */
+.acct-step-chev { display: none; }
+@media (max-width: 560px) {
+  .acct-check--steps li > .acct-step-quiet { border: 0 !important; background: none !important; padding: 0 !important; min-height: 32px !important; height: auto !important; color: var(--text-primary) !important; font-weight: 500; gap: 2px; justify-self: start !important; width: auto !important; }
+  .acct-check--steps li > .acct-step-quiet .acct-step-chev { display: inline-block; }
+}
+/* Sign-in expired: on phones the reconnect action lives in step 1. */
+.acct-only-phone-btn { display: none !important; }
+@media (max-width: 560px) {
+  .acct-only-phone-btn { display: inline-flex !important; grid-column: 2; justify-self: stretch !important; width: 100%; }
+  .acct-notice .acct-hide-phone-btn { display: none !important; }
+}
+/* Payment rows: "only here" is quieter than "in the books". */
+.acct-source-note.is-local { color: var(--text-tertiary); }
+
+/* QuickBooks setting step: actions in the right-hand column like the other steps (desktop); under the text on phones. */
+.acct-step-actions--side { display: flex; flex-direction: column; gap: 8px; justify-self: end; align-self: start; min-width: 168px; }
+.acct-step-actions--below { display: none !important; }
+@media (max-width: 560px) {
+  .acct-step-actions--side { display: none !important; }
+  .acct-step-actions--below { display: flex !important; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+  .acct-step-actions--below > .tw-btn--primary { flex: 1 1 100% !important; justify-content: center; }
+  .acct-step-actions--below > .tw-btn:not(.tw-btn--primary) { flex: 0 0 auto !important; }
+}
+/* Last fixes */
+.acct-sum-actions { margin-top: 14px; }
+@media (max-width: 640px) { .acct-sugg-btn { height: auto !important; min-height: 44px; padding-top: 10px; padding-bottom: 10px; } .acct-sugg-btn__text { white-space: normal !important; overflow: visible; text-align: center; } }
+.acct-save-btn:disabled { color: var(--text-tertiary) !important; background: transparent !important; border: 1px dashed var(--border-default) !important; pointer-events: none; }
+.acct-table--recon td.num { padding-left: 16px !important; }
+.acct-val-text, .acct-table--recon td .acct-diff-word { white-space: nowrap !important; font-size: 13px; }
+.acct-row--error .acct-row__actions .tw-btn { height: var(--control-h, 36px) !important; min-height: var(--control-h, 36px) !important; }
+
+/* Last three */
+.acct-oneline { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acct-open-link { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 56px; min-height: 32px; margin: -6px 0; padding: 0 8px; border-radius: var(--radius-control); font: 500 13px/20px var(--font-sans); color: var(--text-secondary); text-decoration: none; }
+.acct-open-link:hover { background: var(--surface-tint-hover); color: var(--text-primary); }
+.acct-open-link:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
+/* Equal stat columns: every column gets the same padding either side of its divider. */
+.acct-tiles--3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.acct-tiles--3 > div, .acct-tiles--3 > div:first-child { padding-left: 16px !important; padding-right: 16px !important; }
+.acct-tiles--3 > div:first-child { border-left: 0; }
+@media (max-width: 640px) { .acct-tiles--3 > div, .acct-tiles--3 > div:first-child { padding-left: 10px !important; padding-right: 6px !important; } }
+/* Payment rows on the invoice: amount level with the date; "Only in TruckWys" in the warning text colour. */
+.acct-paylist-top .fin-paylist__row, .fin-paylist__row:has(.acct-source-note) { align-items: flex-start !important; }
+.acct-source-note.is-local { color: var(--status-warning-text) !important; }
+.acct-source-note .acct-dot { margin-right: 6px; }
+.acct-tiles--3 { margin-left: -16px; width: calc(100% + 16px); }
+@media (max-width: 640px) { .acct-tiles--3 { margin-left: -10px; width: calc(100% + 10px); } }
+/* Final: recon link column inset and readable; payment states as one dot+label system; compact sync card. */
+.acct-table--recon td:last-child, .acct-table--recon th:last-child { padding-right: var(--card-pad, 20px) !important; text-align: right !important; }
+.acct-open-link { color: var(--text-primary); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px; padding: 0; min-width: 0; white-space: nowrap; }
+.acct-open-link:hover { background: none; text-decoration-color: currentColor; }
+.acct-diff-none { color: var(--text-tertiary); }
+.acct-paystate { display: block; margin-top: 4px; color: var(--text-secondary) !important; }
+.acct-paystate.is-local { color: var(--text-primary) !important; }
+.acct-paystate .acct-dot { margin: 0 6px 1px 0; }
+.acct-paystate__hint { display: block; padding-left: 14px; color: var(--text-secondary); font-weight: 400; }
+.acct-sync-line { margin-bottom: 0; }
+.acct-sync-card .acct-sync-open { margin-top: 8px; }

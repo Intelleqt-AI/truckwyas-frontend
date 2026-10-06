@@ -595,16 +595,22 @@ export default function Bookings() {
               const rate = parseFloat(load.rate || '0') || 0;
               const fuel = parseFloat(load.fuel_surcharge || '0') || 0;
               const extra = parseFloat(load.additional_charges || '0') || 0;
+              // Tolls and the driver allowance, copied from the quote on
+              // conversion (newer API; older loads have neither, or 0).
+              const tolls = parseFloat(load.toll_charges || '0') || 0;
+              const driver = parseFloat(load.driver_allowance || '0') || 0;
               const total = parseFloat(load.total_amount || '0') || 0;
-              const gap = Math.round((total - (rate + fuel + extra)) * 100) / 100;
+              const gap = Math.round((total - (rate + fuel + tolls + driver + extra)) * 100) / 100;
               // The per-km figure is a rate, not a summand, so it sits as a
               // note under Base rate rather than among the lines (R10).
               const dist = parseFloat(load.distance || '0') || 0;
               const perKm = dist > 0 ? `${formatMoney(rate / Math.max(dist, 1))}/km` : null;
               const rows: { label: React.ReactNode; key?: string; value: string; note?: React.ReactNode; noteTitle?: string; muted?: boolean }[] = [
               { label: 'Base rate', value: formatCurrency(rate), note: perKm, noteTitle: 'Base rate divided by distance, before surcharges' },
-              { label: 'Fuel surcharge', value: formatCurrency(fuel) },
-              { label: 'Additional charges', value: formatCurrency(extra) },
+              { label: 'Fuel', value: formatCurrency(fuel) },
+              ...(tolls > 0 ? [{ label: 'Tolls', value: formatCurrency(tolls) }] : []),
+              ...(driver > 0 ? [{ label: 'Driver allowance', value: formatCurrency(driver) }] : []),
+              { label: 'Cross-border and other charges', value: formatCurrency(extra) },
               ];
               // Normal weight: when it is a large share of the total it is the
               // line a reader most needs to see, never the faintest one.

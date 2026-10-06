@@ -133,3 +133,12 @@
 .qd-margin-na { white-space: nowrap; }
 /* Touch: the margin tip's 48px hit area clears the booking link's 44px box. */
 @media (pointer: coarse) { .qd-sub:has(.tw-info) + .qd-booked { margin-top: 20px; } }
+
+/* ---- Pricing analysis: the stored pricing decision ---- */
+.qd-decision__head { padding: 8px 0 2px; font: 500 13px/20px var(--font-sans); color: var(--text-primary); }
+.qd-decision__stale { margin: 4px 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.qd-decision .bk-kv__value { text-align: right; }
+.qd-decision .bk-kv__note { color: var(--text-secondary); }
+.qd-decision__neg { color: var(--status-danger-text); }
+.qd-decision .bk-kv__label { flex-shrink: 1; min-width: 0; }
+.qd-decision .bk-kv__value { flex-shrink: 0; max-width: 60%; }

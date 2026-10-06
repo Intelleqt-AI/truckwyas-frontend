@@ -37,6 +37,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
+import LossReasonDialog from '@/components/LossReasonDialog';
+import { lossReasonPayload } from '@/lib/pricing';
 import { rowLink } from '@/lib/rowLink';
 import { StatusChip, statusTone } from '@/components/ui/StatusChip';
 import { Segmented } from '@/components/ui/Segmented';
@@ -123,11 +125,10 @@ function QuoteCardBody({ quote }: { quote: any }) {
       <div className="bk-qcard__route" title={routeOf(quote)}>{routeOf(quote)}</div>
       <div className="bk-qcard__foot">
         <span className="bk-qcard__amount" title={`${formatCurrency(priceInclVat(quote))} incl. VAT`}>{formatMoneyWhole(priceInclVat(quote))}</span>
-        {/* Only a low price confidence is worth a word on the card; otherwise the date it was made. */}
+        {/* Expired, else the date it was made. (No "Low confidence": the
+            builder saves a fixed confidence, so it carried no signal.) */}
         {boardStage(quote) === 'EXPIRED' && quote.valid_until
           ? <span className="bk-qcard__meta" title={`${String(quote.status).toUpperCase() === 'SENT' ? 'Sent' : 'Draft'}, valid until ${formatDate(quote.valid_until)}`}>Expired {formatDateShort(quote.valid_until)}</span>
-          : String(quote.confidence).toUpperCase() === 'LOW'
-          ? <span className="bk-qcard__meta">Low confidence</span>
           : quote.created_at ? <span className="bk-qcard__meta">{formatDateShort(quote.created_at)}</span> : null}
       </div>
     </>
@@ -379,6 +380,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   // Dragging a card into Sent emails the customer (the server sends on the
   // status change), so it is previewed and confirmed first.
   const [pendingSend, setPendingSend] = useState<{ quote: any; oldColumn: string } | null>(null);
+  // Dropped on Declined: an optional loss reason first.
+  const [pendingDecline, setPendingDecline] = useState<{ quote: any; oldColumn: string } | null>(null);
 
   // Search is sent to the backend (it searches across every quote, not just
   // whatever's already loaded on screen) — debounced so typing doesn't fire
@@ -502,8 +505,13 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   }, [queryClient]);
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      patchData({ url: `api/v1/quotes/${id}/`, data: { status } }),
+    mutationFn: ({ id, status, extra }: { id: string; status: string; extra?: Record<string, unknown> }) =>
+      // Accepted and Declined go through update_status: it records the outcome
+      // (the win model's label) and the optional loss reason; a plain PATCH
+      // does neither.
+      status === 'DECLINED' || status === 'ACCEPTED'
+        ? patchData({ url: `api/v1/quotes/${id}/update_status/`, data: { status, ...(extra || {}) } })
+        : patchData({ url: `api/v1/quotes/${id}/`, data: { status } }),
     onError: () => {
       toast.error('Failed to update quote status.');
     },
@@ -588,11 +596,15 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       const quote = allLoadedBoardItems.find((q: any) => String(q.id) === quoteId);
       if (quote) { setPendingSend({ quote, oldColumn }); return; }
     }
+    if (newStatus === 'DECLINED') {
+      const quote = allLoadedBoardItems.find((q: any) => String(q.id) === quoteId);
+      if (quote) { setPendingDecline({ quote, oldColumn }); return; }
+    }
     moveQuote(quoteId, oldColumn, newStatus);
   };
 
-  const moveQuote = (quoteId: string, oldColumn: string, newStatus: string, onDone?: () => void) => {
-    statusMutation.mutate({ id: quoteId, status: newStatus }, {
+  const moveQuote = (quoteId: string, oldColumn: string, newStatus: string, onDone?: () => void, extra?: Record<string, unknown>) => {
+    statusMutation.mutate({ id: quoteId, status: newStatus, extra }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['quotes-column', oldColumn] });
         queryClient.invalidateQueries({ queryKey: ['quotes-column', newStatus] });
@@ -755,7 +767,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       {COLUMN_LABELS[col]}
                       {!colFailed && <span className="bk-col__count">{colCount}</span>}
                     </span>
-                    {colTotal > 0 && <span className="bk-col__total" title={formatCurrency(colTotal)}>{formatMoneyWhole(colTotal)}</span>}
+                    {colTotal > 0 && <span className="bk-col__total" title={`${formatCurrency(colTotal)} incl. VAT`} aria-label={`${formatMoneyWhole(colTotal)} incl. VAT`}>{formatMoneyWhole(colTotal)}</span>}
                   </div>
                   <div className="kanban-col-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
                     {colFailed ? (
@@ -876,7 +888,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                   <th scope="col">Status</th>
                   {anyOutcome && <th scope="col" className="bk-col-phone">Outcome</th>}
                   <th scope="col" className="bk-col-phone">Created</th>
-                  <th scope="col" className="is-num">Amount</th>
+                  <th scope="col" className="is-num">Amount incl. VAT</th>
                   {anyAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Action</span></th>}
                 </tr>
               </thead>
@@ -981,6 +993,18 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           onConfirm={() => {
             const { quote, oldColumn } = pendingSend;
             moveQuote(String(quote.id), oldColumn, 'SENT', () => setPendingSend(null));
+          }}
+        />
+      )}
+
+      {pendingDecline && (
+        <LossReasonDialog
+          quoteNumber={pendingDecline.quote.quote_number}
+          busy={statusMutation.isPending}
+          onCancel={() => setPendingDecline(null)}
+          onConfirm={(reason) => {
+            const { quote, oldColumn } = pendingDecline;
+            moveQuote(String(quote.id), oldColumn, 'DECLINED', () => setPendingDecline(null), lossReasonPayload(reason));
           }}
         />
       )}

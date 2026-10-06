@@ -23,7 +23,7 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         <div className="fin-panel-head__text" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%' }}>
           <h2 id={titleId} className="fin-panel-title">{name}</h2>
           {/* A failure is already the banner above the invoice: the card stays factual. */}
-          {!failing && <StatusChip tone={chip.tone} label={chip.label} size="sm" />}
+          <StatusChip tone={chip.tone} label={chip.label} size="sm" />
         </div>
       </div>
       {failing ? (
@@ -31,7 +31,7 @@ export function AccountingSyncCard({ sync, what, localNumber }: { sync: Accounti
         <p className="acct-sync-line">
           {sync.status === 'BLOCKED'
             ? `Waiting on you before it can go to ${name}.`
-            : `Last sent ${sync.last_synced_at ? formatDate(sync.last_synced_at) : 'never'}. ${sync.status === 'DEAD' ? 'Newer changes need a retry from the Sync tab.' : 'Newer changes are waiting to send.'}`}
+            : `Last sent ${sync.last_synced_at ? formatDate(sync.last_synced_at) : 'never'}`}
         </p>
       ) : (
         <dl className="fin-dl">
@@ -84,7 +84,7 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
         <strong>{`Not up to date in ${name}`}</strong>
-        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? "Fix the mapping and we'll send the latest version on the next try." : 'Fix it, then retry from the Sync tab.'}
+        {(sync.last_error || `${name} refused it`).replace(/\.$/, '')}. {retrying ? 'Fix the mapping and it sends on the next try.' : 'Fix it, then retry from the Sync tab.'}
       </div>
       <Link to={`/settings/integrations/accounting?tab=${/account|tax|vat|tracking/i.test(sync.last_error) ? 'mapping' : 'sync'}`} className="tw-btn fl-notice__action">
         {/account|tax|vat|tracking/i.test(sync.last_error) ? 'Fix account mapping' : 'View sync issue'}
@@ -98,9 +98,21 @@ export function AccountingSyncNotice({ sync, what }: { sync: AccountingSync | nu
  * accounting system owns payments, the ones entered in TruckWys before; else
  * the ones that came from the accounting system.
  */
-export function PaymentSourceBadge({ source, managed = false }: { source?: string | null; managed?: boolean }) {
+export function PaymentSourceBadge({ source, managed = false, externalId, providerName }: { source?: string | null; managed?: boolean; externalId?: string | null; providerName?: string }) {
   const manual = !source || source === 'MANUAL';
-  if (managed) return <span className="acct-source-note acct-source-note--line">{manual ? 'Recorded in TruckWys before the switch' : `Recorded in ${source === 'BANK' ? 'bank feed' : providerConfig(source).short}`}</span>;
+  if (managed) {
+    // Its state in the accounting system: came from there, sent there, or only here.
+    const where = providerName || (manual ? '' : providerConfig(source).short);
+    const label = !manual ? (source === 'BANK' ? 'From bank feed' : `In ${providerConfig(source).short}`)
+      : externalId ? `In ${where || 'your books'}` : 'Only in TruckWys';
+    const local = manual && !externalId;
+    return (
+      <span className={`acct-source-note acct-source-note--line acct-paystate${local ? ' is-local' : ''}`}>
+        <span className={`acct-dot acct-dot--inline ${local ? 'acct-dot--warning' : 'acct-dot--success'}`} aria-hidden="true" />{label}
+        {local && <span className="acct-paystate__hint">Add it in {where || "your books"} to match.</span>}
+      </span>
+    );
+  }
   if (manual) return null;
   const label = source === 'BANK' ? 'From bank feed' : `From ${providerConfig(source).short}`;
   return <span className="acct-source-badge">{label}</span>;

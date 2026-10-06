@@ -34,7 +34,7 @@ const FIELD_LABEL: Record<string, string> = {
 const isMoney = (v: string) => /^-?\d+(\.\d+)?$/.test(String(v).trim());
 /** Provider status codes in plain words (Xero's AUTHORISED is an unpaid, approved invoice). */
 const STATUS_WORD: Record<string, string> = { AUTHORISED: 'Awaiting payment', SUBMITTED: 'Awaiting approval', OPEN: 'Open', OVERDUE: 'Overdue', VOIDED: 'Void' };
-const showValue = (v: string) => (isMoney(v) ? formatCurrency(v) : STATUS_WORD[String(v).toUpperCase()] ?? (humanise(v) || '—'));
+const showValue = (v: string): React.ReactNode => (isMoney(v) ? formatCurrency(v) : <span className="acct-val-text">{STATUS_WORD[String(v).toUpperCase()] ?? (humanise(v) || '—')}</span>);
 
 /** Does TruckWys agree with the books? Per invoice, per customer, per month. */
 export function ReconciliationTab({ connection, onOpen }: { connection: Connection; onOpen?: (tab: AccountingTab) => void }) {
@@ -76,7 +76,7 @@ export function ReconciliationTab({ connection, onOpen }: { connection: Connecti
     <>
       <AcctCard
         title={`Checked against ${cfg.short}`}
-        description={`We compare invoices, customer balances and monthly sales and VAT with ${cfg.short}.`}
+        description="We compare invoices, customer balances and monthly sales and VAT."
         actions={runButton}
       >
         {!last ? (
@@ -89,14 +89,14 @@ export function ReconciliationTab({ connection, onOpen }: { connection: Connecti
             ) : differences.length === 0 ? (
               <>
                 <p className="acct-ok-lead" role="status"><CheckCircle2 size={18} aria-hidden="true" />Everything matches {cfg.short}</p>
-                {(connection.counts.errors + connection.counts.dead) > 0 && (
-                  <p className="acct-section-desc acct-dot-note" style={{ margin: '-10px 0 14px' }}><span className="acct-dot acct-dot--warning acct-dot--inline" aria-hidden="true" />{plural(connection.counts.errors + connection.counts.dead, 'document')} {connection.counts.errors + connection.counts.dead === 1 ? "hasn't" : "haven't"} reached {cfg.short} yet, so {connection.counts.errors + connection.counts.dead === 1 ? "it isn't" : "they aren't"} compared.{onOpen && <>{' '}<button type="button" className="acct-linkbtn" onClick={() => onOpen('sync')}>View in Sync</button></>}</p>
-                )}
               </>
             ) : (
               <p className="acct-diff-lead" role="status"><AlertTriangle size={18} aria-hidden="true" />{plural(last.difference_count, 'difference')} with {cfg.short}</p>
             )}
             <p className="acct-section-desc" style={{ margin: '-10px 0 14px' }}><span className="acct-nowrap">Checked {formatDateTime(last.ran_at)}</span><span className="acct-dotsep" aria-hidden="true"> · </span><span className="acct-nowrap acct-block-phone">Checks again nightly at {nextCheck(last.ran_at)}</span></p>
+            {differences.length === 0 && last.status !== 'FAILED' && (connection.counts.errors + connection.counts.dead) > 0 && (
+                  <p className="acct-section-desc acct-dot-note" style={{ margin: '-8px 0 14px' }}><span className="acct-dot acct-dot--warning acct-dot--inline" aria-hidden="true" />{plural(connection.counts.errors + connection.counts.dead, 'document')} {connection.counts.errors + connection.counts.dead === 1 ? "hasn't" : "haven't"} reached {cfg.short} yet, so {connection.counts.errors + connection.counts.dead === 1 ? "it isn't" : "they aren't"} compared.{onOpen && <>{' '}<button type="button" className="acct-linkbtn" onClick={() => onOpen('sync')}>View in Sync</button></>}</p>
+                )}
             <div className="acct-tiles acct-tiles--3">
               {SCOPES.map(sc => {
                 const n = sc.scope === 'INVOICE' ? last.checked.invoices : sc.scope === 'CUSTOMER' ? last.checked.customers : last.checked.months;
@@ -126,8 +126,8 @@ export function ReconciliationTab({ connection, onOpen }: { connection: Connecti
             <div className="acct-table-wrap acct-only-wide" role="region" aria-label={`${title} differences`} tabIndex={0}>
               <table className="acct-table acct-table--recon">
                 <colgroup>
-                  <col style={{ width: '37%' }} /><col style={{ width: '21%' }} />
-                  <col style={{ width: '21%' }} /><col style={{ width: '21%' }} />{hasLinks && <col style={{ width: 56 }} />}
+                  <col style={{ width: '37%' }} /><col style={{ width: '19%' }} />
+                  <col style={{ width: '23%' }} /><col style={{ width: '21%' }} />{hasLinks && <col style={{ width: 132 }} />}
                 </colgroup>
                 <thead>
                   <tr>
@@ -191,16 +191,16 @@ function DiffRow({ d, providerName, hasLinks }: { d: ReconDifference; providerNa
     <tr>
       <td>
         {d.local_url ? <Link className="acct-link" to={d.local_url}>{head}</Link> : head}
-        <div className="acct-row__sub">{[...rest, FIELD_LABEL[d.field] ?? humanise(d.field)].join(' · ')}</div>
+        {(() => { const sub = [`${FIELD_LABEL[d.field] ?? humanise(d.field)} differs`, ...rest].join(' · '); return <div className="acct-row__sub acct-oneline" title={sub}>{sub}</div>; })()}
       </td>
       <td className="num">{showValue(d.truckwys)}</td>
       <td className="num">{showValue(d.provider)}</td>
-      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <span className="acct-diff-word">Status differs</span>}</td>
+      <td className={`num acct-diff${isMoney(d.difference) && d.difference !== '' ? '' : ' acct-diff--text'}`}>{isMoney(d.difference) && d.difference !== '' ? diffText(d) : <span className="acct-diff-none" aria-label="No amount">—</span>}</td>
       {hasLinks && (
         <td>
           {d.provider_url && (
-            <a className="acct-icon-link" href={d.provider_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${d.label || d.key} in ${providerName}`} title={`Open in ${providerName}`}>
-              <ExternalLink size={14} aria-hidden="true" />
+            <a className="acct-open-link" href={d.provider_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${d.label || d.key} in ${providerName}`} title={`Open ${d.label || d.key} in ${providerName}`}>
+              Open in {providerName}<ExternalLink size={12} aria-hidden="true" />
             </a>
           )}
         </td>

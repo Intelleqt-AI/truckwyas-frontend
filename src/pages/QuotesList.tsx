@@ -518,10 +518,11 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   });
 
   const convertToLoadMutation = useMutation({
-    mutationFn: ({ quote, driverId, vehicleId }: { quote: any; driverId: string; vehicleId: string }) =>
+    mutationFn: ({ quote, driverId, vehicleId, dates }: { quote: any; driverId: string; vehicleId: string; dates?: { pickup_date: string; delivery_date: string } }) =>
       postData({
         url: `api/v1/quotes/${quote.id}/convert_to_load/`,
-        data: { driver_id: driverId, vehicle_id: vehicleId },
+        // dates: only when the quote had none and the modal showed suggested ones.
+        data: { driver_id: driverId, vehicle_id: vehicleId, ...(dates || {}) },
       }).then(data => ({ data, quote })),
     onSuccess: ({ quote }) => {
       // Invalidate both keys — QuotesList uses 'loads', LoadsList uses 'loads-list'
@@ -709,6 +710,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
         <span className="bk-toolbar__end">
           {view === 'board' && !billingBlocked ? 'Drag a card to change its status' : ''}
           {failedColumns.length === 0 && <>{view === 'board' && !billingBlocked ? ' · ' : ''}{totalQuotesCount} {totalQuotesCount === 1 ? 'quote' : 'quotes'}</>}
+          {/* The board's card and column amounts are incl. VAT (R13): said once, visibly. */}
+          {view === 'board' && ' · amounts incl. VAT'}
         </span>
         {/* List view (R6): the status filter shares the search row, as on
             Orders and History, so the table starts at the same height. */}
@@ -1024,7 +1027,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           quoteNumber={pendingConvertQuote.quote_number}
           vehicleType={pendingConvertQuote.vehicle_type}
           busy={convertToLoadMutation.isPending}
-          onConfirm={(driverId, vehicleId) => convertToLoadMutation.mutate({ quote: pendingConvertQuote, driverId, vehicleId })}
+          pickupDate={pendingConvertQuote?.pickup_date}
+          deliveryDate={pendingConvertQuote?.delivery_date}
+          onConfirm={(driverId, vehicleId, dates) => convertToLoadMutation.mutate({ quote: pendingConvertQuote, driverId, vehicleId, dates })}
           onCancel={() => setPendingConvertQuote(null)}
         />
       )}

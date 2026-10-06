@@ -1,4 +1,3 @@
-import { formatCompact } from "@/lib/formatters";
 import { linear, useWidth } from "@/components/viz/core";
 import "@/components/viz/viz.css";
 import type { Choice, CurvePoint } from "./types";
@@ -15,7 +14,7 @@ export function LikelihoodCurve({ curve, range, choices, price }: {
 }) {
   const [ref, w] = useWidth<HTMLDivElement>(300);
   if (curve.length < 2) return null;
-  const H = 132, L = 34, R = 8, T = 10, B = 22;
+  const H = 132, L = 42, R = 8, T = 10, B = 22;
   const x = linear(range[0], range[1], L, w - R);
   const y = linear(0, 100, H - B, T);
   const pts = curve.filter((p) => p.price >= range[0] && p.price <= range[1]);
@@ -46,7 +45,7 @@ export function LikelihoodCurve({ curve, range, choices, price }: {
             <text x={L - 6} y={y(v) + 4} textAnchor="end" className="viz-muted">{v}%</text>
           </g>
         ))}
-        {epArea && <path d={epArea} fill="var(--accent-dim)" stroke="none" />}
+        {epArea && <path d={epArea} fill="var(--accent-dim)" stroke="var(--pa-band-edge)" strokeWidth={1} />}
         {peak && <line x1={x(peak.price)} x2={x(peak.price)} y1={y(0)} y2={y(90)} stroke="var(--viz-accent)" strokeOpacity={0.35} strokeDasharray="2 3" />}
         <path d={line} fill="none" stroke="var(--text-secondary)" strokeWidth={1.75} strokeLinejoin="round" />
         {price != null && inRange(price) && (
@@ -56,8 +55,8 @@ export function LikelihoodCurve({ curve, range, choices, price }: {
           <circle key={c.key} cx={x(c.price)} cy={y(pctAt(c.price))} r={c.recommended ? 4.5 : 3.5}
             fill={c.recommended ? "var(--text-primary)" : "var(--bg-surface)"} stroke="var(--text-primary)" strokeWidth={1.5} />
         ))}
-        <text x={L} y={H - 4} textAnchor="start" className="viz-muted">{formatCompact(range[0])}</text>
-        <text x={w - R} y={H - 4} textAnchor="end" className="viz-muted">{formatCompact(range[1])}</text>
+        <text x={L} y={H - 4} textAnchor="start" className="viz-muted">{`R\u00a0${Math.round(range[0] / 1000)}k`}</text>
+        <text x={w - R} y={H - 4} textAnchor="end" className="viz-muted">{`R\u00a0${Math.round(range[1] / 1000)}k`}</text>
       </svg>
     </div>
   );

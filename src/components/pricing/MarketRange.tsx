@@ -26,6 +26,10 @@ export function MarketRange({ market, floor, price }: { market: Market; floor: n
     return Math.max(half, Math.min(w - half, cx));
   };
   const youLabel = price != null && price > 0 ? `You ${formatMoneyWhole(price)}` : null;
+  // Floor label is pinned to its tick; when "You" is within ~24 px of it,
+  // the You label steps sideways so the two never collide.
+  const close = floor != null && price != null && price > 0 && Math.abs(x(price) - x(floor)) < 24;
+  const youX = !youLabel ? 0 : close ? clampText(x(price!) + (x(price!) >= x(floor!) ? 1 : -1) * (youLabel.length * 3.5), youLabel) : clampText(x(price!), youLabel);
   const floorLabel = floor != null ? `Floor ${formatMoneyWhole(floor)}` : null;
 
   return (
@@ -54,7 +58,7 @@ export function MarketRange({ market, floor, price }: { market: Market; floor: n
           <g>
             <line x1={x(price!)} x2={x(price!)} y1={barY - 8} y2={barY + barH} stroke="var(--viz-accent)" strokeWidth={2} />
             <circle cx={x(price!)} cy={barY - 9} r={3.5} fill="var(--viz-accent)" />
-            <text x={clampText(x(price!), youLabel)} y={barY - 17} textAnchor="middle" className="viz-strong">{youLabel}</text>
+            <text x={youX} y={barY - 17} textAnchor="middle" className="viz-strong">{youLabel}</text>
           </g>
         )}
       </svg>

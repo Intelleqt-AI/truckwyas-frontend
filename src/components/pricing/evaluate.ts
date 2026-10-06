@@ -50,7 +50,7 @@ export function likelihoodAt(a: PricingAnalysis | null, price: number): LiveLike
     }
     // Outside what the model has seen: a band, never an extrapolated %.
     const band = rulesBand();
-    return { level: "rules", band, label: band ? BAND_LABEL[band] : NO_BAND, note: "Outside the range the model has seen" };
+    return { level: "rules", band, label: band ? BAND_LABEL[band] : NO_BAND, note: "Outside the prices we've seen you quote" };
   }
   const band = rulesBand();
   return { level: "rules", band, label: band ? BAND_LABEL[band] : NO_BAND, note: null };
@@ -64,7 +64,7 @@ export function readPrice(a: PricingAnalysis | null, price: number): LiveReading
   // At a choice's own price, say exactly what its card says.
   const cl = matchedChoice?.likelihood;
   const likelihood: LiveLikelihood = cl
-    ? (cl.level === "model" ? { level: "model", pct: Math.round(cl.pct) } : { level: "rules", band: cl.band, label: cl.label, note: cl.outsideModelRange ? "Outside the range the model has seen" : null })
+    ? (cl.level === "model" ? { level: "model", pct: Math.round(cl.pct) } : { level: "rules", band: cl.band, label: cl.label, note: cl.outsideModelRange ? "Outside the prices we've seen you quote" : null })
     : likelihoodAt(a, price);
   return {
     price,
@@ -78,7 +78,7 @@ export function readPrice(a: PricingAnalysis | null, price: number): LiveReading
 }
 
 /** The additive `pricing_decision` saved with the quote (see CONTRACT.md). */
-export function pricingDecision(a: PricingAnalysis, finalPrice: number, picked: ChoiceKey | "custom") {
+export function pricingDecision(a: PricingAnalysis, finalPrice: number, picked: ChoiceKey | "custom", priceAdjustment = 0) {
   const live = readPrice(a, finalPrice);
   const lk = live.likelihood;
   return {
@@ -93,6 +93,9 @@ export function pricingDecision(a: PricingAnalysis, finalPrice: number, picked: 
         : c.likelihood ? { level: "rules", band: c.likelihood.band } : null,
     })),
     picked_choice: picked,
+    // So quote detail can reconcile the floor line by line.
+    floor_lines: (a.costFloor?.lines ?? []).map((l) => ({ key: l.key, label: l.label, amount: l.amount })),
+    price_adjustment: Math.round(priceAdjustment * 100) / 100,
     final_price: Math.round(finalPrice * 100) / 100,
     floor: a.costFloor ? Math.round(a.costFloor.total * 100) / 100 : null,
     market: a.market?.available
@@ -103,7 +106,9 @@ export function pricingDecision(a: PricingAnalysis, finalPrice: number, picked: 
     n_closed: a.likelihood?.level === "model" ? a.likelihood.model?.nClosed ?? null : null,
     basis_label: a.likelihood?.level === "model" ? a.likelihood.model?.basisLabel || null : null,
     likelihood_level: a.likelihood?.level ?? null,
-    likelihood_at_final_pct: lk?.level === "model" ? lk.pct : null,
-    band_at_final: lk?.level === "rules" ? lk.band : null,
+    // A choice's own figure (from the server) is kept; for a custom price the
+    // server computes it at save, so nothing client-side is sent as fact.
+    likelihood_at_final_pct: picked !== "custom" && lk?.level === "model" ? lk.pct : null,
+    band_at_final: picked !== "custom" && lk?.level === "rules" ? lk.band : null,
   };
 }

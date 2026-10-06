@@ -1,7 +1,7 @@
 // Shared pricing helpers: one margin definition everywhere (owner rule 6).
 // margin = price − full cost floor; margin % = margin / price (excl. VAT).
 // Small and pure: used by the quote builder, quote detail and the quotes list.
-import { formatMoneyWhole } from './formatters';
+import { formatMoney, formatMoneyWhole } from './formatters';
 
 export type LikelihoodBand = 'likely' | 'even' | 'less_likely';
 export type PickedChoice = 'safe' | 'balanced' | 'stretch' | 'custom';
@@ -37,6 +37,21 @@ export function marginOf(price: unknown, floor: unknown): { amount: number; pct:
   return { amount, pct: p > 0 ? Math.round(((p - f) / p) * 100) : null };
 }
 
+/** "R 25 100" when the cents are zero, else "R 1 448,78". U+2212 minus. */
+export function formatRand(value: unknown): string {
+  const n = num(value);
+  if (n === null) return '—';
+  return Math.abs(Math.round(n * 100)) % 100 === 0 ? formatMoneyWhole(n) : formatMoney(n);
+}
+
+/** A difference with its sign: "+R 1 200" / "−R 1 200" (U+2212), "R 0" at zero. */
+export function formatSignedRand(value: unknown): string {
+  const n = num(value);
+  if (n === null) return '—';
+  const body = formatRand(Math.abs(n));
+  return Math.round(n * 100) === 0 ? body : `${n > 0 ? '+' : '\u2212'}${body}`;
+}
+
 /** "R 6 550 · 26%" (whole rand, whole %). */
 export function formatMargin(m: { amount: number; pct: number | null } | null): string {
   if (!m) return '—';
@@ -56,13 +71,25 @@ const BAND_LABEL: Record<LikelihoodBand, string> = {
 export function likelihoodLabel(level: string | null | undefined, value: number | string | null | undefined): string | null {
   if (level === 'model') {
     const pct = num(value);
-    return pct === null ? null : `${Math.round(pct)}% likely to win`;
+    return pct === null ? null : `${Math.round(pct)}% chance to win`;
   }
   if (level === 'rules' && typeof value === 'string' && value in BAND_LABEL) {
     return BAND_LABEL[value as LikelihoodBand];
   }
   return null;
 }
+
+/** The short form beside a price: "72% to win" (model) or the band ("Likely"). */
+export function likelihoodShort(level: string | null | undefined, value: number | string | null | undefined): string | null {
+  if (level === 'model') {
+    const pct = num(value);
+    return pct === null ? null : `${Math.round(pct)}% to win`;
+  }
+  return likelihoodLabel(level, value);
+}
+
+/** One name for the p25–p75 range, in the builder and on the quote. */
+export const MARKET_RANGE_LABEL = 'Middle half of the market';
 
 export const CHOICE_LABEL: Record<PickedChoice, string> = {
   safe: 'Safe',

@@ -16,11 +16,17 @@
   .qb-after { grid-area: after; }
   .qb-aside {
     grid-area: aside; position: sticky; top: 16px; margin-bottom: 16px;
-    /* Never taller than the window above the sticky price bar. */
-    max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain;
-    scrollbar-width: thin; border-radius: var(--radius-card, 12px);
+    /* Within the app scroller (below the 64px top bar), above the sticky
+       price bar (--pricebar-h, set by the bar itself) with 12px + 16px air. */
+    max-height: calc(100dvh - var(--qb-topbar-h, 64px) - 32px);
+    overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+    border-radius: var(--radius-card, 12px);
+    /* Soft fade where the panel scrolls under its own edge. */
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
+            mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
   }
-  .qb-has-pricebar .qb-aside { max-height: calc(100vh - 156px); }
+  .qb-aside > .pa { padding-bottom: 12px; }
+  .qb-has-pricebar .qb-aside { max-height: calc(100dvh - var(--qb-topbar-h, 64px) - var(--pricebar-h, 98px) - 12px - 32px); }
 }
 @media (min-width: 1280px) {
   .qb-layout { grid-template-columns: minmax(0, 1fr) 360px; }
@@ -101,3 +107,34 @@
   .qb-has-pricebar { --ai-fab-bottom: 57px; }
 }
 .qb-cost__hint { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); margin-left: 6px; }
+
+/* ---- Round 2: loss tone, toasts above the bar, phone compact bar -------- */
+.qb-pricebar__loss, .qb-pricebar__loss .qb-pricebar__num { color: var(--status-danger-text); }
+.qb-pricebar__lk--loss { color: var(--status-danger-text); }
+.qb-pricebar__lk--loss::before { background: var(--status-danger-dot); }
+.qb-pricebar__read .qb-pricebar__warn { color: var(--status-danger-text); }
+/* Toasts never cover Save / Send. */
+body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-right,
+body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-center,
+body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
+  bottom: calc(var(--pricebar-h, 98px) + 24px);
+}
+@media (max-width: 640px) {
+  /* The no-truck nudge lives in the build-up card on phones (its subtitle
+     says so), keeping the bar short. */
+  .qb-pricebar__read .qb-pricebar__nudge { display: none; }
+  /* The tab bar steps aside while the price is being typed. */
+  body:has(#qb-price-input:focus) .tw-tabbar { display: none; }
+  .qb-pricebar.is-compact {
+    grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto;
+    gap: 0 12px; padding-top: 8px; padding-bottom: 8px; cursor: pointer;
+  }
+  .qb-pricebar.is-compact .qb-pricebar__price { grid-column: 1; grid-row: 1; }
+  .qb-pricebar.is-compact .qb-pricebar__read { grid-column: 1; grid-row: 2; }
+  .qb-pricebar.is-compact .qb-pricebar__actions { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+  .qb-pricebar.is-compact .qb-pricebar__label,
+  .qb-pricebar.is-compact .qb-pricebar__read > :not(.qb-pricebar__line),
+  .qb-pricebar.is-compact .qb-pricebar__actions > :not(.tw-btn--primary) { display: none; }
+  .qb-pricebar.is-compact .qb-pricebar__actions .tw-btn--primary { height: 44px; flex: none; padding: 0 16px; }
+  .qb-pricebar.is-compact .qb-pricebar__field { border-bottom-color: transparent; width: auto; }
+}

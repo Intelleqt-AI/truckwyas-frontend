@@ -25,6 +25,9 @@ export interface FloorLine {
   details: { label: string; value: string }[];
   /** driver_allowance only: approved rate × nights, to prefill the Driver input. */
   suggested: number | null;
+  /** driver_allowance only: nights away, and whether the user still has to give a figure. */
+  nights: number | null;
+  needsInput: boolean;
 }
 export interface CostFloor {
   total: number; perKm: number | null; includeReturn: boolean;
@@ -55,9 +58,9 @@ export interface LikelihoodInfo {
 export interface LaneQuote { id: number | null; number: string | null; date: string | null; price: number; outcome: "accepted" | "rejected" | "open" | "expired" | string }
 export interface CustomerEvidence {
   id: number | null; name: string | null;
-  acceptance: { won: number; decided: number; ratePct: number | null } | null;
+  acceptance: { won: number; decided: number; ratePct: number | null; scope: "lane" | "all" } | null;
   recentLaneQuotes: LaneQuote[];
-  paymentRisk: { band: "low" | "medium" | "high" | "unknown"; label: string; basis: string | null } | null;
+  paymentRisk: { band: "low" | "medium" | "high" | "unknown"; label: string; basis: string | null; attention: boolean } | null;
 }
 export interface PricingAnalysis {
   version: string;
@@ -198,6 +201,10 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
         editable: l!.editable === true,
         details: arr(l!.details).map(obj).filter(Boolean).map((d) => ({ label: String(d!.label ?? ""), value: String(d!.value ?? "") })),
         suggested: num(l!.suggested),
+        nights: num(l!.nights),
+        // Backend flag when it lands; until then: nights away, no approved rate, nothing typed.
+        needsInput: l!.status === "needs_input"
+          || (l!.key === "driver_allowance" && (num(l!.nights) ?? 0) >= 1 && num(l!.suggested) == null && (obj(l!.source)?.kind !== "user")),
       };
     }),
     fixedCostPerKm: fx && num(fx.value) != null ? {
@@ -268,6 +275,7 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
     id: num(cu.id), name: str(cu.name),
     acceptance: acc && num(acc.decided) != null ? {
       won: num(acc.won) ?? 0, decided: num(acc.decided) ?? 0, ratePct: num(acc.rate_pct),
+      scope: acc.scope === "lane" ? "lane" : "all",
     } : null,
     recentLaneQuotes: arr(cu.recent_lane_quotes).map(obj).filter(Boolean).map((q) => ({
       id: num(q!.id), number: str(q!.number), date: str(q!.date), price: num(q!.price) ?? 0, outcome: String(q!.outcome ?? "open"),
@@ -276,6 +284,7 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
       band: (["low", "medium", "high", "unknown"] as const).find((b) => b === pr.band) ?? "unknown",
       label: str(pr.label) || "No payment history yet",
       basis: str(pr.basis),
+      attention: pr.attention === true || pr.band === "medium" || pr.band === "high",
     } : null,
   } : null;
 

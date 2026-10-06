@@ -21,12 +21,11 @@ import { AIChatPanel, type ChatMessage } from "@/components/AIChatPanel";
 import { useAuth } from "@/lib/AuthContext";
 import { isSubscriptionBlocked, subscriptionStatusDetail } from "@/lib/subscriptionStatus";
 import { MessageCircle, Map, Info, Maximize2, Mic, Square, X, Plus, GripVertical, ChevronDown, ChevronUp, Check, AlertTriangle } from "lucide-react";
-import { PricingPanel, lkTone, type PricingPhase } from "@/components/pricing/PricingPanel";
+import { PricingPanel, lkTone, likelihoodShort, signedPct, type PricingPhase } from "@/components/pricing/PricingPanel";
 import { usePricingAnalysis } from "@/components/pricing/usePricingAnalysis";
 import { readPrice, pricingDecision } from "@/components/pricing/evaluate";
 import type { ChoiceKey, PricingInputs } from "@/components/pricing/types";
 import "@/components/pricing/quote-builder-pricing.css";
-import { likelihoodLabel } from "@/lib/pricing";
 import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -1088,11 +1087,8 @@ export default function QuoteBuilder() {
     if (!(price >= 0) || !Number.isFinite(price)) return;
     setServiceCharge(round2(price - costSum));
   };
-  const applyChoice = (price: number, key: ChoiceKey) => {
-    applyPrice(price);
-    const label = pricing.data?.choices.find(c => c.key === key)?.label ?? "Price";
-    toast.success(`${label} price in your quote: ${formatMoneyWhole(price)}`);
-  };
+  // No toast: the applied card ("In your quote") and the bar confirm it.
+  const applyChoice = (price: number, _key: ChoiceKey) => { applyPrice(price); };
   // A reopened quote priced with the analysis: keep the price that was decided.
   useEffect(() => {
     const saved = savedFinalPriceRef.current;
@@ -1101,6 +1097,37 @@ export default function QuoteBuilder() {
     if (Math.abs(saved - total) >= 0.5) applyPrice(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeIsCurrent]);
+
+  // Price bar height as a CSS variable (sticky aside, toasts sit above it).
+  const priceBarRef = useRef<HTMLElement | null>(null);
+  const [priceBarEl, setPriceBarEl] = useState<HTMLElement | null>(null);
+  useEffect(() => { setPriceBarEl(priceBarRef.current); });
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!priceBarEl) { root.style.removeProperty("--pricebar-h"); return; }
+    const set = () => root.style.setProperty("--pricebar-h", `${Math.round(priceBarEl.getBoundingClientRect().height)}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(priceBarEl);
+    return () => { ro.disconnect(); root.style.removeProperty("--pricebar-h"); };
+  }, [priceBarEl]);
+  // Phones: the bar folds to one compact row while scrolling down, and opens
+  // again on scroll up, a tap, or focus.
+  const [barCompact, setBarCompact] = useState(false);
+  useEffect(() => {
+    let last = -1;
+    const onScroll = (e: Event) => {
+      const t = e.target as HTMLElement;
+      if (!t || !(t instanceof HTMLElement) || !t.classList?.contains("os-app-main")) return;
+      if (!window.matchMedia("(max-width: 640px)").matches) { setBarCompact(false); return; }
+      if (document.activeElement?.id === "qb-price-input") return;
+      const y = t.scrollTop;
+      if (last >= 0 && Math.abs(y - last) > 6) setBarCompact(y > last && y > 120);
+      last = y;
+    };
+    document.addEventListener("scroll", onScroll, true);
+    return () => document.removeEventListener("scroll", onScroll, true);
+  }, []);
 
   // Price bar input: free text while focused, formatted otherwise.
   const [priceDraft, setPriceDraft] = useState<string | null>(null);
@@ -1139,7 +1166,7 @@ export default function QuoteBuilder() {
     // No heuristic win_probability any more: the server sets it from the
     // model's likelihood at the final price (model level only). What was shown
     // and picked is saved, additively, as pricing_decision.
-    ...(pricing.data ? { pricing_decision: pricingDecision(pricing.data, total, liveReading.matchedChoice ?? "custom") } : {}),
+    ...(pricing.data ? { pricing_decision: pricingDecision(pricing.data, total, liveReading.matchedChoice ?? "custom", serviceCharge) } : {}),
     base_rate_per_km: serviceCharge !== 0 && chargeDistance > 0 ? round2(savedBase / chargeDistance) : Number(baseRatePerKm) || null,
     // Full raw request+response of the route-calculate call behind the
     // currently-selected route, captured for future ML training — see
@@ -2028,15 +2055,17 @@ export default function QuoteBuilder() {
 
       {/* One price, next to Send. Sticky so Send stays in reach while scrolling. */}
       {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 && (
-        <section className="qb-pricebar" aria-label="Quote price and send">
+        <section ref={priceBarRef} className={`qb-pricebar${barCompact ? " is-compact" : ""}`} aria-label="Quote price and send"
+          onClick={() => { if (barCompact) setBarCompact(false); }}>
           <div className="qb-pricebar__price">
             <label className="qb-pricebar__label" htmlFor="qb-price-input">Quote price excl. VAT</label>
             <span className="qb-pricebar__field">
               <span className="qb-pricebar__cur" aria-hidden="true">R</span>
               <input id="qb-price-input" className="qb-pricebar__input" inputMode="decimal" autoComplete="off"
                 aria-describedby="qb-price-read"
-                value={priceDraft ?? formatNumber(total, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                onFocus={(e) => { setPriceDraft(String(round2(total))); requestAnimationFrame(() => e.target.select()); }}
+                value={priceDraft ?? formatNumber(total, Math.abs(total - Math.round(total)) < 0.005
+                  ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                onFocus={(e) => { setBarCompact(false); setPriceDraft(String(round2(total))); requestAnimationFrame(() => e.target.select()); }}
                 onBlur={() => setPriceDraft(null)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
                 onChange={(e) => onPriceInput(e.target.value)} />
@@ -2047,35 +2076,45 @@ export default function QuoteBuilder() {
             {liveReading.margin != null ? (
               <>
                 <span className="qb-pricebar__line">
-                  <span>Margin <span className="qb-pricebar__num">{formatMoneyWhole(liveReading.margin)}</span>
-                    {" "}<span className="qb-pricebar__num">({Math.round(liveReading.marginPct ?? 0)}%)</span></span>
-                  {liveReading.likelihood && (
+                  <span className={liveReading.belowFloor ? "qb-pricebar__loss" : undefined}>Margin <span className="qb-pricebar__num">{formatMoneyWhole(liveReading.margin)}</span>
+                    {" "}<span className="qb-pricebar__num">({signedPct(liveReading.marginPct ?? 0)})</span></span>
+                  {/* Never pair a chance to win with a price that loses money. */}
+                  {liveReading.belowFloor ? (
+                    <span className="qb-pricebar__lk qb-pricebar__lk--loss">Below cost</span>
+                  ) : liveReading.likelihood && (
                     <span className={`qb-pricebar__lk qb-pricebar__lk--${lkTone(liveReading.likelihood)}`}>
-                      <span>{liveReading.likelihood.level === "model" ? likelihoodLabel("model", liveReading.likelihood.pct) : liveReading.likelihood.label}
+                      <span>{likelihoodShort(liveReading.likelihood)}
                         {liveReading.likelihood.level === "rules" && liveReading.likelihood.note && <span className="qb-pricebar__lknote"> · {liveReading.likelihood.note.toLowerCase()}</span>}</span>
                     </span>
                   )}
                 </span>
                 {liveReading.belowFloor ? (
-                  <span className="qb-pricebar__warn" role="status">
+                  <span className="qb-pricebar__warn">
                     <AlertTriangle size={13} aria-hidden="true" />
                     {formatMoneyWhole(-liveReading.margin)} below your cost floor of {formatMoneyWhole(liveReading.floor)}
                   </span>
                 ) : (
                   <span className="qb-pricebar__muted">
-                    {liveReading.matchedChoice
-                      ? `${pricing.data?.choices.find(c => c.key === liveReading.matchedChoice)?.label ?? "Chosen"} price`
-                      : Math.abs(serviceCharge) >= 0.005 ? "Your own price" : "Sum of the cost lines"}
-                    {" "}· floor {formatMoneyWhole(liveReading.floor)}
+                    {(() => {
+                      const choiceLabel = liveReading.matchedChoice ? pricing.data?.choices.find(c => c.key === liveReading.matchedChoice)?.label : null;
+                      const gap = round2(serviceCharge);
+                      const rec = pricing.data?.choices.find(c => c.recommended);
+                      const parts: string[] = [];
+                      parts.push(choiceLabel ? `${choiceLabel} price` : Math.abs(gap) >= 0.5 ? "Your own price" : "Sum of the build-up");
+                      if (Math.abs(gap) >= 0.5) parts.push(`${formatMoneyWhole(Math.abs(gap))} ${gap > 0 ? "above" : "below"} your build-up of ${formatMoneyWhole(costSum)}`);
+                      else if (!choiceLabel && rec && total > 0 && Math.abs(rec.price - total) / total > 0.15) parts.push(`recommended ${formatMoneyWhole(rec.price)}`);
+                      parts.push(`floor ${formatMoneyWhole(liveReading.floor)}`);
+                      return parts.join(" · ");
+                    })()}
                   </span>
                 )}
               </>
             ) : null}
             {liveReading.margin == null && (
               <span className="qb-pricebar__muted">
-                {pricing.status === "loading" || pricingPhase === "route" ? "Working out margin and likelihood…"
-                  : pricing.status === "error" || pricing.status === "offline" || pricing.status === "unavailable" ? "Margin and likelihood unavailable right now"
-                  : "Margin and likelihood follow the pricing analysis"}
+                {pricing.status === "loading" || pricingPhase === "route" ? "Working out margin and chance to win…"
+                  : pricing.status === "error" || pricing.status === "offline" || pricing.status === "unavailable" ? "Margin and chance to win unavailable right now"
+                  : "Margin and chance to win follow the pricing analysis"}
               </span>
             )}
             {/* No truck: the price runs on the company default rate. Say so

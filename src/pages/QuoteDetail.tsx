@@ -27,7 +27,7 @@ import { loadsQuery, mapLoadsByQuoteId } from './QuotesList';
 import { InfoTip } from '@/components/ui/InfoTip';
 import LossReasonDialog from '@/components/LossReasonDialog';
 import PricingDecisionRows from '@/components/PricingDecisionRows';
-import { LOSS_REASONS, lossReasonPayload, type LossReason } from '@/lib/pricing';
+import { LOSS_REASONS, formatRand, formatSignedRand, lossReasonPayload, type LossReason } from '@/lib/pricing';
 import { pricingDecisionOf } from '@/lib/pricingDecision';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
@@ -235,10 +235,11 @@ export default function QuoteDetail() {
   });
 
   const convertToLoadMutation = useMutation({
-    mutationFn: ({ driverId, vehicleId }: { driverId: string; vehicleId: string }) =>
+    mutationFn: ({ driverId, vehicleId, dates }: { driverId: string; vehicleId: string; dates?: { pickup_date: string; delivery_date: string } }) =>
       postData({
         url: `api/v1/quotes/${id}/convert_to_load/`,
-        data: { driver_id: driverId, vehicle_id: vehicleId },
+        // dates: only when the quote had none and the modal showed suggested ones.
+        data: { driver_id: driverId, vehicle_id: vehicleId, ...(dates || {}) },
       }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['loads'] });
@@ -254,11 +255,25 @@ export default function QuoteDetail() {
   });
 
   const outcomeMutation = useMutation({
-    mutationFn: (data: { outcome: string; final_price?: number } & Record<string, unknown>) =>
-      patchData({ url: `api/v1/quotes/${id}/outcome/`, data }),
+    // The answer moves the quote too: Accepted -> ACCEPTED (so Convert to
+    // booking shows straight away), Rejected -> DECLINED. The outcome endpoint
+    // does that itself on newer APIs; when its reply doesn't show the new
+    // status, update_status follows (idempotent: the outcome row is kept).
+    mutationFn: async (data: { outcome: string; final_price?: number } & Record<string, unknown>) => {
+      const res = await patchData({ url: `api/v1/quotes/${id}/outcome/`, data });
+      const target = data.outcome === 'accepted' ? 'ACCEPTED' : 'DECLINED';
+      const current = (res as { status?: string } | null)?.status ?? quote?.status;
+      const moved = target === 'ACCEPTED' ? ['ACCEPTED', 'IT', 'COMPLETED'].includes(String(current)) : current === 'DECLINED';
+      if (!moved) {
+        const { outcome: _o, final_price: _f, ...extra } = data;
+        await patchData({ url: `api/v1/quotes/${id}/update_status/`, data: { status: target, ...(target === 'DECLINED' ? extra : {}) } });
+      }
+      return res;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['quotes-column'] });
       setShowOutcomeModal(false);
       setOutcomeType(null);
       setLossFor(null);
@@ -479,6 +494,11 @@ export default function QuoteDetail() {
   // decision only. The legacy margin_percentage is the markup share of the
   // price, a different figure, so it is not shown as the margin.
   const marginNow = decision && !decision.stale ? decision.margin : null;
+  // The builder folds its price adjustment into the saved base rate; when the
+  // decision records the adjustment, the base rate line names it (as the
+  // builder shows it) so the two screens read the same.
+  const adjustmentRaw = Number(quote.pricing_decision?.price_adjustment);
+  const adjustment = decision && !decision.stale && Number.isFinite(adjustmentRaw) && Math.abs(adjustmentRaw) >= 1 ? adjustmentRaw : null;
   const statusOptions: StatusOption[] = [
     { value: 'DRAFT', label: 'Draft', hint: 'Not offered to the customer yet' },
     // An expired quote can still be marked Sent (the preview warns), but the
@@ -657,7 +677,8 @@ export default function QuoteDetail() {
         <div ref={railRef} className="quote-detail-rail">
           <section className="bk-card" aria-labelledby="qd-price-title">
             <h2 className="bk-fact__label" id="qd-price-title" style={{ margin: 0 }}>{isRound ? 'Total, both legs' : 'Total'}{vat?.vat_registered ? ' excl. VAT' : ''}</h2>
-            <div className="qd-total">{formatMoney(total)}</div>
+            {/* Whole rand when the cents are zero, as in the builder's price bar. */}
+            <div className="qd-total">{formatRand(total)}</div>
             <div className="qd-sub">
               {marginNow && (
                 <span className={decision?.belowFloor ? 'qd-decision__neg' : undefined}>
@@ -694,12 +715,12 @@ export default function QuoteDetail() {
             )}
             <div className="qd-price-rows">
               {priceRows.map(r => (
-                <div key={r.label} className="bk-kv"><span className="bk-kv__label">{r.label}</span><span className="bk-kv__value">{formatMoney(r.value)}</span></div>
+                <div key={r.label} className="bk-kv"><span className="bk-kv__label">{r.label}</span><span className="bk-kv__value">{formatRand(r.value)}{r.label === 'Base rate' && adjustment ? <span className="bk-kv__note">incl. {formatSignedRand(adjustment)} price adjustment</span> : null}</span></div>
               ))}
               {/* Normal weight: when it is a large share of the total it is the
                   line a reader most needs to see (as on Booking detail). */}
               {hasGap && (
-                <div className="bk-kv"><span className="bk-kv__label">Not itemised <InfoTip label="About this line">Set on the quote; its total includes charges not broken down here.</InfoTip></span><span className="bk-kv__value">{formatMoney(notItemised)}</span></div>
+                <div className="bk-kv"><span className="bk-kv__label">Not itemised <InfoTip label="About this line">Set on the quote; its total includes charges not broken down here.</InfoTip></span><span className="bk-kv__value">{formatRand(notItemised)}</span></div>
               )}
             </div>
             {/* VAT and the total incl. VAT: what the customer is sent (same
@@ -977,7 +998,9 @@ export default function QuoteDetail() {
           quoteNumber={quote?.quote_number}
           vehicleType={quote?.vehicle_type}
           busy={convertToLoadMutation.isPending}
-          onConfirm={(driverId, vehicleId) => convertToLoadMutation.mutate({ driverId, vehicleId })}
+          pickupDate={quote?.pickup_date}
+          deliveryDate={quote?.delivery_date}
+          onConfirm={(driverId, vehicleId, dates) => convertToLoadMutation.mutate({ driverId, vehicleId, dates })}
           onCancel={() => setShowConvertModal(false)}
         />
       )}

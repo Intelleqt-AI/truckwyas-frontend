@@ -339,6 +339,8 @@ export default function QuoteBuilder() {
   const [returnLoadBooked, setReturnLoadBooked] = useState(false);
   // §6: unknown tolls / an estimated distance block until fixed or confirmed.
   const [tollsNone, setTollsNone] = useState(false);
+  // Border costs typed for this quote (all legs); "" = the route's.
+  const [borderTyped, setBorderTyped] = useState("");
   const [distanceConfirmed, setDistanceConfirmed] = useState(false);
   // diesel_own_off "Use official" for this quote only.
   const [useOfficialDiesel, setUseOfficialDiesel] = useState(false);
@@ -511,7 +513,11 @@ export default function QuoteBuilder() {
     : aiTollActive ? aiToll!.oneWay
     : routeTollsUnknown || routeToll == null ? null : Number(routeToll);
   const tollBreakdownOneWay = tollBreakdown.reduce((s, b) => s + Number(b.tariff), 0);
-  const borderOneWay = (routeData?.additional_costs?.border_fees || 0) + (routeData?.additional_costs?.weighbridge_fees || 0) + (routeData?.additional_costs?.non_sa_tolls || 0);
+  const routeBorderOneWay = (routeData?.additional_costs?.border_fees || 0) + (routeData?.additional_costs?.weighbridge_fees || 0) + (routeData?.additional_costs?.non_sa_tolls || 0);
+  const borderOneWay = borderTyped !== "" ? (Number(borderTyped) || 0) / legs : routeBorderOneWay;
+  // A cross-border trip (route or any point outside SA): no border cost blocks.
+  const tripInternational = !!routeData?.cross_border || (routeData?.countries || []).some(c => isForeignCountry(c))
+    || [pickupCoords?.country_code, deliveryCoords?.country_code, ...stops.map(st => st.coords?.country_code)].some(c => isForeignCountry(c));
   const weightKg = loadT * 1000;
 
   // ---- company figures the costing needs: the server's resolution
@@ -552,6 +558,7 @@ export default function QuoteBuilder() {
     driver: { allowance_per_night: allowancePerNight, nights: null, amount: driverEdited ? (driverAllowanceInput === "" ? null : Number(driverAllowanceInput) || 0) : null },
     hours_per_day: si?.hours_per_day ?? null,
     border_cost: borderOneWay * legs,
+    international: tripInternational,
     include_empty_return: returnLoadBooked ? false : null,
     settings: si?.settings ?? {
       include_empty_return_default: companyProfile?.include_empty_return_default ?? true,
@@ -859,7 +866,7 @@ export default function QuoteBuilder() {
     setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
     setPickupDate(""); setDeliveryDate(""); setNlText("");
     setEditableTollCost(""); setTollManuallyEdited(false); setDriverAllowanceInput("");
-    setDriverEdited(false); setReturnLoadBooked(false); setTollsNone(false); setDistanceConfirmed(false); setUseOfficialDiesel(false);
+    setDriverEdited(false); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setDistanceConfirmed(false); setUseOfficialDiesel(false);
     savedFinalPriceRef.current = null; savedPricingRef.current = null; setReopenNotice(null); setPriceSet(null); setSavedPriceShown(false);
     setRouteError(false);
     setRouteData(null); setSelectedRouteIndex(0); setRouteBlockedMessage(null);
@@ -1317,6 +1324,7 @@ export default function QuoteBuilder() {
       case "update_allowance": navigate("/settings/company#pricing"); break;
       case "retry_diesel": queryClient.invalidateQueries({ queryKey: ["fuel-price-current"] }); break;
       case "enter_tolls": document.getElementById("qb-tolls-input")?.focus(); break;
+      case "enter_border_costs": document.getElementById("qb-border-input")?.focus(); break;
       case "confirm_no_tolls": setTollsNone(true); break;
       case "recalculate_route": setDistanceConfirmed(false); calculateRoute(); break;
       case "confirm_distance": setDistanceConfirmed(true); break;
@@ -1747,9 +1755,12 @@ export default function QuoteBuilder() {
               // "Check" for R 0 tolls / flagged operating costs, "Not set" for
               // border costs an international trip still needs (server flags).
               const paLine = (k: string) => (pricing.isCurrent ? pricing.data?.costFloor?.lines.find(l => l.key === k) : null) ?? null;
-              const tollsCheck = !!paLine("tolls")?.check && lineAmt("tolls") === 0 && !tollsNone;
-              const opCheck = !!paLine("fixed_cost")?.check;
-              const borderNotSet = !!paLine("border")?.needsInput && crossBorderCost <= 0;
+              // The costing's own codes: tolls_none_found, border_costs_missing
+              // (border line needs_input); the server's operating_cost_overlap.
+              const tollsCheck = costing.warnings.some(w => w.code === "tolls_none_found");
+              const opCheck = !!pricing.data?.warnings.some(w => w.code === "operating_cost_overlap") || !!paLine("fixed_cost")?.check;
+              const borderLine = costing.lines.find(l => l.key === "border") ?? null;
+              const borderNotSet = borderLine?.status === "needs_input";
               const opEstimate = opLine?.source === "vehicle_default";
               const money = (v: number | null | undefined) => (v == null ? "—" : formatMoneyWhole(v));
               const rIn = (node: React.ReactNode) => <span className="qb-cost__money"><span aria-hidden="true">R</span>{node}</span>;
@@ -1808,13 +1819,16 @@ export default function QuoteBuilder() {
                   onValue={(n) => { setDriverAllowanceInput(n == null ? "" : String(n)); setDriverEdited(true); }}
                   aria-label="Driver allowance (R)" className={`qb-mini qb-cost__input${driverLineC?.amount == null ? " is-missing" : ""}`} />)}
               </div>
-              {borderNotSet && (
+              {(borderNotSet || borderTyped !== "") && (
                 <div className="qb-cost__row">
-                  <span className="qb-cost__label">Border fees<span className="qb-cost__tag">Not set</span></span>
-                  <span className="qb-cost__value">—</span>
+                  <span className="qb-cost__label">Border fees{borderNotSet && <span className="qb-cost__tag">Not set</span>}
+                    {borderTyped !== "" && <button type="button" className="qb-linkbtn" onClick={() => setBorderTyped("")}>Reset</button>}</span>
+                  {rIn(<NumberField id="qb-border-input" decimals={0} value={borderTyped === "" ? null : Number(borderTyped)} placeholder="Needed"
+                    onValue={(n) => setBorderTyped(n == null ? "" : String(n))}
+                    aria-label="Border fees (R)" className={`qb-mini qb-cost__input${borderNotSet ? " is-missing" : ""}`} />)}
                 </div>
               )}
-              {crossBorderCost > 0 && (() => {
+              {crossBorderCost > 0 && borderTyped === "" && (() => {
                 const items = routeData?.cross_border_breakdown || [];
                 const rows = items.length
                   ? items.filter(it => it.amount > 0).map(it => [it.description, formatCurrency(it.amount)] as [string, string])

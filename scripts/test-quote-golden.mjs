@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { compute } from "../src/lib/quoteRules.ts";
+import { compute, changesSincePriced } from "../src/lib/quoteRules.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const file = join(here, "fixtures/quote_golden.json");
@@ -22,7 +22,7 @@ if (backend && existsSync(backend)) assert.equal(raw, readFileSync(backend, "utf
 const golden = JSON.parse(raw);
 assert.ok(golden.cases.length >= 12, "at least 12 golden cases");
 
-const TOL = /(^|\.)(litres|loaded|empty_return|total|burn_l_per_100km|burn_loaded_l_per_100km|burn_empty_l_per_100km|load_ratio|hours_one_way|margin_pct|km|km_loaded|km_empty|km_driven)$/;
+const TOL = /(^|\.)(litres|loaded|empty_return|total|burn_l_per_100km|burn_loaded_l_per_100km|burn_empty_l_per_100km|load_ratio|hours_one_way|margin_pct|margin_then|margin_now|km|km_loaded|km_empty|km_driven)$/;
 const COPY = /(\.basis|\.detail)$/;   // server copy: reported, not failed
 const copyDiffs = [];
 
@@ -53,5 +53,12 @@ for (const c of golden.cases) {
   try { cmp(c.expected, got, ""); } catch (e) { e.message = `${c.name}: ${e.message}`; throw e; }
   n++;
 }
+let r = 0;
+for (const c of golden.reopen_cases ?? []) {
+  const i = c.inputs;
+  const got = JSON.parse(JSON.stringify(changesSincePriced(i.price, i.floor_then, i.floor_now, i.priced_at)));
+  try { cmp(c.expected, got, ""); } catch (e) { e.message = `reopen ${c.name}: ${e.message}`; throw e; }
+  r++;
+}
 if (copyDiffs.length) console.log(`(copy differences, not compared: ${copyDiffs.length})\n  ${copyDiffs.slice(0, 10).join("\n  ")}`);
-console.log(`quote golden vectors: ${n} cases match to the cent`);
+console.log(`quote golden vectors: ${n} cases and ${r} reopen cases match to the cent`);

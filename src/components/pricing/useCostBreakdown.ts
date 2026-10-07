@@ -16,6 +16,7 @@ export interface ServerCosting {
   } | null;
   floor: number | null;
   warnings: unknown[];
+  resolution?: { vehicle_type_id?: number | null; suggested_vehicle_type_id?: number | null } | null;
 }
 
 /**

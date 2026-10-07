@@ -10,9 +10,10 @@ import { postData, patchData, fetchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatMoneyWhole, formatNumber, formatDateTime, sentenceCaseLabel } from "@/lib/formatters";
 import { DatePicker } from "@/components/ui/date-picker";
-import { dieselInputFrom, dieselSourceNote, randPerLitre, currentPeriodStartIso, shortDate, isoDay, type QuoteWarning } from "@/lib/dieselPrice";
-import { compute, suggestTruck, capacityTonnes, vehicleClass, CLASS_OPERATING_DEFAULTS, cents, marginPct as marginPctOf, type CostingInputs, type DieselInput } from "@/lib/quoteRules";
+import { dieselInputFrom, dieselSourceNote, randPerLitre, currentPeriodStartIso, isoDay, type QuoteWarning } from "@/lib/dieselPrice";
+import { compute, changesSincePriced, suggestTruck, capacityTonnes, vehicleClass, CLASS_OPERATING_DEFAULTS, cents, type CostingInputs, type DieselInput } from "@/lib/quoteRules";
 import { useCostBreakdown } from "@/components/pricing/useCostBreakdown";
+import { sendBlockedMessage } from "@/lib/quoteWarnings";
 import { LocationInput, type LocationCoords } from "@/components/LocationInput";
 import { RouteMapView } from "@/components/RouteMapView";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -210,7 +211,7 @@ interface RouteOption {
   toll_cost_zar?: number; toll_breakdown?: TollBreakdownItem[]; fuel_cost_zar?: number; total_cost_zar?: number;
   label?: string; geometry?: { lat: number; lon: number }[];
   road_type?: string; motorway_pct?: number; traffic_status?: string; congested_km?: number; terrain?: string[];
-  fuel_usage_litres?: number; country_codes?: string[]; tolls_unavailable?: boolean;
+  fuel_usage_litres?: number; country_codes?: string[]; tolls_unavailable?: boolean; tolls_unknown?: boolean;
 }
 const formatDuration = (min?: number) => {
   if (!min || min <= 0) return "—";
@@ -370,8 +371,8 @@ export default function QuoteBuilder() {
   const savedFinalPriceRef = useRef<number | null>(null);
   // §11: what a reopened quote was priced on (its floor and when), so a cost
   // change since then is said once, with Keep price / Re-price.
-  const savedPricingRef = useRef<{ price: number; floor: number; pricedAt: string | null; fuelPrice: number | null } | null>(null);
-  const [reopenNotice, setReopenNotice] = useState<{ delta: number; since: string | null; fromPct: number; toPct: number; reprice: number } | null>(null);
+  const savedPricingRef = useRef<{ price: number; floor: number; pricedAt: string | null; pricedAtRaw: string | null; fuelPrice: number | null } | null>(null);
+  const [reopenNotice, setReopenNotice] = useState<{ text: string; since: string | null; reprice: number | null } | null>(null);
 
   // ---- computed / async state ----
   const [routeData, setRouteData] = useState<RouteData | null>(null);
@@ -452,14 +453,29 @@ export default function QuoteBuilder() {
   // (smallest capacity ≥ load, tie → lowest rated burn). Priced from every
   // type the company has, not only the ones free today.
   const loadT = Number(weight) > 0 ? Number(weight) : 0;
-  const suggestedVT = useMemo(() => suggestTruck(allVehicleTypes, loadT),
+  // The server's costing for this route and load (POST /quotes/cost-breakdown/):
+  // its suggested truck and the company figures it resolved. Sent without a
+  // truck while none is chosen, so the server suggests one.
+  const chosenVT = vehicleType ? allVehicleTypes.find((v: any) => v.name === vehicleType) ?? null : null;
+  const preRoute = routeData?.routes?.[selectedRouteIndex] || null;
+  const preDistance = preRoute?.distance_km ?? routeData?.distance_km ?? 0;
+  const preDuration = preRoute?.duration_minutes ?? preRoute?.duration_min ?? routeData?.duration_minutes ?? null;
+  const breakdownPayload = customerId && pickupCoords && deliveryCoords && loadT > 0 && preDistance > 0 ? {
+    trip_type: tripType, one_way_distance_km: Math.round(preDistance * 100) / 100, legs: tripType === "ROUND_TRIP" ? 2 : 1,
+    duration_minutes: preDuration != null ? Math.round(Number(preDuration)) : null,
+    weight: loadT * 1000, vehicle_type_id: chosenVT?.id ?? null, vehicle_type: vehicleType || null,
+  } : null;
+  const serverBreakdown = useCostBreakdown(breakdownPayload);
+  const serverSuggestedId = serverBreakdown?.resolution?.suggested_vehicle_type_id ?? null;
+  const localSuggestedVT = useMemo(() => suggestTruck(allVehicleTypes, loadT),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [vehicleTypesRaw, loadT]);
+  const suggestedVT = (serverSuggestedId != null ? allVehicleTypes.find((v: any) => String(v.id) === String(serverSuggestedId)) : null) ?? localSuggestedVT;
   const selectedVT = useMemo(() => (vehicleType
     ? allVehicleTypes.find((v: any) => v.name === vehicleType) ?? vehicleTypes.find((v: any) => v.name === vehicleType)
     : suggestedVT) ?? null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [vehicleTypesRaw, vehicleType, suggestedVT]);
+    [vehicleTypesRaw, vehicleType, suggestedVT?.id]);
   /** The truck the quote is priced and saved on (chosen or suggested). */
   const truckName: string = selectedVT?.name || vehicleType || "";
   const vtLabel = sentenceCaseLabel(truckName);
@@ -473,7 +489,8 @@ export default function QuoteBuilder() {
   const aiFuelActive = !!aiFuel && aiFuel.fuelType === fuelType;
   const dieselInput: DieselInput = isDieselPricing
     ? { ...dieselInputFrom({ company: companyProfile, live: liveFuel }), use_official: useOfficialDiesel, override_price: aiFuelActive ? aiFuel!.pricePerL : null }
-    : { zone: companyProfile?.fuel_zone, mode: "LIVE", official_price: null, override_price: aiFuelActive ? aiFuel!.pricePerL : otherFuelPrice };
+    // Other fuels have no official price: the company's own per-fuel price.
+    : { zone: companyProfile?.fuel_zone, mode: "OWN", own_price: otherFuelPrice, official_price: null, override_price: aiFuelActive ? aiFuel!.pricePerL : null, fuel_type: fuelType };
 
   const applyVehicleType = (name: string) => {
     setVehicleType(name);
@@ -491,7 +508,8 @@ export default function QuoteBuilder() {
   const chargeDistance = distance * legs;
   const durationMin: number | null = route?.duration_minutes ?? route?.duration_min ?? routeData?.duration_minutes ?? null;
   const distanceEstimated = routeData?.source === "estimated" || routeData?.distance_estimated === true;
-  const routeTollsUnknown = (route?.tolls_unavailable ?? routeData?.tolls_unavailable) === true || routeData?.tolls_unknown === true;
+  const routeTollsUnknown = (route?.tolls_unavailable ?? routeData?.tolls_unavailable) === true
+    || (route?.tolls_unknown ?? routeData?.tolls_unknown) === true;
   const tollBreakdown = route?.toll_breakdown ?? routeData?.toll_breakdown ?? [];
   // The plazas and truck an applied market toll figure was verified for.
   const tollRouteKey = JSON.stringify([truckName, tollBreakdown.map(b => b.plaza)]);
@@ -508,12 +526,6 @@ export default function QuoteBuilder() {
 
   // ---- company figures the costing needs: the server's resolution
   // (POST /quotes/cost-breakdown/) when in, else the profile's own ----
-  const breakdownPayload = ready && distance > 0 && selectedVT ? {
-    trip_type: tripType, one_way_distance_km: Math.round(distance * 100) / 100, legs,
-    duration_minutes: durationMin != null ? Math.round(Number(durationMin)) : null,
-    weight: weightKg, vehicle_type_id: selectedVT.id ?? null, vehicle_type: truckName,
-  } : null;
-  const serverBreakdown = useCostBreakdown(breakdownPayload);
   const si = serverBreakdown?.inputs ?? null;
   const opInUse = companyProfile?.operating_cost_in_use;
   const localOp = (() => {
@@ -755,7 +767,7 @@ export default function QuoteBuilder() {
         const floor = Number(q.cost_floor ?? sn.cost_floor ?? q.pricing_decision?.floor);
         const price = Number(q.pricing_decision?.final_price ?? q.total_amount);
         savedPricingRef.current = floor > 0 && price > 0
-          ? { price, floor, pricedAt: isoDay(q.priced_at), fuelPrice: Number(q.fuel_price_used) || null }
+          ? { price, floor, pricedAt: isoDay(q.priced_at), pricedAtRaw: q.priced_at ?? null, fuelPrice: Number(q.fuel_price_used) || null }
           : null;
         setReturnLoadBooked(ci.include_empty_return === false);
         setTollsNone(ci.tolls_confirmed_none === true);
@@ -1019,7 +1031,8 @@ export default function QuoteBuilder() {
     countryCodes: route?.country_codes ?? routeData?.countries ?? null,
     crossBorderCost, isInternational,
     pickupDate: pickupDate || null,
-    driverAllowance: driverEdited || allowancePerNight != null ? driverAllowance : null,
+    // Only a figure the user typed (sent as an override); else the server prices the nights.
+    driverAllowance: driverEdited ? driverAllowance : null,
     includeReturn: legs === 1 ? emptyReturn.included : null,
     yourPrice: total,
   } : null;
@@ -1055,20 +1068,17 @@ export default function QuoteBuilder() {
   }, [routeIsCurrent]);
   // §11: costs changed since the quote was priced → one compact notice. The
   // floor is the one the panel shows (the server's), else the local costing.
-  const analysisSettled = pricing.status === "ready" || pricing.status === "error" || pricing.status === "unavailable" || pricing.status === "offline";
-  const floorNow = pricing.data?.costFloor?.total ?? costing.floor;
+  // One floor everywhere: the costing (the panel's floor is the same compute()).
+  const floorNow = costing.floor;
   useEffect(() => {
     const sp = savedPricingRef.current;
-    if (!sp || !routeIsCurrent || !analysisSettled || floorNow == null) return;
+    if (!sp || !routeIsCurrent || floorNow == null) return;
     savedPricingRef.current = null;
-    const delta = cents(floorNow - sp.floor);
-    if (Math.abs(delta) < 1) return;
-    const fromPct = marginPctOf(sp.price, sp.floor) ?? 0;
-    const toPct = marginPctOf(sp.price, floorNow) ?? 0;
-    const reprice = fromPct < 100 ? Math.ceil(floorNow / (1 - fromPct / 100)) : sp.price;
-    setReopenNotice({ delta, since: sp.pricedAt, fromPct, toPct, reprice });
+    const ch = changesSincePriced(sp.price, sp.floor, floorNow, sp.pricedAtRaw);
+    if (!ch.changed || !ch.notice) return;
+    setReopenNotice({ text: ch.notice, since: sp.pricedAt, reprice: ch.repriced_price_keep_margin });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeIsCurrent, analysisSettled, floorNow]);
+  }, [routeIsCurrent, floorNow]);
 
   // Price bar height as a CSS variable (sticky aside, toasts sit above it).
   const priceBarRef = useRef<HTMLElement | null>(null);
@@ -1288,7 +1298,7 @@ export default function QuoteBuilder() {
       localStorage.removeItem(DRAFT_KEY);
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
       navigate(quoteId ? `/bookings/quotes/${quoteId}` : "/bookings/quotes");
-    } catch (e: any) { toast.error(e?.message || "Couldn't save the quote"); }
+    } catch (e: unknown) { toast.error(sendBlockedMessage(e) || (e as { message?: string } | null)?.message || "Couldn't save the quote"); }
     finally { setSaving(false); }
   };
 
@@ -1308,7 +1318,7 @@ export default function QuoteBuilder() {
       case "choose_vehicle": document.getElementById("qb-truck-select")?.focus(); break;
       case "edit_vehicle": case "add_vehicle": navigate("/fleet/vehicles"); break;
       case "use_minimum": if (minimumCharge != null) applyPrice(minimumCharge); break;
-      case "reprice": if (reopenNotice) { applyPrice(reopenNotice.reprice); setReopenNotice(null); } break;
+      case "reprice": if (reopenNotice?.reprice != null) { applyPrice(reopenNotice.reprice); setReopenNotice(null); } break;
       case "keep_price": setReopenNotice(null); break;
     }
   };
@@ -1471,7 +1481,7 @@ export default function QuoteBuilder() {
                 <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "3px 12px" }}>
                   <span style={{ color: "var(--text-tertiary)" }}>Distance</span><span>{Math.round(r.distance_km)} km</span>
                   <span style={{ color: "var(--text-tertiary)" }}>Duration</span><span>{formatDuration(r.duration_minutes ?? r.duration_min)}</span>
-                  <span style={{ color: "var(--text-tertiary)" }}>Tolls</span><span>{r.tolls_unavailable ? "Unknown" : formatCurrency(r.toll_cost_zar)}</span>
+                  <span style={{ color: "var(--text-tertiary)" }}>Tolls</span><span>{r.tolls_unavailable || r.tolls_unknown || r.toll_cost_zar == null ? "Unknown" : formatCurrency(r.toll_cost_zar)}</span>
                   {r.road_type && (<><span style={{ color: "var(--text-tertiary)" }}>Road</span><span>{r.road_type}</span></>)}
                   {r.terrain && r.terrain.length > 0 && (<><span style={{ color: "var(--text-tertiary)" }}>Terrain</span><span>{r.terrain.join(", ")}</span></>)}
                 </div>
@@ -1921,9 +1931,9 @@ export default function QuoteBuilder() {
         const slot = blocked ? <WarnLine list={quoteWarnings} onAction={runWarningAction} />
           : reopenNotice ? (
             <span className="qb-pricebar__next qb-pricebar__notice" role="status">
-              <span>Costs {reopenNotice.delta > 0 ? "up" : "down"} {formatMoneyWhole(Math.abs(reopenNotice.delta))}{reopenNotice.since ? ` since ${shortDate(reopenNotice.since)}` : ""}. Margin {signedPct(reopenNotice.fromPct)} → {signedPct(reopenNotice.toPct)}.</span>
+              <span>{reopenNotice.text}</span>
               <button type="button" className="qb-linkbtn" onClick={() => setReopenNotice(null)}>Keep price</button>
-              <button type="button" className="qb-linkbtn qb-linkbtn--strong" onClick={() => { applyPrice(reopenNotice.reprice); setReopenNotice(null); }}>Re-price</button>
+              {reopenNotice.reprice != null && <button type="button" className="qb-linkbtn qb-linkbtn--strong" onClick={() => { applyPrice(reopenNotice.reprice!); setReopenNotice(null); }}>Re-price</button>}
             </span>)
           : useRec && ready && !priceTyping ? (
             <span className="qb-pricebar__next">

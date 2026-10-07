@@ -130,7 +130,7 @@ export interface DieselInput {
   zone?: string | null; mode?: string | null;
   own_price?: number | null; own_set_at?: string | null;
   official_price?: number | null; official_effective_from?: string | null; official_stale?: boolean;
-  use_official?: boolean; override_price?: number | null;
+  use_official?: boolean; override_price?: number | null; fuel_type?: string | null;
 }
 export interface CostingInputs {
   trip_type?: string | null;
@@ -155,7 +155,7 @@ export interface CostingInputs {
 }
 
 export interface ResolvedDiesel {
-  zone: string; mode: string; own_price: number | null; own_set_at: string | null;
+  zone: string; mode: string; own_price: number | null; own_set_at: string | null; fuel_type: string;
   official_price: number | null; official_effective_from: string | null; official_stale: boolean;
   price: number | null; source: "own" | "official" | "override" | "missing";
 }
@@ -170,7 +170,7 @@ export function resolveDiesel(d: DieselInput | null | undefined): ResolvedDiesel
   const official = pos(d.official_price);
   const override = pos(d.override_price);
   const base = {
-    zone, mode, own_price: own, own_set_at: iso(d.own_set_at),
+    zone, mode, own_price: own, own_set_at: iso(d.own_set_at), fuel_type: d.fuel_type || "Diesel",
     official_price: official, official_effective_from: iso(d.official_effective_from),
     official_stale: official !== null ? !!d.official_stale : false,
   };
@@ -184,8 +184,15 @@ export function dieselWarnings(diesel: ResolvedDiesel, litresTotal: number | nul
   const out: QuoteWarning[] = [];
   const zoneTxt = diesel.zone === "COASTAL" ? "coastal" : "inland";
   if (diesel.source === "missing") {
-    out.push(warning("diesel_missing", "block", "No diesel price available",
-      "No official price on record; set your own in settings.", null, ["retry_diesel", "update_own"]));
+    const fuel = String(diesel.fuel_type || "Diesel").toLowerCase();
+    if (fuel === "diesel") {
+      out.push(warning("diesel_missing", "block", "No diesel price available",
+        "No official price on record; set your own in settings.", null, ["retry_diesel", "update_own"]));
+    } else {
+      const unit = fuel === "electric" ? "kWh" : "litre";
+      out.push(warning("diesel_missing", "block", `No ${fuel} price set`,
+        `Set your ${fuel} price per ${unit} in settings.`, null, ["update_own"], { fuel_type: fuel }));
+    }
     return out;
   }
   if (diesel.source === "own" && diesel.official_price) {
@@ -365,18 +372,19 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
   const suggested = nights !== null && rate !== null ? cents(nights * rate) : (nights === 0 ? 0.0 : null);
   let drvAmt: number | null; let drvSource: string;
   if (userAmount !== null && userAmount >= 0) { drvAmt = cents(userAmount); drvSource = "user"; }
-  else { drvAmt = suggested; drvSource = "suggested"; }
+  else if (suggested === null && nights) {
+    // Nights away but no allowance rate anywhere: priced at R 0 and said so (warn).
+    drvAmt = 0.0; drvSource = "missing";
+    warnings.push(warning("driver_allowance_missing", "warn", "No driver allowance rate set",
+      `${nights} night${nights !== 1 ? "s" : ""} away priced at R 0; enter the driver cost or set a rate.`, null, ["enter_driver_cost", "update_allowance"]));
+  } else { drvAmt = suggested; drvSource = "suggested"; }
   if (drvAmt === null) {
-    if (nights === null) {
-      warnings.push(warning("driver_nights_unknown", "block", "Driving time is unknown",
-        "Enter the driver cost, or recalculate the route.", null, ["enter_driver_cost", "recalculate_route"]));
-    } else {
-      warnings.push(warning("driver_allowance_missing", "block", "Driver nights have no allowance",
-        `${nights} night${nights !== 1 ? "s" : ""} away: enter the driver cost or set a rate.`, null, ["enter_driver_cost", "update_allowance"]));
-    }
+    warnings.push(warning("driver_nights_unknown", "block", "Driving time is unknown",
+      "Enter the driver cost, or recalculate the route.", null, ["enter_driver_cost", "recalculate_route"]));
   }
   add("driver", "loaded", drvAmt,
     drvSource === "user" ? "Your figure"
+      : drvSource === "missing" ? `${nights} night${nights !== 1 ? "s" : ""} at R 0: no allowance rate set`
       : rate !== null && nights ? `${nights} night${nights !== 1 ? "s" : ""} × ${fmtRand(rate, 2)}`
       : nights === 0 ? "No night away" : "Unknown",
     { nights, suggested_nights: suggestedNights, rate_per_night: rate, suggested, source: drvSource });
@@ -399,13 +407,14 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
     add("tolls_return", "empty_return", retToll !== null ? cents(retToll) : null,
       retToll === null ? "Unknown" : `${fmtRand(retToll, 2)} home empty`, { one_way: retToll });
     returnNights = nightsOne !== null ? (nightsTwo as number) - nightsOne : null;
-    const drAmt = returnNights !== null && rate !== null ? cents(returnNights * rate) : (returnNights === 0 ? 0.0 : null);
-    if (drAmt === null && drvAmt !== null) {
-      warnings.push(warning("driver_allowance_missing", "block", "Driver nights have no allowance",
-        `${returnNights ?? "Extra"} extra night${returnNights !== 1 ? "s" : ""} coming home: set a rate per night.`.replace("Extra extra", "Extra"), null, ["update_allowance"]));
+    const drAmt = returnNights !== null && rate !== null ? cents(returnNights * rate) : (returnNights !== null ? 0.0 : null);
+    if (returnNights && rate === null && !warnings.some((w) => w.code === "driver_allowance_missing")) {
+      warnings.push(warning("driver_allowance_missing", "warn", "No driver allowance rate set",
+        `${returnNights} extra night${returnNights !== 1 ? "s" : ""} coming home priced at R 0; set a rate per night.`, null, ["update_allowance"]));
     }
     add("driver_return", "empty_return", drAmt,
       rate !== null && returnNights ? `${returnNights} extra night${returnNights !== 1 ? "s" : ""} × ${fmtRand(rate, 2)}`
+        : returnNights ? `${returnNights} extra night${returnNights !== 1 ? "s" : ""} at R 0: no allowance rate set`
         : returnNights === 0 ? "No extra night" : "Unknown",
       { nights: returnNights, rate_per_night: rate });
   }
@@ -513,3 +522,35 @@ export function vehicleClass(name: string | null | undefined, capacity: unknown)
 
 /** Margin as a share of price (§7), unrounded. */
 export const marginPct = (price: number, floor: number) => (price > 0 ? (price - floor) / price * 100 : null);
+
+// ---------------------------------------------------------------- reopen (§11)
+
+export interface ChangesSincePriced {
+  priced_at: string | null; price: number | null; floor_then: number | null; floor_now: number | null;
+  delta_zar: number | null; margin_then: number | null; margin_now: number | null;
+  repriced_price_keep_margin: number | null; changed: boolean; notice: string | null;
+  actions: { id: string; label: string }[];
+}
+
+/** quote_costing.changes_since_priced: the reopen notice ("Costs up R 1 050
+ *  since 2 Sep. Margin 14% → 9%.") and the Re-price figure (keeps margin). */
+export function changesSincePriced(price: unknown, floorThen: unknown, floorNow: unknown, pricedAt: unknown = null): ChangesSincePriced {
+  const p = pos(price), ft = num(floorThen), fn = num(floorNow);
+  const delta = ft !== null && fn !== null ? cents(fn - ft) : null;
+  const mThen = p && ft !== null ? (p - ft) / p * 100 : null;
+  const mNow = p && fn !== null ? (p - fn) / p * 100 : null;
+  const keep = mThen !== null && fn !== null && mThen < 100 ? cents(fn / (1 - mThen / 100)) : null;
+  const changed = delta !== null && Math.abs(delta) >= 1;
+  let notice: string | null = null;
+  if (changed) {
+    const when = saDate(pricedAt);
+    notice = `Costs ${(delta as number) > 0 ? "up" : "down"} ${fmtRand(Math.abs(delta as number))}`
+      + (when ? ` since ${when.slice(0, when.lastIndexOf(" "))}` : "") + "."
+      + (mThen !== null && mNow !== null ? ` Margin ${Math.floor(mThen + 0.5)}% → ${Math.floor(mNow + 0.5)}%.` : "");
+  }
+  return {
+    priced_at: iso(pricedAt), price: p, floor_then: ft, floor_now: fn, delta_zar: delta, margin_then: mThen, margin_now: mNow,
+    repriced_price_keep_margin: keep, changed, notice,
+    actions: changed ? ["keep_price", "reprice"].map((a) => ({ id: a, label: ACTION_LABELS[a] })) : [],
+  };
+}

@@ -759,12 +759,20 @@ export default function QuoteBuilder() {
         setCargo(/^not specified$/i.test(c) || c === legacy ? "" : c); } setNotes(q.notes || "");
       // The saved driver figure is the quote's own (kept, not re-prefilled).
       if (q.driver_allowance != null) { setDriverAllowanceInput(String(Number(q.driver_allowance))); setDriverEdited(true); }
-      savedFinalPriceRef.current = Number(q.pricing_decision?.final_price) > 0 ? Number(q.pricing_decision.final_price) : null;
+      // Theirs (53856f8): the stored pricing decision describes this quote only
+      // while its final price still equals the quote's total (to 50 cents,
+      // QuoteDetail's rule) and the server hasn't marked it stale. Otherwise
+      // the quote reopens at its saved total, never put back to the decision's.
+      const decision = q.pricing_decision;
+      const decidedPrice = Number(decision?.final_price);
+      const decisionCurrent = !!decision && !decision.stale && decidedPrice > 0
+        && Math.abs(decidedPrice - Number(q.total_amount)) <= 0.5;
+      savedFinalPriceRef.current = decisionCurrent ? decidedPrice : Number(q.total_amount) > 0 ? Number(q.total_amount) : null;
       { const sn = q.route_snapshot || {};
         const ci = q.costing_inputs || {};
         // §11: what it was priced on (the server's snapshot, else the decision).
-        const floor = Number(q.cost_floor ?? sn.cost_floor ?? q.pricing_decision?.floor);
-        const price = Number(q.pricing_decision?.final_price ?? q.total_amount);
+        const floor = Number(q.cost_floor ?? sn.cost_floor ?? (decisionCurrent ? decision?.floor : null));
+        const price = decisionCurrent ? decidedPrice : Number(q.total_amount);
         savedPricingRef.current = floor > 0 && price > 0
           ? { price, floor, pricedAt: isoDay(q.priced_at), pricedAtRaw: q.priced_at ?? null, fuelPrice: Number(q.fuel_price_used) || null }
           : null;
@@ -1214,14 +1222,18 @@ export default function QuoteBuilder() {
     driver_allowance: round2(driverAllowance), additional_charges: round2(crossBorderCost + savedBaseShortfall),
     total_amount: round2(total),
     // One margin definition: price − full cost floor (pricing analysis). Sent
-    // only when the floor is known, so an edit never wipes a saved figure.
-    ...(liveReading.marginPct != null ? { margin_percentage: Math.max(-999.99, Math.min(999.99, Math.round(liveReading.marginPct * 100) / 100)) } : {}),
+    // only when the floor is known, so an edit never wipes a saved figure, and
+    // only from an analysis of exactly these values (not one still refreshing).
+    ...(pricing.isCurrent && liveReading.marginPct != null ? { margin_percentage: Math.max(-999.99, Math.min(999.99, Math.round(liveReading.marginPct * 100) / 100)) } : {}),
     notes, status,
     sla_hours: Number(companyProfile?.default_sla_hours) || 48, valid_until: validUntilToSave, trip_type: tripType,
     // No heuristic win_probability any more: the server sets it from the
     // model's likelihood at the final price (model level only). What was shown
     // and picked is saved, additively, as pricing_decision.
-    ...(pricing.data ? { pricing_decision: pricingDecision(pricing.data, total, liveReading.matchedChoice ?? "custom", defaultPrice != null ? round2(total - defaultPrice) : 0) } : {}),
+    // Only an analysis of exactly what is being saved (theirs, 53856f8): while
+    // one is still refreshing the quote saves without it (the old decision is
+    // then marked superseded on the server if the price moved).
+    ...(pricing.data && pricing.isCurrent ? { pricing_decision: pricingDecision(pricing.data, total, liveReading.matchedChoice ?? "custom", defaultPrice != null ? round2(total - defaultPrice) : 0) } : {}),
     base_rate_per_km: chargeDistance > 0 ? round2(savedBase / chargeDistance) : null,
     costing_inputs: costingInputsPayload,
     // Full raw request+response of the route-calculate call behind the
@@ -1516,7 +1528,11 @@ export default function QuoteBuilder() {
   const inputS: React.CSSProperties = { background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-control, 8px)", padding: "9px 11px", color: "var(--text-primary)", fontSize: 14, lineHeight: "20px", fontFamily: "var(--font-sans)", width: "100%", minHeight: "var(--field-h, 40px)", boxSizing: "border-box" };
 
   // Same condition the price bar renders on (display only).
-  const showPriceBar = !billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && (total > 0 || blockWarnings.length > 0);
+  // Never gated on the typed price (theirs, issue 18): clearing the price box
+  // to retype (0) must not hide the bar being typed into. Shown once there is
+  // a floor, a price set, or a block to say.
+  const showPriceBar = !billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage
+    && (costing.floor != null || priceSet != null || blockWarnings.length > 0);
 
   return (
     <div ref={controlsRef} className={`qi-form qb-controls${showPriceBar ? " qb-has-pricebar" : ""}`}>
@@ -1727,6 +1743,13 @@ export default function QuoteBuilder() {
               // ONE cost model: these lines are what the job costs; they add up
               // to the cost floor. The price is in the bar.
               const opLine = costing.lines.find(l => l.key === "operating") ?? null;
+              // Floor gap chips (theirs, 53856f8) on the one floor's own lines:
+              // "Check" for R 0 tolls / flagged operating costs, "Not set" for
+              // border costs an international trip still needs (server flags).
+              const paLine = (k: string) => (pricing.isCurrent ? pricing.data?.costFloor?.lines.find(l => l.key === k) : null) ?? null;
+              const tollsCheck = !!paLine("tolls")?.check && lineAmt("tolls") === 0 && !tollsNone;
+              const opCheck = !!paLine("fixed_cost")?.check;
+              const borderNotSet = !!paLine("border")?.needsInput && crossBorderCost <= 0;
               const opEstimate = opLine?.source === "vehicle_default";
               const money = (v: number | null | undefined) => (v == null ? "—" : formatMoneyWhole(v));
               const rIn = (node: React.ReactNode) => <span className="qb-cost__money"><span aria-hidden="true">R</span>{node}</span>;
@@ -1734,7 +1757,7 @@ export default function QuoteBuilder() {
               <div className="qb-cost__row">
                 <span className="qb-cost__label">
                   Operating costs
-                  {opEstimate && <span className="qb-cost__tag">Estimate</span>}
+                  {opCheck ? <span className="qb-cost__tag">Check</span> : opEstimate && <span className="qb-cost__tag">Estimate</span>}
                   <InfoPop label="Operating costs working" title="Operating costs" rows={[
                     ["Rate", opLine?.rate_per_km != null ? `${formatCurrency(Number(opLine.rate_per_km))}/km` : "Not set"],
                     ["Distance", `${formatNumber(Math.round(chargeDistance))} km`],
@@ -1761,6 +1784,7 @@ export default function QuoteBuilder() {
               <div className="qb-cost__row">
                 <span className="qb-cost__label">
                   Tolls
+                  {tollsCheck && <span className="qb-cost__tag" title="No toll plazas found for this route: check">Check</span>}
                   <InfoPop label="Toll plazas" title="Toll plazas" rows={tollBreakdown.length
                     ? tollBreakdown.map(b => [b.plaza, formatCurrency(b.tariff)] as [string, string])
                     : [[routeTollsUnknown ? "Lookup failed" : "None on this route", ""]]}
@@ -1784,6 +1808,12 @@ export default function QuoteBuilder() {
                   onValue={(n) => { setDriverAllowanceInput(n == null ? "" : String(n)); setDriverEdited(true); }}
                   aria-label="Driver allowance (R)" className={`qb-mini qb-cost__input${driverLineC?.amount == null ? " is-missing" : ""}`} />)}
               </div>
+              {borderNotSet && (
+                <div className="qb-cost__row">
+                  <span className="qb-cost__label">Border fees<span className="qb-cost__tag">Not set</span></span>
+                  <span className="qb-cost__value">—</span>
+                </div>
+              )}
               {crossBorderCost > 0 && (() => {
                 const items = routeData?.cross_border_breakdown || [];
                 const rows = items.length

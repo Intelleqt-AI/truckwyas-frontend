@@ -19,6 +19,8 @@ export interface PricingState {
   data: PricingAnalysis | null;
   /** The request body the shown data answers (stale while refreshing). */
   dataKey: string | null;
+  /** The shown data answers exactly the builder's current values. */
+  isCurrent: boolean;
   retry: () => void;
 }
 
@@ -36,13 +38,19 @@ export function usePricingAnalysis(inputs: PricingInputs | null, enabled: boolea
   const [dataKey, setDataKey] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+  // The values the builder shows now: an answer for anything else is dropped.
+  const latestKeyRef = useRef<string | null>(null);
+  latestKeyRef.current = key;
   const lastNonceRef = useRef(0);
   const hasDataRef = useRef(false);
   hasDataRef.current = !!data;
 
   useEffect(() => {
+    // Any change cancels the request still on its way at once (not when the
+    // next one is sent): its answer is for values no longer on screen.
+    abortRef.current?.abort();
+    abortRef.current = null;
     if (!key) {
-      abortRef.current?.abort();
       setStatus("idle");
       setData(null); setDataKey(null);
       return;
@@ -52,19 +60,19 @@ export function usePricingAnalysis(inputs: PricingInputs | null, enabled: boolea
     if (key === dataKey && !forced) { setStatus("ready"); return; }
     setStatus(hasDataRef.current ? "refreshing" : "loading");
     const timer = setTimeout(async () => {
-      abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       try {
         const res = await postData({ url: PRICING_URL, data: JSON.parse(key), config: { signal: ctrl.signal, timeout: 15000 } });
-        if (ctrl.signal.aborted) return;
+        // Only an answer for exactly what is on screen now is shown.
+        if (ctrl.signal.aborted || key !== latestKeyRef.current) return;
         const adapted = adaptAnalysis(res);
         if (!adapted) { setStatus("error"); return; }
         setData(adapted);
         setDataKey(key);
         setStatus("ready");
       } catch (e) {
-        if (ctrl.signal.aborted) return;
+        if (ctrl.signal.aborted || key !== latestKeyRef.current) return;
         const err = e as { status?: number; message?: string };
         if (err?.message === "canceled") return;
         if (err?.status === 404 || err?.status === 403 || err?.status === 402) setStatus("unavailable");
@@ -87,5 +95,5 @@ export function usePricingAnalysis(inputs: PricingInputs | null, enabled: boolea
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const retry = useCallback(() => setNonce((n) => n + 1), []);
-  return { status, data: key ? data : null, dataKey, retry };
+  return { status, data: key ? data : null, dataKey, isCurrent: !!key && dataKey === key, retry };
 }

@@ -27,7 +27,10 @@ export interface FloorLine {
   suggested: number | null;
   /** driver_allowance only: nights away, and whether the user still has to give a figure. */
   nights: number | null;
+  /** A figure the floor still needs (driver allowance, or border costs on an international trip). */
   needsInput: boolean;
+  /** A figure worth checking: R0 tolls (none found for the route, which may be missing data). */
+  check: boolean;
 }
 export interface CostFloor {
   total: number; perKm: number | null; includeReturn: boolean;
@@ -253,6 +256,7 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
         // Backend flag when it lands; until then: nights away, no approved rate, nothing typed.
         needsInput: l!.status === "needs_input"
           || (l!.key === "driver_allowance" && (num(l!.nights) ?? 0) >= 1 && num(l!.suggested) == null && (obj(l!.source)?.kind !== "user")),
+        check: l!.status === "check",
       };
     }),
     fixedCostPerKm: fx && num(fx.value) != null ? {

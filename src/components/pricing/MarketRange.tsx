@@ -15,7 +15,7 @@ export function MarketRange({ market, floor, price }: { market: Market; floor: n
   const { p25, median, p75 } = market;
   if (p25 == null || median == null || p75 == null) return null;
 
-  const values = [p25, p75, median, ...(floor != null ? [floor] : []), ...(price != null && price > 0 ? [price] : [])];
+  const values = [p25, p75, median, ...(floor != null ? [floor] : []), ...(price != null ? [price] : [])];
   const lo = Math.min(...values), hi = Math.max(...values);
   const pad = Math.max((hi - lo) * 0.08, hi * 0.02);
   const PADX = 6;
@@ -25,11 +25,12 @@ export function MarketRange({ market, floor, price }: { market: Market; floor: n
     const half = label.length * 3.5 + 2;
     return Math.max(half, Math.min(w - half, cx));
   };
-  // Words only: the figures are said once elsewhere (bar, floor row).
-  const youLabel = price != null && price > 0 ? "You" : null;
+  // Words only (the figures are said once elsewhere); shown for any typed
+  // price, 0 included, so the marker never vanishes mid-edit (theirs, issue 18).
+  const youLabel = price != null ? "You" : null;
   // Floor label is pinned to its tick; when "You" is within ~24 px of it,
   // the You label steps sideways so the two never collide.
-  const close = floor != null && price != null && price > 0 && Math.abs(x(price) - x(floor)) < 24;
+  const close = floor != null && price != null && Math.abs(x(price) - x(floor)) < 24;
   const youX = !youLabel ? 0 : close ? clampText(x(price!) + (x(price!) >= x(floor!) ? 1 : -1) * (youLabel.length * 3.5), youLabel) : clampText(x(price!), youLabel);
   const floorLabel = floor != null ? "Floor" : null;
 

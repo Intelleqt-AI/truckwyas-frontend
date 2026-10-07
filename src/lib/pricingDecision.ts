@@ -156,7 +156,9 @@ export function pricingDecisionOf(quote: ({ total_amount?: unknown; pricing_deci
   }
 
   const total = num(quote?.total_amount);
-  const stale = total !== null && Math.abs(total - finalPrice) > 0.5;
+  // Stale: the server marked it (the price changed without a new analysis),
+  // or the quote total no longer matches the price it was made at.
+  const stale = d.stale === true || (total !== null && Math.abs(total - finalPrice) > 0.5);
   const fl = floorLinesOf(d, quote || {}, floor, stale);
   return {
     floorLines: fl.lines,

@@ -268,6 +268,11 @@ function Result(p: BodyProps & { data: PricingAnalysis }) {
       )}
       <Alerts data={data} customerName={p.customerName} onOneWay={p.returnApplicable ? () => p.onIncludeReturn(false) : null} includeReturn={includeReturn} />
       {/* The cost floor is said once, as the builder's Costs total. */}
+      {data.choices.length === 0 && data.missing.some((k) => MISSING_GATES.includes(k)) && (
+        <p className="pa-quiet pa-reveal" style={{ ["--d" as string]: "1" }}>
+          No prices until {data.missing.filter((k) => MISSING_GATES.includes(k)).map((k) => (k === "border" ? "border costs" : k)).join(" and ")} {data.missing.filter((k) => MISSING_GATES.includes(k)).length > 1 ? "are" : "is"} known.
+        </p>
+      )}
       {data.choices.length > 0 && <ChoicesSection data={data} price={p.price} onApply={p.onApplyPrice} includeReturn={includeReturn}
         returnApplicable={p.returnApplicable} onIncludeReturn={p.onIncludeReturn} />}
       <MarketSection data={data} price={p.price} />
@@ -346,6 +351,11 @@ function Alerts({ data, customerName, onOneWay, includeReturn }: { data: Pricing
     </div>
   );
 }
+
+/** Theirs (53856f8): say why there are no prices when fuel, tolls or border
+ *  costs aren't known yet — one short line (the builder's warning line says
+ *  which figure and how to fix it). */
+const MISSING_GATES = ["fuel", "tolls", "border"];
 
 function Section({ title, aside, children, delay, label, className }: { title: string; aside?: ReactNode; children: ReactNode; delay: number; label?: string; className?: string }) {
   return (
@@ -455,7 +465,8 @@ function MarketSection({ data, price }: { data: PricingAnalysis; price: number }
         <>
           <TierLine m={m} />
           {m.oneWayX2 && <p className="pa-tier pa-tier--x2">One-way quotes ×2.</p>}
-          <MarketRange market={m} floor={floor} price={price > 0 ? price : null} />
+          {/* Any typed price, 0 included (theirs, issue 18). */}
+          <MarketRange market={m} floor={floor} price={price} />
           <p className="pa-range-legend">
             <span title={MARKET_RANGE_LABEL}><i className="pa-key pa-key--band" aria-hidden="true" />Middle half <span className="pa-nowrap">{formatMoneyWhole(m.p25)} – {formatMoneyWhole(m.p75)}</span></span>
             <span><i className="pa-key pa-key--median" aria-hidden="true" />Median {formatMoneyWhole(m.median)}</span>
@@ -504,7 +515,7 @@ function WhySection({ data, price }: { data: PricingAnalysis; price: number }) {
           {reasons.length > 0 && <ul className="pa-reasons">{reasons.map((r) => <li key={r}>{r}</li>)}</ul>}
           {model && (
             <figure className="pa-fig">
-              <LikelihoodCurve curve={model.curve} range={model.range} choices={data.choices} price={!atChoice && price > 0 ? price : null}
+              <LikelihoodCurve curve={model.curve} range={model.range} choices={data.choices} price={!atChoice ? price : null}
                 median={data.market?.available && !data.market.isEstimate ? data.market.median : null} />
               <figcaption className="pa-fig__cap">Chance to win by price, from {model.basisLabel || plural(model.nClosed, "closed quote")}.</figcaption>
             </figure>

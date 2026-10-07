@@ -221,3 +221,22 @@ table.settings-table.is-inset :is(th, td):last-child { padding-right: 0; }
 /* R7 Company: a label's info tip keeps its 44px target clear of the control
    below it on touch screens. */
 @media (pointer: coarse) { .tw-settings-shell { --cs-tip-gap: 14px; } }
+
+/* ---- Pricing round 5 (F-3) ---- */
+.cs-pricing-grid { column-gap: 24px; row-gap: 20px; }
+.cs-pricing-grid__wide { grid-column: 1 / -1; }
+/* The sharing select lines up with the left column. */
+.cs-pricing-grid__half { max-width: calc(50% - 12px); }
+@media (max-width: 640px) { .cs-pricing-grid__half { max-width: none; } }
+/* Units inside the field: "R" before, "%" or "/km" after. */
+.cs-affix { position: relative; }
+.cs-affix__pre, .cs-affix__post {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  font: 400 14px/20px var(--font-sans); color: var(--text-tertiary); pointer-events: none;
+}
+.cs-affix__pre { left: 12px; }
+.cs-affix__post { right: 12px; }
+.cs-affix.has-prefix input { padding-left: 28px !important; }
+.cs-affix.has-suffix input { padding-right: 44px !important; }
+.cs-affix input::placeholder { color: var(--text-tertiary); opacity: 1; }
+.cs-affix.is-invalid input { border-color: var(--status-danger) !important; }

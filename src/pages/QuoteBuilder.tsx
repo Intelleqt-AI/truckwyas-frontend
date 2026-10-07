@@ -20,8 +20,14 @@ import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { AIChatPanel, type ChatMessage } from "@/components/AIChatPanel";
 import { useAuth } from "@/lib/AuthContext";
 import { isSubscriptionBlocked, subscriptionStatusDetail } from "@/lib/subscriptionStatus";
-import { MessageCircle, Map, Info, Maximize2, Mic, Square, X, Plus, GripVertical, ChevronDown, ChevronUp, Check } from "lucide-react";
-import { AIPriceAnalysisPanel, type AIPriceReviewResponse, type PriceCheckOffer } from "@/components/AIPriceAnalysisPanel";
+import { MessageCircle, Map, Info, Maximize2, Mic, Square, X, Plus, GripVertical, ChevronDown, ChevronUp, Check, AlertTriangle } from "lucide-react";
+import { formatRand } from "@/lib/pricing";
+import { PricingPanel, lkTone, likelihoodShort, signedPct, wayOutChoice, type PricingPhase } from "@/components/pricing/PricingPanel";
+import { usePricingAnalysis } from "@/components/pricing/usePricingAnalysis";
+import { readPrice, pricingDecision, rowLikelihoods } from "@/components/pricing/evaluate";
+import { NumberField } from "@/components/pricing/NumberField";
+import type { ChoiceKey, PricingInputs } from "@/components/pricing/types";
+import "@/components/pricing/quote-builder-pricing.css";
 import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -39,13 +45,10 @@ import QuoteSendPreview from "@/components/QuoteSendPreview";
  */
 
 const DRAFT_KEY = "truckwyas_newquote_draft";
-// AI price panel overrides (see applyAiRecommendation).
+// Market figures applied by the former market price check. Quotes saved with
+// them reopen with them (route_snapshot), and the cost lines offer a way back.
 type AiFuel = { pricePerL: number; fuelType: string };
 type AiToll = { oneWay: number; routeKey: string };
-type AiInputs = {
-  aiFuel: AiFuel | null; aiToll: AiToll | null; editableTollCost: string; tollManuallyEdited: boolean;
-  driverAllowanceInput: string; baseRatePerKm: string; serviceCharge: number;
-};
 const FUEL_FALLBACK: Record<string, number> = {
   Flatbed: 32, Tautliner: 33, Refrigerated: 38, Tanker: 35, "Box Truck": 28, "Danger Load": 34,
 };
@@ -264,9 +267,8 @@ export default function QuoteBuilder() {
   const [delivery, setDelivery] = useState("");
   const [deliveryCoords, setDeliveryCoords] = useState<LocationCoords | null>(null);
 
-  // ---- intermediate stops (UI only for now — not yet sent to the backend
-  // or factored into route/distance calculation; that's the follow-up once
-  // this is wired up server-side) ----
+  // ---- intermediate stops: routed through (RouteCalculatorView) and saved
+  // with the quote (buildPayload `stops`) ----
   const [stops, setStops] = useState<QuoteStop[]>([]);
   const stopIdRef = useRef(0);
   const addStop = () => {
@@ -326,6 +328,11 @@ export default function QuoteBuilder() {
   // correct live total.
   const [tollManuallyEdited, setTollManuallyEdited] = useState(false);
   const [driverAllowanceInput, setDriverAllowanceInput] = useState("0");
+  // True once the user typed a driver allowance (or a saved quote had one).
+  // Until then the pricing analysis prefills the approved allowance × nights.
+  const [driverEdited, setDriverEdited] = useState(false);
+  // Pricing analysis: empty-return toggle (null = the company's default).
+  const [includeReturn, setIncludeReturn] = useState<boolean | null>(null);
   const [baseRatePerKm, setBaseRatePerKm] = useState("10");
   const [serviceCharge, setServiceCharge] = useState(0);
   // Market fuel price applied from the AI price panel. Tied to the fuel type
@@ -337,19 +344,9 @@ export default function QuoteBuilder() {
   // or vehicle falls back to that route's own tolls instead of keeping the
   // old plazas. (Typing in Tolls still pins the field, as before.)
   const [aiToll, setAiToll] = useState<AiToll | null>(null);
-  // Which market price check (AIQuotePriceAnalysis id + item choices) is
-  // applied, and the win chance it showed for that price. The ref keeps the
-  // inputs as they were before the first Apply and as the last Apply left
-  // them, so "Undo market figures" restores exactly, and only the fields the
-  // user hasn't changed since.
-  const [aiApplied, setAiApplied] = useState<{ logId: number | null; key: string; winProbability: number | null } | null>(null);
-  const preAiSnapshotRef = useRef<{ before: AiInputs; applied: AiInputs } | null>(null);
-  // Bumped by "Clear & New Quote" so the price check panel starts fresh even
-  // though the route stays /new.
-  const [aiPanelSession, setAiPanelSession] = useState(0);
-  // The price check's current result for this quote, if any: the price bar
-  // then offers the market price in place of main's suggestion.
-  const [aiOffer, setAiOffer] = useState<PriceCheckOffer | null>(null);
+  // A saved quote priced with the pricing analysis reopens at the price that
+  // was decided (pricing_decision.final_price), applied once its route is in.
+  const savedFinalPriceRef = useRef<number | null>(null);
 
   // ---- computed / async state ----
   const [routeData, setRouteData] = useState<RouteData | null>(null);
@@ -361,10 +358,6 @@ export default function QuoteBuilder() {
   // Set when the backend's cross-border company-policy gate refuses this
   // route (RouteCalculatorView) — shown in place of the cost breakdown.
   const [routeBlockedMessage, setRouteBlockedMessage] = useState<string | null>(null);
-  const [analysis, setAnalysis] = useState<any>(null);
-  const [optimizing, setOptimizing] = useState(false);
-  const [guard, setGuard] = useState<any>(null);
-  const [benchmark, setBenchmark] = useState<any>(null);
   const [nlText, setNlText] = useState("");
   const [nlBusy, setNlBusy] = useState(false);
   // Persistent AI conversation — every message and reply lands here (see
@@ -449,6 +442,11 @@ export default function QuoteBuilder() {
   // An applied market price says so instead (it is the official FIASA price).
   const fuelZoneNote = aiFuelActive ? ' · official price' : isDieselPricing ? dieselBasisNote(diesel) : '';
   const liveDieselHintText = isDieselPricing && !aiFuelActive ? liveDieselHint(diesel) : null;
+  // Which fuel price the quote really uses (the cost card's footnote and the
+  // saved route snapshot say the same thing).
+  const fuelSourceWord = aiFuelActive ? "official diesel price"
+    : isDieselPricing ? (diesel.source === "live" ? "live diesel" : diesel.source === "own" ? "your diesel price" : "company diesel price")
+    : `company ${fuelType.toLowerCase()} price`;
   // With no vehicle type picked there is no reference tonnage to scale fuel
   // from, and a flat figure would price a 5t load and a 30t load identically.
   // So infer the truck the load will run on from the load itself: of the types
@@ -684,23 +682,9 @@ export default function QuoteBuilder() {
   })();
   const baseCost = Math.round(chargeDistance * Number(baseRatePerKm));
   const total = baseCost + fuelCost + tollCost + crossBorderCost + driverAllowance + serviceCharge;
-  // Every real cost component the carrier must recover — base rate included.
-  // Excluding base rate here (as an earlier version did) let the AI optimiser
-  // treat it as pure profit already banked, so it could recommend a price
-  // *below* the carrier's own base rate alone. Only the discretionary service
-  // charge (the markup layered on top) is excluded from the cost floor.
-  const directCost = total - serviceCharge;
-  const marginPct = total > 0 ? Math.round(((total - directCost) / total) * 100) : 0;
-  // True operating cost for the Revenue Guard ONLY — deliberately excludes
-  // base rate, unlike directCost above. directCost counts base rate as cost
-  // on purpose (see its own comment: excluding it once let the AI optimizer
-  // recommend below the carrier's own base rate). But that same inclusion
-  // makes directCost identically equal to total - serviceCharge, so the
-  // margin_pct sent to /quotes/guard/ was always exactly 0% no matter what
-  // the base rate was set to. Only this POST body's total_cost field uses
-  // this — analyze's direct_cost, the awaiting-data fallback price, and the
-  // Margin/Profit tiles all keep reading directCost unchanged.
-  const guardTrueCost = fuelCost + tollCost + crossBorderCost + driverAllowance;
+  // serviceCharge is the price adjustment: whatever the price in the bar is
+  // above (or below) the calculated lines. Margin is never read from it; the
+  // one margin is price − full cost floor (pricing analysis).
 
   // ---- route calculation (debounced auto-run) ----
   const calcRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -782,159 +766,6 @@ export default function QuoteBuilder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, pickupCoords, deliveryCoords, vehicleType, billingBlocked, stopsRouteKey]);
 
-  // ---- AI analyze + guard + benchmark once cost is ready ----
-  const analyzeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Guards against out-of-order responses: if the user switches routes (or any
-  // other cost input changes) while a call is in flight, a slower earlier call
-  // must not overwrite the result of a newer one that resolves first.
-  const aiReqRef = useRef(0);
-  const runAI = async () => {
-    if (!routeData || total <= 0) return;
-    const reqId = ++aiReqRef.current;
-    setOptimizing(true);
-    try {
-      const [an, gd] = await Promise.all([
-        postData({ url: "api/v1/quotes/analyze/", data: {
-          quote_total: total, direct_cost: directCost, distance_km: chargeDistance, origin: extractCode(pickup), destination: extractCode(delivery),
-          vehicle_type: vehicleType, weight: weightKg, fuel_cost: fuelCost, toll_cost: tollCost, driver_cost: driverAllowance,
-          fuel_usage_litres: Math.round(chargeDistance * fuelConsumption / 100), fuel_price_used: fuelPricePerL,
-          market_rate: benchmark?.market_avg_rate || 0,
-          // The server derives the real tier/history once customer_id is known
-          // (AIQuoteAnalyzeView._derive_client_features); "standard" is only the
-          // pre-selection placeholder for a not-yet-chosen customer.
-          client_tier: "standard",
-          customer_id: customerId ? parseInt(customerId, 10) : null,
-          // This panel never renders the LLM narrative — skipping it server-side
-          // cuts the analyze round-trip from seconds to near-instant.
-          skip_narrative: true,
-        }}).catch(() => null),
-        postData({ url: "/api/v1/quotes/guard/", data: {
-          total_cost: guardTrueCost, quote_price: total, distance_km: chargeDistance, fuel_cost: fuelCost, toll_cost: tollCost,
-        }}).catch(() => null),
-      ]);
-      if (reqId !== aiReqRef.current) return; // a newer request has since started — this result is stale
-      if (an) setAnalysis(an);
-      if (gd?.success !== false) setGuard(gd);
-    } finally { if (reqId === aiReqRef.current) setOptimizing(false); }
-  };
-  useEffect(() => {
-    if (!routeData || total <= 0) return;
-    // Billing blocked: quotes can't be sent/saved anyway, so skip the AI
-    // round-trips entirely rather than call them just to discard the result.
-    if (billingBlocked) { setAnalysis(null); setGuard(null); setOptimizing(false); return; }
-    // Any total-affecting change (trip-type flip, toll/driver/rate edit, route
-    // switch) invalidates the numbers on screen: clear them and flag loading so
-    // all four AI fields show a spinner together until the fresh analysis lands.
-    setAnalysis(null); setGuard(null); setOptimizing(true);
-    if (analyzeRef.current) clearTimeout(analyzeRef.current);
-    analyzeRef.current = setTimeout(() => { runAI(); }, 700);
-    return () => { if (analyzeRef.current) clearTimeout(analyzeRef.current); };
-    // selectedRouteIndex/legs are folded into `total`, but list them so an
-    // alternate-route pick (or trip-type flip) always re-runs the AI explicitly.
-    // customerId is included so switching customers alone (no cost change)
-    // re-derives client_tier/historical_acceptance_rate server-side instead of
-    // silently reusing the previous customer's analysis.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeData, total, selectedRouteIndex, legs, billingBlocked, customerId]);
-
-  // benchmark on lane resolve
-  useEffect(() => {
-    if (!routeData || billingBlocked) return;
-    // The endpoint requires a vehicle type; with none picked there is no lane
-    // benchmark to fetch, so skip the call instead of sending an empty one.
-    if (!vehicleType) { setBenchmark(null); return; }
-    fetchData(`/api/v1/quotes/benchmark/?origin=${extractCode(pickup)}&destination=${extractCode(delivery)}&vehicle_type=${vehicleType.toLowerCase()}`)
-      .then(b => { if (b?.success !== false) setBenchmark(b); }).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeData, billingBlocked, vehicleType]);
-
-  // The market price check (the panel below) is the one price suggestion now;
-  // the old win-model "suggested price (from platform quotes)" was removed so
-  // the bar never shows a second, different number. `opt` is still read for the
-  // win probability sent with the saved quote (buildPayload).
-  const opt = analysis?.price_optimization;
-  // No current market result (before a check, or the trip changed since the
-  // last one): the bar prompts to run the check instead of showing a number.
-  const showSuggestion = !aiOffer && aiApplied === null;
-  const offerDelta = aiOffer ? aiOffer.price - total : 0;
-
-  // Apply the market price check by writing the chosen figures into the real
-  // Cost breakdown inputs — fuel price, Tolls, Driver, R/km — so the quote
-  // total becomes exactly the panel's recommended price. Items the user
-  // kept as "my price" get the figure that review saw as theirs. Nothing
-  // goes into the hidden serviceCharge. The first Apply snapshots every
-  // input it touches; "Undo market figures" restores that snapshot.
-  const applyAiRecommendation = (review: AIPriceReviewResponse, key: string) => {
-    const combo = review.combinations?.[key];
-    const items = review.cost_breakdown;
-    if (!combo || !items) return;
-    const current: AiInputs = { aiFuel, aiToll, editableTollCost, tollManuallyEdited, driverAllowanceInput, baseRatePerKm, serviceCharge };
-    // A field the user changed since the last Apply is theirs now: that
-    // value, not the older one, is what "Undo market figures" must restore.
-    const prev = preAiSnapshotRef.current;
-    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-    const keep = <K extends keyof AiInputs>(...keys: K[]) =>
-      prev && keys.every(k => same(current[k], prev.applied[k]));
-    const before: AiInputs = !prev ? current : {
-      ...(keep("aiFuel") ? { aiFuel: prev.before.aiFuel } : { aiFuel: current.aiFuel }),
-      ...(keep("aiToll", "editableTollCost", "tollManuallyEdited")
-        ? { aiToll: prev.before.aiToll, editableTollCost: prev.before.editableTollCost, tollManuallyEdited: prev.before.tollManuallyEdited }
-        : { aiToll: current.aiToll, editableTollCost: current.editableTollCost, tollManuallyEdited: current.tollManuallyEdited }),
-      driverAllowanceInput: keep("driverAllowanceInput") ? prev.before.driverAllowanceInput : current.driverAllowanceInput,
-      baseRatePerKm: keep("baseRatePerKm") ? prev.before.baseRatePerKm : current.baseRatePerKm,
-      serviceCharge: keep("serviceCharge") ? prev.before.serviceCharge : current.serviceCharge,
-    };
-    const pickAi = (t: keyof typeof combo.choices) => combo.choices[t] === "ai";
-
-    const fuelRate = Number(pickAi("fuel") ? items.fuel.detail?.market_price_per_litre : items.fuel.detail?.your_price_per_litre);
-    const next: AiInputs = {
-      ...current,
-      aiFuel: fuelRate > 0 && Math.abs(fuelRate - companyFuelPricePerL) > 1e-9 ? { pricePerL: fuelRate, fuelType } : null,
-      driverAllowanceInput: String(combo.values.driver_allowance),
-      baseRatePerKm: String(pickAi("base_rate") ? items.base_rate.detail?.ai_rate_per_km : items.base_rate.detail?.your_rate_per_km),
-      serviceCharge: 0,
-    };
-    if (pickAi("tolls")) {
-      const oneWay = Number(items.tolls.detail?.market_one_way_zar) || combo.values.tolls / legs;
-      Object.assign(next, { aiToll: { oneWay, routeKey: tollRouteKey }, tollManuallyEdited: false });
-    } else if (Math.abs(combo.values.tolls - tollCost) >= 0.005) {
-      // Back to the figure this review saw as yours: the route's own tolls,
-      // or the amount that was typed in.
-      Object.assign(next, Math.abs(combo.values.tolls - autoToll) < 0.005
-        ? { aiToll: null, tollManuallyEdited: false }
-        : { editableTollCost: String(combo.values.tolls), tollManuallyEdited: true });
-    }
-    setAiFuel(next.aiFuel); setAiToll(next.aiToll);
-    setEditableTollCost(next.editableTollCost); setTollManuallyEdited(next.tollManuallyEdited);
-    setDriverAllowanceInput(next.driverAllowanceInput); setBaseRatePerKm(next.baseRatePerKm);
-    setServiceCharge(next.serviceCharge);
-    preAiSnapshotRef.current = { before, applied: next };
-    setAiApplied({ logId: review.usage_log_id ?? null, key, winProbability: combo.win_probability ?? null });
-    toast.success(`Applied ${formatCurrency(combo.price_zar)}`);
-  };
-  // Restores each field only if it still holds what Apply wrote — anything
-  // changed since (e.g. a new vehicle's rate) is the user's and is kept.
-  const undoAiRecommendation = () => {
-    const s = preAiSnapshotRef.current;
-    let keptSome = false;
-    if (s) {
-      const { before, applied } = s;
-      const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-      if (same(aiFuel, applied.aiFuel)) setAiFuel(before.aiFuel); else keptSome = true;
-      if (same([aiToll, editableTollCost, tollManuallyEdited], [applied.aiToll, applied.editableTollCost, applied.tollManuallyEdited])) {
-        setAiToll(before.aiToll); setEditableTollCost(before.editableTollCost); setTollManuallyEdited(before.tollManuallyEdited);
-      } else keptSome = true;
-      if (driverAllowanceInput === applied.driverAllowanceInput) setDriverAllowanceInput(before.driverAllowanceInput); else keptSome = true;
-      if (baseRatePerKm === applied.baseRatePerKm) setBaseRatePerKm(before.baseRatePerKm); else keptSome = true;
-      if (serviceCharge === applied.serviceCharge) setServiceCharge(before.serviceCharge);
-    }
-    preAiSnapshotRef.current = null;
-    setAiApplied(null);
-    toast.success(keptSome ? "Undid the market figures. Fields you changed since were kept." : "Back to your own figures");
-  };
-
-
-
   // ---- natural-language input (typed or transcribed from voice) ----
   // Shared by the top quick-fill bar and the AI chat panel — both are just
   // different entry points into the same conversation, so every message
@@ -1006,6 +837,8 @@ export default function QuoteBuilder() {
       setVehicleType(q.vehicle_type || ""); setWeight(String((Number(q.weight) || 0) / 1000));
       setCargo(q.cargo_description || ""); setNotes(q.notes || "");
       setDriverAllowanceInput(String(q.driver_allowance || 0));
+      setDriverEdited(Number(q.driver_allowance) > 0);
+      savedFinalPriceRef.current = Number(q.pricing_decision?.final_price) > 0 ? Number(q.pricing_decision.final_price) : null;
       if (q.toll_charges != null) setEditableTollCost(String(q.toll_charges));
       // An applied AI fuel price and a typed/AI toll figure are the user's
       // choice, so they survive a reload. Route-derived tolls still don't pin
@@ -1027,6 +860,14 @@ export default function QuoteBuilder() {
       if (q.valid_until) setValidUntil(q.valid_until);
       if (q.pickup_date) setPickupDate(q.pickup_date);
       if (q.delivery_date) setDeliveryDate(q.delivery_date);
+      // A price set in the bar was saved inside base_rate; split it back out
+      // so the quote reopens explaining itself the same way (rate + adjustment).
+      { const adj = Number(q.pricing_decision?.price_adjustment);
+        if (Number.isFinite(adj) && Math.abs(adj) >= 0.5 && q.distance && q.base_rate) {
+          const loadLegs = q.trip_type === "ROUND_TRIP" ? 2 : 1;
+          setBaseRatePerKm(String(Math.round(((Number(q.base_rate) - adj) / (Number(q.distance) * loadLegs)) * 100) / 100));
+          setServiceCharge(adj);
+        } }
       setSavedQuoteId(Number(editId));
       if (q.distance) setRouteData({ distance_km: Number(q.distance), toll_cost_zar: Number(q.toll_charges) });
     }).catch(() => toast.error("Couldn't load that quote"));
@@ -1056,6 +897,19 @@ export default function QuoteBuilder() {
     setPickupCoords(d.pickupCoords || null); setDeliveryCoords(d.deliveryCoords || null);
     setWeight(d.weight || ""); setCargo(d.cargo || ""); setNotes(d.notes || "");
     setTripType(d.tripType || "ONE_WAY");
+    if (d.pickupDate) setPickupDate(d.pickupDate);
+    if (d.deliveryDate) setDeliveryDate(d.deliveryDate);
+    if (d.validUntil) setValidUntil(d.validUntil);
+    if (Array.isArray(d.stops) && d.stops.length) {
+      setStops(d.stops.map((st: { location: string; coords: LocationCoords }, i: number) => ({ id: `resumed-${i}`, location: st.location, coords: st.coords })));
+      setStopsExpanded(true);
+    }
+    if (d.tolls != null) { setEditableTollCost(String(d.tolls)); setTollManuallyEdited(true); }
+    if (d.driver != null) { setDriverAllowanceInput(String(d.driver)); setDriverEdited(true); }
+    // After applyVehicleType above, so a rate typed for this quote wins.
+    if (d.baseRatePerKm) setBaseRatePerKm(String(d.baseRatePerKm));
+    if (Number(d.priceAdjustment)) setServiceCharge(Number(d.priceAdjustment));
+    if (typeof d.includeReturn === "boolean") setIncludeReturn(d.includeReturn);
     setResumable(null);
   };
   const discardResumable = () => { localStorage.removeItem(DRAFT_KEY); setResumable(null); };
@@ -1075,15 +929,11 @@ export default function QuoteBuilder() {
     setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
     setPickupDate(""); setDeliveryDate(""); setNlText("");
     setEditableTollCost(""); setTollManuallyEdited(false); setDriverAllowanceInput("0"); setServiceCharge(0);
-    // A rate written by Apply must not carry into an unrelated quote: put back
-    // the rate from before Apply. Otherwise the rate is kept, as on main.
-    { const snap = preAiSnapshotRef.current;
-      if (snap && baseRatePerKm === snap.applied.baseRatePerKm) setBaseRatePerKm(snap.before.baseRatePerKm); }
+    setDriverEdited(false); setIncludeReturn(null); savedFinalPriceRef.current = null;
     setRouteError(false);
     setRouteData(null); setSelectedRouteIndex(0); setRouteBlockedMessage(null);
-    setAnalysis(null); setGuard(null); setBenchmark(null);
-    setAiFuel(null); setAiToll(null); setAiApplied(null); preAiSnapshotRef.current = null;
-    setAiPanelSession(s => s + 1); lastRouteKeyRef.current = null;
+    setAiFuel(null); setAiToll(null);
+    lastRouteKeyRef.current = null;
     setChatMessages([]); setChatOpen(false); setPendingEntity(null); setDeclinedEntities([]);
     { const d = new Date(); d.setDate(d.getDate() + 7); setValidUntil(localDateISO(d)); }
     if (isEditing) navigate("/bookings/quotes/new", { replace: true });
@@ -1103,14 +953,21 @@ export default function QuoteBuilder() {
     if (draftRef.current) clearTimeout(draftRef.current);
     const doSave = () => {
       try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType }));
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType,
+          pickupDate, deliveryDate, validUntil, stops: stops.filter(st => st.coords).map(st => ({ location: st.location, coords: st.coords })),
+          tolls: tollManuallyEdited ? editableTollCost : null, driver: driverEdited ? driverAllowanceInput : null,
+          baseRatePerKm, priceAdjustment: serviceCharge, includeReturn,
+        }));
         setLastSavedAt(new Date());
       } catch { /* ignore */ }
     };
     draftFlushRef.current = doSave;
     draftRef.current = setTimeout(() => { draftFlushRef.current = null; doSave(); }, 800);
     return () => { if (draftRef.current) clearTimeout(draftRef.current); };
-  }, [isEditing, customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType,
+    pickupDate, deliveryDate, validUntil, stops, tollManuallyEdited, editableTollCost, driverEdited, driverAllowanceInput, baseRatePerKm, serviceCharge, includeReturn]);
 
   // Runs its cleanup ONLY on true unmount (empty deps) — unlike the effect
   // above, whose cleanup also fires on every keystroke as it re-debounces.
@@ -1183,6 +1040,199 @@ export default function QuoteBuilder() {
   // 10 digits" before Django ever gets to round it to 2dp.
   const round2 = (n: number) => Math.round(n * 100) / 100;
 
+  // ---- pricing analysis ----
+  // Consumes the builder's own computed figures (distance, fuel, tolls +
+  // plazas, cross-border, vehicle, weight, client). No route, geocode or toll
+  // call of its own; the request is debounced and stale ones are cancelled.
+  const pricingBlockedReason = billingBlocked ? "Pricing analysis is paused while quoting is blocked."
+    : isDemoQuotaExceeded ? "Pricing analysis is paused: this demo session's quote is used."
+    : routeBlockedMessage ? "This route isn't allowed for your company, so there is nothing to price."
+    : weightBlockedMessage ? "The load is over this vehicle's capacity, so there is nothing to price yet."
+    : null;
+  const pricingPhase: PricingPhase = pricingBlockedReason ? "blocked"
+    : !ready ? "needs"
+    : routeError && !calculatingRoute ? "route_error"
+    : !routeIsCurrent || total <= 0 ? "route"
+    : "ready";
+  const pricingNeeds = [
+    !customerId && "client",
+    !(pickup && pickupCoords) && "collection",
+    !(delivery && deliveryCoords) && "delivery",
+    !(Number(weight) > 0) && "weight",
+  ].filter((x): x is string => !!x);
+  const pricingInputs: PricingInputs | null = pricingPhase === "ready" ? {
+    quoteId: savedQuoteId || (isEditing ? Number(editId) : null),
+    customerId: customerId ? Number(customerId) : null,
+    origin: extractCode(pickup), destination: extractCode(delivery),
+    originLabel: pickup, destinationLabel: delivery,
+    distanceKm: chargeDistance, oneWayDistanceKm: distance, legs, tripType,
+    durationMinutes: route?.duration_minutes ?? route?.duration_min ?? routeData?.duration_minutes ?? null,
+    vehicleTypeId: selectedVT?.id ?? null, vehicleType: vehicleType || null,
+    weightKg: weightKg > 0 ? weightKg : null,
+    fuelType, fuelZone: isDieselPricing ? (companyProfile?.fuel_zone === "COASTAL" ? "COASTAL" : "INLAND") : null,
+    fuelCost, fuelLitres, fuelPricePerL, fuelConsumption,
+    tollCost, routePlazas: tollBreakdown.map(b => ({ plaza: b.plaza, route: b.route, tariff: Number(b.tariff) })),
+    countryCodes: route?.country_codes ?? routeData?.countries ?? null,
+    crossBorderCost, isInternational,
+    pickupDate: pickupDate || null,
+    driverAllowance: driverEdited ? driverAllowance : null,
+    includeReturn,
+    yourPrice: total,
+  } : null;
+  const pricing = usePricingAnalysis(pricingInputs, pricingPhase === "ready");
+  // The price in the bar, read live against the last analysis.
+  const liveReading = readPrice(pricing.data, total);
+  // The bar's one price story: the build-up until a price is applied, then the
+  // applied price (a choice, or the user's own).
+  const atBuildUp = Math.abs(serviceCharge) < 0.005;
+  const recChoice = pricing.data?.choices.find(c => c.recommended) ?? null;
+  const appliedChoice = liveReading.matchedChoice ? pricing.data?.choices.find(c => c.key === liveReading.matchedChoice) ?? null : null;
+  // "Use Balanced R 25 100" sits in the bar until a price is applied.
+  const useRec = atBuildUp && !!recChoice && liveReading.margin != null && Math.abs(recChoice.price - total) >= 0.005;
+
+  // Driver allowance: the approved allowance × nights from the analysis is
+  // OFFERED next to the Driver input (one tap applies it). The builder's own
+  // total never changes on its own.
+  const driverLine = pricing.data?.costFloor?.lines.find(l => l.key === "driver_allowance") ?? null;
+  const driverSuggested = driverLine?.suggested ?? null;
+  const driverNights = driverLine?.details.find(d => /night/i.test(d.label))?.value?.match(/^\d+/)?.[0] ?? (driverLine?.nights ? String(driverLine.nights) : null);
+  // Priced from the company's own "allowance per night" setting (no approved rate).
+  const driverFromSetting = driverLine?.source.kind === "user";
+
+  // Put a price in the bar: the cost lines stay exactly as calculated and the
+  // difference is the price adjustment (serviceCharge), so total === price.
+  const costSum = total - serviceCharge;
+  const applyPrice = (price: number) => {
+    if (!(price >= 0) || !Number.isFinite(price)) return;
+    setServiceCharge(round2(price - costSum));
+  };
+  // No toast: the applied card ("In your quote") and the bar confirm it.
+  const applyChoice = (price: number, _key: ChoiceKey) => { applyPrice(price); };
+  // A reopened quote priced with the analysis: keep the price that was decided.
+  useEffect(() => {
+    const saved = savedFinalPriceRef.current;
+    if (saved == null || !routeIsCurrent) return;
+    savedFinalPriceRef.current = null;
+    // To the cent: a quote saved at R 24 999,99 reopens at R 24 999,99, and a
+    // no-change re-save stores the same total.
+    if (Math.abs(saved - total) >= 0.005) applyPrice(saved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeIsCurrent]);
+
+  // Price bar height as a CSS variable (sticky aside, toasts sit above it).
+  const priceBarRef = useRef<HTMLElement | null>(null);
+  const [priceBarEl, setPriceBarEl] = useState<HTMLElement | null>(null);
+  useEffect(() => { setPriceBarEl(priceBarRef.current); });
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!priceBarEl) { root.style.removeProperty("--pricebar-h"); return; }
+    const set = () => root.style.setProperty("--pricebar-h", `${Math.round(priceBarEl.getBoundingClientRect().height)}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(priceBarEl);
+    return () => { ro.disconnect(); root.style.removeProperty("--pricebar-h"); };
+  }, [priceBarEl]);
+  // Phones: the bar folds to one compact row while scrolling down, and opens
+  // again on scroll up, a tap, or focus.
+  const [barCompact, setBarCompact] = useState(false);
+  useEffect(() => {
+    let last = -1;
+    const onScroll = (e: Event) => {
+      const t = e.target as HTMLElement;
+      if (!t || !(t instanceof HTMLElement) || !t.classList?.contains("os-app-main")) return;
+      if (!window.matchMedia("(max-width: 640px)").matches) { setBarCompact(false); return; }
+      if (document.activeElement?.id === "qb-price-input") return;
+      const y = t.scrollTop;
+      if (last >= 0 && Math.abs(y - last) > 6) setBarCompact(y > last && y > 120);
+      last = y;
+    };
+    document.addEventListener("scroll", onScroll, true);
+    return () => document.removeEventListener("scroll", onScroll, true);
+  }, []);
+
+  // The aside's bottom fade only shows while it really scrolls and isn't at the end.
+  const asideRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = asideRef.current;
+    if (!el) return;
+    const upd = () => el.classList.toggle("is-overflowing", el.scrollHeight - el.clientHeight - el.scrollTop > 4);
+    upd();
+    const ro = new ResizeObserver(upd);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    el.addEventListener("scroll", upd, { passive: true });
+    return () => { ro.disconnect(); el.removeEventListener("scroll", upd); };
+  }, []);
+
+  // Desktop geometry (≥1024): the price bar is fixed to the window's foot,
+  // spanning the main column (its edges from .qb-controls), and the sticky
+  // aside is clamped to sit 16px under the top bar and 16px above the bar at
+  // every scroll position.
+  const controlsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = controlsRef.current;
+    if (!root) return;
+    let raf = 0;
+    const desk = () => window.matchMedia("(min-width: 1024px)").matches;
+    const place = () => {
+      raf = 0;
+      const r = root.getBoundingClientRect();
+      root.style.setProperty("--qb-main-left", `${Math.round(r.left)}px`);
+      root.style.setProperty("--qb-main-right", `${Math.max(0, Math.round(window.innerWidth - r.right))}px`);
+      const aside = asideRef.current;
+      if (!aside) return;
+      if (!desk()) { aside.style.maxHeight = ""; return; }
+      const scroller = root.closest(".os-app-main") as HTMLElement | null;
+      const topbarBottom = scroller ? scroller.getBoundingClientRect().top : 0;
+      const bar = priceBarRef.current;
+      const vh = window.innerHeight;
+      const barTop = bar ? bar.getBoundingClientRect().top : vh;
+      const barH = bar ? bar.getBoundingClientRect().height + 12 : 0;
+      const asideTop = aside.getBoundingClientRect().top;
+      const max = Math.min(vh - topbarBottom - 16 - 16 - barH, barTop - 16 - asideTop);
+      aside.style.maxHeight = `${Math.max(160, Math.floor(max))}px`;
+    };
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(place); };
+    place();
+    const ro = new ResizeObserver(schedule);
+    ro.observe(root);
+    if (priceBarRef.current) ro.observe(priceBarRef.current);
+    window.addEventListener("resize", schedule);
+    document.addEventListener("scroll", schedule, { capture: true, passive: true });
+    return () => {
+      ro.disconnect(); if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("resize", schedule);
+      document.removeEventListener("scroll", schedule, { capture: true } as EventListenerOptions);
+    };
+  }, [priceBarEl]);
+
+  // While the price is being typed it isn't judged: no colour, no "below
+  // floor", until it is settled: blur, Enter, or 900 ms without a keystroke,
+  // AND the analysis for that exact price has landed (B-2.4). Settled figures
+  // are the server's own (`your_price`), or the choice's at a choice price.
+  const [priceTyping, setPriceTyping] = useState(false);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settlePrice = () => { if (typingTimerRef.current) clearTimeout(typingTimerRef.current); setPriceTyping(false); };
+  const serverAtPrice = pricing.data?.yourPrice && pricing.status === "ready" && Math.abs(pricing.data.yourPrice.price - total) <= 0.005
+    ? pricing.data.yourPrice : null;
+  const barSettled = !priceTyping && (!!appliedChoice || !!serverAtPrice);
+  const [settledTotal, setSettledTotal] = useState(total);
+  useEffect(() => { if (barSettled || !pricing.data) setSettledTotal(total); }, [total, barSettled, pricing.data]);
+  const onPriceInput = (n: number | null) => {
+    setPriceTyping(true);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => setPriceTyping(false), 900);
+    if (n != null && Number.isFinite(n) && n >= 0) applyPrice(n);
+  };
+  useEffect(() => () => { if (typingTimerRef.current) clearTimeout(typingTimerRef.current); }, []);
+
+  // A price set in the bar is a change to what the haulage (base rate) line
+  // charges, so it is saved there: the line items still add up to the total,
+  // additional_charges stays the border line, and a reopened quote recovers
+  // the same R/km (base_rate ÷ km) and price. Only a price below the
+  // pass-through costs leaves a (negative) remainder in additional_charges.
+  const savedBase = Math.max(0, baseCost + serviceCharge);
+  const savedBaseShortfall = Math.min(0, baseCost + serviceCharge);
   // ---- build the save payload (matches production) ----
   const buildPayload = (status: "DRAFT" | "SENT") => ({
     customer: parseInt(customerId), pickup_location: pickup, delivery_location: delivery,
@@ -1191,24 +1241,22 @@ export default function QuoteBuilder() {
     pickup_lat: round6(pickupCoords?.lat), pickup_lng: round6(pickupCoords?.lon), delivery_lat: round6(deliveryCoords?.lat), delivery_lng: round6(deliveryCoords?.lon),
     cargo_description: cargo || `${weight || 0}t ${vehicleType}`.trim(), weight: weightKg, distance,
     estimated_duration_minutes: route?.duration_min ? Math.round(route.duration_min) : (routeData?.duration_minutes || null),
-    vehicle_type: vehicleType, base_rate: round2(baseCost), fuel_surcharge: round2(fuelCost), toll_charges: round2(tollCost),
+    vehicle_type: vehicleType, base_rate: round2(savedBase), fuel_surcharge: round2(fuelCost), toll_charges: round2(tollCost),
     // International transport is zero-rated for VAT (the customer sees VAT 0%):
     // sent only when the route or a point's country says so either way.
     ...(internationalKnown ? { is_international: isInternational } : {}),
-    driver_allowance: round2(driverAllowance), additional_charges: round2(crossBorderCost + serviceCharge),
+    driver_allowance: round2(driverAllowance), additional_charges: round2(crossBorderCost + savedBaseShortfall),
     total_amount: round2(total),
-    // The markup share, as on main. An applied market price has no markup and
-    // no known margin, so it sends none (the saved value is kept, 0 on create).
-    ...(aiApplied === null ? { margin_percentage: marginPct } : {}),
-    notes, status, confidence: "MEDIUM",
+    // One margin definition: price − full cost floor (pricing analysis). Sent
+    // only when the floor is known, so an edit never wipes a saved figure.
+    ...(liveReading.marginPct != null ? { margin_percentage: Math.max(-999.99, Math.min(999.99, Math.round(liveReading.marginPct * 100) / 100)) } : {}),
+    notes, status,
     sla_hours: Number(companyProfile?.default_sla_hours) || 48, valid_until: validUntil, trip_type: tripType,
-    // Only sent when known (an edit must not wipe a saved figure with null):
-    // the win chance shown for an applied market price, else main's
-    // suggestion's win chance.
-    ...(aiApplied?.winProbability != null
-      ? { win_probability: Math.round(aiApplied.winProbability * 100) }
-      : opt?.win_probability_at_optimal != null ? { win_probability: Math.round(opt.win_probability_at_optimal * 100) } : {}),
-    base_rate_per_km: Number(baseRatePerKm) || null,
+    // No heuristic win_probability any more: the server sets it from the
+    // model's likelihood at the final price (model level only). What was shown
+    // and picked is saved, additively, as pricing_decision.
+    ...(pricing.data ? { pricing_decision: pricingDecision(pricing.data, total, liveReading.matchedChoice ?? "custom", serviceCharge) } : {}),
+    base_rate_per_km: serviceCharge !== 0 && chargeDistance > 0 ? round2(savedBase / chargeDistance) : Number(baseRatePerKm) || null,
     // Full raw request+response of the route-calculate call behind the
     // currently-selected route, captured for future ML training — see
     // Quote.route_snapshot. Only set once a route has actually resolved.
@@ -1221,10 +1269,9 @@ export default function QuoteBuilder() {
       fuel_price_per_litre_used: fuelPricePerL, fuel_type_used: fuelType,
       // "market_check": applied from the market price check ("ai_market" is
       // still read back from quotes saved before the rename).
-      fuel_price_source: aiFuelActive ? "market_check" : "company_setting",
+      fuel_price_source: aiFuelActive ? "market_check" : isDieselPricing && diesel.source === "live" ? "live" : "company_setting",
       toll_charges_source: tollManuallyEdited ? "manual" : aiTollActive ? "market_check" : "route",
       ...(aiTollActive && !tollManuallyEdited ? { ai_toll_one_way: aiToll!.oneWay, ai_toll_route_key: aiToll!.routeKey } : {}),
-      ai_price_analysis: aiApplied ? { log_id: aiApplied.logId, choice_key: aiApplied.key } : null,
     } } : {}),
     // Only stops with a resolved location count — same rule the route-calc
     // call already applies (see the routeData effect below). Previously
@@ -1431,7 +1478,7 @@ export default function QuoteBuilder() {
                   onClick={() => setSelectedRouteIndex(i)}
                   aria-pressed={i === selectedRouteIndex}
                   className="qb-routeopt">
-                  {r.label || r.summary || `Route ${i + 1}`} · {Math.round(r.distance_km)} km
+                  {/^best routes?$/i.test((r.label || "").trim()) ? "Recommended route" : (r.label || r.summary || `Route ${i + 1}`)} · {Math.round(r.distance_km)} km
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" style={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", fontSize: 13, lineHeight: "20px", padding: "10px 12px", maxWidth: 220, borderRadius: 8 }}>
@@ -1440,7 +1487,7 @@ export default function QuoteBuilder() {
                   <span style={{ color: "var(--text-tertiary)" }}>Duration</span><span>{formatDuration(r.duration_minutes ?? r.duration_min)}</span>
                   <span style={{ color: "var(--text-tertiary)" }}>Fuel</span><span>{formatCurrency(r.fuel_cost_zar)}</span>
                   <span style={{ color: "var(--text-tertiary)" }}>Tolls</span><span>{formatCurrency(r.toll_cost_zar)}</span>
-                  <span style={{ color: "var(--text-tertiary)" }}>Total</span><span>{formatCurrency(r.total_cost_zar)}</span>
+                  <span style={{ color: "var(--text-tertiary)" }}>Fuel + tolls</span><span>{formatCurrency(r.total_cost_zar)}</span>
                   {r.road_type && (<><span style={{ color: "var(--text-tertiary)" }}>Road</span><span>{r.road_type}</span></>)}
                   {r.terrain && r.terrain.length > 0 && (<><span style={{ color: "var(--text-tertiary)" }}>Terrain</span><span>{r.terrain.join(", ")}</span></>)}
                 </div>
@@ -1486,7 +1533,7 @@ export default function QuoteBuilder() {
   const showPriceBar = !billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0;
 
   return (
-    <div className={`qi-form qb-controls${showPriceBar ? " qb-has-pricebar" : ""}`}>
+    <div ref={controlsRef} className={`qi-form qb-controls${showPriceBar ? " qb-has-pricebar" : ""}`}>
       {/* header */}
       {/* Same page head as every page (layout only): H1 on the title row,
           one grey line under it, actions on the right. */}
@@ -1498,7 +1545,8 @@ export default function QuoteBuilder() {
         back={isEditing ? { to: `/bookings/quotes/${editId}`, label: "Quote" } : { to: "/bookings/quotes", label: "Quotes" }}
         description={
           <span className="qb-savestate" aria-live="polite">
-            {saving ? "Saving…" : lastSavedAt ? `Saved in this browser at ${formatDateTime(lastSavedAt).split(", ")[1]}` : "Auto-saves in this browser"}
+            {saving ? "Saving…" : isEditing || savedQuoteId ? "Saved quote · changes save when you press Save or Send"
+              : lastSavedAt ? `Not saved yet · draft kept on this device at ${formatDateTime(lastSavedAt).split(", ")[1]}` : "Not saved yet · a draft is kept on this device"}
           </span>
         }
         actions={
@@ -1521,6 +1569,10 @@ export default function QuoteBuilder() {
         </div>
       )}
 
+      {/* Form left, pricing analysis right (≥1024px); on narrower screens the
+          analysis stacks under the cost breakdown. */}
+      <div className="qb-layout">
+      <div className="qb-main">
       {/* NL input — typed or voice */}
       <div className="qb-nl" style={{ ...cardS, border: "1px solid var(--border-control)", display: "flex", alignItems: "center", gap: 8, padding: "8px 8px 8px 14px", marginBottom: 16, minHeight: 44 }}>
         {voice.recording ? (
@@ -1546,7 +1598,7 @@ export default function QuoteBuilder() {
           <>
             <MessageCircle size={16} color="var(--text-tertiary)" aria-hidden="true" className="qb-nl__icon" style={{ flexShrink: 0 }} />
             <input value={nlText} onChange={e => setNlText(e.target.value)} onKeyDown={e => e.key === "Enter" && submitNL()}
-              placeholder={narrowNl ? "Describe the load" : "Describe it, e.g. “20t steel, JHB to Cape Town, flatbed, Tuesday”"} aria-label="Describe the load" style={{ ...inputS, border: "none", background: "transparent", paddingLeft: 4, minWidth: 0 }} />
+              placeholder={narrowNl ? "Describe the load" : "Describe it, e.g. “Move 28 tonnes of steel coils from Johannesburg to Durban”"} aria-label="Describe the load" style={{ ...inputS, border: "none", background: "transparent", paddingLeft: 4, minWidth: 0 }} />
             <button type="button" onClick={voice.start} title="Record voice" aria-label="Record voice"
               className="tw-btn qb-nl__mic">
               <Mic size={16} />
@@ -1721,8 +1773,8 @@ export default function QuoteBuilder() {
           </div>
           <section className="qb-cost" aria-labelledby="qb-cost-title" style={{ ...cardS, padding: "var(--card-pad, 20px)" }}>
             <div className="qb-cost__head">
-              <h2 id="qb-cost-title" className="qb-cost__title">Cost breakdown</h2>
-              <p className="qb-cost__sub">{vehicleType ? `On your ${vtLabel} rates` : "No truck picked, so company defaults"}</p>
+              <h2 id="qb-cost-title" className="qb-cost__title">Price build-up</h2>
+              <p className="qb-cost__sub">{vehicleType ? `On your ${vtLabel} rates. Fuel, tolls, driver and border pass through; the base rate carries your fixed costs and margin.` : "No truck picked, so company defaults. Fuel, tolls, driver and border pass through; the base rate carries your fixed costs and margin."}</p>
             </div>
             {billingBlocked && (
               <div style={{
@@ -1799,7 +1851,7 @@ export default function QuoteBuilder() {
                 { key: "tolls", l: `Tolls (SA plazas${aiTollActive && !tollManuallyEdited ? " · checked tariffs" : ""})`, v: tollCost, c: "var(--status-warning)" },
                 ...(crossBorderCost > 0 ? [{ key: "cb", l: "Cross-border / weighbridge", v: crossBorderCost, c: "#2BB6A6" }] : []),
                 { key: "driver", l: "Driver allowance", v: driverAllowance, c: "var(--text-tertiary)" },
-                { key: "base", l: `Base rate (${hasVehicleType ? vtLabel : "company default"} · ${formatCurrency(baseRatePerKm)}/km)`, v: baseCost, c: "var(--accent-primary)" },
+                { key: "base", l: `Base rate (${hasVehicleType ? vtLabel : "company default"})`, v: baseCost, c: "var(--accent-primary)" },
               ].map((r, i) => (
                 <div key={i} className="qb-cost__row">
                   <span className="qb-cost__label">
@@ -1809,6 +1861,65 @@ export default function QuoteBuilder() {
                         <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{normaliseFigures(liveDieselHintText)}</span>
                       </span>
                     ) : r.l}
+                    {r.key === "driver" && driverSuggested != null && Math.abs(driverSuggested - driverAllowance) >= 0.5 && (
+                      <button type="button" className="qb-linkbtn" onClick={() => { setDriverAllowanceInput(String(driverSuggested)); setDriverEdited(true); }}
+                        title={driverFromSetting ? "Your allowance per night (company settings) for the nights this trip keeps the driver away" : "The approved allowance for the nights this trip keeps the driver away"}>
+                        Use {formatMoneyWhole(driverSuggested)} ({driverFromSetting ? "your setting" : "approved"}{driverNights ? ` × ${driverNights} night${driverNights === "1" ? "" : "s"}` : ""})
+                      </button>
+                    )}
+                    {r.key === "driver" && driverLine && driverSuggested == null && !driverEdited && (
+                      <span className="qb-cost__hint">No approved allowance on record</span>
+                    )}
+                    {r.key === "base" && (
+                      <span className="qb-cost__rate">
+                        <NumberField decimals={2} value={baseRatePerKm === "" ? null : Number(baseRatePerKm)}
+                          onValue={(n) => setBaseRatePerKm(n == null ? "" : String(n))}
+                          aria-label="Base rate per km" className="qb-mini qb-cost__input qb-cost__input--rate"
+                          title={baseRateSource || undefined} />
+                        <span aria-hidden="true">/km</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button type="button" title="Where this rate comes from"
+                              className="qb-info">
+                              <Info size={14} aria-hidden="true" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
+                            <div style={{ ...labelS, marginBottom: 8 }}>Base rate per km</div>
+                            <div style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                              What this quote charges per kilometre, before fuel, tolls and allowances.
+                            </div>
+                            <div style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginTop: 8 }}>
+                              A vehicle type's own rate is used whenever one is picked. With no type,
+                              or a type that has no rate of its own, the quote falls back to your
+                              company default.
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border-row)" }}>
+                              <span style={{ color: "var(--text-tertiary)" }}>Company default</span>
+                              <span style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+                                {Number(companyProfile?.default_base_rate_per_km) > 0
+                                  ? formatCurrency(companyProfile.default_base_rate_per_km)
+                                  : "not set"}
+                              </span>
+                            </div>
+                            {hasVehicleType && (
+                              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, paddingTop: 5 }}>
+                                <span style={{ color: "var(--text-tertiary)" }}>{vtLabel}</span>
+                                <span style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+                                  {Number(selectedVT?.base_rate) > 0
+                                    ? formatCurrency(selectedVT.base_rate)
+                                    : "not set"}
+                                </span>
+                              </div>
+                            )}
+                            <div style={{ color: "var(--text-tertiary)", marginTop: 10, lineHeight: 1.5 }}>
+                              Change them in Settings &rarr; Company Details, or Settings &rarr; Vehicle Types.
+                              Editing the box here only affects this quote.
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </span>
+                    )}
                     {/* The only way back from an AI fuel price on a reopened quote (the undo snapshot doesn't survive a reload). */}
                     {r.key === "fuel" && aiFuelActive && (
                       <button type="button" className="qb-linkbtn" onClick={() => setAiFuel(null)} title="Price fuel at your company's own R/L again">
@@ -1967,178 +2078,186 @@ export default function QuoteBuilder() {
                       );
                     })()}
                   </span>
-                  <span className="qb-cost__value">{formatCurrency(r.v)}</span>
-                </div>
-              ))}
-              {serviceCharge > 0 && (
-                <div className="qb-cost__row">
-                  <span className="qb-cost__label">Markup (suggested price in use)</span>
-                  <span className="qb-cost__value">{formatCurrency(serviceCharge)}</span>
-                </div>
-              )}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, paddingTop: 12 }}>
-                <span style={labelS}>Quote price</span>
-                <span style={{ fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontSize: 28, lineHeight: "36px", fontWeight: 600, color: "var(--text-primary)" }}>{formatCurrency(total)}</span>
-              </div>
-              <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 8 }}>{formatNumber(Math.round(distance))} km {legs === 2 ? `one way · ${formatNumber(Math.round(chargeDistance))} km round trip` : "one way"} · live diesel · {hasVehicleType ? `your ${vtLabel} settings` : "your company defaults"}{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
-              <div className="qb-cost__adjust">
-                <div style={{ flex: 1, minWidth: 0 }}><div style={{ ...fieldLabelS, marginBottom: 4 }}><span>Tolls</span></div><input type="number" value={tollManuallyEdited ? editableTollCost : String(tollCost)} onChange={e => { setEditableTollCost(e.target.value); setTollManuallyEdited(true); }} aria-label="Tolls" className="qb-mini" style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
-                <div style={{ flex: 1, minWidth: 0 }}><div style={{ ...fieldLabelS, marginBottom: 4 }}><span>Driver</span></div><input type="number" value={driverAllowanceInput} onChange={e => setDriverAllowanceInput(e.target.value)} aria-label="Driver allowance" className="qb-mini" style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ ...fieldLabelS, marginBottom: 4 }}>
-                    <span>R/km</span>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button type="button" title="Where this rate comes from"
-                          className="qb-info">
-                          <Info size={14} aria-hidden="true" />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent align="end" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
-                        <div style={{ ...labelS, marginBottom: 8 }}>Base rate per km</div>
-                        <div style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                          What this quote charges per kilometre, before fuel, tolls and allowances.
-                        </div>
-                        <div style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginTop: 8 }}>
-                          A vehicle type's own rate is used whenever one is picked. With no type,
-                          or a type that has no rate of its own, the quote falls back to your
-                          company default.
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border-row)" }}>
-                          <span style={{ color: "var(--text-tertiary)" }}>Company default</span>
-                          <span style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-                            {Number(companyProfile?.default_base_rate_per_km) > 0
-                              ? formatCurrency(companyProfile.default_base_rate_per_km)
-                              : "not set"}
-                          </span>
-                        </div>
-                        {hasVehicleType && (
-                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, paddingTop: 5 }}>
-                            <span style={{ color: "var(--text-tertiary)" }}>{vtLabel}</span>
-                            <span style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-                              {Number(selectedVT?.base_rate) > 0
-                                ? formatCurrency(selectedVT.base_rate)
-                                : "not set"}
-                            </span>
-                          </div>
-                        )}
-                        <div style={{ color: "var(--text-tertiary)", marginTop: 10, lineHeight: 1.5 }}>
-                          Change them in Settings &rarr; Company Details, or Settings &rarr; Vehicle Types.
-                          Editing the box here only affects this quote.
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <input
-                    type="number"
-                    value={baseRatePerKm}
-                    onChange={e => setBaseRatePerKm(e.target.value)}
-                    aria-label="Base rate per km"
-                    className="qb-mini"
-                    style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }}
-                  />
-                  {baseRateSource && (
-                    <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 4 }}>
-                      {baseRateSource}
-                    </div>
+                  {r.key === "tolls" ? (
+                    <NumberField value={tollManuallyEdited ? (editableTollCost === "" ? null : Number(editableTollCost)) : tollCost}
+                      onValue={(n) => { setEditableTollCost(n == null ? "" : String(n)); setTollManuallyEdited(true); }}
+                      aria-label="Tolls (R)" className="qb-mini qb-cost__input" />
+                  ) : r.key === "driver" ? (
+                    <NumberField value={driverAllowanceInput === "" ? null : Number(driverAllowanceInput) || 0}
+                      onValue={(n) => { setDriverAllowanceInput(n == null ? "" : String(n)); setDriverEdited(true); }}
+                      aria-label="Driver allowance (R)" className="qb-mini qb-cost__input" />
+                  ) : (
+                    <span className="qb-cost__value">{formatMoneyWhole(r.v)}</span>
                   )}
                 </div>
+              ))}
+              {Math.abs(serviceCharge) >= 0.005 && (
+                <div className="qb-cost__row">
+                  <span className="qb-cost__label">
+                    Price adjustment
+                    <button type="button" className="qb-linkbtn" onClick={() => setServiceCharge(0)} title="Go back to the sum of the lines above">
+                      Remove
+                    </button>
+                  </span>
+                  <span className="qb-cost__value">{serviceCharge > 0 ? "+" : ""}{formatMoneyWhole(serviceCharge)}</span>
+                </div>
+              )}
+              {/* One price display: the price bar. This is the lines' sum (hidden on
+                  phones, where the bar sits right under it). */}
+              <div className="qb-cost__total">
+                <span>Quote price excl. VAT</span>
+                <span className="qb-cost__total-fig">{formatRand(total)}</span>
               </div>
+              <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 8 }}>{formatNumber(Math.round(distance))} km {legs === 2 ? `one way · ${formatNumber(Math.round(chargeDistance))} km round trip` : "one way"} · {fuelSourceWord} · {hasVehicleType ? `your ${vtLabel} settings` : "your company defaults"}{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
             </>)}
           </section>
       </div>
 
-      {/* 3 — market price check */}
-      {/* Kept mounted while the form briefly isn't ready (an address being
-          retyped, the weight box cleared) so its result and item choices
-          survive; it just renders nothing meanwhile. It never runs on its own:
-          a check costs money, so it runs only from its "Check price" button. */}
-      {!billingBlocked && !isDemoQuotaExceeded && (
-        <AIPriceAnalysisPanel
-          key={`${editId ?? "new"}:${aiPanelSession}`}
-          active={ready && !routeBlockedMessage && !weightBlockedMessage && total > 0}
-          routeReady={routeIsCurrent}
-          routeError={routeError && !calculatingRoute}
-          onOpenFuelSettings={() => navigate("/settings/company")}
-          routeData={routeData}
-          route={route}
-          total={total}
-          chargeDistance={chargeDistance}
-          oneWayDistance={distance}
-          legs={legs}
-          tripType={tripType}
-          durationMinutes={route?.duration_minutes ?? route?.duration_min ?? routeData?.duration_minutes ?? null}
-          origin={extractCode(pickup)}
-          destination={extractCode(delivery)}
-          vehicleType={vehicleType}
-          weightKg={weightKg}
-          customerId={customerId}
-          fuelCost={fuelCost}
-          fuelLitres={fuelLitres}
-          fuelConsumption={fuelConsumption}
-          fuelPricePerL={fuelPricePerL}
-          fuelType={fuelType}
-          fuelZone={companyFuelPriceField === "fuel_price_per_litre" ? (companyProfile?.fuel_zone === "COASTAL" ? "COASTAL" : "INLAND") : null}
-          tollCost={tollCost}
-          driverAllowance={driverAllowance}
-          crossBorderCost={crossBorderCost}
-          baseRatePerKm={baseRatePerKm}
-          pickupDate={pickupDate}
-          benchmark={benchmark}
-          guard={guard}
-          billingBlocked={billingBlocked}
-          quoteId={savedQuoteId || (isEditing ? Number(editId) : null)}
-          appliedKey={aiApplied?.key ?? null}
-          onResultChange={setAiOffer}
-        />
-      )}
+      </div>
 
+      {/* 3 — pricing analysis */}
+      <aside className="qb-aside" aria-label="Pricing analysis" ref={asideRef}>
+        <PricingPanel
+          state={pricing}
+          phase={pricingPhase}
+          blockedReason={pricingBlockedReason}
+          needs={pricingNeeds}
+          customerName={customers.find((c: any) => String(c.id) === String(customerId))?.name ?? null}
+          price={settledTotal}
+          distanceKm={distance}
+          buildUp={costSum}
+          settingsHref="/settings/company#pricing"
+          onApplyPrice={applyChoice}
+          driver={{
+            value: driverAllowanceInput,
+            edited: driverEdited,
+            onChange: (v) => { setDriverAllowanceInput(v); setDriverEdited(true); },
+            onReset: () => { if (driverSuggested != null) { setDriverAllowanceInput(String(driverSuggested)); setDriverEdited(true); } else setDriverEdited(false); },
+          }}
+          buildUpDriver={driverAllowance}
+          onAddDriverToBuildUp={(amount) => { setDriverAllowanceInput(String(amount)); setDriverEdited(true); }}
+          includeReturn={includeReturn}
+          onIncludeReturn={setIncludeReturn}
+          returnApplicable={legs === 1}
+          revealKey={`${pickup}|${delivery}|${selectedVT?.id ?? vehicleType}|${tripType}|${customerId}`}
+          atBuildUp={atBuildUp}
+        />
+      </aside>
+
+      <div className="qb-after">
       {/* notes: above the price bar so they are filled in before sending */}
       {ready && <div style={{ marginBottom: 16 }}><div style={fieldLabelS}><label htmlFor="qb-notes">Notes (optional)</label></div><textarea id="qb-notes" value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Anything for the client or your team…" style={{ ...inputS, resize: "vertical" }} /></div>}
+      </div>
+      </div>
 
-      {/* One price, next to Send. Sticky so Send stays in reach while scrolling. */}
-      {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 && (
-        <section className="qb-pricebar" aria-label="Quote price and send">
+      {/* One price, next to Send. Fixed to the window's foot on desktop
+          (sticky on narrower screens) so Send stays in reach. */}
+      {showPriceBar && (() => {
+        const data = pricing.data;
+        const ready = liveReading.margin != null;
+        const waiting = !ready && (pricing.status === "loading" || pricing.status === "refreshing" || pricing.status === "idle" || pricingPhase === "route");
+        const failed = !ready && !waiting;
+        // The bar's figures: the choice's own at a choice price (the row says
+        // the same), the server's at a settled custom price, else a neutral
+        // client reading while typing or waiting (never coloured).
+        const rowLk = appliedChoice && data ? rowLikelihoods(data, data.choices).get(appliedChoice.key) ?? null : null;
+        const settled = barSettled && ready;
+        const margin = settled && appliedChoice ? appliedChoice.margin
+          : settled && serverAtPrice?.margin != null ? serverAtPrice.margin : liveReading.margin;
+        const marginPct = settled && appliedChoice ? appliedChoice.marginPct
+          : settled && serverAtPrice?.marginPct != null ? serverAtPrice.marginPct : liveReading.marginPct;
+        const below = margin != null && margin < 0;
+        const lk = !settled || below ? null : appliedChoice ? rowLk : serverAtPrice?.likelihood ?? null;
+        const showLk = lk && !(lk.level === "rules" && lk.band == null);
+        const loss = settled && below;
+        const wayOut = loss ? wayOutChoice(data?.choices ?? [], liveReading.floor) : null;
+        const sendPrimary = !useRec && !waiting;
+        // Where the price comes from: the build-up's rate and what it adds.
+        const adds = ["fuel", "tolls", ...(crossBorderCost > 0 ? ["border"] : []), ...(driverAllowance > 0 ? ["driver"] : [])].slice(0, 3);
+        const addsText = adds.length > 1 ? `${adds.slice(0, -1).join(", ")} and ${adds[adds.length - 1]}` : adds[0];
+        return (
+        <section ref={priceBarRef} className={`qb-pricebar${barCompact ? " is-compact" : ""}${atBuildUp && !priceTyping ? " is-buildup" : ""}`} aria-label="Quote price and send"
+          onClick={() => { if (barCompact) setBarCompact(false); }}>
           <div className="qb-pricebar__price">
-            <span className="qb-pricebar__label">Quote price</span>
-            <span className="qb-pricebar__figure" aria-live="polite">{formatCurrency(total)}</span>
-            <span className="qb-pricebar__sub">Excl. VAT · what the client is sent{serviceCharge > 0 ? " · includes markup" : ""}</span>
-          </div>
-          <div className="qb-pricebar__suggest" aria-live="polite">
-            {/* the market price check's offer, next to Send */}
-            {aiOffer?.needsApply && (
-              <>
-                <span>Market price</span>
-                <button type="button" className="tw-btn qb-pricebar__use" onClick={() => applyAiRecommendation(aiOffer.review, aiOffer.key)}>
-                  Apply {formatMoneyWhole(aiOffer.price)}{" "}
-                  <span className="qb-pricebar__muted">({Math.abs(offerDelta) < 0.5 ? "same price" : `${offerDelta < 0 ? "\u2212" : "+"}${formatMoneyWhole(Math.abs(offerDelta))}`})</span>
+            <label className="qb-pricebar__label" htmlFor="qb-price-input">Quote price · excl. VAT</label>
+            <span className="qb-pricebar__field">
+              <span className="qb-pricebar__cur" aria-hidden="true">R</span>
+              <NumberField id="qb-price-input" className="qb-pricebar__input" aria-describedby="qb-price-read"
+                value={total}
+                onFocus={() => setBarCompact(false)}
+                onBlur={() => settlePrice()}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
+                onValue={(n) => onPriceInput(n)} />
+            </span>
+            {atBuildUp && !priceTyping ? (
+              <span className="qb-pricebar__sub qb-pricebar__src">
+                <span className="qb-pricebar__chip">Build-up</span>
+                <span className="qb-pricebar__rate">
+                  {chargeDistance > 0 && Number(baseRatePerKm) > 0
+                    ? <>{formatCurrency(Number(baseRatePerKm))}/km × {formatNumber(Math.round(chargeDistance))} km{legs === 2 ? " (return)" : ""} + {addsText}</>
+                    : "Sum of the cost lines"}
+                </span>
+              </span>
+            ) : (
+              <span className="qb-pricebar__sub qb-pricebar__src">
+                <span className="qb-pricebar__chip">{appliedChoice && !priceTyping ? appliedChoice.label : "Your price"}</span>
+                <button type="button" className="qb-linkbtn" onClick={() => applyPrice(costSum)}>
+                  Back to build-up {formatMoneyWhole(costSum)}
                 </button>
-              </>
+              </span>
             )}
-            {!aiOffer?.needsApply && aiApplied !== null && (
-              <>
-                <span>Using the market price</span>
-                <button type="button" className="tw-btn tw-btn--ghost qb-pricebar__use" onClick={undoAiRecommendation}>Undo market figures</button>
-              </>
-            )}
-            {aiOffer && !aiOffer.needsApply && aiApplied === null && (
-              <span className="qb-pricebar__muted">Market price check: nothing to change</span>
-            )}
-            {/* The market price check is the only price suggestion. Until it
-                has run for this trip, prompt to run it instead of showing a
-                second, different number. */}
-            {showSuggestion && (
-              <span className="qb-pricebar__muted">Run the market price check to see the market price</span>
-            )}
+          </div>
+          <div className="qb-pricebar__read" id="qb-price-read" aria-live="off">
+            <span className={`qb-pricebar__line${settled ? "" : " is-neutral"}${loss ? " qb-pricebar__loss" : ""}`}>
+              {!ready ? (
+                <span className="qb-pricebar__muted">{failed ? "Margin and chance to win unavailable right now" : "Working out margin and chance to win…"}</span>
+              ) : below ? (
+                <span>Loss of <span className="qb-pricebar__num">{formatMoneyWhole(-margin!)}</span>
+                  {loss && <> · below your cost floor of <span className="qb-pricebar__num">{formatMoneyWhole(liveReading.floor)}</span></>}</span>
+              ) : (
+                <span>Margin <span className="qb-pricebar__num">{formatMoneyWhole(margin)} · {signedPct(marginPct ?? 0)}</span></span>
+              )}
+              {ready && showLk && (
+                <span className={`qb-pricebar__lk qb-pricebar__lk--${lkTone(lk!)}`}>{likelihoodShort(lk!)}</span>
+              )}
+            </span>
+            {useRec && ready && !priceTyping ? (
+              <span className="qb-pricebar__next">
+                <button type="button" className="tw-btn tw-btn--primary tw-btn--sm qb-pricebar__use" onClick={() => applyPrice(recChoice!.price)}>
+                  Use {recChoice!.label} {formatMoneyWhole(recChoice!.price)}
+                </button>
+              </span>
+            ) : wayOut ? (
+              <span className="qb-pricebar__next">
+                <button type="button" className="qb-linkbtn qb-linkbtn--strong" onClick={() => applyPrice(wayOut.price)}>
+                  Use {wayOut.label} {formatMoneyWhole(wayOut.price)}
+                </button>
+              </span>
+            ) : !hasVehicleType && !priceTyping ? (
+              /* No truck: the price runs on the company default rate. */
+              <span className="qb-pricebar__next qb-pricebar__nudge">
+                No truck picked: company default rate.
+                {suggestions.length > 0 && (
+                  <button type="button" className="qb-linkbtn" onClick={() => applyVehicleType(suggestions[0].vt.name)}>
+                    Use {sentenceCaseLabel(suggestions[0].vt.name)}
+                  </button>
+                )}
+              </span>
+            ) : null}
           </div>
           <div className="qb-pricebar__actions">
-            <button type="button" className="tw-btn" onClick={() => save(false)} disabled={saving}>Save as draft</button>
-            <button type="button" className="tw-btn tw-btn--primary" onClick={openSendPreview} disabled={saving}>Send quote</button>
+            <button type="button" className="tw-btn" onClick={() => save(false)} disabled={saving}>
+              <span className="qb-lbl-long">Save as draft</span><span className="qb-lbl-short">Save draft</span>
+            </button>
+            {/* One primary action at a time: while the recommended price is
+                on offer that button leads; once a price is set, Send does. */}
+            <button type="button" className={`tw-btn${sendPrimary ? " tw-btn--primary" : ""}`} onClick={openSendPreview} disabled={saving}>Send quote</button>
             {/* Assistant launcher slot while the bar shows (see nlChatSlotRef). */}
             <span ref={barChatSlotRef} className="qb-chatslot" />
           </div>
         </section>
-      )}
+        );
+      })()}
 
       {sendPreviewOpen && (() => {
         const client = customers.find((c: any) => String(c.id) === String(customerId));

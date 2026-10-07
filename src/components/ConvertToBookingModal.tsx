@@ -7,7 +7,13 @@ interface Props {
   quoteNumber?: string;
   vehicleType?: string;
   busy?: boolean;
-  onConfirm: (driverId: string, vehicleId: string) => void;
+  /** The quote's own dates (YYYY-MM-DD), when it has them. */
+  pickupDate?: string | null;
+  deliveryDate?: string | null;
+  /** The quote's distance (km), so a suggested delivery date fits the run. */
+  distanceKm?: number | null;
+  /** dates: only when the quote lacks them and the suggested dates are shown. */
+  onConfirm: (driverId: string, vehicleId: string, dates?: { pickup_date: string; delivery_date: string }) => void;
   onCancel: () => void;
 }
 
@@ -78,8 +84,30 @@ const fieldLabelStyle: React.CSSProperties = {
 // action button's label reflects whatever's chosen: nothing picked converts
 // and leaves the booking unassigned (pick it up later from Bookings); a
 // vehicle picked (driver optional) converts pre-assigned.
-export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfirm, onCancel }: Props) {
+// YYYY-MM-DD in local time, n days from today.
+const isoInDays = (n: number) => {
+  const d = new Date(); d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+// The date n days after a YYYY-MM-DD date (local calendar).
+const addDays = (iso: string, n: number) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  const t = new Date(y, (m || 1) - 1, d || 1); t.setDate(t.getDate() + n);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+};
+// Days on the road for a suggestion: about 700 km a day, so a 600 km run is
+// delivered the same day and Johannesburg to Cape Town in two.
+const roadDays = (km?: number | null) => (km && km > 0 ? Math.floor(km / 700) : 2);
+
+export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, pickupDate, deliveryDate, distanceKm, onConfirm, onCancel }: Props) {
   useFocusTrap(latestModal, true);
+  // A booking needs dates. When the quote has none, the suggested ones are
+  // shown and editable here, never filled in silently.
+  const needsDates = !pickupDate || !deliveryDate;
+  const [pickup, setPickup] = useState(pickupDate || isoInDays(2));
+  const [delivery, setDelivery] = useState(deliveryDate || addDays(pickupDate || isoInDays(2), roadDays(distanceKm)));
+  const datesBad = needsDates && (!pickup || !delivery || delivery < pickup);
   const [showAssign, setShowAssign] = useState(false);
   const [driverId, setDriverId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
@@ -109,7 +137,7 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
   // a vehicle is ambiguous (a driver needs a truck) — same rule the backend
   // enforces on convert_to_load.
   const driverWithoutVehicle = !!driverId && !vehicleId;
-  const canProceed = !driverWithoutVehicle && !busy;
+  const canProceed = !driverWithoutVehicle && !datesBad && !busy;
 
   return (
     <div style={overlayStyle} onClick={onCancel}>
@@ -118,6 +146,23 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
         <div style={messageStyle}>
           Convert {quoteNumber ? <b>{quoteNumber}</b> : 'this quote'} to an active booking?
         </div>
+
+        {needsDates && (
+          <div style={{ marginBottom: 12 }}>
+            <p style={{ ...messageStyle, marginBottom: 10 }}>The quote has no {!pickupDate && !deliveryDate ? 'collection or delivery date' : !pickupDate ? 'collection date' : 'delivery date'}. A booking needs both: check these suggested dates.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label htmlFor="convert-pickup" style={fieldLabelStyle}>Collection{pickupDate ? '' : ' (suggested)'}</label>
+                <input id="convert-pickup" type="date" value={pickup} onChange={e => setPickup(e.target.value)} style={selectStyle} disabled={!!pickupDate} />
+              </div>
+              <div>
+                <label htmlFor="convert-delivery" style={fieldLabelStyle}>Delivery{deliveryDate ? '' : ' (suggested)'}</label>
+                <input id="convert-delivery" type="date" value={delivery} min={pickup || undefined} onChange={e => setDelivery(e.target.value)} style={selectStyle} disabled={!!deliveryDate} />
+              </div>
+            </div>
+            {datesBad && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning-text, var(--status-warning))', marginTop: 6 }}>Delivery can't be before collection.</div>}
+          </div>
+        )}
 
         {!showAssign ? (
           <button
@@ -176,7 +221,7 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
           <button onClick={onCancel} style={cancelBtnStyle}>Cancel</button>
           <button
-            onClick={() => canProceed && onConfirm(driverId, vehicleId)}
+            onClick={() => canProceed && onConfirm(driverId, vehicleId, needsDates ? { pickup_date: pickup, delivery_date: delivery } : undefined)}
             disabled={!canProceed}
             style={{
               padding: '8px 16px',

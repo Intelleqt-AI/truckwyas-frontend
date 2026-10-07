@@ -133,3 +133,80 @@
 .qd-margin-na { white-space: nowrap; }
 /* Touch: the margin tip's 48px hit area clears the booking link's 44px box. */
 @media (pointer: coarse) { .qd-sub:has(.tw-info) + .qd-booked { margin-top: 20px; } }
+
+/* ---- Pricing analysis: the stored pricing decision ---- */
+.qd-decision__head { padding: 8px 0 2px; font: 500 13px/20px var(--font-sans); color: var(--text-primary); }
+.qd-decision__stale { margin: 4px 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.qd-decision .bk-kv__value { text-align: right; }
+.qd-decision .bk-kv__note { color: var(--text-secondary); }
+.qd-decision__neg { color: var(--status-danger-text); }
+/* R3: one layout for every decision row (label left, value right); the
+   source or basis sits on its own full-width muted line below the row. */
+.qd-decision .bk-kv__label { white-space: nowrap; }
+.qd-decision .bk-kv__value { white-space: nowrap; }
+.qd-decision .bk-kv:has(+ .qd-decision__src) { border-bottom: 0; padding-bottom: 0; }
+.qd-decision__src { margin: 0; padding: 0 0 6px; border-bottom: 1px solid var(--border-row); font: 400 12px/18px var(--font-sans); color: var(--text-secondary); text-align: left; text-wrap: pretty; }
+/* A basis line with no row above it (the figure is in the card's header). */
+.qd-decision__src--solo { padding-top: 6px; }
+.qd-decision__parts:has(+ .qd-decision__src) { border-bottom: 0; padding-bottom: 2px; }
+.qd-decision__src:last-child { border-bottom: 0; }
+/* Phones: two-column rows stack (label over value) instead of squeezing. */
+@media (max-width: 480px) {
+  .qd-decision .bk-kv { flex-direction: column; align-items: flex-start; gap: 0; }
+  .qd-decision .bk-kv__value { text-align: left; }
+}
+/* Touch: the head's Send and "…" buttons are drawn at 44px here (the shared
+   head draws 36px with a 44px ::after hit area; R3 asked for the drawn size). */
+@media (pointer: coarse) and (max-width: 768px) {
+  .qd .section-header__actions { min-height: 44px; top: -5px; }
+  .qd .section-header__actions > *:not([data-sh-hidden]),
+  .qd .section-header__actions [data-sh-primary],
+  .qd .section-header__more-btn { height: 44px !important; min-height: 44px !important; }
+  .qd .section-header__actions [data-sh-icon] { width: 44px; min-width: 44px !important; }
+}
+/* R2: the floor's parts, indented under it, so the margin can be traced. */
+.qd-decision__parts { list-style: none; margin: -2px 0 4px; padding: 0 0 6px 12px; border-bottom: 1px solid var(--border-row); }
+.qd-decision__parts li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; font: 400 12px/18px var(--font-sans); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+/* Floor part provenance (stored source_kind) and "Not set" parts. */
+.qd-decision__kind { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--bg-raised); color: var(--text-secondary); font: 500 11px/16px var(--font-sans); white-space: nowrap; }
+.qd-decision__parts li.is-missing > span:last-child { color: var(--text-secondary); font-style: italic; }
+
+/* ---- Pricing round 4 ---- */
+/* Won at a different price: "Agreed R 24 500 (quoted R 25 100)" under the total. */
+.qd-agreed { display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; margin: 8px 0 0; font: 500 13px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.qd-agreed__quoted { font-weight: 400; color: var(--text-secondary); }
+.qd-agreed .tw-info { margin-left: -2px; }
+/* Source lines wrap between parts, never inside one ("last 180 days"). */
+.qd-decision__part { white-space: nowrap; }
+/* A free-text value (why it was lost): label above, text left-aligned below. */
+.qd-price-rows .bk-kv.qd-kv-stack { flex-direction: column; align-items: flex-start; gap: 2px; }
+.qd-kv-stack .bk-kv__value { text-align: left; white-space: normal; overflow-wrap: anywhere; }
+
+/* ---- Pricing round 5 (F-1): the price card ---- */
+.qd-total { margin-top: 2px; font-size: 32px; line-height: 40px; font-weight: 600; }
+/* "Margin R 4 688 · 20% · 51% chance to win": one line where it fits; a wrap
+   comes before "· 51% chance to win", never inside it. */
+.qd-readout { margin: 4px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.qd-readout__chance { white-space: nowrap; }
+.qd-agreed { flex-direction: column; align-items: flex-start; gap: 0; }
+.qd-agreed__line { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0 6px; }
+.qd-agreed__margin { font-weight: 400; color: var(--text-secondary); }
+/* How it was priced: one grid for every row, values in one right-aligned column. */
+.qd-decision__head { font-weight: 600; }
+.qd-decision .bk-kv { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: baseline; }
+.qd-decision .bk-kv__value { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* "Your price · Balanced was recommended" is the one long value: the label
+   keeps its width and the value wraps, still flush right. */
+.qd-decision .bk-kv.qd-decision__picked { grid-template-columns: auto minmax(0, 1fr); }
+.qd-decision .qd-decision__picked .bk-kv__value { white-space: normal; text-wrap: balance; }
+.qd-decision__parts li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; }
+.qd-decision__parts li > span:last-child { text-align: right; white-space: nowrap; }
+.qd-decision__src { color: var(--text-tertiary); overflow-wrap: anywhere; }
+/* Parts stay whole ("last 180 days"); the separator outside each span is the break point. */
+.qd-decision__part { white-space: nowrap; }
+@media (max-width: 480px) {
+  .qd-decision .bk-kv, .qd-decision .bk-kv.qd-decision__picked { grid-template-columns: minmax(0, 1fr); }
+  .qd-decision .bk-kv__value { text-align: left; white-space: normal; }
+}
+/* Never-sent draft: "Record the answer" and its one-line explanation. */
+.qd-answer-sub { margin: -8px 0 12px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }

@@ -8,6 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader } from '@/components/Loader';
 import { toast } from '@/lib/toast';
 import { useAuth } from '@/lib/AuthContext';
+import { useLocation } from 'react-router-dom';
 import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from './settingsUi';
 
 const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
@@ -34,8 +35,10 @@ const labelTipStyle: React.CSSProperties = { ...settingsLabelStyle, display: 'fl
    exactly what was loaded; only while typing does the field hold the text
    the user typed, accepted with a comma or a dot. */
 const toRaw = (text: string) => text.replace(/[\s\u00A0\u202F]/g, '').replace(',', '.');
-function DecimalInput({ id, value, onChange, placeholder, decimals = 2 }: {
+function DecimalInput({ id, value, onChange, placeholder, decimals = 2, onBlur, error, describedBy }: {
   id: string; value: string; onChange: (raw: string) => void; placeholder?: string; decimals?: number;
+  /** Inline validation: runs on blur; an error turns the border red. */
+  onBlur?: () => void; error?: string | null; describedBy?: string;
 }) {
   const [text, setText] = useState<string | null>(null);
   const n = parseFloat(value);
@@ -44,17 +47,123 @@ function DecimalInput({ id, value, onChange, placeholder, decimals = 2 }: {
     <input
       id={id}
       className="settings-control"
-      style={inputStyle}
+      style={error ? { ...inputStyle, borderColor: 'var(--status-danger)' } : inputStyle}
       type="text"
       inputMode="decimal"
       autoComplete="off"
       placeholder={placeholder}
       value={shown}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={describedBy}
       onFocus={() => setText(shown)}
       onChange={e => { setText(e.target.value); onChange(toRaw(e.target.value)); }}
-      onBlur={() => setText(null)}
+      onBlur={() => { setText(null); onBlur?.(); }}
     />
   );
+}
+
+// Pricing fields (R5, F-3.3): checked on blur and on Save. Comma or dot as
+// the decimal separator; anything else that isn't a plain number ("abc",
+// "−5", "1e3") is invalid, never silently coerced.
+type PricingField = 'margin_target_pct' | 'operating_cost_per_km' | 'driver_allowance_per_night';
+const PRICING_ORDER: PricingField[] = ['margin_target_pct', 'operating_cost_per_km', 'driver_allowance_per_night'];
+const PRICING_INPUT_ID: Record<PricingField, string> = {
+  margin_target_pct: 'company-margin-target',
+  operating_cost_per_km: 'company-operating-cost-per-km',
+  driver_allowance_per_night: 'company-driver-allowance',
+};
+const PLAIN_NUMBER = /^\d+(\.\d+)?$/;
+function pricingError(field: PricingField, raw: string, targetRange: [number, number] = [1, 40]): string | null {
+  const t = toRaw(raw.trim());
+  if (field === 'margin_target_pct') {
+    const [lo, hi] = targetRange;
+    const msg = `Enter a whole number from ${lo} to ${hi}.`;
+    if (!/^\d+$/.test(t)) return msg;
+    const n = Number(t);
+    return n >= lo && n <= hi ? null : msg;
+  }
+  if (!t) return null;
+  if (field === 'operating_cost_per_km') {
+    const msg = 'Enter R 1 to R 200 per km, or leave it empty for automatic.';
+    if (!PLAIN_NUMBER.test(t)) return msg;
+    const n = Math.round(Number(t) * 100) / 100;
+    return n >= 1 && n <= 200 ? null : msg;
+  }
+  const msg = 'Enter R 1 to R 5 000, or leave it empty.';
+  if (!PLAIN_NUMBER.test(t)) return msg;
+  const n = Math.round(Number(t));
+  return n >= 1 && n <= 5000 ? null : msg;
+}
+/** A valid typed value, rounded as it will be saved: R/km to the cent, rand and % whole. */
+function pricingNormalised(field: PricingField, raw: string): string {
+  const t = toRaw(raw.trim());
+  if (!t || !PLAIN_NUMBER.test(t)) return raw;
+  return field === 'operating_cost_per_km' ? String(Math.round(Number(t) * 100) / 100) : String(Math.round(Number(t)));
+}
+
+/* A pricing field with its unit inside the box ("R" before, "%" or "/km"
+   after). Shows the saved value in the ZA format ("16,94", "650"); while
+   focused it holds exactly what was typed. */
+function PricingInput({ id, value, onChange, onBlur, isValid, placeholder, decimals, inputMode, prefix, suffix, error, describedBy }: {
+  id: string; value: string; onChange: (raw: string) => void; onBlur: (raw: string) => void; placeholder?: string;
+  /** An invalid entry stays exactly as typed (never reformatted into something it isn't). */
+  isValid: (raw: string) => boolean;
+  decimals: number; inputMode: 'numeric' | 'decimal'; prefix?: string; suffix?: string; error?: string | null; describedBy?: string;
+}) {
+  const [text, setText] = useState<string | null>(null);
+  const n = Number(value);
+  const shown = text ?? (value === '' || !PLAIN_NUMBER.test(value) || error ? value : formatNumber(n, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }));
+  return (
+    <div className={`cs-affix${prefix ? ' has-prefix' : ''}${suffix ? ' has-suffix' : ''}${error ? ' is-invalid' : ''}`}>
+      {prefix && <span className="cs-affix__pre" aria-hidden="true">{prefix}</span>}
+      <input
+        id={id}
+        className="settings-control"
+        style={inputStyle}
+        type="text"
+        inputMode={inputMode}
+        autoComplete="off"
+        placeholder={placeholder}
+        value={shown}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+        onFocus={() => setText(shown)}
+        onChange={e => { setText(e.target.value); onChange(toRaw(e.target.value)); }}
+        onBlur={e => { const raw = toRaw(e.target.value); if (isValid(raw)) setText(null); onBlur(raw); }}
+      />
+      {suffix && <span className="cs-affix__post" aria-hidden="true">{suffix}</span>}
+    </div>
+  );
+}
+const fieldErrorStyle: React.CSSProperties = { fontFamily: 'var(--font-sans)', fontSize: 12, lineHeight: '16px', marginTop: 6, color: 'var(--status-danger-text)' };
+
+/** The operating cost the cost floor uses now (company profile, read-only). */
+interface CostInUse { value: number | null; source: string | null; trips: number | null; minTrips: number | null; window: string | null; label: string | null; superlink: number | null }
+function costInUseOf(v: unknown): CostInUse | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const n = (x: unknown) => (x === null || x === undefined || x === '' || !Number.isFinite(Number(x)) ? null : Number(x));
+  const value = n(o.value);
+  if (value === null) return null;
+  const est = o.estimates && typeof o.estimates === 'object' ? (o.estimates as Record<string, unknown>) : {};
+  return { value, source: o.source ? String(o.source) : null, trips: n(o.trips), minTrips: n(o.min_trips), window: o.window ? String(o.window) : null, label: o.label ? String(o.label) : null, superlink: n(est.superlink) };
+}
+// "Now using R 13,99/km from 37 trips (last 12 months)." / "Now using the
+// R 12,50/km superlink estimate." The saved figure needs no line: it is in the field.
+function costInUseText(c: CostInUse | null): string | null {
+  if (!c || c.value === null || c.source === 'setting' || c.source === 'company_setting') return null;
+  const rate = `${formatMoney(c.value)}/km`;
+  if (c.source === 'company_actuals') {
+    const trips = c.trips ? ` from ${formatNumber(c.trips)} trip${c.trips === 1 ? '' : 's'}` : '';
+    return `Now using ${rate}${trips}${c.window ? ` (${c.window})` : ''}.`;
+  }
+  // An estimate: it follows each quote's vehicle type, so name the
+  // superlink figure (the common long-haul truck) as the example.
+  const eg = c.superlink !== null ? ` (${formatMoney(c.superlink)}/km for a superlink)` : '';
+  const until = c.minTrips
+    ? ` until ${formatNumber(c.minTrips)} completed trips have costs${c.trips !== null ? ` (you have ${formatNumber(c.trips)})` : ''}`
+    : '';
+  return `Now using the typical estimate per truck type${eg}${until}.`;
 }
 
 export function CompanySettings() {
@@ -77,7 +186,28 @@ export function CompanySettings() {
     fuel_price_per_litre: '', fuel_price_petrol: '', fuel_price_electric: '', fuel_price_hybrid: '',
     bank_name: '', bank_account_holder: '', bank_account_number: '', bank_branch_code: '',
     bank_account_type: '', payment_reference_hint: '',
+    // Pricing analysis (company profile, additive fields).
+    operating_cost_per_km: '', pricing_include_empty_return: 'no', pool_pricing_data: 'no',
+    margin_target_pct: '10', driver_allowance_per_night: '',
   });
+  // Round 4 fields arrive from the API as they are added: a field the
+  // profile does not return is not shown (and not saved).
+  const [hasDriverField, setHasDriverField] = useState(false);
+  const [hasTargetField, setHasTargetField] = useState(false);
+  const [costInUse, setCostInUse] = useState<CostInUse | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [pricingErrors, setPricingErrors] = useState<Partial<Record<PricingField, string | null>>>({});
+  // The analysis' own clamp for the target margin (K-9 margin_target_range), else 1–40.
+  const [targetRange, setTargetRange] = useState<[number, number]>([1, 40]);
+  const checkPricing = (field: PricingField, raw?: string) =>
+    setPricingErrors(p => ({ ...p, [field]: pricingError(field, raw ?? (form as Record<string, string>)[field] ?? '', targetRange) }));
+  // On blur: validate, and a valid value is shown as it will be saved ("12,345" -> "12,35").
+  const blurPricing = (field: PricingField, raw: string) => {
+    const err = pricingError(field, raw, targetRange);
+    setPricingErrors(p => ({ ...p, [field]: err }));
+    if (!err) setForm(p => ({ ...p, [field]: pricingNormalised(field, raw) }));
+  };
+  const location = useLocation();
   const [logoUrl, setLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -172,16 +302,38 @@ export function CompanySettings() {
           bank_branch_code: d.bank_branch_code || '',
           bank_account_type: d.bank_account_type || '',
           payment_reference_hint: d.payment_reference_hint || '',
+          operating_cost_per_km: d.operating_cost_per_km != null ? String(d.operating_cost_per_km) : '',
+          pricing_include_empty_return: d.pricing_include_empty_return === true ? 'yes' : 'no',
+          pool_pricing_data: d.pool_pricing_data === true ? 'yes' : 'no',
+          // "10.00" -> "10" (whole %, as everywhere in pricing).
+          margin_target_pct: d.margin_target_pct != null && d.margin_target_pct !== '' ? String(Number(d.margin_target_pct)) : '10',
+          driver_allowance_per_night: d.driver_allowance_per_night != null ? String(d.driver_allowance_per_night) : '',
         });
+        setHasTargetField('margin_target_pct' in d);
+        setHasDriverField('driver_allowance_per_night' in d);
+        setCostInUse(costInUseOf(d.operating_cost_in_use));
+        const range = Array.isArray(d.margin_target_range) ? d.margin_target_range.map(Number) : null;
+        if (range && range.length === 2 && range.every((x: number) => Number.isFinite(x)) && range[0] < range[1]) setTargetRange([range[0], range[1]]);
         // Only show a real uploaded logo, not the backend's default placeholder
         if (d.logo_url && !d.logo_url.endsWith('/brand/logo.svg')) setLogoUrl(d.logo_url);
       }
+      setLoaded(true);
     }).catch(() => { toast.error('Failed to load company details'); })
       // Chained, not parallel: the live-price nudge below reads the current
       // Diesel field to decide whether it looks untouched, so it must run
       // after the real saved value has actually landed in form state.
       .finally(() => loadLivePrice(false));
   }, []);
+
+  // /settings/company#pricing (the quote builder's "Set yours" link) lands on
+  // the Pricing card once the form has its values (so the layout is final).
+  useEffect(() => {
+    if (!loaded || location.hash !== '#pricing') return;
+    const el = document.getElementById('pricing');
+    if (!el) return;
+    const raf = requestAnimationFrame(() => el.scrollIntoView({ block: 'start' }));
+    return () => cancelAnimationFrame(raf);
+  }, [loaded, location.hash]);
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
@@ -232,6 +384,17 @@ export function CompanySettings() {
         return;
       }
     }
+    // Pricing: target margin, operating cost and driver allowance, inline.
+    const pricingFields = PRICING_ORDER.filter(f => (f !== 'margin_target_pct' || hasTargetField) && (f !== 'driver_allowance_per_night' || hasDriverField));
+    const errs = Object.fromEntries(pricingFields.map(f => [f, pricingError(f, (form as Record<string, string>)[f] ?? '', targetRange)])) as Partial<Record<PricingField, string | null>>;
+    setPricingErrors(errs);
+    const firstInvalid = pricingFields.find(f => errs[f]);
+    if (firstInvalid) {
+      // The first invalid field takes focus (its message is right below it).
+      document.getElementById(PRICING_INPUT_ID[firstInvalid])?.focus();
+      return;
+    }
+    const opCost = form.operating_cost_per_km ? Math.round(parseFloat(form.operating_cost_per_km) * 100) / 100 : null;
     // Blank is allowed (falls back to the model default on save); a value that
     // is present must be a sane whole number of hours.
     const slaHours = form.default_sla_hours ? parseInt(form.default_sla_hours, 10) : null;
@@ -292,6 +455,11 @@ export function CompanySettings() {
         bank_branch_code: branchDigits || null,
         bank_account_type: form.bank_account_type || null,
         payment_reference_hint: form.payment_reference_hint.trim() || null,
+        operating_cost_per_km: opCost,
+        ...(hasTargetField ? { margin_target_pct: Math.round(Number(form.margin_target_pct)) } : {}),
+        ...(hasDriverField ? { driver_allowance_per_night: form.driver_allowance_per_night ? Math.round(parseFloat(form.driver_allowance_per_night)) : null } : {}),
+        pricing_include_empty_return: form.pricing_include_empty_return === 'yes',
+        pool_pricing_data: form.pool_pricing_data === 'yes',
       } });
       // The quote builder reads these defaults through the shared
       // ["company-profile"] query, which has a 5 minute staleTime — so without
@@ -306,6 +474,10 @@ export function CompanySettings() {
     }
     setSaving(false);
   };
+
+  // The operating cost the floor uses while the field is empty, as the API words it.
+  const costInUseLine = costInUse?.label || costInUseText(costInUse);
+  const anyPricingError = Object.values(pricingErrors).some(Boolean);
 
   return (
     <div style={{ maxWidth: 'var(--form-max, 720px)' }}>
@@ -628,6 +800,101 @@ export function CompanySettings() {
         </div>
       </div>
 
+      {/* Pricing: what the quote builder's cost floor and chance to win use. */}
+      <div style={{ ...sectionStyle, scrollMarginTop: 16 }} id="pricing">
+        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Pricing</h2></div>
+        <div style={bodyStyle}>
+          {/* Two columns at desktop (R5, F-3.1): target | operating cost,
+              driver allowance | empty return, then sharing across both. */}
+          <div className="cs-grid cs-grid--2 cs-pricing-grid">
+            {hasTargetField && (
+              <div>
+                <label htmlFor="company-margin-target" style={labelTipStyle}>
+                  Target margin (%)
+                  <InfoTip label="About the target margin">The margin you aim for on every quote: price less the full cost floor, as a share of the price excl. VAT. The suggested prices never go below it, and go above it when the market pays more.</InfoTip>
+                </label>
+                <PricingInput id="company-margin-target" inputMode="numeric" decimals={0} suffix="%" value={form.margin_target_pct}
+                  onChange={v => { set('margin_target_pct', v); if (pricingErrors.margin_target_pct) checkPricing('margin_target_pct', v); }}
+                  onBlur={raw => blurPricing('margin_target_pct', raw)} isValid={raw => !pricingError('margin_target_pct', raw, targetRange)} error={pricingErrors.margin_target_pct} describedBy="company-margin-target-help" />
+                <div id="company-margin-target-help">
+                  {pricingErrors.margin_target_pct
+                    ? <div role="alert" style={fieldErrorStyle}>{pricingErrors.margin_target_pct}</div>
+                    : <div style={helpTextStyle}>Safe starts here. Balanced and Stretch follow the market.</div>}
+                </div>
+              </div>
+            )}
+            <div>
+              <label htmlFor="company-operating-cost-per-km" style={labelTipStyle}>
+                Operating cost per km
+                <InfoTip label="About the operating cost per km">Driver wages, vehicle finance, insurance, licences, tyres, maintenance and overheads, per km. It goes into every quote's cost floor. Leave it empty and we use your costs from the last 12 months, or a typical figure for the vehicle type until you have enough costed trips.</InfoTip>
+              </label>
+              <PricingInput id="company-operating-cost-per-km" inputMode="decimal" decimals={2} prefix="R" suffix="/km" placeholder="Automatic"
+                value={form.operating_cost_per_km}
+                onChange={v => { set('operating_cost_per_km', v); if (pricingErrors.operating_cost_per_km) checkPricing('operating_cost_per_km', v); }}
+                onBlur={raw => blurPricing('operating_cost_per_km', raw)} isValid={raw => !pricingError('operating_cost_per_km', raw, targetRange)} error={pricingErrors.operating_cost_per_km} describedBy="company-operating-cost-help" />
+              <div id="company-operating-cost-help">
+                {pricingErrors.operating_cost_per_km
+                  ? <div role="alert" style={fieldErrorStyle}>{pricingErrors.operating_cost_per_km}</div>
+                  : <div style={helpTextStyle}>Excludes fuel, tolls, driver allowance and border fees.</div>}
+                {form.operating_cost_per_km
+                  ? !pricingErrors.operating_cost_per_km && <div style={{ ...helpTextStyle, marginTop: 2, color: 'var(--text-secondary)' }}>Your figure replaces the automatic one.</div>
+                  : costInUseLine && <div style={{ ...helpTextStyle, marginTop: 2, color: 'var(--text-secondary)' }}>{costInUseLine}</div>}
+              </div>
+            </div>
+            {hasDriverField && (
+              <div>
+                <label htmlFor="company-driver-allowance" style={labelTipStyle}>
+                  Driver allowance per night (R)
+                  <InfoTip label="About the driver allowance">What you pay a driver for each night away from base. Quotes use it for trips with nights away when no approved rate is on record; each quote can still change it.</InfoTip>
+                </label>
+                <PricingInput id="company-driver-allowance" inputMode="numeric" decimals={0} prefix="R" placeholder="Not set" value={form.driver_allowance_per_night}
+                  onChange={v => { set('driver_allowance_per_night', v); if (pricingErrors.driver_allowance_per_night) checkPricing('driver_allowance_per_night', v); }}
+                  onBlur={raw => blurPricing('driver_allowance_per_night', raw)} isValid={raw => !pricingError('driver_allowance_per_night', raw, targetRange)} error={pricingErrors.driver_allowance_per_night} describedBy="company-driver-allowance-help" />
+                <div id="company-driver-allowance-help">
+                  {pricingErrors.driver_allowance_per_night
+                    ? <div role="alert" style={fieldErrorStyle}>{pricingErrors.driver_allowance_per_night}</div>
+                    : <div style={helpTextStyle}>Paid per night away. Same-day trips have none.</div>}
+                </div>
+              </div>
+            )}
+            <div>
+              <label htmlFor="company-include-empty-return" style={labelTipStyle}>
+                Empty return in the cost floor
+                <InfoTip label="About the empty return">For one-way quotes: whether the cost floor includes driving home empty. Each quote can still switch it.</InfoTip>
+              </label>
+              <Select value={form.pricing_include_empty_return} onValueChange={val => set('pricing_include_empty_return', val)}>
+                <SelectTrigger style={inputStyle} className="cs-select" id="company-include-empty-return">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no">No, one way only</SelectItem>
+                  <SelectItem value="yes">Yes, include the run home</SelectItem>
+                </SelectContent>
+              </Select>
+              <div style={helpTextStyle}>Each quote can still switch it.</div>
+            </div>
+            <div className="cs-pricing-grid__wide">
+              <label htmlFor="company-pool-pricing-data" style={labelTipStyle}>
+                Share anonymised win/loss data
+                <InfoTip label="About sharing win/loss data">With Yes, whether your quotes were won or lost (price, lane, truck type and timing; never customer names, contacts or documents) helps train a shared pricing model, and you can use that model's chance to win while you have too few closed quotes of your own. With No, your outcomes only ever train your own model. You can switch it off at any time.</InfoTip>
+              </label>
+              <div className="cs-pricing-grid__half">
+                <Select value={form.pool_pricing_data} onValueChange={val => set('pool_pricing_data', val)}>
+                  <SelectTrigger style={inputStyle} className="cs-select" id="company-pool-pricing-data">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="no">No, keep it to us</SelectItem>
+                    <SelectItem value="yes">Yes, share anonymised outcomes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div style={helpTextStyle}>Shares won/lost and price vs market only, never customer names. Helps chance to win on lanes where you have few quotes.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Fuel Price Defaults */}
       <div style={sectionStyle}>
         <div style={{ ...sectionHeaderStyle, justifyContent: 'space-between' }}>
@@ -732,8 +999,11 @@ export function CompanySettings() {
           className="btn-action settings-control"
           onClick={handleSave}
           disabled={saving || isDemo}
-          title={isDemo ? 'Fixed in demo mode' : undefined}
-          style={{ opacity: isDemo ? 0.5 : saving ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+          // Invalid pricing field: Save reads as disabled, and a click puts
+          // focus on the first invalid field instead of saving.
+          aria-disabled={anyPricingError || undefined}
+          title={isDemo ? 'Fixed in demo mode' : anyPricingError ? 'Fix the highlighted field first' : undefined}
+          style={{ opacity: isDemo || anyPricingError ? 0.5 : saving ? 0.6 : 1, cursor: isDemo || anyPricingError ? 'not-allowed' : undefined }}
         >
           {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
         </button>

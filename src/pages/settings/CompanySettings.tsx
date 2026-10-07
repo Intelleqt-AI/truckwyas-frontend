@@ -73,14 +73,16 @@ const PRICING_INPUT_ID: Record<PricingField, string> = {
   driver_allowance_per_night: 'company-driver-allowance',
 };
 const PLAIN_NUMBER = /^\d+(\.\d+)?$/;
-function pricingError(field: PricingField, raw: string, targetRange: [number, number] = [1, 40]): string | null {
+function pricingError(field: PricingField, raw: string): string | null {
   const t = toRaw(raw.trim());
   if (field === 'margin_target_pct') {
-    const [lo, hi] = targetRange;
-    const msg = `Enter a whole number from ${lo} to ${hi}.`;
-    if (!/^\d+$/.test(t)) return msg;
+    // The server's own rule (above 0%, below 100%, 2 decimals). A figure
+    // outside the range the analysis uses is allowed: it is noted, not
+    // refused (marginRangeNote), so an existing value never blocks a save.
+    const msg = 'Enter a margin above 0% and below 100%.';
+    if (!/^\d+(\.\d{1,2})?$/.test(t)) return msg;
     const n = Number(t);
-    return n >= lo && n <= hi ? null : msg;
+    return n > 0 && n < 100 ? null : msg;
   }
   if (!t) return null;
   if (field === 'operating_cost_per_km') {
@@ -98,7 +100,17 @@ function pricingError(field: PricingField, raw: string, targetRange: [number, nu
 function pricingNormalised(field: PricingField, raw: string): string {
   const t = toRaw(raw.trim());
   if (!t || !PLAIN_NUMBER.test(t)) return raw;
-  return field === 'operating_cost_per_km' ? String(Math.round(Number(t) * 100) / 100) : String(Math.round(Number(t)));
+  return field === 'driver_allowance_per_night' ? String(Math.round(Number(t))) : String(Math.round(Number(t) * 100) / 100);
+}
+
+/** The target the pricing analysis actually uses, when the saved figure is outside its range. */
+function marginRangeNote(raw: string, [lo, hi]: [number, number]): string | null {
+  const t = toRaw(raw.trim());
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
+  const n = Number(t);
+  if (n > hi) return `Pricing uses at most ${hi}%.`;
+  if (n > 0 && n < lo) return `Pricing uses at least ${lo}%.`;
+  return null;
 }
 
 /* A pricing field with its unit inside the box ("R" before, "%" or "/km"
@@ -194,16 +206,19 @@ export function CompanySettings() {
   // profile does not return is not shown (and not saved).
   const [hasDriverField, setHasDriverField] = useState(false);
   const [hasTargetField, setHasTargetField] = useState(false);
+  // The target margin as loaded: an untouched field is neither checked nor
+  // sent on Save, so a stored figure never blocks (or is rounded by) a save.
+  const [loadedTarget, setLoadedTarget] = useState<string | null>(null);
   const [costInUse, setCostInUse] = useState<CostInUse | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [pricingErrors, setPricingErrors] = useState<Partial<Record<PricingField, string | null>>>({});
   // The analysis' own clamp for the target margin (K-9 margin_target_range), else 1–40.
   const [targetRange, setTargetRange] = useState<[number, number]>([1, 40]);
   const checkPricing = (field: PricingField, raw?: string) =>
-    setPricingErrors(p => ({ ...p, [field]: pricingError(field, raw ?? (form as Record<string, string>)[field] ?? '', targetRange) }));
+    setPricingErrors(p => ({ ...p, [field]: pricingError(field, raw ?? (form as Record<string, string>)[field] ?? '') }));
   // On blur: validate, and a valid value is shown as it will be saved ("12,345" -> "12,35").
   const blurPricing = (field: PricingField, raw: string) => {
-    const err = pricingError(field, raw, targetRange);
+    const err = pricingError(field, raw);
     setPricingErrors(p => ({ ...p, [field]: err }));
     if (!err) setForm(p => ({ ...p, [field]: pricingNormalised(field, raw) }));
   };
@@ -305,11 +320,12 @@ export function CompanySettings() {
           operating_cost_per_km: d.operating_cost_per_km != null ? String(d.operating_cost_per_km) : '',
           pricing_include_empty_return: d.pricing_include_empty_return === true ? 'yes' : 'no',
           pool_pricing_data: d.pool_pricing_data === true ? 'yes' : 'no',
-          // "10.00" -> "10" (whole %, as everywhere in pricing).
+          // "10.00" -> "10", "12.50" -> "12.5".
           margin_target_pct: d.margin_target_pct != null && d.margin_target_pct !== '' ? String(Number(d.margin_target_pct)) : '10',
           driver_allowance_per_night: d.driver_allowance_per_night != null ? String(d.driver_allowance_per_night) : '',
         });
         setHasTargetField('margin_target_pct' in d);
+        setLoadedTarget(d.margin_target_pct != null && d.margin_target_pct !== '' ? String(Number(d.margin_target_pct)) : '10');
         setHasDriverField('driver_allowance_per_night' in d);
         setCostInUse(costInUseOf(d.operating_cost_in_use));
         const range = Array.isArray(d.margin_target_range) ? d.margin_target_range.map(Number) : null;
@@ -385,8 +401,9 @@ export function CompanySettings() {
       }
     }
     // Pricing: target margin, operating cost and driver allowance, inline.
-    const pricingFields = PRICING_ORDER.filter(f => (f !== 'margin_target_pct' || hasTargetField) && (f !== 'driver_allowance_per_night' || hasDriverField));
-    const errs = Object.fromEntries(pricingFields.map(f => [f, pricingError(f, (form as Record<string, string>)[f] ?? '', targetRange)])) as Partial<Record<PricingField, string | null>>;
+    const targetChanged = hasTargetField && form.margin_target_pct !== loadedTarget;
+    const pricingFields = PRICING_ORDER.filter(f => (f !== 'margin_target_pct' || targetChanged) && (f !== 'driver_allowance_per_night' || hasDriverField));
+    const errs = Object.fromEntries(pricingFields.map(f => [f, pricingError(f, (form as Record<string, string>)[f] ?? '')])) as Partial<Record<PricingField, string | null>>;
     setPricingErrors(errs);
     const firstInvalid = pricingFields.find(f => errs[f]);
     if (firstInvalid) {
@@ -456,7 +473,8 @@ export function CompanySettings() {
         bank_account_type: form.bank_account_type || null,
         payment_reference_hint: form.payment_reference_hint.trim() || null,
         operating_cost_per_km: opCost,
-        ...(hasTargetField ? { margin_target_pct: Math.round(Number(form.margin_target_pct)) } : {}),
+        // Only when changed, to the cent as typed (never rounded to a whole %).
+        ...(targetChanged ? { margin_target_pct: Math.round(Number(toRaw(form.margin_target_pct)) * 100) / 100 } : {}),
         ...(hasDriverField ? { driver_allowance_per_night: form.driver_allowance_per_night ? Math.round(parseFloat(form.driver_allowance_per_night)) : null } : {}),
         pricing_include_empty_return: form.pricing_include_empty_return === 'yes',
         pool_pricing_data: form.pool_pricing_data === 'yes',
@@ -813,13 +831,13 @@ export function CompanySettings() {
                   Target margin (%)
                   <InfoTip label="About the target margin">The margin you aim for on every quote: price less the full cost floor, as a share of the price excl. VAT. The suggested prices never go below it, and go above it when the market pays more.</InfoTip>
                 </label>
-                <PricingInput id="company-margin-target" inputMode="numeric" decimals={0} suffix="%" value={form.margin_target_pct}
+                <PricingInput id="company-margin-target" inputMode="decimal" decimals={/\.\d/.test(form.margin_target_pct) ? 2 : 0} suffix="%" value={form.margin_target_pct}
                   onChange={v => { set('margin_target_pct', v); if (pricingErrors.margin_target_pct) checkPricing('margin_target_pct', v); }}
-                  onBlur={raw => blurPricing('margin_target_pct', raw)} isValid={raw => !pricingError('margin_target_pct', raw, targetRange)} error={pricingErrors.margin_target_pct} describedBy="company-margin-target-help" />
+                  onBlur={raw => blurPricing('margin_target_pct', raw)} isValid={raw => !pricingError('margin_target_pct', raw)} error={pricingErrors.margin_target_pct} describedBy="company-margin-target-help" />
                 <div id="company-margin-target-help">
                   {pricingErrors.margin_target_pct
                     ? <div role="alert" style={fieldErrorStyle}>{pricingErrors.margin_target_pct}</div>
-                    : <div style={helpTextStyle}>Safe starts here. Balanced and Stretch follow the market.</div>}
+                    : <div style={helpTextStyle}>Safe starts here. Balanced and Stretch follow the market.{marginRangeNote(form.margin_target_pct, targetRange) ? ` ${marginRangeNote(form.margin_target_pct, targetRange)}` : ''}</div>}
                 </div>
               </div>
             )}
@@ -831,7 +849,7 @@ export function CompanySettings() {
               <PricingInput id="company-operating-cost-per-km" inputMode="decimal" decimals={2} prefix="R" suffix="/km" placeholder="Automatic"
                 value={form.operating_cost_per_km}
                 onChange={v => { set('operating_cost_per_km', v); if (pricingErrors.operating_cost_per_km) checkPricing('operating_cost_per_km', v); }}
-                onBlur={raw => blurPricing('operating_cost_per_km', raw)} isValid={raw => !pricingError('operating_cost_per_km', raw, targetRange)} error={pricingErrors.operating_cost_per_km} describedBy="company-operating-cost-help" />
+                onBlur={raw => blurPricing('operating_cost_per_km', raw)} isValid={raw => !pricingError('operating_cost_per_km', raw)} error={pricingErrors.operating_cost_per_km} describedBy="company-operating-cost-help" />
               <div id="company-operating-cost-help">
                 {pricingErrors.operating_cost_per_km
                   ? <div role="alert" style={fieldErrorStyle}>{pricingErrors.operating_cost_per_km}</div>
@@ -849,7 +867,7 @@ export function CompanySettings() {
                 </label>
                 <PricingInput id="company-driver-allowance" inputMode="numeric" decimals={0} prefix="R" placeholder="Not set" value={form.driver_allowance_per_night}
                   onChange={v => { set('driver_allowance_per_night', v); if (pricingErrors.driver_allowance_per_night) checkPricing('driver_allowance_per_night', v); }}
-                  onBlur={raw => blurPricing('driver_allowance_per_night', raw)} isValid={raw => !pricingError('driver_allowance_per_night', raw, targetRange)} error={pricingErrors.driver_allowance_per_night} describedBy="company-driver-allowance-help" />
+                  onBlur={raw => blurPricing('driver_allowance_per_night', raw)} isValid={raw => !pricingError('driver_allowance_per_night', raw)} error={pricingErrors.driver_allowance_per_night} describedBy="company-driver-allowance-help" />
                 <div id="company-driver-allowance-help">
                   {pricingErrors.driver_allowance_per_night
                     ? <div role="alert" style={fieldErrorStyle}>{pricingErrors.driver_allowance_per_night}</div>

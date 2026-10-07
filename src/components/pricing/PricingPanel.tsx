@@ -358,6 +358,9 @@ function Alerts({ data, customerName, onOneWay, includeReturn }: { data: Pricing
 }
 
 const MISSING_COPY: Record<string, string> = {
+  fuel: "Fuel isn't worked out yet, so no prices are suggested.",
+  tolls: "Tolls aren't worked out yet, so no prices are suggested.",
+  border: "This is an international trip and its border costs aren't worked out yet. Add them in the build-up to see prices.",
   vehicle: "No vehicle type picked, so running costs use fleet defaults. Pick one for a sharper floor.",
   customer: "Pick a client to see their history on this lane.",
   weight: "Add the weight for a sharper fuel and running-cost figure.",
@@ -591,8 +594,11 @@ function FloorRow({ line, open, onToggle, driver, fixed, missing, focusToken }: 
   }, [focusToken, open]);
   const kind: SourceKind = driver?.edited ? "user" : line.source.kind;
   const isFixedEstimate = !!fixed && fixed.source === "vehicle_default";
-  const chip = missing
+  const notSet = missing || (line.needsInput && line.key !== "driver_allowance");
+  const chip = notSet
     ? { tone: "warning" as StatusTone, label: "Not set" }
+    : line.check
+      ? { tone: "warning" as StatusTone, label: "Check" }
     : line.key === "driver_allowance" && driver?.edited
       ? { tone: "neutral" as StatusTone, label: "Your figure" }
       : line.key === "driver_allowance" && line.amount === 0 && line.nights === 0
@@ -605,7 +611,7 @@ function FloorRow({ line, open, onToggle, driver, fixed, missing, focusToken }: 
       <button type="button" className="pa-line__row" aria-expanded={open} aria-controls={detailId} onClick={onToggle}>
         <span className="pa-line__label">{line.label}</span>
         <StatusChip tone={chip.tone} label={chip.label} title={line.source.label || undefined} />
-        <span className="pa-line__amt">{missing ? "—" : formatMoneyWhole(line.amount)}</span>
+        <span className="pa-line__amt">{notSet ? "—" : formatMoneyWhole(line.amount)}</span>
         <ChevronRight size={14} className="pa-line__chev" aria-hidden="true" />
         <span className="pa-sr">{open ? "Hide details" : "Show details"}</span>
       </button>

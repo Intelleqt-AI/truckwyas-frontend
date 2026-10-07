@@ -19,6 +19,8 @@ export interface PricingDecision {
   likelihood_at_final_pct?: number | string | null;
   band_at_final?: LikelihoodBand | string | null;
   n_closed?: number | null;
+  /** Server: the quote's price changed after this was saved (no new analysis). */
+  stale?: boolean;
   [key: string]: unknown;
 }
 

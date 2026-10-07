@@ -838,7 +838,15 @@ export default function QuoteBuilder() {
       setCargo(q.cargo_description || ""); setNotes(q.notes || "");
       setDriverAllowanceInput(String(q.driver_allowance || 0));
       setDriverEdited(Number(q.driver_allowance) > 0);
-      savedFinalPriceRef.current = Number(q.pricing_decision?.final_price) > 0 ? Number(q.pricing_decision.final_price) : null;
+      // The stored pricing decision describes this quote only while its final
+      // price still equals the quote's total (to 50 cents, QuoteDetail's rule)
+      // and the server hasn't marked it stale. A price changed without a new
+      // analysis must reopen as saved, never be put back to the decision's.
+      const decision = q.pricing_decision;
+      const decidedPrice = Number(decision?.final_price);
+      const decisionCurrent = !!decision && !decision.stale && decidedPrice > 0
+        && Math.abs(decidedPrice - Number(q.total_amount)) <= 0.5;
+      savedFinalPriceRef.current = decisionCurrent ? decidedPrice : null;
       if (q.toll_charges != null) setEditableTollCost(String(q.toll_charges));
       // An applied AI fuel price and a typed/AI toll figure are the user's
       // choice, so they survive a reload. Route-derived tolls still don't pin
@@ -863,7 +871,7 @@ export default function QuoteBuilder() {
       // A price set in the bar was saved inside base_rate; split it back out
       // so the quote reopens explaining itself the same way (rate + adjustment).
       { const adj = Number(q.pricing_decision?.price_adjustment);
-        if (Number.isFinite(adj) && Math.abs(adj) >= 0.5 && q.distance && q.base_rate) {
+        if (decisionCurrent && Number.isFinite(adj) && Math.abs(adj) >= 0.5 && q.distance && q.base_rate) {
           const loadLegs = q.trip_type === "ROUND_TRIP" ? 2 : 1;
           setBaseRatePerKm(String(Math.round(((Number(q.base_rate) - adj) / (Number(q.distance) * loadLegs)) * 100) / 100));
           setServiceCharge(adj);
@@ -1248,14 +1256,18 @@ export default function QuoteBuilder() {
     driver_allowance: round2(driverAllowance), additional_charges: round2(crossBorderCost + savedBaseShortfall),
     total_amount: round2(total),
     // One margin definition: price − full cost floor (pricing analysis). Sent
-    // only when the floor is known, so an edit never wipes a saved figure.
-    ...(liveReading.marginPct != null ? { margin_percentage: Math.max(-999.99, Math.min(999.99, Math.round(liveReading.marginPct * 100) / 100)) } : {}),
+    // only when the floor is known, so an edit never wipes a saved figure, and
+    // only from an analysis of exactly these values (not one still refreshing).
+    ...(pricing.isCurrent && liveReading.marginPct != null ? { margin_percentage: Math.max(-999.99, Math.min(999.99, Math.round(liveReading.marginPct * 100) / 100)) } : {}),
     notes, status,
     sla_hours: Number(companyProfile?.default_sla_hours) || 48, valid_until: validUntil, trip_type: tripType,
     // No heuristic win_probability any more: the server sets it from the
     // model's likelihood at the final price (model level only). What was shown
     // and picked is saved, additively, as pricing_decision.
-    ...(pricing.data ? { pricing_decision: pricingDecision(pricing.data, total, liveReading.matchedChoice ?? "custom", serviceCharge) } : {}),
+    // Only an analysis of exactly what is being saved: while one is still
+    // refreshing the quote saves without it (the old decision is then marked
+    // superseded on the server if the price moved).
+    ...(pricing.data && pricing.isCurrent ? { pricing_decision: pricingDecision(pricing.data, total, liveReading.matchedChoice ?? "custom", serviceCharge) } : {}),
     base_rate_per_km: serviceCharge !== 0 && chargeDistance > 0 ? round2(savedBase / chargeDistance) : Number(baseRatePerKm) || null,
     // Full raw request+response of the route-calculate call behind the
     // currently-selected route, captured for future ML training — see

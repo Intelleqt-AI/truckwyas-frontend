@@ -627,7 +627,7 @@ function FloorRow({ line, open, onToggle, driver, fixed, missing, focusToken }: 
                 <NumberField ref={inputRef} value={driver.value === "" ? null : Number(driver.value) || 0}
                   onValue={(n) => driver.onChange(n == null ? "" : String(n))} />
               </label>
-              {driver.edited && line.suggested != null && <button type="button" className="pa-link" onClick={driver.onReset}>{line.source.kind === "user" ? `Use your setting (${formatMoneyWhole(line.suggested)})` : `Use the approved figure (${formatMoneyWhole(line.suggested)})`}</button>}
+              {driver.edited && line.suggested != null && <button type="button" className="pa-link" onClick={driver.onReset}>{line.source.kind === "user" ? `Reset to your setting (${formatMoneyWhole(line.suggested)})` : `Use the approved figure (${formatMoneyWhole(line.suggested)})`}</button>}
             </div>
           )}
           {isFixedEstimate && (
@@ -701,7 +701,7 @@ function MarketSection({ data, price }: { data: PricingAnalysis; price: number }
         <>
           <TierLine m={m} />
           {m.oneWayX2 && <p className="pa-tier pa-tier--x2">Return trip: one-way quotes ×2, not real return-trip quotes.</p>}
-          <MarketRange market={m} floor={floor} price={price > 0 ? price : null} />
+          <MarketRange market={m} floor={floor} price={price} />
           <p className="pa-range-legend">
             <span><i className="pa-key pa-key--band" aria-hidden="true" />{MARKET_RANGE_LABEL} <span className="pa-nowrap">{formatMoneyWhole(m.p25)} to {formatMoneyWhole(m.p75)}</span></span>
             <span><i className="pa-key pa-key--median" aria-hidden="true" />Median {formatMoneyWhole(m.median)}</span>
@@ -749,7 +749,7 @@ function WhySection({ data, price }: { data: PricingAnalysis; price: number }) {
           {reasons.length > 0 && <ul className="pa-reasons">{reasons.map((r) => <li key={r}>{r}</li>)}</ul>}
           {model && (
             <figure className="pa-fig">
-              <LikelihoodCurve curve={model.curve} range={model.range} choices={data.choices} price={!atChoice && price > 0 ? price : null}
+              <LikelihoodCurve curve={model.curve} range={model.range} choices={data.choices} price={!atChoice ? price : null}
                 median={data.market?.available && !data.market.isEstimate ? data.market.median : null} />
               <figcaption className="pa-fig__cap">Chance to win by price, from {model.basisLabel || plural(model.nClosed, "closed quote")}.</figcaption>
             </figure>

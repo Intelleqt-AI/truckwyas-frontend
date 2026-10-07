@@ -1542,7 +1542,11 @@ export default function QuoteBuilder() {
   const inputS: React.CSSProperties = { background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-control, 8px)", padding: "9px 11px", color: "var(--text-primary)", fontSize: 14, lineHeight: "20px", fontFamily: "var(--font-sans)", width: "100%", minHeight: "var(--field-h, 40px)", boxSizing: "border-box" };
 
   // Same condition the price bar renders on (display only).
-  const showPriceBar = !billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0;
+  // Gated on costSum (the underlying cost build-up), not total: total
+  // includes the user's own price override and briefly hits 0 while they
+  // retype the price box (clearing it first), which must not hide the bar
+  // they are typing into.
+  const showPriceBar = !billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && costSum > 0;
 
   return (
     <div ref={controlsRef} className={`qi-form qb-controls${showPriceBar ? " qb-has-pricebar" : ""}`}>

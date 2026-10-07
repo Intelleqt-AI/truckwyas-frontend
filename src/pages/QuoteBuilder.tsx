@@ -11,7 +11,7 @@ import { toast } from "@/lib/toast";
 import { formatCurrency, formatMoneyWhole, formatNumber, formatDateTime, sentenceCaseLabel } from "@/lib/formatters";
 import { DatePicker } from "@/components/ui/date-picker";
 import { dieselInputFrom, dieselSourceNote, randPerLitre, currentPeriodStartIso, isoDay, type QuoteWarning } from "@/lib/dieselPrice";
-import { compute, changesSincePriced, defaultQuotePrice, suggestTruck, capacityTonnes, vehicleClass, CLASS_OPERATING_DEFAULTS, cents, type CostingInputs, type DieselInput } from "@/lib/quoteRules";
+import { compute, changesSincePriced, suggestTruck, capacityTonnes, vehicleClass, CLASS_OPERATING_DEFAULTS, cents, type CostingInputs, type DieselInput } from "@/lib/quoteRules";
 import { useCostBreakdown } from "@/components/pricing/useCostBreakdown";
 import { sendBlockedMessage, SEND_CHECK_KEY } from "@/lib/quoteWarnings";
 import { LocationInput, type LocationCoords } from "@/components/LocationInput";
@@ -567,6 +567,8 @@ export default function QuoteBuilder() {
     },
     minimum_charge: minimumCharge,
     target_margin_pct: si?.target_margin_pct ?? (companyProfile?.margin_target_pct != null && companyProfile.margin_target_pct !== "" ? Number(companyProfile.margin_target_pct) : null),
+    default_price_per_km: si && "default_price_per_km" in si ? (si as { default_price_per_km?: number | null }).default_price_per_km ?? null
+      : Number(companyProfile?.default_base_rate_per_km) > 0 ? Number(companyProfile.default_base_rate_per_km) : null,
   };
   const costing = compute(costingInputs);
   const lineAmt = (key: string) => costing.lines.find(l => l.key === key)?.amount ?? null;
@@ -595,19 +597,18 @@ export default function QuoteBuilder() {
   // separate. Default price = cost floor + target margin (never below the
   // minimum charge), or the optional default price per km when that is more;
   // whole rand. Unknown floor → no default price.
-  const passThrough = fuelCost + tollCost + crossBorderCost + driverAllowance + emptyReturn.total;
-  const perKmDefault = Number(selectedVT?.base_rate) > 0 ? Number(selectedVT.base_rate)
-    : Number(companyProfile?.default_base_rate_per_km) > 0 ? Number(companyProfile.default_base_rate_per_km) : null;
-  const defaultPrice: number | null = defaultQuotePrice(costing.target_price, perKmDefault, chargeDistance);
+  // The costing's own default price (backend rule: ceil(max(rate price,
+  // target price)); rate price = company default price per km × loaded km).
+  const defaultPrice: number | null = costing.default_price;
   const total = cents(priceSet ?? defaultPrice ?? 0);
   // The same costing at the price in the bar: margin, below floor / minimum.
   const costingAtPrice = total > 0 ? compute({ ...costingInputs, price: total }) : costing;
   // §5 the other trip shape, priced the same way: "Loaded back R 25 100".
-  const altReturnPrice: number | null = (() => {
-    if (!costing.trip.empty_return_default) return null;
-    const alt = compute({ ...costingInputs, include_empty_return: !costing.trip.empty_return_included });
-    return defaultQuotePrice(alt.target_price, perKmDefault, chargeDistance);
-  })();
+  // Loaded back: the costing's alternative_with_return_load; empty back
+  // (a return load is booked): the same costing with the empty return in.
+  const altReturnPrice: number | null = !costing.trip.empty_return_default ? null
+    : costing.trip.empty_return_included ? costing.alternative_with_return_load?.default_price ?? null
+    : compute({ ...costingInputs, include_empty_return: true }).default_price;
 
   // ---- route calculation (debounced auto-run) ----
   const calcRef = useRef<ReturnType<typeof setTimeout> | null>(null);

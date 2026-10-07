@@ -105,19 +105,22 @@ export function saDate(value: unknown): string | null {
   const s = new Date(d.getTime() + 2 * 3600 * 1000);
   return `${s.getUTCDate()} ${MONTHS[s.getUTCMonth()]} ${s.getUTCFullYear()}`;
 }
-/** SA style: space thousands, comma decimals ("1 050", "32,80"). */
+/** ROUND_HALF_UP on the shortest decimal form of the double (1,005 → 1,01). */
+function halfUp(v: number, dp: number): number {
+  return Number(`${Math.round(Number(`${Math.abs(v)}e${dp}`))}e-${dp}`);
+}
+/** SA style: space thousands, comma decimals ("1 050", "32,80"), half up. */
 export function fmtNum(v: number, dp = 0): string {
-  const fixed = Math.abs(v).toFixed(dp);
+  const fixed = halfUp(v, dp).toFixed(dp);
   const [int, dec] = fixed.split(".");
   const txt = int.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + (dec ? `,${dec}` : "");
   return (v < 0 && /[1-9]/.test(txt) ? "−" : "") + txt;
 }
 /** "R 32,80" / "R 1 050" (whole rand half-up when dp = 0). */
 export function fmtRand(v: number, dp = 0): string {
-  let x = v;
-  if (dp === 0) x = Math.floor(Math.abs(x) + 0.5) * (x >= 0 ? 1 : -1);
-  const sign = x < 0 && Math.abs(x) >= (dp === 0 ? 0.5 : 0.005) ? "−" : "";
-  return `${sign}R ${fmtNum(Math.abs(x), dp)}`;
+  const shown = halfUp(v, dp);
+  const sign = v < 0 && shown !== 0 ? "−" : "";
+  return `${sign}R ${fmtNum(Math.abs(v), dp)}`;
 }
 function warning(code: string, severity: "block" | "warn", title: string, detail: string,
   impact_zar: number | null = null, actions: string[] = [], extra: Record<string, unknown> = {}): QuoteWarning {
@@ -151,6 +154,8 @@ export interface CostingInputs {
   settings?: { include_empty_return_default?: boolean | null; empty_return_min_km?: number | null } | null;
   minimum_charge?: number | null;
   target_margin_pct?: number | null;
+  /** Optional default price per km (a price, not a cost). */
+  default_price_per_km?: number | null;
   price?: number | null;
 }
 
@@ -180,7 +185,12 @@ export function resolveDiesel(d: DieselInput | null | undefined): ResolvedDiesel
   return { ...base, price: null, source: "missing" };
 }
 
-export function dieselWarnings(diesel: ResolvedDiesel, litresTotal: number | null = null): QuoteWarning[] {
+/** Sum of the fuel line amounts (each to the cent) at `price`. */
+function fuelLinesTotal(parts: number[], price: number): number {
+  return cents(parts.reduce((s, l) => s + cents(l * price), 0));
+}
+
+export function dieselWarnings(diesel: ResolvedDiesel, litresTotal: number | null = null, litresParts: number[] | null = null): QuoteWarning[] {
   const out: QuoteWarning[] = [];
   const zoneTxt = diesel.zone === "COASTAL" ? "coastal" : "inland";
   if (diesel.source === "missing") {
@@ -199,10 +209,10 @@ export function dieselWarnings(diesel: ResolvedDiesel, litresTotal: number | nul
     const own = diesel.own_price as number;
     const official = diesel.official_price;
     if (Math.abs(own - official) / official > OWN_OFF_THRESHOLD) {
-      const impact = litresTotal !== null ? cents((own - official) * litresTotal) : null;
-      const moreLess = impact !== null ? `: ${fmtRand(Math.abs(impact))} ${impact > 0 ? "more" : "less"} on this quote` : "";
+      const impact = litresParts !== null ? cents(fuelLinesTotal(litresParts, own) - fuelLinesTotal(litresParts, official))
+        : litresTotal !== null ? cents((own - official) * litresTotal) : null;
       out.push(warning("diesel_own_off", "warn", "Your diesel price differs from official",
-        `Yours ${fmtRand(own, 2)}/L, official ${fmtRand(official, 2)}/L (${zoneTxt})${moreLess}.`,
+        `Yours ${fmtRand(own, 2)}/L, official ${fmtRand(official, 2)}/L (${zoneTxt}).`,
         impact, ["use_official", "update_own"], { own_price: own, official_price: official }));
     }
     const setAt = parseDt(diesel.own_set_at);
@@ -242,6 +252,10 @@ export interface Costing {
   target_margin_pct: number | null;
   target_price: number | null;
   minimum_charge: number | null;
+  default_price_per_km: number | null;
+  rate_price: number | null;
+  default_price: number | null;
+  alternative_with_return_load: { floor: number | null; target_price: number | null; default_price: number | null } | null;
   price: number | null;
   margin: number | null;
   margin_pct: number | null;
@@ -308,8 +322,8 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
         `${fmtNum(loadT, 1)} t on a ${fmtNum(capT, 1)} t truck.`, null, ["choose_vehicle"]));
     }
     if (capT !== null && ((rated !== null && rated < SUSPECT_BURN_MIN && capT >= SUSPECT_BURN_MIN_CAPACITY_T) || capT > SUSPECT_CAPACITY_MAX_T)) {
-      const what = capT > SUSPECT_CAPACITY_MAX_T ? `${fmtNum(capT, 1)} t payload looks like GVM`
-        : `${fmtNum(rated as number, 1)} L/100km for ${fmtNum(capT, 1)} t looks low`;
+      const what = capT > SUSPECT_CAPACITY_MAX_T ? `A ${fmtNum(capT)} t payload looks like the GVM`
+        : `${fmtNum(rated as number)} L/100 km is low for a ${fmtNum(capT)} t truck`;
       warnings.push(warning("truck_burn_suspect", "warn", "Check this truck's fuel or capacity", `${what}.`, null, ["edit_vehicle"]));
     }
   }
@@ -320,7 +334,8 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
 
   // --- diesel (§1) ---
   const diesel = resolveDiesel(i.diesel);
-  warnings.push(...dieselWarnings(diesel, litresTotal));
+  const parts = litresLoaded !== null && litresEmpty !== null ? [litresLoaded, ...(emptyReturn ? [litresEmpty] : [])] : null;
+  warnings.push(...dieselWarnings(diesel, litresTotal, parts));
   const priceL = diesel.price;
 
   const lines: CostLine[] = [];
@@ -445,7 +460,20 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
   }
   if (price !== null && minimum !== null && price < minimum) {
     warnings.push(warning("below_minimum_charge", "block", "Price is below your minimum charge",
-      `Your minimum charge is ${fmtRand(minimum)}.`, cents(minimum - price), ["use_minimum"]));
+      `${fmtRand(minimum - price)} below your ${fmtRand(minimum)} minimum.`, cents(minimum - price), ["use_minimum"]));
+  }
+
+  // Default price (coordinator round 3): max(rate price, target price),
+  // rounded UP to the whole rand; the rate price only when a default price
+  // per km > 0 is set, on the billable (loaded) km. No floor → none.
+  const ratePerKm = pos(i.default_price_per_km);
+  const ratePrice = ratePerKm !== null && kmLoaded !== null ? cents(ratePerKm * kmLoaded) : null;
+  const defaultPrice = targetPrice !== null ? Math.ceil(Math.max(ratePrice ?? 0, targetPrice) - 1e-9) : null;
+  // The same quote with a return load booked (one-way, empty return included).
+  let alternative: { floor: number | null; target_price: number | null; default_price: number | null } | null = null;
+  if (emptyReturn && requested !== false) {
+    const alt = compute({ ...i, include_empty_return: false });
+    alternative = { floor: alt.floor, target_price: alt.target_price, default_price: alt.default_price };
   }
 
   const blocking = warnings.filter((w) => w.severity === "block").map((w) => w.code);
@@ -471,6 +499,10 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
     target_margin_pct: target,
     target_price: targetPrice,
     minimum_charge: minimum,
+    default_price_per_km: ratePerKm,
+    rate_price: ratePrice,
+    default_price: defaultPrice,
+    alternative_with_return_load: alternative,
     price,
     margin,
     margin_pct: marginPct,
@@ -553,16 +585,4 @@ export function changesSincePriced(price: unknown, floorThen: unknown, floorNow:
     repriced_price_keep_margin: keep, changed, notice,
     actions: changed ? ["keep_price", "reprice"].map((a) => ({ id: a, label: ACTION_LABELS[a] })) : [],
   };
-}
-
-// ---------------------------------------------------------------- builder price
-
-/** The quote's default price (one cost model: the cost lines make the floor,
- *  the price is separate): the target price (floor + target margin, never
- *  below the minimum charge), or the optional default price per km × km when
- *  that is more; whole rand, up. null when the floor isn't known. */
-export function defaultQuotePrice(targetPrice: number | null, perKm: number | null, km: number): number | null {
-  if (targetPrice == null) return null;
-  const byKm = perKm != null && perKm > 0 && km > 0 ? perKm * km : 0;
-  return Math.ceil(Math.max(targetPrice, byKm) - 1e-9);
 }

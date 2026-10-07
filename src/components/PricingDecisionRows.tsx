@@ -60,7 +60,7 @@ export default function PricingDecisionRows({ decision, marginInHeader = false, 
             <ul className="qd-decision__parts" aria-label="Cost floor parts">
               {d.floorLines.map((l) => (
                 <li key={l.label} className={l.missing ? 'is-missing' : undefined}>
-                  <span>{l.label}{l.source && <span className="qd-decision__kind">{l.source}</span>}</span>
+                  <span>{l.label}{l.source && /estimate/i.test(l.source) && <span className="qd-decision__kind">Estimate</span>}</span>
                   {/* A cost with no figure on record reads "Not set" (the floor leaves it out), never "R 0". */}
                   <span>{l.missing ? 'Not set' : l.note || money(l.amount)}</span>
                 </li>

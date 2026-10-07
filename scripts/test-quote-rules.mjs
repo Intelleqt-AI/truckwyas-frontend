@@ -2,7 +2,7 @@
 // Builder helpers in src/lib/quoteRules.ts not covered by the golden vectors
 // (scripts/test-quote-golden.mjs covers compute()).
 import assert from "node:assert/strict";
-import { suggestTruck, capacityTonnes, nightsAway, vehicleClass, cents } from "../src/lib/quoteRules.ts";
+import { suggestTruck, capacityTonnes, nightsAway, vehicleClass, cents, defaultQuotePrice, compute } from "../src/lib/quoteRules.ts";
 
 const cases = [];
 const t = (name, fn) => { fn(); cases.push(name); };
@@ -30,6 +30,26 @@ t("vehicle class (operating cost)", () => {
 });
 t("cents: floor(x * 100 + 0.5) / 100", () => {
   assert.equal(cents(1.005), 1); assert.equal(cents(2.675), 2.68); assert.equal(cents(-1.005), -1);
+});
+
+t("default price: target (floor + margin), whole rand up; per-km default only when more; none without a floor", () => {
+  assert.equal(defaultQuotePrice(19617.11, null, 397.2), 19618);
+  assert.equal(defaultQuotePrice(19617.11, 27, 397.2), 19618);      // 27 x 397,2 = 10 724: the target wins
+  assert.equal(defaultQuotePrice(19617.11, 60, 397.2), 23832);      // 60 x 397,2 = 23 832
+  assert.equal(defaultQuotePrice(20000, null, 100), 20000);
+  assert.equal(defaultQuotePrice(null, 60, 397.2), null);
+});
+t("one cost model: the cost lines add up to the floor; the price never feeds the floor", () => {
+  const base = { trip_type: "ONE_WAY", distance_km: 400, duration_minutes: 300, load_kg: 12000,
+    vehicle: { id: 1, name: "Rigid", capacity: 14, rated_burn_l_per_100km: 30 },
+    diesel: { zone: "INLAND", mode: "LIVE", official_price: 32.8 }, operating_cost_per_km: 11.65,
+    tolls: { one_way: 637 }, driver: { allowance_per_night: 650 }, target_margin_pct: 10 };
+  const a = compute(base), b = compute({ ...base, price: 99999 });
+  assert.equal(a.floor, b.floor);
+  assert.equal(a.floor, cents(a.lines.reduce((s, l) => s + l.amount, 0)));
+  // Loaded back: no return lines, a lower floor and target.
+  const c = compute({ ...base, include_empty_return: false });
+  assert.ok(c.floor < a.floor && c.lines.every((l) => l.leg === "loaded"));
 });
 
 console.log(`quoteRules helpers: ${cases.length} cases passed`);

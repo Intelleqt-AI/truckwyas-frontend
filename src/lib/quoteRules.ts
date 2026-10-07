@@ -554,3 +554,15 @@ export function changesSincePriced(price: unknown, floorThen: unknown, floorNow:
     actions: changed ? ["keep_price", "reprice"].map((a) => ({ id: a, label: ACTION_LABELS[a] })) : [],
   };
 }
+
+// ---------------------------------------------------------------- builder price
+
+/** The quote's default price (one cost model: the cost lines make the floor,
+ *  the price is separate): the target price (floor + target margin, never
+ *  below the minimum charge), or the optional default price per km × km when
+ *  that is more; whole rand, up. null when the floor isn't known. */
+export function defaultQuotePrice(targetPrice: number | null, perKm: number | null, km: number): number | null {
+  if (targetPrice == null) return null;
+  const byKm = perKm != null && perKm > 0 && km > 0 ? perKm * km : 0;
+  return Math.ceil(Math.max(targetPrice, byKm) - 1e-9);
+}

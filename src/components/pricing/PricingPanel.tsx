@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronRight, ExternalLink } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Check, ChevronRight } from "lucide-react";
 import { formatDate, formatMoneyWhole, formatNumber } from "@/lib/formatters";
 import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { MarketRange } from "./MarketRange";
 import { LikelihoodCurve } from "./LikelihoodCurve";
-import { NumberField } from "./NumberField";
 import { readPrice, rowLikelihoods } from "./evaluate";
 import type { PricingState } from "./usePricingAnalysis";
-import { BAND_LABEL, type Band, type Choice, type ChoiceKey, type FloorLine, type Likelihood, type PricingAnalysis, type SourceKind } from "./types";
+import { BAND_LABEL, type Band, type Choice, type ChoiceKey, type Likelihood, type PricingAnalysis } from "./types";
 import { likelihoodShort as sharedShort, MARKET_RANGE_LABEL } from "@/lib/pricing";
 import "./pricing-panel.css";
 
@@ -46,13 +44,6 @@ export interface PricingPanelProps {
   paused?: boolean;
 }
 
-const SOURCE_CHIP: Record<SourceKind, { tone: StatusTone; label: string }> = {
-  official: { tone: "success", label: "Official" },
-  calculated: { tone: "neutral", label: "Calculated" },
-  company_actuals: { tone: "info", label: "Your actuals" },
-  estimate: { tone: "warning", label: "Estimate" },
-  user: { tone: "neutral", label: "You" },
-};
 const OUTCOME: Record<string, { tone: StatusTone; label: string }> = {
   accepted: { tone: "success", label: "Accepted" },
   rejected: { tone: "danger", label: "Declined" },
@@ -156,8 +147,8 @@ export function PricingPanel(p: PricingPanelProps) {
       <header className="pa__head">
         <h2 id={titleId} className="pa__title">Pricing analysis</h2>
         {/* Out of the flow: appearing never moves or re-wraps anything. */}
-        <span className={`pa__status${busy || p.paused ? "" : " is-idle"}${p.paused && !busy ? " is-paused" : ""}`} aria-hidden={!busy && !p.paused}>
-          {busy ? <><i className="pa-pulse" aria-hidden="true" />{loading || phase === "route" ? "Analysing" : "Updating"}</> : "Fix flagged costs"}
+        <span className={`pa__status${busy ? "" : " is-idle"}`} aria-hidden={!busy}>
+          {busy ? <><i className="pa-pulse" aria-hidden="true" />{loading || phase === "route" ? "Analysing" : "Updating"}</> : null}
         </span>
         {sub && <p className="pa__sub">{sub}</p>}
       </header>
@@ -276,7 +267,7 @@ function Result(p: BodyProps & { data: PricingAnalysis }) {
         </div>
       )}
       <Alerts data={data} customerName={p.customerName} onOneWay={p.returnApplicable ? () => p.onIncludeReturn(false) : null} includeReturn={includeReturn} />
-      {data.costFloor && <FloorSection {...p} />}
+      {/* The cost floor is said once, as the builder's Costs total. */}
       {data.choices.length > 0 && <ChoicesSection data={data} price={p.price} onApply={p.onApplyPrice} includeReturn={includeReturn}
         returnApplicable={p.returnApplicable} onIncludeReturn={p.onIncludeReturn} />}
       <MarketSection data={data} price={p.price} />
@@ -414,7 +405,8 @@ function ChoiceRow({ c, lk, ariaLk, applied, onApply }: { c: Choice; lk: Likelih
       aria-label={`${c.label}${c.recommended ? ", recommended" : ""}: ${formatMoneyWhole(c.price)}, margin ${formatMoneyWhole(c.margin)} or ${signedPct(c.marginPct)}${chance ? `, ${chance}` : ""}. ${applied ? "In your quote." : "Use this price."}`}>
       <span className="pa-choice__label">
         {applied && <Check size={12} strokeWidth={2.75} className="pa-choice__check" aria-hidden="true" />}
-        {c.label}{c.recommended && <span className="pa-choice__rec">Recommended</span>}
+        {/* Never "Recommended" on a price that is less likely to win. */}
+        {c.label}{c.recommended && !(ariaLk && lkTone(ariaLk) === "less_likely") && <span className="pa-choice__rec">Recommended</span>}
       </span>
       <span className="pa-choice__price">{formatMoneyWhole(c.price)}</span>
       <span className="pa-choice__margin">{formatMoneyWhole(c.margin)} · {signedPct(c.marginPct)}</span>
@@ -428,140 +420,6 @@ function ChoiceRow({ c, lk, ariaLk, applied, onApply }: { c: Choice; lk: Likelih
 export function wayOutChoice(choices: Choice[], floor: number | null): Choice | null {
   if (floor == null) return null;
   return [...choices].sort((a, b) => a.price - b.price).find((c) => c.price >= floor) ?? null;
-}
-
-// ---- cost floor: one summary row, hints, lines inside
-function FloorSection(p: BodyProps & { data: PricingAnalysis }) {
-  const f = p.data.costFloor!;
-  const driverLine = f.lines.find((l) => l.key === "driver_allowance");
-  const driverMissing = !!driverLine?.needsInput && !p.driver.edited;
-  const [expanded, setExpanded] = useState(false);
-  const [open, setOpen] = useState<string | null>(null);
-  const focusDriver = 0;
-  const includeReturn = p.includeReturn ?? f.includeReturn;
-  // The server's figure and label (total ÷ km actually driven), in whole rand —
-  // the same figure the reasons state ("R 31 per km driven").
-  const bothLegs = f.kmDriven != null && f.distanceKm != null && f.kmDriven > f.distanceKm + 0.5 && includeReturn;
-  const perKmText = f.perKm == null ? null
-    : `${formatMoneyWhole(f.perKm)} ${f.perKmLabel || "per km driven"}${f.kmDriven ? ` (${formatNumber(Math.round(f.kmDriven))} km${bothLegs ? ", there and back" : ""})` : ""}`;
-  const id = useId();
-  const wayOut = p.belowFloor ? wayOutChoice(p.data.choices, f.total) : null;
-  const fixedEstimate = f.fixedCostPerKm?.source === "vehicle_default" ? f.fixedCostPerKm.value : null;
-  return (
-    <section className={`pa-sec pa-reveal pa-floor${p.belowFloor ? " is-below" : ""}`} style={{ ["--d" as string]: "1" }} aria-label="Cost floor">
-      <div className="pa-floor__head">
-        <h3 className="pa-sec__title">
-          Cost floor
-          <InfoTip label="What the cost floor is" trigger="click">What the job costs to run, before profit.</InfoTip>
-        </h3>
-        <button type="button" className="pa-floor__toggle" aria-expanded={expanded} aria-controls={id} onClick={() => setExpanded((v) => !v)}>
-          <span className="pa-floor__fig">{formatMoneyWhole(f.total)}</span>
-          <ChevronRight size={14} className="pa-floor__chev" aria-hidden="true" />
-          <span className="pa-sr">{expanded ? "Hide the cost lines" : "Show the cost lines"}</span>
-        </button>
-      </div>
-      {p.belowFloor && !p.atBuildUp && (
-        <p className="pa-hint">
-
-          {wayOut && <> <button type="button" className="pa-link pa-link--inline pa-link--strong" onClick={() => p.onApplyPrice(wayOut.price, wayOut.key)}>Use {wayOut.label} {formatMoneyWhole(wayOut.price)}</button></>}
-        </p>
-      )}
-      {fixedEstimate != null && (
-        <p className="pa-hint">
-          Running cost estimated.{p.settingsHref && <> <Link to={p.settingsHref} className="pa-link pa-link--inline">Set yours</Link></>}
-        </p>
-      )}
-      {expanded && (
-        <div id={id} className="pa-floor__body">
-          {perKmText && <p className="pa-floor__perkm">{perKmText}</p>}
-          <ul className="pa-lines">
-            {f.lines.map((l) => (
-              <FloorRow key={l.key} line={l} open={open === l.key} onToggle={() => setOpen(open === l.key ? null : l.key)}
-                driver={l.key === "driver_allowance" ? p.driver : null} missing={l.key === "driver_allowance" && driverMissing}
-                focusToken={l.key === "driver_allowance" ? focusDriver : 0}
-                fixed={l.key === "fixed_cost" ? f.fixedCostPerKm : null} />
-            ))}
-          </ul>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function FloorRow({ line, open, onToggle, driver, fixed, missing, focusToken }: {
-  line: FloorLine; open: boolean; onToggle: () => void;
-  driver: PricingPanelProps["driver"] | null;
-  fixed: NonNullable<PricingAnalysis["costFloor"]>["fixedCostPerKm"];
-  missing: boolean; focusToken: number;
-}) {
-  const detailId = useId();
-  const inputRef = useRef<HTMLInputElement>(null);
-  // "Add it": open onto the allowance field, focused with its text selected.
-  useEffect(() => {
-    if (!focusToken || !open) return;
-    const t = requestAnimationFrame(() => { inputRef.current?.focus(); inputRef.current?.select(); inputRef.current?.scrollIntoView({ block: "nearest" }); });
-    return () => cancelAnimationFrame(t);
-  }, [focusToken, open]);
-  const kind: SourceKind = driver?.edited ? "user" : line.source.kind;
-  const isFixedEstimate = !!fixed && fixed.source === "vehicle_default";
-  const chip = missing
-    ? { tone: "warning" as StatusTone, label: "Not set" }
-    : line.key === "driver_allowance" && driver?.edited
-      ? { tone: "neutral" as StatusTone, label: "Your figure" }
-      : line.key === "driver_allowance" && line.amount === 0 && line.nights === 0
-        ? { tone: "neutral" as StatusTone, label: "None due (same day)" }
-        : line.key === "driver_allowance" && kind === "user"
-          ? { tone: "neutral" as StatusTone, label: "Your setting" }
-          : { ...SOURCE_CHIP[kind], label: isFixedEstimate ? "Estimate" : SOURCE_CHIP[kind].label };
-  return (
-    <li className={`pa-line${open ? " is-open" : ""}`}>
-      <button type="button" className="pa-line__row" aria-expanded={open} aria-controls={detailId} onClick={onToggle}>
-        <span className="pa-line__label">{line.label}</span>
-        <StatusChip tone={chip.tone} label={chip.label} title={line.source.label || undefined} />
-        <span className="pa-line__amt">{missing ? "—" : formatMoneyWhole(line.amount)}</span>
-        <ChevronRight size={14} className="pa-line__chev" aria-hidden="true" />
-        <span className="pa-sr">{open ? "Hide details" : "Show details"}</span>
-      </button>
-      {open && (
-        <div id={detailId} className="pa-line__detail">
-          {missing
-            ? <p className="pa-line__basis">{line.nights ? `${plural(line.nights, "night")} away. ` : ""}No allowance set.</p>
-            : line.basis && !(line.key === "driver_allowance" && driver?.edited) && <p className="pa-line__basis">{tidy(line.basis)}</p>}
-          {driver && (
-            <div className="pa-line__edit">
-              <label className="pa-field">
-                <span>Allowance for this trip (R)</span>
-                <NumberField ref={inputRef} value={driver.value === "" ? null : Number(driver.value) || 0}
-                  onValue={(n) => driver.onChange(n == null ? "" : String(n))} />
-              </label>
-              {driver.edited && line.suggested != null && <button type="button" className="pa-link" onClick={driver.onReset}>{line.source.kind === "user" ? `Use your setting (${formatMoneyWhole(line.suggested)})` : `Use the approved figure (${formatMoneyWhole(line.suggested)})`}</button>}
-            </div>
-          )}
-          {isFixedEstimate && (
-            <p className="pa-line__basis">Typical SA figure until your own costs are in.</p>
-          )}
-          {fixed && !isFixedEstimate && fixed.trips != null && fixed.trips > 0 && (
-            <p className="pa-line__basis">From {plural(fixed.trips, "trip")}{fixed.window ? `, ${fixed.window}` : ""}.</p>
-          )}
-          {line.details.length > 0 && !missing && (
-            <dl className="pa-dl">
-              {line.details.map((d) => (<div key={d.label}><dt>{d.label}</dt><dd>{tidy(d.value)}</dd></div>))}
-            </dl>
-          )}
-          {(line.source.label || line.source.asOf || line.source.url) && !missing && (
-            <p className="pa-line__src">
-              {line.source.label}{line.source.asOf ? `${line.source.label ? " · " : ""}as of ${formatDate(line.source.asOf)}` : ""}
-              {line.source.url && (
-                <a href={line.source.url} target="_blank" rel="noopener noreferrer" className="pa-link">
-                  Source <ExternalLink size={11} aria-hidden="true" /><span className="pa-sr"> (opens in a new tab)</span>
-                </a>
-              )}
-            </p>
-          )}
-        </div>
-      )}
-    </li>
-  );
 }
 
 /** The market source line as received; each part keeps together and the line
@@ -599,7 +457,7 @@ function MarketSection({ data, price }: { data: PricingAnalysis; price: number }
           {m.oneWayX2 && <p className="pa-tier pa-tier--x2">One-way quotes ×2.</p>}
           <MarketRange market={m} floor={floor} price={price > 0 ? price : null} />
           <p className="pa-range-legend">
-            <span title={MARKET_RANGE_LABEL}><i className="pa-key pa-key--band" aria-hidden="true" />Middle half <span className="pa-nowrap">{formatMoneyWhole(m.p25)}–{formatMoneyWhole(m.p75)}</span></span>
+            <span title={MARKET_RANGE_LABEL}><i className="pa-key pa-key--band" aria-hidden="true" />Middle half <span className="pa-nowrap">{formatMoneyWhole(m.p25)} – {formatMoneyWhole(m.p75)}</span></span>
             <span><i className="pa-key pa-key--median" aria-hidden="true" />Median {formatMoneyWhole(m.median)}</span>
           </p>
         </>
@@ -692,12 +550,12 @@ function EvidenceSection({ data, customerName }: { data: PricingAnalysis; custom
             ? <><span className="pa-nowrap">{`${acc.won} of ${acc.decided}`}</span>{la ? <>{" · "}<span className="pa-nowrap">{`${la.won} of ${la.decided} here`}</span></> : null}</>
             : "None decided"}</span>
         </div>
-        <div className="pa-fact">
+        {!inAlert && <div className="pa-fact">
           <span className="pa-fact__k">Payment</span>
           <span className="pa-fact__v">{c.paymentRisk
             ? <span title={!inAlert && c.paymentRisk.basis ? tidy(c.paymentRisk.basis) : undefined}><StatusChip tone={RISK_TONE[c.paymentRisk.band]} label={c.paymentRisk.label} /></span>
             : "No history"}</span>
-        </div>
+        </div>}
       </div>
       {/* The lane's last quotes are detail: on tap. */}
       {quotes.length > 0 ? (

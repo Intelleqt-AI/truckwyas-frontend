@@ -145,7 +145,9 @@ export default function QuoteDetail() {
   // Sending (button or status change to Sent) emails the customer: preview first.
   const [sendPreview, setSendPreview] = useState<'button' | 'status' | null>(null);
   // §11: the server's send check (block / warn), fetched when a send opens.
-  const sendWarnings = useSendCheck(sendPreview ? id : null, quote);
+  // Fetched up front for an open quote, so a block shows on Send itself.
+  const sendWarnings = useSendCheck(quote && ['DRAFT', 'SENT', 'ACCEPTED'].includes(quote.status) ? id : null, quote);
+  const sendBlock = sendWarnings.find((w) => w.severity === 'block') ?? null;
 
   const quoteFailed = loadFailed(quoteQuery);
   const quoteError = (quoteQuery.error ?? quoteQuery.failureReason) as { status?: number } | null;
@@ -490,7 +492,7 @@ export default function QuoteDetail() {
             <dl className="qd-facts qd-facts--load">
               {fact('Cargo', cargoText(quote.cargo_description, quote.vehicle_type) || 'Not specified')}
               {fact('Truck type', sentenceCaseLabel(quote.vehicle_type) || 'Not recorded')}
-              {fact('Weight', quote.weight ? `${formatNumber(parseFloat(quote.weight))} kg` : 'Not recorded')}
+              {fact('Weight', quote.weight ? `${formatNumber(parseFloat(quote.weight) / 1000, { maximumFractionDigits: 1 })} t` : 'Not recorded')}
               {fact('Distance', quote.distance ? formatDistance(parseFloat(quote.distance)) : 'Not recorded')}
               {quote.pickup_date && fact('Pickup date', formatDate(quote.pickup_date))}
               {quote.vehicle_display && fact('Vehicle', quote.vehicle_display)}
@@ -536,7 +538,9 @@ export default function QuoteDetail() {
     // menu says to edit it first (R11).
     ...(booked
       ? [{ value: 'SENT', label: 'Sent', hint: `Already booked as ${booking?.load_number || 'a load'}`, disabledReason: `Already booked as ${booking?.load_number || 'a load'}` }]
-      : [{ value: 'SENT', label: 'Sent', hint: lapsed ? 'Quote has expired, edit first' : 'Emails the quote to the customer' }]),
+      : sendBlock
+        ? [{ value: 'SENT', label: 'Sent', hint: sendBlock.title, disabledReason: sendBlock.title }]
+        : [{ value: 'SENT', label: 'Sent', hint: lapsed ? 'Quote has expired, edit first' : 'Emails the quote to the customer' }]),
     { value: 'ACCEPTED', label: 'Accepted', hint: booked ? 'Won and booked' : 'Ready to convert to a booking' },
     { value: 'DECLINED', label: 'Declined' },
     // In transit and Completed live on the order created by "Convert to
@@ -580,7 +584,7 @@ export default function QuoteDetail() {
             {/* An expired quote is not sent again as it stands: the body card
                 offers "Send an updated quote", so the head holds Edit only.
                 A price-stale draft that is still valid keeps Send beside it. */}
-            {!lapsed && <button type="button" className="bk-btn bk-btn--secondary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending}>
+            {!lapsed && <button type="button" className="bk-btn bk-btn--secondary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending || !!sendBlock} title={sendBlock ? sendBlock.title : undefined}>
               {sendToCustomerMutation.isPending ? (quote.status === 'SENT' ? 'Resending…' : 'Generating…') : sendLabel}
             </button>}
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate(`/bookings/quotes/${id}/edit`)} aria-label="Edit quote">
@@ -602,7 +606,7 @@ export default function QuoteDetail() {
               {convertToLoadMutation.isPending ? 'Converting…' : <span className="qd-label-long" data-short="Convert">Convert to booking</span>}
             </button>
           ) : (
-            <button type="button" className="bk-btn bk-btn--primary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending} aria-label={sendToCustomerMutation.isPending ? undefined : (quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer')}>
+            <button type="button" className="bk-btn bk-btn--primary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending || !!sendBlock} title={sendBlock ? sendBlock.title : undefined} aria-label={sendToCustomerMutation.isPending ? undefined : (quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer')}>
               {sendToCustomerMutation.isPending
                 ? (quote.status === 'SENT' ? 'Resending…' : 'Generating…')
                 // Phones: the short label keeps it on the title row (R5); the
@@ -748,13 +752,17 @@ export default function QuoteDetail() {
                 Marked {STATUS_LABEL[quote.status].toLowerCase()} on an older record. No booking is linked to this quote.
               </p>
             )}
-            {fuelNote && (
+            {fuelNote && !pricedOn && (
               <p className="qd-fuel" role="status">
                 <span className="bk-dot bk-dot--warning" aria-hidden="true" />
                 <span>{fuelNote}</span>
               </p>
             )}
-            {pricedOn && <p className="qd-priced-on">{pricedOn}</p>}
+            {pricedOn && <p className={fuelNote ? 'qd-fuel' : 'qd-priced-on'} role={fuelNote ? 'status' : undefined}>
+              {fuelNote && <span className="bk-dot bk-dot--warning" aria-hidden="true" />}
+              <span>{pricedOn}{fuelNote && Number.isFinite(fuelDelta) && Math.abs(fuelDelta) >= 0.005 ? ` Now ${fuelDelta > 0 ? 'up' : 'down'} ${formatMoney(Math.abs(fuelDelta))}/L.` : ''}</span>
+            </p>}
+            {sendBlock && openStatus && <p className="qd-block" role="alert">{sendBlock.title}</p>}
             {showBuildUp && <div className="qd-price-rows">
               {/* Lines in whole rand. */}
               {priceRows.map(r => (
@@ -801,7 +809,7 @@ export default function QuoteDetail() {
             </div>
           </section>
 
-          {!booked && !declined && (effectiveShareUrl || ((quote.status === 'SENT' || quote.status === 'DRAFT') && undecided)) && (
+          {!booked && !declined && !neverSent && (effectiveShareUrl || (quote.status === 'SENT' && undecided)) && (
             <section className="bk-card" aria-labelledby="qd-customer-title">
               {/* A never-sent draft has nobody to be "with" yet: the card only records an answer that came another way. */}
               <h2 className="bk-card__title" id="qd-customer-title" style={{ marginBottom: 12 }}>{neverSent ? 'Record the answer' : 'With the customer'}</h2>
@@ -901,7 +909,7 @@ export default function QuoteDetail() {
               <Download size={16} aria-hidden="true" /> Download PDF
             </button>
             {quote.status === 'ACCEPTED' && !booked && (
-              <button type="button" className="bk-btn bk-btn--quiet" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending}>
+              <button type="button" className="bk-btn bk-btn--quiet" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending || !!sendBlock} title={sendBlock ? sendBlock.title : undefined}>
                 Send to customer
               </button>
             )}

@@ -153,18 +153,10 @@ function costInUseOf(v: unknown): CostInUse | null {
 // R 12,50/km superlink estimate." The saved figure needs no line: it is in the field.
 function costInUseText(c: CostInUse | null): string | null {
   if (!c || c.value === null || c.source === 'setting' || c.source === 'company_setting') return null;
-  const rate = `${formatMoney(c.value)}/km`;
-  if (c.source === 'company_actuals') {
-    const trips = c.trips ? ` from ${formatNumber(c.trips)} trip${c.trips === 1 ? '' : 's'}` : '';
-    return `Now using ${rate}${trips}${c.window ? ` (${c.window})` : ''}.`;
-  }
-  // An estimate: it follows each quote's vehicle type, so name the
-  // superlink figure (the common long-haul truck) as the example.
-  const eg = c.superlink !== null ? ` (${formatMoney(c.superlink)}/km for a superlink)` : '';
-  const until = c.minTrips
-    ? ` until ${formatNumber(c.minTrips)} completed trips have costs${c.trips !== null ? ` (you have ${formatNumber(c.trips)})` : ''}`
-    : '';
-  return `Now using the typical estimate per truck type${eg}${until}.`;
+  // "R 16,94/km fleet · R 18,00/km superlink": the figure in use, and what a
+  // superlink is priced at (each quote uses its own truck's class).
+  const fleet = `${formatMoney(c.value)}/km ${c.source === 'company_actuals' ? 'fleet' : 'estimate'}`;
+  return c.superlink !== null && Math.abs(c.superlink - c.value) >= 0.005 ? `${fleet} · ${formatMoney(c.superlink)}/km superlink` : fleet;
 }
 
 export function CompanySettings() {
@@ -202,6 +194,8 @@ export function CompanySettings() {
   const [hasReturnFields, setHasReturnFields] = useState(false);
   const [hasMinimumField, setHasMinimumField] = useState(false);
   const [ownSetAt, setOwnSetAt] = useState<string | null>(null);
+  // "My own price" with nothing in it is not silently official: it is an error.
+  const [ownError, setOwnError] = useState<string | null>(null);
   const [hasTargetField, setHasTargetField] = useState(false);
   const [costInUse, setCostInUse] = useState<CostInUse | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -225,14 +219,12 @@ export function CompanySettings() {
   const [livePrice, setLivePrice] = useState<any>(null);
   const [fetchingLivePrice, setFetchingLivePrice] = useState(false);
 
-  /** The official price only: never written into the own-price field
-   *  (§1: no on-load fill, Fetch and a zone change never touch it). Petrol,
-   *  which has no own/official split, is still filled when blank or fetched. */
+  /** The official price only: never written into any price field (§1: no
+   *  on-load fill; "Check now" and a zone change never touch them). */
   const loadLivePrice = (force: boolean) => {
     setFetchingLivePrice(true);
     fetchData(`api/v1/fuel-prices/current/${force ? '?force=true' : ''}`).then((d: any) => {
       setLivePrice(d);
-      if (d?.petrol_95) setForm(prev => (force || !prev.fuel_price_petrol ? { ...prev, fuel_price_petrol: String(d.petrol_95) } : prev));
       if (force) {
         if (d?.success === false || d?.inland_price == null) toast.error("Couldn't reach the official price source");
         else toast.success('Official prices checked');
@@ -264,7 +256,7 @@ export function CompanySettings() {
           allow_cross_border: d.allow_cross_border === false ? 'no' : 'yes',
           auto_email_invoices: d.auto_email_invoices === true ? 'yes' : 'no',
           default_base_rate_per_km:
-            d.default_base_rate_per_km != null ? String(d.default_base_rate_per_km) : '',
+            Number(d.default_base_rate_per_km) > 0 ? String(d.default_base_rate_per_km) : '',
           default_toll_rate_per_km:
             d.default_toll_rate_per_km != null ? String(d.default_toll_rate_per_km) : '',
           default_sla_hours: d.default_sla_hours != null ? String(d.default_sla_hours) : '',
@@ -350,6 +342,11 @@ export function CompanySettings() {
   };
 
   const handleSave = async () => {
+    if (form.fuel_price_mode === 'OWN' && !(parseFloat(form.fuel_price_own) > 0)) {
+      setOwnError('Enter your price per litre, or choose Official.');
+      document.getElementById('company-diesel-own')?.focus();
+      return;
+    }
     const validityDays = parseInt(form.default_quote_validity_days, 10);
     if (isNaN(validityDays) || validityDays < 1 || validityDays > 365) {
       toast.error('Default quote validity must be between 1 and 365 days');
@@ -366,7 +363,7 @@ export function CompanySettings() {
       }
     }
     for (const [key, label] of [
-      ['default_base_rate_per_km', 'Base rate'], ['default_toll_rate_per_km', 'Toll rate'],
+      ['default_base_rate_per_km', 'Default price per km'], ['default_toll_rate_per_km', 'Toll rate'],
     ] as const) {
       const raw = (form as any)[key];
       if (raw && (isNaN(parseFloat(raw)) || parseFloat(raw) < 0)) {
@@ -428,8 +425,8 @@ export function CompanySettings() {
         default_quote_validity_days: validityDays,
         allow_cross_border: form.allow_cross_border === 'yes',
         auto_email_invoices: form.auto_email_invoices === 'yes',
-        default_base_rate_per_km: form.default_base_rate_per_km
-          ? parseFloat(form.default_base_rate_per_km) : 10.00,
+        // Optional price (not a cost): empty = none (0).
+        default_base_rate_per_km: form.default_base_rate_per_km ? parseFloat(form.default_base_rate_per_km) : 0,
         default_toll_rate_per_km: form.default_toll_rate_per_km
           ? parseFloat(form.default_toll_rate_per_km) : 0.50,
         default_sla_hours: slaHours ?? 48,
@@ -481,7 +478,7 @@ export function CompanySettings() {
   };
 
   // The operating cost the floor uses while the field is empty, as the API words it.
-  const costInUseLine = costInUse?.label || costInUseText(costInUse);
+  const costInUseLine = costInUseText(costInUse);
   const anyPricingError = Object.values(pricingErrors).some(Boolean);
 
   return (
@@ -756,11 +753,11 @@ export function CompanySettings() {
           <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
             <div>
               <label htmlFor="company-default-base-rate-r-km" style={labelTipStyle}>
-                Base rate (R/km)
-                <InfoTip label="About the base rate">Used when the vehicle type on a quote has no rate of its own (Settings, Vehicle types). A type's own rate always wins.</InfoTip>
+                Default price per km (optional)
+                <InfoTip label="About the default price per km">A price, not a cost: a new quote starts at this rate × km when that is more than your cost floor plus target margin. Costs are set under Pricing.</InfoTip>
               </label>
-              <DecimalInput id="company-default-base-rate-r-km" placeholder="e.g. 33,00" value={form.default_base_rate_per_km} onChange={v => set('default_base_rate_per_km', v)} />
-              <div style={helpTextStyle}>When a vehicle type has no rate.</div>
+              <PricingInput id="company-default-base-rate-r-km" inputMode="decimal" decimals={2} prefix="R" suffix="/km" placeholder="Not set"
+                value={form.default_base_rate_per_km} onChange={v => set('default_base_rate_per_km', v)} onBlur={() => {}} isValid={() => true} error={null} describedBy="company-default-base-rate-help" />
             </div>
             <div>
               <label htmlFor="company-default-toll-rate-r-km" style={labelStyle}>Toll rate (R/km)</label>
@@ -876,15 +873,16 @@ export function CompanySettings() {
             </div>
             {hasReturnFields && (
               <div>
-                <label htmlFor="company-empty-return-min-km" style={labelStyle}>Empty return from (km)</label>
+                <label htmlFor="company-empty-return-min-km" style={labelStyle}>Charge empty return on trips over (km)</label>
                 <input id="company-empty-return-min-km" className="settings-control" style={inputStyle} type="number" min={0} max={5000}
                   value={form.empty_return_min_km} onChange={e => set('empty_return_min_km', e.target.value)} />
               </div>
             )}
             {hasMinimumField && (
               <div>
-                <label htmlFor="company-minimum-charge" style={labelStyle}>Minimum charge (R)</label>
-                <DecimalInput id="company-minimum-charge" placeholder="None" value={form.minimum_charge} onChange={v => set('minimum_charge', v)} />
+                <label htmlFor="company-minimum-charge" style={labelStyle}>Minimum charge</label>
+                <PricingInput id="company-minimum-charge" inputMode="decimal" decimals={2} prefix="R" placeholder="Not set"
+                  value={form.minimum_charge} onChange={v => set('minimum_charge', v)} onBlur={() => {}} isValid={() => true} error={null} describedBy="company-minimum-charge" />
               </div>
             )}
             <div className="cs-pricing-grid__wide">
@@ -956,15 +954,21 @@ export function CompanySettings() {
                     {(['LIVE', 'OWN'] as const).map(m => (
                       <button key={m} type="button" role="radio" aria-checked={form.fuel_price_mode === m}
                         className={`tw-seg__opt${form.fuel_price_mode === m ? ' is-active' : ''}`}
-                        onClick={() => set('fuel_price_mode', m)}>{m === 'LIVE' ? 'Official' : 'My own price'}</button>
+                        onClick={() => { set('fuel_price_mode', m); setOwnError(null); }}>{m === 'LIVE' ? 'Official' : 'My own price'}</button>
                     ))}
                   </div>
                   {own ? (
                     <div style={{ marginTop: 8 }}>
-                      <DecimalInput id="company-diesel-own" placeholder="R/L excl. VAT" decimals={4} value={form.fuel_price_own} onChange={v => set('fuel_price_own', v)} />
-                      <div style={helpTextStyle}>
-                        {ownSetAt && form.fuel_price_own ? `Set on ${longDate(ownSetAt)}` : 'Empty uses official.'}
-                        {official != null ? ` · Official ${formatMoney(official)}/L` : ''}
+                      <PricingInput id="company-diesel-own" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="excl. VAT"
+                        value={form.fuel_price_own} onChange={v => { set('fuel_price_own', v); if (ownError && parseFloat(v) > 0) setOwnError(null); }}
+                        onBlur={() => {}} isValid={() => true} error={ownError} describedBy="company-diesel-own-help" />
+                      <div id="company-diesel-own-help">
+                        {ownError
+                          ? <div role="alert" style={fieldErrorStyle}>{ownError}</div>
+                          : <div style={helpTextStyle}>
+                              {ownSetAt && form.fuel_price_own ? `Set on ${longDate(ownSetAt)}` : ''}
+                              {official != null ? `${ownSetAt && form.fuel_price_own ? ' · ' : ''}Official is ${formatMoney(official)}/L.` : ''}
+                            </div>}
                       </div>
                     </div>
                   ) : (
@@ -981,18 +985,18 @@ export function CompanySettings() {
           })()}
           <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
             <div>
-              <label htmlFor="company-petrol-r-l" style={labelStyle}>Petrol (R/L)</label>
-              <DecimalInput id="company-petrol-r-l" placeholder="Not set" value={form.fuel_price_petrol} onChange={v => set('fuel_price_petrol', v)} />
+              <label htmlFor="company-petrol-r-l" style={labelStyle}>Petrol</label>
+              <PricingInput id="company-petrol-r-l" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="Not set" value={form.fuel_price_petrol} onChange={v => set('fuel_price_petrol', v)} onBlur={() => {}} isValid={() => true} error={null} />
             </div>
             <div>
-              <label htmlFor="company-electric-r-kwh" style={labelStyle}>Electric (R/kWh)</label>
-              <DecimalInput id="company-electric-r-kwh" placeholder="Not set" value={form.fuel_price_electric} onChange={v => set('fuel_price_electric', v)} />
+              <label htmlFor="company-electric-r-kwh" style={labelStyle}>Electric</label>
+              <PricingInput id="company-electric-r-kwh" inputMode="decimal" decimals={2} prefix="R" suffix="/kWh" placeholder="Not set" value={form.fuel_price_electric} onChange={v => set('fuel_price_electric', v)} onBlur={() => {}} isValid={() => true} error={null} />
             </div>
           </div>
           <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
             <div>
-              <label htmlFor="company-hybrid-r-l" style={labelStyle}>Hybrid (R/L)</label>
-              <DecimalInput id="company-hybrid-r-l" placeholder="Not set" value={form.fuel_price_hybrid} onChange={v => set('fuel_price_hybrid', v)} />
+              <label htmlFor="company-hybrid-r-l" style={labelStyle}>Hybrid</label>
+              <PricingInput id="company-hybrid-r-l" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="Not set" value={form.fuel_price_hybrid} onChange={v => set('fuel_price_hybrid', v)} onBlur={() => {}} isValid={() => true} error={null} />
             </div>
           </div>
         </div>

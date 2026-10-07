@@ -119,14 +119,15 @@ export default function SendPreviewDialog({
 
         <div className="send-preview__actions">
           <button type="button" className="tw-btn" onClick={onCancel} disabled={sending}>Cancel</button>
-          <button
+          {/* Blocked: no disabled Send to stare at; the reason is above. */}
+          {!confirmBlocked && <button
             type="button"
             className={preferredAction ? 'tw-btn' : 'tw-btn tw-btn--primary'}
             onClick={onConfirm}
             disabled={blocked || sending}
           >
             {label}
-          </button>
+          </button>}
           {preferredAction && (
             <button type="button" className="tw-btn tw-btn--primary" onClick={preferredAction.onClick} disabled={sending}>
               {preferredAction.label}

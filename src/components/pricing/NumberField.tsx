@@ -6,8 +6,8 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | 
   value: number | null;
   /** Every keystroke: the number the text means (null when empty or not a number yet). */
   onValue: (n: number | null, text: string) => void;
-  /** "auto": whole numbers bare, cents when present; 2: always two decimals ("24,00"). */
-  decimals?: "auto" | 2;
+  /** "auto": whole numbers bare, cents when present; 2: always two decimals ("24,00"); 0: whole rand shown. */
+  decimals?: "auto" | 2 | 0;
 };
 
 /**

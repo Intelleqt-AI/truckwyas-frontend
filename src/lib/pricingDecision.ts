@@ -150,7 +150,7 @@ export function pricingDecisionOf(quote: ({ total_amount?: unknown; pricing_deci
   } else if (band) {
     likelihood = {
       text: band,
-      basis: d.likelihood_level === 'model' ? 'This price was outside what your model has learned from.' : 'A rough guide from the market and this customer, not a prediction.',
+      basis: d.likelihood_level === 'model' ? 'This price was outside what your model has learned from.' : 'A rough guide from the market and this customer.',
       model: false,
     };
   }

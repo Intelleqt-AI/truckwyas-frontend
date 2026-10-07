@@ -92,7 +92,11 @@ export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send 
       subject={quote.quote_number ? `Your freight quote ${quote.quote_number} from ${company}` : undefined}
       rows={rows}
       note={line
-        ? <span className={block || expired ? 'send-preview__warn' : undefined} role={block ? 'alert' : 'status'} style={{ fontWeight: 500 }}>{line.title}</span>
+        ? <span className={block ? 'send-preview__block' : expired ? 'send-preview__warn' : undefined} role={block ? 'alert' : 'status'}>
+            <span style={{ fontWeight: 500 }}>{line.title}</span>
+            {/* The figures behind it (server detail, e.g. "This trip loses R 14 512."). */}
+            {'detail' in line && line.detail ? <span className="send-preview__detail"> {line.detail}</span> : null}
+          </span>
         : 'They can accept or decline online.'}
       noEmailHint="No email on file. It is marked sent; share the link yourself."
       noEmailConfirmLabel={expired ? 'Mark sent anyway' : 'Mark as sent'}

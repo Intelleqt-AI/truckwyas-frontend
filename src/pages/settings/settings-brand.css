@@ -223,10 +223,10 @@ table.settings-table.is-inset :is(th, td):last-child { padding-right: 0; }
 @media (pointer: coarse) { .tw-settings-shell { --cs-tip-gap: 14px; } }
 
 /* ---- Pricing round 5 (F-3) ---- */
-.cs-pricing-grid { column-gap: 24px; row-gap: 20px; }
+.cs-pricing-grid { column-gap: 16px; row-gap: 20px; }  /* same columns as every other settings grid */
 .cs-pricing-grid__wide { grid-column: 1 / -1; }
 /* The sharing select lines up with the left column. */
-.cs-pricing-grid__half { max-width: calc(50% - 12px); }
+.cs-pricing-grid__half { max-width: calc(50% - 8px); }
 @media (max-width: 640px) { .cs-pricing-grid__half { max-width: none; } }
 /* Units inside the field: "R" before, "%" or "/km" after. */
 .cs-affix { position: relative; }

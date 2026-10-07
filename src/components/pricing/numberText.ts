@@ -62,8 +62,10 @@ export function caretAfterGroup(raw: string, rawCaret: number, grouped: string):
 }
 
 /** A settled figure for a field: whole numbers without decimals, cents with 2. */
-export function formatFieldValue(n: number, decimals: "auto" | 2 = "auto"): string {
+export function formatFieldValue(n: number, decimals: "auto" | 2 | 0 = "auto"): string {
   if (!Number.isFinite(n)) return "";
+  // 0: whole rand for display (the value itself is never rounded).
+  if (decimals === 0) n = Math.floor(Math.abs(n) + 0.5) * (n < 0 ? -1 : 1);
   const cents = Math.round(Math.abs(n) * 100);
   const whole = Math.floor(cents / 100);
   const rest = cents % 100;

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 import './proposal-presentation.css';
 
@@ -26,6 +27,10 @@ export interface Proposal {
   confirm_text?: string;
   status: 'pending' | 'executed' | 'dismissed' | 'failed' | 'expired';
   result?: ProposalResult | null;
+  /** Quote proposals priced as they would be saved (below floor / target, incomplete). */
+  price_warnings?: { code: string; severity?: string; title?: string; detail?: string }[];
+  /** Sending with these warnings needs an explicit acknowledgement. */
+  requires_acknowledgement?: boolean;
 }
 
 const OP_LABELS: Record<Proposal['operation'], string> = { CREATE: 'Create', UPDATE: 'Update', DELETE: 'Delete', SEND: 'Send' };
@@ -39,7 +44,8 @@ const OP_TONES: Record<Proposal['operation'], StatusTone> = {
 
 interface Props {
   proposal: Proposal;
-  onConfirm: () => void;
+  /** acknowledged: the user ticked "I've checked the price" (price warnings). */
+  onConfirm: (acknowledged: boolean) => void;
   onDismiss: () => void;
   busy: boolean;
 }
@@ -49,6 +55,9 @@ interface Props {
 // status chip so rehydrated history stays readable but not actionable.
 export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: Props) {
   const pending = proposal.status === 'pending';
+  const [ack, setAck] = useState(false);
+  const warnings = (proposal.price_warnings || []).filter(w => w && (w.title || w.code));
+  const needsAck = !!proposal.requires_acknowledgement;
 
   return (
     <div className={`copilot-proposal${pending ? ' is-pending' : ''}`}>
@@ -69,6 +78,17 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
           <div className="copilot-proposal__label">AI analysis</div>
           {proposal.analysis_summary}
         </div>
+      )}
+
+      {/* Price warnings (QUOTE-RULES §10): one line each, red when blocking. */}
+      {warnings.length > 0 && (
+        <ul className="copilot-proposal__price-warnings" aria-label="Price warnings">
+          {warnings.map((w, i) => (
+            <li key={`${w.code}-${i}`} className={w.severity === 'block' ? 'is-block' : undefined}>
+              <b>{w.title || w.code}</b>{w.detail ? ` ${w.detail}` : ''}
+            </li>
+          ))}
+        </ul>
       )}
 
       {/* Fields table */}
@@ -96,7 +116,14 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
       {/* Footer: actions when pending, inert status chip otherwise */}
       {pending ? (
         <div className="copilot-proposal__actions">
-          <button type="button" className="tw-btn tw-btn--primary" onClick={onConfirm} disabled={busy}>
+          {needsAck && (
+            <label className="copilot-proposal__ack">
+              <input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} />
+              I've checked the price
+            </label>
+          )}
+          <button type="button" className="tw-btn tw-btn--primary" onClick={() => onConfirm(needsAck && ack)} disabled={busy || (needsAck && !ack)}
+            title={needsAck && !ack ? 'Tick "I\'ve checked the price" first' : undefined}>
             {proposal.confirm_text || 'Confirm'}
           </button>
           <button type="button" className="tw-btn" onClick={onDismiss} disabled={busy}>

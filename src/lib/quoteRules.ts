@@ -32,6 +32,7 @@ export const LINE_LABELS: Record<string, string> = {
   operating_return: "Operating costs, empty return",
   tolls_return: "Tolls, empty return",
   driver_return: "Driver nights, empty return",
+  border_return: "Border fees, empty return",
 };
 
 export const ACTION_LABELS: Record<string, string> = {
@@ -95,9 +96,12 @@ function parseDt(value: unknown): Date | null {
   const d = new Date(text);
   return Number.isNaN(d.getTime()) ? null : d;
 }
+/** ISO 8601 in SAST with its offset ("2026-10-07T00:01:00+02:00"). */
 function iso(value: unknown): string | null {
   const d = parseDt(value);
-  return d ? d.toISOString().replace(/\.\d{3}Z$/, "Z") : null;
+  if (!d) return null;
+  const s = new Date(Math.floor(d.getTime() / 1000) * 1000 + 2 * 3600 * 1000).toISOString();
+  return `${s.slice(0, 19)}+02:00`;
 }
 /** "7 Oct 2026" in SAST (UTC+2). */
 export function saDate(value: unknown): string | null {
@@ -457,6 +461,15 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
         : returnNights ? `${returnNights} extra night${returnNights !== 1 ? "s" : ""} at R 0: no allowance rate set`
         : returnNights === 0 ? "No extra night" : "Unknown",
       { nights: returnNights, rate_per_night: rate });
+    if (drAmt === null && !warnings.some((w) => w.code === "driver_nights_unknown")) {
+      // Without the driving time the return nights are unknown: a null line blocks.
+      warnings.push(warning("driver_nights_unknown", "block", "Driving time is unknown",
+        "Enter the driver cost, or recalculate the route.", null, ["enter_driver_cost", "recalculate_route"]));
+    }
+    if (i.international && border !== null && border > 0) {
+      // The empty truck crosses the border(s) back: the same costs per crossing.
+      add("border_return", "empty_return", cents(border), "Border costs crossing back, empty");
+    }
   }
 
   if (op === null && distance !== null) complete = false;

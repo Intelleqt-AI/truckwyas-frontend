@@ -530,7 +530,15 @@ export default function QuoteDetail() {
   // One margin definition (price − full cost floor), from the stored
   // decision only. The legacy margin_percentage is the markup share of the
   // price, a different figure, so it is not shown as the margin.
-  const marginNow = decision && !decision.stale ? decision.margin : null;
+  // The margin at the quote's current total: the saved decision's while it
+  // still describes this price, else the server's own floor (cost_floor, e.g.
+  // after a copilot price change or with no decision saved).
+  const serverFloor = quote.cost_floor != null && quote.cost_floor !== '' && Number.isFinite(Number(quote.cost_floor)) ? Number(quote.cost_floor) : null;
+  const serverMargin = serverFloor != null && total > 0 && !quoteIncomplete(quote) ? {
+    amount: total - serverFloor,
+    pct: quote.margin_percentage != null && quote.margin_percentage !== '' ? Math.round(Number(quote.margin_percentage)) : Math.round((total - serverFloor) / total * 100),
+  } : null;
+  const marginNow = decision && !decision.stale ? decision.margin : serverMargin;
   // No chance to win on a dead offer (R9), nor once decided: then it shows
   // once, as "when priced", under How it was priced.
   const showChance = !!decision?.likelihood && openStatus && !lapsed && undecided;
@@ -733,7 +741,7 @@ export default function QuoteDetail() {
               <p className="qd-readout">
                 {marginNow && (
                   <span className={decision?.belowFloor ? 'qd-decision__neg' : undefined}>
-                    Margin {formatMoneyWhole(marginNow.amount)}{marginNow.pct !== null ? ` · ${formatPct(marginNow.pct)}` : ''}{decision?.belowFloor ? ', below the cost floor' : ''}
+                    Margin {formatMoneyWhole(marginNow.amount)}{marginNow.pct !== null ? ` · ${formatPct(marginNow.pct)}` : ''}{(decision && !decision.stale ? decision.belowFloor : marginNow.amount < 0) ? ', below the cost floor' : ''}
                   </span>
                 )}
                 {chanceText && <>{marginNow ? ' ' : ''}<span className="qd-readout__chance">{marginNow ? '· ' : ''}{chanceText}</span></>}
@@ -804,6 +812,11 @@ export default function QuoteDetail() {
               </div>
             )}
             {decision && <PricingDecisionRows decision={decision} marginInHeader={!!marginNow} likelihoodInHeader={showChance} />}
+            {(!decision || decision.stale) && serverFloor != null && !quoteIncomplete(quote) && (
+              <div className="qd-price-rows">
+                <div className="bk-kv"><span className="bk-kv__label">Cost floor now</span><span className="bk-kv__value">{formatMoneyWhole(serverFloor)}</span></div>
+              </div>
+            )}
             <div className="qd-price-rows">
               {quote.valid_until && (
                 <div className="bk-kv">

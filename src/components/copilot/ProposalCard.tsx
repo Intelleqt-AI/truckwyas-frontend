@@ -1,5 +1,13 @@
 import { useState } from 'react';
 import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
+import { formatRand } from '@/lib/pricing';
+
+/** Money fields read as money ("37600.00" → "R 37 600"); everything else as sent. */
+const MONEY_LABEL = /price|amount|total|rate|charge|cost|toll|fuel|allowance|surcharge/i;
+const shown = (label: string, v: string | null | undefined) => {
+  const t = String(v ?? '').trim();
+  return MONEY_LABEL.test(label) && /^-?\d+(\.\d+)?$/.test(t) ? formatRand(Number(t)) : t;
+};
 import './proposal-presentation.css';
 
 export interface ProposalField {
@@ -78,7 +86,8 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
       </div>
 
       {/* Warning banner */}
-      {!!proposal.warning && (
+      {/* Said once: a price warning shows in the list below, not also as a banner. */}
+      {!!proposal.warning && !(proposal.price_warnings && proposal.price_warnings.length) && (
         <div className="copilot-proposal__warning">{proposal.warning}</div>
       )}
 
@@ -111,11 +120,11 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
                 <td>
                   {f.old_value !== undefined && f.old_value !== null ? (
                     <>
-                      <span className="copilot-proposal__old">{f.old_value}</span>
+                      <span className="copilot-proposal__old">{shown(f.label, f.old_value)}</span>
                       <span className="copilot-proposal__arrow" aria-label="changes to">→</span>
-                      <span>{f.value}</span>
+                      <span>{shown(f.label, f.value)}</span>
                     </>
-                  ) : f.value}
+                  ) : shown(f.label, f.value)}
                 </td>
               </tr>
             ))}

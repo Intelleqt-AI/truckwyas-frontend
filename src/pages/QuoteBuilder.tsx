@@ -684,8 +684,10 @@ export default function QuoteBuilder() {
   // below). routeIsCurrent: `route` really is the route for these inputs, not
   // a leftover from before an address edit or the distance-only stub an
   // edited quote starts with.
+  // The truck priced (chosen or suggested) shapes the route's tolls and class:
+  // a change of truck is a new route, so a save is never priced on the old one.
   const routeRequestKey = JSON.stringify([pickupCoords?.lat, pickupCoords?.lon, deliveryCoords?.lat, deliveryCoords?.lon,
-    vehicleType || "Flatbed", stopsRouteKey]);
+    truckName || "Flatbed", selectedVT?.id ?? null, stopsRouteKey]);
   const routeIsCurrent = !!route && !calculatingRoute && lastRouteKeyRef.current === routeRequestKey;
 
   useEffect(() => {
@@ -694,7 +696,7 @@ export default function QuoteBuilder() {
     calcRef.current = setTimeout(() => { calculateRoute(); }, 500);
     return () => { if (calcRef.current) clearTimeout(calcRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, pickupCoords, deliveryCoords, vehicleType, billingBlocked, stopsRouteKey]);
+  }, [ready, pickupCoords, deliveryCoords, truckName, selectedVT?.id, billingBlocked, stopsRouteKey]);
 
   // ---- natural-language input (typed or transcribed from voice) ----
   // Shared by the top quick-fill bar and the AI chat panel — both are just
@@ -1300,6 +1302,8 @@ export default function QuoteBuilder() {
     if (!customerId) return "Pick a client first";
     if (!ready) return "Add collection, delivery and weight";
     if (routeBlockedMessage) return routeBlockedMessage;
+    // Never saved on a route worked out for other inputs (e.g. the previous truck).
+    if (pickupCoords && deliveryCoords && !routeIsCurrent && !routeError) return "The route is still updating: try again in a moment";
     if (weightBlockedMessage) return weightBlockedMessage;
     if (isDemoQuotaExceeded) return "This demo session's quote is used. Log in again for a new one.";
     return null;

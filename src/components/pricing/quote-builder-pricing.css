@@ -350,3 +350,10 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
 .qb-cost__seg .tw-seg__opt { min-width: 0; padding: 0 8px; }
 .qb-trip-short { display: none; }
 @media (max-width: 640px) { .qb-trip-long { display: none; } .qb-trip-short { display: inline; } }
+/* The reopen notice is never cut off: below 1280 px it wraps to two short lines. */
+@media (max-width: 1279px) {
+  .qb-pricebar__warnline:has(.qb-pricebar__notice) { overflow: visible; }
+  .qb-pricebar__notice { flex-wrap: wrap; row-gap: 0; font-size: 12px; line-height: 16px; }
+  .qb-pricebar__notice > span:first-child { white-space: normal; overflow: visible; text-overflow: clip; flex-basis: 100%; }
+  .qb-pricebar__notice .qb-linkbtn { font-size: 12px; line-height: 16px; }
+}

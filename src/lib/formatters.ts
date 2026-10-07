@@ -209,6 +209,22 @@ export const toDate = (date: string | number | Date | null | undefined): Date | 
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
+/** Calendar parts in SAST (UTC+2, no DST), whatever the browser's zone, so a
+ *  timestamp near midnight reads the same day on the list, board and detail.
+ *  A plain "YYYY-MM-DD" is a calendar date and is read as written. */
+const SAST_MS = 2 * 3600 * 1000;
+function partsOf(date: string | number | Date | null | undefined): { y: number; m: number; d: number; h: number; min: number } | null {
+  if (date == null || date === '') return null;
+  if (typeof date === 'string') {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date.trim());
+    if (m) return { y: Number(m[1]), m: Number(m[2]) - 1, d: Number(m[3]), h: 0, min: 0 };
+  }
+  const t = toDate(date);
+  if (!t) return null;
+  const s = new Date(t.getTime() + SAST_MS);
+  return { y: s.getUTCFullYear(), m: s.getUTCMonth(), d: s.getUTCDate(), h: s.getUTCHours(), min: s.getUTCMinutes() };
+}
+
 /**
  * "5 Apr 2026". The optional Intl options are honoured for the parts they
  * name (year: undefined drops the year, hour/minute add a time).
@@ -217,20 +233,20 @@ export const formatDate = (
   date: string | number | Date | null | undefined,
   options: Intl.DateTimeFormatOptions = {}
 ): string => {
-  const d = toDate(date);
-  if (!d) return MISSING;
+  const p = partsOf(date);
+  if (!p) return MISSING;
   const showYear = !('year' in options) || options.year !== undefined;
   const showDay = !('day' in options) || options.day !== undefined;
-  let out = `${showDay ? `${d.getDate()} ` : ''}${MONTHS[d.getMonth()]}${showYear ? ` ${d.getFullYear()}` : ''}`;
-  if (options.hour || options.minute) out += `, ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  let out = `${showDay ? `${p.d} ` : ''}${MONTHS[p.m]}${showYear ? ` ${p.y}` : ''}`;
+  if (options.hour || options.minute) out += `, ${pad2(p.h)}:${pad2(p.min)}`;
   return out;
 };
 
 /** "5 Apr". */
 export const formatDateShort = (date: string | number | Date | null | undefined): string => {
-  const d = toDate(date);
-  if (!d) return MISSING;
-  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  const p = partsOf(date);
+  if (!p) return MISSING;
+  return `${p.d} ${MONTHS[p.m]}`;
 };
 
 /**
@@ -247,9 +263,9 @@ export const formatMonthShort = (date: string | number | Date | null | undefined
 
 /** "Apr 2026". */
 export const formatMonth = (date: string | number | Date | null | undefined): string => {
-  const d = toDate(date);
-  if (!d) return MISSING;
-  return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  const p = partsOf(date);
+  if (!p) return MISSING;
+  return `${MONTHS[p.m]} ${p.y}`;
 };
 
 /** "5 Apr 2026, 14:05". */

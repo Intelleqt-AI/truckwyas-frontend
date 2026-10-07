@@ -1,7 +1,7 @@
 import '@/pages/settings/settings-brand.css';
 import { formatMoney, formatNumber } from '@/lib/formatters';
 import { shortDate, longDate } from '@/lib/dieselPrice';
-import { priceFieldError, ownPriceError } from '@/lib/settingsChecks';
+import { priceFieldError, priceFieldErrors, fieldChanged, ownPriceError } from '@/lib/settingsChecks';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData, postData } from "@/lib/Api";
@@ -235,6 +235,8 @@ export function CompanySettings() {
   const [loadedTarget, setLoadedTarget] = useState<string | null>(null);
   const [costInUse, setCostInUse] = useState<CostInUse | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // The form as loaded (and as last saved): what "changed" is measured against.
+  const [loadedForm, setLoadedForm] = useState<Record<string, string> | null>(null);
   const [pricingErrors, setPricingErrors] = useState<Partial<Record<PricingField, string | null>>>({});
   // The analysis' own clamp for the target margin (K-9 margin_target_range), else 1–40.
   const [targetRange, setTargetRange] = useState<[number, number]>([1, 40]);
@@ -272,7 +274,7 @@ export function CompanySettings() {
   useEffect(() => {
     fetchData('/api/v1/company/profile/').then((d: any) => {
       if (d) {
-        setForm({
+        const loadedValues = {
           company_name: d.company_name || '',
           registration_number: d.registration_number || '',
           vat_number: d.vat_number || '',
@@ -327,7 +329,13 @@ export function CompanySettings() {
           // "10.00" -> "10", "12.50" -> "12.5".
           margin_target_pct: d.margin_target_pct != null && d.margin_target_pct !== '' ? String(Number(d.margin_target_pct)) : '10',
           driver_allowance_per_night: d.driver_allowance_per_night != null ? String(d.driver_allowance_per_night) : '',
-        });
+        };
+        setForm(loadedValues);
+        setLoadedForm({ ...(loadedValues as Record<string, string>) });
+        // A stored value outside today's ranges is shown under its field (a hint, not blocking).
+        { const { hint } = priceFieldErrors(['fuel_price_electric', ...('fuel_price_petrol_mode' in d ? [] : ['fuel_price_hybrid']), 'default_base_rate_per_km', 'default_toll_rate_per_km'],
+            loadedValues as Record<string, string>, loadedValues as Record<string, string>);
+          if (Object.keys(hint).length) setFieldErrors(hint); }
         setHasTargetField('margin_target_pct' in d);
         setLoadedTarget(d.margin_target_pct != null && d.margin_target_pct !== '' ? String(Number(d.margin_target_pct)) : '10');
         setHasDriverField('driver_allowance_per_night' in d);
@@ -415,8 +423,9 @@ export function CompanySettings() {
     // Other prices, inline under their fields (the server's ranges, lib/settingsChecks).
     {
       const keys = ['fuel_price_electric', ...(!hasPetrolModeField ? ['fuel_price_hybrid'] : []), 'default_base_rate_per_km', 'default_toll_rate_per_km'];
-      const errs: Record<string, string> = {};
-      for (const k of keys) { const m = priceFieldError(k, (form as Record<string, string>)[k]); if (m) errs[k] = m; }
+      // Only a changed value can block; a stored one is shown as a hint.
+      const { block: errs, hint } = priceFieldErrors(keys, form as Record<string, string>, loadedForm);
+      if (Object.keys(hint).length) setFieldErrors(p => ({ ...p, ...hint }));
       if (Object.keys(errs).length) {
         setFieldErrors(p => ({ ...p, ...errs }));
         const ids: Record<string, string> = { fuel_price_electric: 'company-electric-r-kwh', fuel_price_hybrid: 'company-hybrid-r-l',
@@ -481,9 +490,12 @@ export function CompanySettings() {
         allow_cross_border: form.allow_cross_border === 'yes',
         auto_email_invoices: form.auto_email_invoices === 'yes',
         // Optional price (not a cost): empty = none (0).
-        default_base_rate_per_km: form.default_base_rate_per_km ? parseFloat(form.default_base_rate_per_km) : 0,
-        default_toll_rate_per_km: form.default_toll_rate_per_km
-          ? parseFloat(form.default_toll_rate_per_km) : 0.50,
+        // These four are sent only when changed: a stored out-of-range value
+        // never fails an unrelated save.
+        ...(fieldChanged('default_base_rate_per_km', form as Record<string, string>, loadedForm)
+          ? { default_base_rate_per_km: form.default_base_rate_per_km ? parseFloat(form.default_base_rate_per_km) : 0 } : {}),
+        ...(fieldChanged('default_toll_rate_per_km', form as Record<string, string>, loadedForm)
+          ? { default_toll_rate_per_km: form.default_toll_rate_per_km ? parseFloat(form.default_toll_rate_per_km) : 0.50 } : {}),
         default_sla_hours: slaHours ?? 48,
         cross_border_crossings_per_year: crossings ?? 24,
         fuel_zone: form.fuel_zone,
@@ -507,9 +519,11 @@ export function CompanySettings() {
             ? { fuel_price_petrol_mode: 'OWN', fuel_price_petrol: own, ...grade }
             : { fuel_price_petrol_mode: 'LIVE', ...grade };
         })(),
-        fuel_price_electric: form.fuel_price_electric ? parseFloat(form.fuel_price_electric) : null,
+        ...(fieldChanged('fuel_price_electric', form as Record<string, string>, loadedForm)
+          ? { fuel_price_electric: form.fuel_price_electric ? parseFloat(form.fuel_price_electric) : null } : {}),
         // Hybrid is hidden (and ignored for pricing) on a newer backend: never sent there.
-        ...(!hasPetrolModeField ? { fuel_price_hybrid: form.fuel_price_hybrid ? parseFloat(form.fuel_price_hybrid) : null } : {}),
+        ...(!hasPetrolModeField && fieldChanged('fuel_price_hybrid', form as Record<string, string>, loadedForm)
+          ? { fuel_price_hybrid: form.fuel_price_hybrid ? parseFloat(form.fuel_price_hybrid) : null } : {}),
         bank_name: form.bank_name.trim() || null,
         bank_account_holder: form.bank_account_holder.trim() || null,
         bank_account_number: accountDigits || null,
@@ -537,6 +551,7 @@ export function CompanySettings() {
       if (savedSetAt && 'fuel_price_own_set_at' in savedSetAt) setOwnSetAt(savedSetAt.fuel_price_own_set_at ?? null);
       // The saved target is the new baseline, so it can be changed (and set back) again.
       if (hasTargetField) setLoadedTarget(form.margin_target_pct);
+      setLoadedForm({ ...(form as Record<string, string>) });
       const savedPetrol = saved as { fuel_price_petrol_set_at?: string | null; petrol_price_in_use?: unknown } | null;
       if (savedPetrol && 'fuel_price_petrol_set_at' in savedPetrol) setPetrolOwnSetAt(savedPetrol.fuel_price_petrol_set_at ?? null);
       if (savedPetrol && 'petrol_price_in_use' in savedPetrol) setPetrolInUse((savedPetrol.petrol_price_in_use as typeof petrolInUse) ?? null);

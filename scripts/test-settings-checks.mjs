@@ -1,6 +1,6 @@
 // Run: node --experimental-strip-types scripts/test-settings-checks.mjs
 import assert from "node:assert/strict";
-import { priceFieldError as e, ownPriceError as own } from "../src/lib/settingsChecks.ts";
+import { priceFieldError as e, ownPriceError as own, priceFieldErrors, fieldChanged } from "../src/lib/settingsChecks.ts";
 
 assert.equal(e("fuel_price_electric", ""), null);
 assert.equal(e("fuel_price_electric", "3,45"), null);
@@ -14,4 +14,16 @@ assert.equal(e("minimum_charge", "20 000"), null);
 assert.match(own(""), /Official/);
 assert.match(own("4,99"), /R 5 to R 100/);
 assert.equal(own("32,80"), null);
-console.log("settingsChecks: 12 cases passed");
+// Toll rate: the DB column's max, not R 1 000.
+assert.equal(e("default_toll_rate_per_km", "5 000"), null);
+assert.match(e("default_toll_rate_per_km", "1 000 000"), /999 999/);
+// Only changed values block; stored ones are hints (and are not re-sent).
+const loaded = { fuel_price_electric: "25", default_base_rate_per_km: "10" };
+const same = priceFieldErrors(["fuel_price_electric", "default_base_rate_per_km"], { ...loaded }, loaded);
+assert.deepEqual(Object.keys(same.block), []); assert.deepEqual(Object.keys(same.hint), ["fuel_price_electric"]);
+const edited = priceFieldErrors(["fuel_price_electric"], { fuel_price_electric: "30" }, loaded);
+assert.deepEqual(Object.keys(edited.block), ["fuel_price_electric"]);
+assert.equal(fieldChanged("fuel_price_electric", { fuel_price_electric: "25" }, loaded), false);
+assert.equal(fieldChanged("fuel_price_electric", { fuel_price_electric: "3" }, loaded), true);
+assert.equal(fieldChanged("fuel_price_electric", { fuel_price_electric: "3" }, null), true);
+console.log("settingsChecks: 20 cases passed");

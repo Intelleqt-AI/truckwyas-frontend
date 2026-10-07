@@ -58,6 +58,9 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
   const [ack, setAck] = useState(false);
   const warnings = (proposal.price_warnings || []).filter(w => w && (w.title || w.code));
   const needsAck = !!proposal.requires_acknowledgement;
+  // A proposal that sends the quote says "Send", whatever the generic confirm text.
+  const sends = proposal.operation === 'SEND' || (proposal.fields || []).some(f => /status/i.test(f.label) && /^sent$/i.test(String(f.value).trim()));
+  const sentence = (t: string) => (/[.!?]$/.test(t.trim()) ? t.trim() : `${t.trim()}.`);
 
   return (
     <div className={`copilot-proposal${pending ? ' is-pending' : ''}`}>
@@ -85,7 +88,7 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
         <ul className="copilot-proposal__price-warnings" aria-label="Price warnings">
           {warnings.map((w, i) => (
             <li key={`${w.code}-${i}`} className={w.severity === 'block' ? 'is-block' : undefined}>
-              <b>{w.title || w.code}</b>{w.detail ? ` ${w.detail}` : ''}
+              <b>{sentence(w.title || w.code)}</b>{w.detail ? ` ${sentence(w.detail)}` : ''}
             </li>
           ))}
         </ul>
@@ -124,7 +127,7 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
           )}
           <button type="button" className="tw-btn tw-btn--primary" onClick={() => onConfirm(needsAck && ack)} disabled={busy || (needsAck && !ack)}
             title={needsAck && !ack ? 'Tick "I\'ve checked the price" first' : undefined}>
-            {proposal.confirm_text || 'Confirm'}
+            {sends ? 'Send' : proposal.confirm_text || 'Confirm'}
           </button>
           <button type="button" className="tw-btn" onClick={onDismiss} disabled={busy}>
             Dismiss

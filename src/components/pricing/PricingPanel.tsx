@@ -42,6 +42,8 @@ export interface PricingPanelProps {
   atBuildUp?: boolean;
   /** A block warning is open in the builder: the result is dimmed, nothing moves. */
   paused?: boolean;
+  /** The builder's first block warning (the price bar's), so both lead with the same blocker. */
+  firstBlockCode?: string | null;
 }
 
 const OUTCOME: Record<string, { tone: StatusTone; label: string }> = {
@@ -268,9 +270,11 @@ function Result(p: BodyProps & { data: PricingAnalysis }) {
       )}
       <Alerts data={data} customerName={p.customerName} onOneWay={p.returnApplicable ? () => p.onIncludeReturn(false) : null} includeReturn={includeReturn} />
       {/* The cost floor is said once, as the builder's Costs total. */}
-      {data.choices.length === 0 && firstGate(data.missing) && (
+      {data.choices.length === 0 && (p.firstBlockCode && BLOCK_WORDS[p.firstBlockCode] || firstGate(data.missing)) && (
         <div className="pa-sec pa-reveal" style={{ ["--d" as string]: "1" }}>
-          <p className="pa-quiet">No prices until {firstGate(data.missing)} {firstGate(data.missing) === "tolls" ? "are" : "is"} known.</p>
+          <p className="pa-quiet">{p.firstBlockCode && BLOCK_WORDS[p.firstBlockCode]
+            ? `No prices until ${BLOCK_WORDS[p.firstBlockCode]}.`
+            : `No prices until ${firstGate(data.missing)} ${firstGate(data.missing) === "tolls" ? "are" : "is"} known.`}</p>
         </div>
       )}
       {data.choices.length > 0 && <ChoicesSection data={data} price={p.price} onApply={p.onApplyPrice} includeReturn={includeReturn}
@@ -359,6 +363,13 @@ const MISSING_GATES = ["fuel", "tolls", "border"];
 /** The first missing figure, worded: "the fuel price", "tolls", "the border costs". */
 const GATE_WORDS: Record<string, string> = { fuel: "the fuel price", tolls: "tolls", border: "the border cost" };
 const firstGate = (missing: string[]) => { const k = MISSING_GATES.find((g) => missing.includes(g)); return k ? GATE_WORDS[k] : null; };
+/** "No prices until …" for the builder's first blocker (same order as the price bar). */
+const BLOCK_WORDS: Record<string, string> = {
+  distance_missing: "the route is known", distance_estimated: "the distance is confirmed",
+  no_vehicle: "a truck is chosen", truck_burn_missing: "the truck's fuel use is set", overload: "the load fits the truck",
+  diesel_missing: "the fuel price is known", tolls_unknown: "tolls are known", border_costs_missing: "border costs are known",
+  driver_nights_unknown: "the driving time is known",
+};
 
 function Section({ title, aside, children, delay, label, className }: { title: string; aside?: ReactNode; children: ReactNode; delay: number; label?: string; className?: string }) {
   return (

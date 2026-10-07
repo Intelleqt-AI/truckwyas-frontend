@@ -1,6 +1,7 @@
 import '@/pages/settings/settings-brand.css';
 import { formatMoney, formatNumber } from '@/lib/formatters';
 import { shortDate, longDate } from '@/lib/dieselPrice';
+import { priceFieldError, ownPriceError } from '@/lib/settingsChecks';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData, postData } from "@/lib/Api";
@@ -226,6 +227,7 @@ export function CompanySettings() {
   const [petrolOwnError, setPetrolOwnError] = useState<string | null>(null);
   // Inline errors for the other fields (client checks and the server's 400s).
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const clearFieldError = (k: string) => setFieldErrors(p => (p[k] ? { ...p, [k]: '' } : p));
   const [petrolInUse, setPetrolInUse] = useState<{ zone?: string; grade?: string; official?: { price?: unknown; effective_from?: string | null; source?: string | null; stale?: boolean } | null } | null>(null);
   const [hasTargetField, setHasTargetField] = useState(false);
   // The target margin as loaded: an untouched field is neither checked nor
@@ -384,11 +386,6 @@ export function CompanySettings() {
 
   const handleSave = async () => {
     // Own fuel prices: present and R 5 to R 100 per litre (the server's rule), inline.
-    const ownPriceError = (raw: string) => {
-      const n = parseFloat(toRaw(raw));
-      if (!(n > 0)) return 'Enter your price per litre, or choose Official.';
-      return n >= 5 && n <= 100 ? null : 'Enter R 5 to R 100 per litre.';
-    };
     if (form.fuel_price_mode === 'OWN') {
       const err = ownPriceError(form.fuel_price_own);
       if (err) { setOwnError(err); document.getElementById('company-diesel-own')?.focus(); return; }
@@ -398,8 +395,8 @@ export function CompanySettings() {
       if (err) { setPetrolOwnError(err); document.getElementById('company-petrol-own')?.focus(); return; }
     }
     // Minimum charge: a number or empty, inline.
-    if (hasMinimumField && form.minimum_charge && !PLAIN_NUMBER.test(toRaw(form.minimum_charge.trim()))) {
-      setFieldErrors(p => ({ ...p, minimum_charge: 'Enter an amount in rand, or leave it empty.' }));
+    if (hasMinimumField && priceFieldError('minimum_charge', form.minimum_charge)) {
+      setFieldErrors(p => ({ ...p, minimum_charge: priceFieldError('minimum_charge', form.minimum_charge)! }));
       document.getElementById('company-minimum-charge')?.focus();
       return;
     }
@@ -415,22 +412,16 @@ export function CompanySettings() {
       toast.error('Default quote validity must be between 1 and 365 days');
       return;
     }
-    for (const [key, label] of [
-      ['fuel_price_own', 'Diesel'], ['fuel_price_petrol', 'Petrol'],
-      ['fuel_price_electric', 'Electric'], ['fuel_price_hybrid', 'Hybrid'],
-    ] as const) {
-      const raw = (form as any)[key];
-      if (raw && (isNaN(parseFloat(raw)) || parseFloat(raw) < 0)) {
-        toast.error(`${label} fuel price must be a positive number`);
-        return;
-      }
-    }
-    for (const [key, label] of [
-      ['default_base_rate_per_km', 'Default price per km'], ['default_toll_rate_per_km', 'Toll rate'],
-    ] as const) {
-      const raw = (form as any)[key];
-      if (raw && (isNaN(parseFloat(raw)) || parseFloat(raw) < 0)) {
-        toast.error(`${label} must be a positive number`);
+    // Other prices, inline under their fields (the server's ranges, lib/settingsChecks).
+    {
+      const keys = ['fuel_price_electric', ...(!hasPetrolModeField ? ['fuel_price_hybrid'] : []), 'default_base_rate_per_km', 'default_toll_rate_per_km'];
+      const errs: Record<string, string> = {};
+      for (const k of keys) { const m = priceFieldError(k, (form as Record<string, string>)[k]); if (m) errs[k] = m; }
+      if (Object.keys(errs).length) {
+        setFieldErrors(p => ({ ...p, ...errs }));
+        const ids: Record<string, string> = { fuel_price_electric: 'company-electric-r-kwh', fuel_price_hybrid: 'company-hybrid-r-l',
+          default_base_rate_per_km: 'company-default-base-rate-r-km', default_toll_rate_per_km: 'company-default-toll-rate-r-km' };
+        document.getElementById(ids[Object.keys(errs)[0]])?.focus();
         return;
       }
     }
@@ -517,7 +508,8 @@ export function CompanySettings() {
             : { fuel_price_petrol_mode: 'LIVE', ...grade };
         })(),
         fuel_price_electric: form.fuel_price_electric ? parseFloat(form.fuel_price_electric) : null,
-        fuel_price_hybrid: form.fuel_price_hybrid ? parseFloat(form.fuel_price_hybrid) : null,
+        // Hybrid is hidden (and ignored for pricing) on a newer backend: never sent there.
+        ...(!hasPetrolModeField ? { fuel_price_hybrid: form.fuel_price_hybrid ? parseFloat(form.fuel_price_hybrid) : null } : {}),
         bank_name: form.bank_name.trim() || null,
         bank_account_holder: form.bank_account_holder.trim() || null,
         bank_account_number: accountDigits || null,
@@ -565,7 +557,9 @@ export function CompanySettings() {
         if (pricing.length) setPricingErrors(p => ({ ...p, ...Object.fromEntries(pricing.map(f => [f, errs[f]])) }));
         setFieldErrors(errs);
         const firstId = errs.fuel_price_own ? 'company-diesel-own' : errs.fuel_price_petrol ? 'company-petrol-own'
-          : pricing[0] ? PRICING_INPUT_ID[pricing[0]] : errs.minimum_charge ? 'company-minimum-charge' : errs.empty_return_min_km ? 'company-empty-return-min-km' : null;
+          : pricing[0] ? PRICING_INPUT_ID[pricing[0]] : errs.minimum_charge ? 'company-minimum-charge' : errs.empty_return_min_km ? 'company-empty-return-min-km'
+          : errs.fuel_price_electric ? 'company-electric-r-kwh' : errs.fuel_price_hybrid ? 'company-hybrid-r-l'
+          : errs.default_base_rate_per_km ? 'company-default-base-rate-r-km' : errs.default_toll_rate_per_km ? 'company-default-toll-rate-r-km' : null;
         if (firstId) document.getElementById(firstId)?.focus();
       }
       toast.error((e as { message?: string } | null)?.message || 'Failed to save company details');
@@ -853,11 +847,13 @@ export function CompanySettings() {
                 <InfoTip label="About the default price per km">A price, not a cost: a new quote starts at this rate × km when that is more than your cost floor plus target margin. Costs are set under Pricing.</InfoTip>
               </label>
               <PricingInput id="company-default-base-rate-r-km" inputMode="decimal" decimals={2} prefix="R" suffix="/km" placeholder="Not set"
-                value={form.default_base_rate_per_km} onChange={v => set('default_base_rate_per_km', v)} onBlur={() => {}} isValid={() => true} error={null} describedBy="company-default-base-rate-help" />
+                value={form.default_base_rate_per_km} onChange={v => { set('default_base_rate_per_km', v); clearFieldError('default_base_rate_per_km'); }} onBlur={() => {}} isValid={() => true} error={fieldErrors.default_base_rate_per_km || null} describedBy="company-default-base-rate-help" />
+              {fieldErrors.default_base_rate_per_km && <div id="company-default-base-rate-help" role="alert" style={fieldErrorStyle}>{fieldErrors.default_base_rate_per_km}</div>}
             </div>
             <div>
               <label htmlFor="company-default-toll-rate-r-km" style={labelStyle}>Toll rate (R/km)</label>
-              <DecimalInput id="company-default-toll-rate-r-km" placeholder="e.g. 0,50" value={form.default_toll_rate_per_km} onChange={v => set('default_toll_rate_per_km', v)} />
+              <DecimalInput id="company-default-toll-rate-r-km" placeholder="e.g. 0,50" value={form.default_toll_rate_per_km} onChange={v => { set('default_toll_rate_per_km', v); clearFieldError('default_toll_rate_per_km'); }} />
+              {fieldErrors.default_toll_rate_per_km && <div role="alert" style={fieldErrorStyle}>{fieldErrors.default_toll_rate_per_km}</div>}
               <div style={helpTextStyle}>Only when tolls can't be itemised.</div>
             </div>
           </div>
@@ -1100,8 +1096,10 @@ export function CompanySettings() {
             const electric = (
               <div>
                 <label htmlFor="company-electric-r-kwh" style={labelStyle}>Electricity</label>
-                <PricingInput id="company-electric-r-kwh" inputMode="decimal" decimals={2} prefix="R" suffix="/kWh" placeholder="Not set" value={form.fuel_price_electric} onChange={v => set('fuel_price_electric', v)} onBlur={() => {}} isValid={() => true} error={null} describedBy="company-electric-help" />
-                <div id="company-electric-help" style={helpTextStyle}>Your electricity cost per kWh, for electric trucks. There is no official price.</div>
+                <PricingInput id="company-electric-r-kwh" inputMode="decimal" decimals={2} prefix="R" suffix="/kWh" placeholder="Not set" value={form.fuel_price_electric} onChange={v => { set('fuel_price_electric', v); clearFieldError('fuel_price_electric'); }} onBlur={() => {}} isValid={() => true} error={fieldErrors.fuel_price_electric || null} describedBy="company-electric-help" />
+                <div id="company-electric-help">{fieldErrors.fuel_price_electric
+                  ? <div role="alert" style={fieldErrorStyle}>{fieldErrors.fuel_price_electric}</div>
+                  : <div style={helpTextStyle}>Your electricity cost per kWh, for electric trucks. There is no official price.</div>}</div>
               </div>
             );
             if (!hasPetrolModeField) {
@@ -1117,7 +1115,8 @@ export function CompanySettings() {
                 <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
                   <div>
                     <label htmlFor="company-hybrid-r-l" style={labelStyle}>Hybrid</label>
-                    <PricingInput id="company-hybrid-r-l" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="Not set" value={form.fuel_price_hybrid} onChange={v => set('fuel_price_hybrid', v)} onBlur={() => {}} isValid={() => true} error={null} />
+                    <PricingInput id="company-hybrid-r-l" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="Not set" value={form.fuel_price_hybrid} onChange={v => { set('fuel_price_hybrid', v); clearFieldError('fuel_price_hybrid'); }} onBlur={() => {}} isValid={() => true} error={fieldErrors.fuel_price_hybrid || null} describedBy="company-hybrid-err" />
+                    {fieldErrors.fuel_price_hybrid && <div id="company-hybrid-err" role="alert" style={fieldErrorStyle}>{fieldErrors.fuel_price_hybrid}</div>}
                   </div>
                 </div>
               </>);

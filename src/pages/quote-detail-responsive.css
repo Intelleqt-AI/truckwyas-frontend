@@ -219,3 +219,4 @@
 body:has(.quote-detail-rail) .Toastify__toast-container--bottom-right,
 body:has(.quote-detail-rail) .Toastify__toast-container--bottom-center,
 body:has(.quote-detail-rail) .Toastify__toast-container--bottom-left { bottom: auto; top: 72px; }
+.qd-demote { margin: 8px 0 0; font: 400 13px/20px var(--font-sans); color: var(--status-warning-text); }

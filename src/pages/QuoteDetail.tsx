@@ -476,7 +476,12 @@ export default function QuoteDetail() {
   const booking = (quote.booked_load ?? mapLoadsByQuoteId(loadsQ.data).get(String(quote.id))) as { id: number | string; load_number?: string; status?: string } | undefined;
   const booked = !!booking;
   const loadStateOnly = !booked && (quote.status === 'IT' || quote.status === 'COMPLETED');
-  const needsEdit = !booked && openStatus && (lapsed || (quote.status === 'DRAFT' && !!fuelAlert?.has_alert));
+  // Only an alert about this quote's own fuel can demote Send (fuelNote is fuel-aware).
+  const fuelDemotes = quote.status === 'DRAFT' && !!fuelNote;
+  const needsEdit = !booked && openStatus && (lapsed || fuelDemotes);
+  // Said where Send stepped down, so the change of button is explained.
+  const demoteReason = !needsEdit ? null : lapsed ? 'Expired: edit it to set a new valid-until date before sending.'
+    : `${fuelWord.charAt(0).toUpperCase()}${fuelWord.slice(1)} price changed since this was priced: edit to re-price before sending.`;
   const sendLabel = quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer';
   // Booked (R12): the chip follows the booking, so it can never contradict
   // the "Booked as" line (legacy quotes still carry In transit themselves).
@@ -771,6 +776,7 @@ export default function QuoteDetail() {
               <span>{pricedOn}{fuelNote && Number.isFinite(fuelDelta) && Math.abs(fuelDelta) >= 0.005 ? ` Now ${fuelDelta > 0 ? 'up' : 'down'} ${formatMoney(Math.abs(fuelDelta))}/L.` : ''}</span>
             </p>}
             {sendBlock && openStatus && <p className="qd-block" role="alert">{sendBlock.title}</p>}
+            {!sendBlock && demoteReason && <p className="qd-demote" role="status">{demoteReason}</p>}
             {showBuildUp && <div className="qd-price-rows">
               {/* Lines in whole rand. */}
               {priceRows.map(r => (

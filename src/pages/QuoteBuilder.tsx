@@ -179,7 +179,8 @@ function WarnLine({ list, onAction }: { list: QuoteWarning[]; onAction: (id: str
         <PopoverTrigger asChild>
           <button type="button" className="qb-warn__title">{w.title}{impactText(w) ? <span className="qb-warn__more"> · {impactText(w)!.replace(" on this quote.", "")}</span> : null}{sorted.length > 1 ? <span className="qb-warn__more"> +{sorted.length - 1} more</span> : null}</button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="qb-pop qb-pop--warn">
+        {/* Above the whole bar, never over its margin line. */}
+        <PopoverContent align="start" side="top" sideOffset={48} className="qb-pop qb-pop--warn">
           {sorted.map((x) => (
             <div key={x.code} className="qb-pop__warn">
               <div className={`qb-pop__warn-title is-${x.severity}`}>{x.title}</div>
@@ -419,8 +420,10 @@ export default function QuoteBuilder() {
 
   // ---- reference data ----
   const { data: companyProfile } = useQuery({ queryKey: ["company-profile"], queryFn: () => fetchData("api/v1/company/profile/") });
-  const { data: customersRaw } = useQuery({ queryKey: ["customers"], queryFn: () => fetchData("api/v1/customers/") });
-  const { data: vehicleTypesRaw } = useQuery({ queryKey: ["vehicle-types"], queryFn: () => fetchData("api/v1/vehicle-types/") });
+  // "+ New" opens the client / truck page in a new tab: coming back refreshes
+  // these lists, so what was just added is there to pick.
+  const { data: customersRaw } = useQuery({ queryKey: ["customers"], queryFn: () => fetchData("api/v1/customers/"), refetchOnWindowFocus: "always" });
+  const { data: vehicleTypesRaw } = useQuery({ queryKey: ["vehicle-types"], queryFn: () => fetchData("api/v1/vehicle-types/"), refetchOnWindowFocus: "always" });
   // Live diesel for the company's fuel zone. A failure just means no live
   // price (the company setting is used, as before) — never blocks the quote.
   const { data: liveFuel } = useQuery({ queryKey: ["fuel-price-current"], queryFn: () => fetchData("api/v1/fuel-prices/current/").catch(() => null), staleTime: 10 * 60 * 1000 });
@@ -1804,7 +1807,8 @@ export default function QuoteBuilder() {
                     ["Litres", fuelConsumption != null ? `≈ ${fmtNum(fuelLitres)} L` : "—"],
                   ]} total={lineAmt("fuel") != null ? ["Fuel", money(fuelCost)] : undefined} />
                   {aiFuelActive && <button type="button" className="qb-linkbtn" onClick={() => setAiFuel(null)}>Reset</button>}
-                  {useOfficialDiesel && <button type="button" className="qb-linkbtn" onClick={() => setUseOfficialDiesel(false)}>Use mine</button>}
+                  {/* Only when there is an own price for this truck's fuel to go back to. */}
+                  {useOfficialDiesel && costing.diesel.own_price != null && costing.diesel.mode === "OWN" && <button type="button" className="qb-linkbtn" onClick={() => setUseOfficialDiesel(false)}>Use mine</button>}
                 </span>
                 <span className="qb-cost__value">{lineAmt("fuel") != null ? money(fuelCost) : "—"}</span>
               </div>
@@ -1897,6 +1901,7 @@ export default function QuoteBuilder() {
           state={pricing}
           phase={pricingPhase}
           blockedReason={pricingBlockedReason}
+          firstBlockCode={blockWarnings[0]?.code ?? null}
           paused={blockWarnings.length > 0}
           needs={pricingNeeds}
           customerName={customers.find((c: any) => String(c.id) === String(customerId))?.name ?? null}

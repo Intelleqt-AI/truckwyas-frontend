@@ -134,6 +134,8 @@ export interface DieselInput {
   own_price?: number | null; own_set_at?: string | null;
   official_price?: number | null; official_effective_from?: string | null; official_stale?: boolean;
   use_official?: boolean; override_price?: number | null; fuel_type?: string | null;
+  /** Petrol only: the official grade priced on ('95' | '93'). */
+  grade?: string | null;
 }
 export interface CostingInputs {
   trip_type?: string | null;
@@ -163,6 +165,8 @@ export interface ResolvedDiesel {
   zone: string; mode: string; own_price: number | null; own_set_at: string | null; fuel_type: string;
   official_price: number | null; official_effective_from: string | null; official_stale: boolean;
   price: number | null; source: "own" | "official" | "override" | "missing";
+  /** Echoed only when the input carried one (petrol). */
+  grade?: string;
 }
 
 export function resolveDiesel(d: DieselInput | null | undefined): ResolvedDiesel {
@@ -178,6 +182,7 @@ export function resolveDiesel(d: DieselInput | null | undefined): ResolvedDiesel
     zone, mode, own_price: own, own_set_at: iso(d.own_set_at), fuel_type: d.fuel_type || "Diesel",
     official_price: official, official_effective_from: iso(d.official_effective_from),
     official_stale: official !== null ? !!d.official_stale : false,
+    ...(d.grade ? { grade: String(d.grade) } : {}),
   };
   if (override !== null) return { ...base, price: override, source: "override" };
   if (mode === "OWN" && !d.use_official) return { ...base, price: own, source: "own" };
@@ -193,15 +198,21 @@ function fuelLinesTotal(parts: number[], price: number): number {
 export function dieselWarnings(diesel: ResolvedDiesel, litresTotal: number | null = null, litresParts: number[] | null = null): QuoteWarning[] {
   const out: QuoteWarning[] = [];
   const zoneTxt = diesel.zone === "COASTAL" ? "coastal" : "inland";
+  const fuel = String(diesel.fuel_type || "Diesel").toLowerCase();
+  const officialFuel = fuel === "diesel" || fuel === "petrol";   // fuels with an official FIASA price
+  const grade = diesel.grade;
+  const where = fuel === "petrol" && grade ? `${zoneTxt} ${grade}` : zoneTxt;
+  const extra: Record<string, unknown> = fuel === "diesel" ? {} : { fuel_type: fuel };
   if (diesel.source === "missing") {
-    const fuel = String(diesel.fuel_type || "Diesel").toLowerCase();
-    if (fuel === "diesel") {
-      out.push(warning("diesel_missing", "block", "No diesel price available",
-        "No official price on record; set your own in settings.", null, ["retry_diesel", "update_own"]));
+    if (officialFuel) {
+      out.push(warning("diesel_missing", "block", `No ${fuel} price available`,
+        "No official price on record; set your own in settings.", null, ["retry_diesel", "update_own"], extra));
+    } else if (fuel === "electric") {
+      out.push(warning("diesel_missing", "block", "No electricity price set",
+        "Set your electricity cost per kWh in settings.", null, ["update_own"], extra));
     } else {
-      const unit = fuel === "electric" ? "kWh" : "litre";
       out.push(warning("diesel_missing", "block", `No ${fuel} price set`,
-        `Set your ${fuel} price per ${unit} in settings.`, null, ["update_own"], { fuel_type: fuel }));
+        `Set your ${fuel} price per litre in settings.`, null, ["update_own"], extra));
     }
     return out;
   }
@@ -211,21 +222,21 @@ export function dieselWarnings(diesel: ResolvedDiesel, litresTotal: number | nul
     if (Math.abs(own - official) / official > OWN_OFF_THRESHOLD) {
       const impact = litresParts !== null ? cents(fuelLinesTotal(litresParts, own) - fuelLinesTotal(litresParts, official))
         : litresTotal !== null ? cents((own - official) * litresTotal) : null;
-      out.push(warning("diesel_own_off", "warn", "Your diesel price differs from official",
-        `Yours ${fmtRand(own, 2)}/L, official ${fmtRand(official, 2)}/L (${zoneTxt}).`,
-        impact, ["use_official", "update_own"], { own_price: own, official_price: official }));
+      out.push(warning("diesel_own_off", "warn", `Your ${fuel} price differs from official`,
+        `Yours ${fmtRand(own, 2)}/L, official ${fmtRand(official, 2)}/L (${where}).`,
+        impact, ["use_official", "update_own"], { own_price: own, official_price: official, ...extra }));
     }
     const setAt = parseDt(diesel.own_set_at);
     const eff = parseDt(diesel.official_effective_from);
     if (setAt && eff && setAt.getTime() < eff.getTime()) {
-      out.push(warning("diesel_own_old", "warn", "Your diesel price predates the latest change",
-        `Set ${saDate(setAt.toISOString())}; official price changed ${saDate(eff.toISOString())}.`, null, ["update_own", "use_official"]));
+      out.push(warning("diesel_own_old", "warn", `Your ${fuel} price predates the latest change`,
+        `Set ${saDate(setAt.toISOString())}; official price changed ${saDate(eff.toISOString())}.`, null, ["update_own", "use_official"], extra));
     }
   }
   if (diesel.source === "official" && diesel.official_stale) {
     const eff = diesel.official_effective_from;
-    out.push(warning("diesel_stale", "warn", "Official diesel price may be out of date",
-      eff ? `Latest on record is from ${saDate(eff)}.` : "This month's price is not loaded yet.", null, ["retry_diesel", "update_own"]));
+    out.push(warning("diesel_stale", "warn", `Official ${fuel} price may be out of date`,
+      eff ? `Latest on record is from ${saDate(eff)}.` : "This month's price is not loaded yet.", null, ["retry_diesel", "update_own"], extra));
   }
   return out;
 }

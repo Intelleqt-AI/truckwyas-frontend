@@ -39,6 +39,8 @@ export interface ResolvedDieselPrice extends ResolvedDiesel {
 /** The fields read from the server's diesel resolution (company_price / diesel_price_in_use). */
 interface ServerDiesel {
   mode?: string; zone?: string; price?: unknown; source?: string;
+  /** Petrol resolution only (petrol_price_in_use / company_petrol_price). */
+  fuel_type?: string; grade?: string | null;
   official?: { price?: unknown; effective_from?: string | null; stale?: boolean } | null;
   own?: { price?: unknown; set_at?: string | null } | null;
 }
@@ -47,12 +49,21 @@ export interface CompanyLike {
   fuel_zone?: string | null; fuel_price_mode?: string | null; fuel_price_own?: unknown;
   fuel_price_own_set_at?: string | null; fuel_price_per_litre?: unknown; updated_at?: string | null;
   diesel_price_in_use?: ServerDiesel | null;
+  // Petrol (petrol and hybrid trucks), same rule as diesel. Absent on an
+  // older backend: petrol is then priced on fuel_price_petrol alone.
+  fuel_price_petrol?: unknown; fuel_price_petrol_mode?: string | null; fuel_price_petrol_set_at?: string | null;
+  fuel_price_petrol_grade?: string | null; petrol_price_in_use?: ServerDiesel | null;
+  fuel_price_electric?: unknown; fuel_price_hybrid?: unknown;
 }
+/** One official petrol figure on the fuel-price response (null = not published). */
+export interface OfficialPetrol { price?: unknown; effective_from?: string | null; source?: string | null; stale?: boolean }
 /** The fuel-price response fields read here (api/v1/fuel-prices/current/). */
 export interface LiveLike {
   success?: boolean; source?: string | null; zone?: string | null; zone_price?: unknown;
   inland_price?: unknown; coastal_price?: unknown; diesel_500ppm_inland?: unknown; diesel_500ppm_coastal?: unknown;
   effective_from?: string | null; last_updated?: string | null; stale?: boolean; company_price?: ServerDiesel | null;
+  petrol?: { inland_95?: OfficialPetrol | null; inland_93?: OfficialPetrol | null; coastal_95?: OfficialPetrol | null; coastal_93?: OfficialPetrol | null } | null;
+  company_petrol_price?: ServerDiesel | null;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -173,4 +184,91 @@ export function dieselSourceNote(r: { source: string; zone: string; official_eff
   if (r.source === "official") return `official ${zone}${r.official_effective_from ? `, ${shortDate(r.official_effective_from, now)}` : ""}`;
   if (r.source === "override") return "set for this quote";
   return "missing";
+}
+
+// ---- other fuels (petrol, hybrid, electric) ----
+
+/** Which price a truck's fuel_type is priced on: hybrid trucks use petrol. */
+export type FuelKind = "Diesel" | "Petrol" | "Electric";
+export function fuelKind(fuelType: string | null | undefined): FuelKind {
+  const f = String(fuelType || "Diesel").trim().toLowerCase();
+  if (f === "petrol" || f === "hybrid") return "Petrol";
+  if (f === "electric") return "Electric";
+  return "Diesel";
+}
+
+/** The official petrol grade a company prices on: 93 only inland and only when chosen. */
+export function petrolGrade(company: CompanyLike | null | undefined): "95" | "93" {
+  const zone = String(company?.fuel_zone || "INLAND").toUpperCase();
+  return String(company?.fuel_price_petrol_grade || "95") === "93" && zone !== "COASTAL" ? "93" : "95";
+}
+
+/** True when the backend resolves petrol as Official / My own price. */
+export function hasPetrolModes(company: CompanyLike | null | undefined, live?: LiveLike | null): boolean {
+  return !!(live?.company_petrol_price || company?.petrol_price_in_use
+    || company?.fuel_price_petrol_mode === "LIVE" || company?.fuel_price_petrol_mode === "OWN");
+}
+
+/** The quoteRules fuel input for petrol (and hybrid trucks). Never writes or
+ * invents a figure: the server's resolution when sent, else the profile's
+ * mode + the official zone/grade figure, else (older backend) the company's
+ * own petrol price only. `hybridLegacy`: an older backend prices hybrid trucks
+ * on fuel_price_hybrid, so match it until the backend has petrol modes. */
+export function petrolInputFrom({ company, live, hybridLegacy = false }:
+  { company: CompanyLike | null | undefined; live: LiveLike | null | undefined; hybridLegacy?: boolean }): DieselInput {
+  const server = live?.company_petrol_price ?? company?.petrol_price_in_use ?? null;
+  if (server && typeof server === "object" && server.official && typeof server.official === "object") {
+    return {
+      zone: server.zone ?? company?.fuel_zone ?? "INLAND",
+      mode: server.mode ?? "LIVE",
+      own_price: positive(server.own?.price),
+      own_set_at: server.own?.set_at ?? null,
+      official_price: positive(server.official.price),
+      official_effective_from: server.official.effective_from ?? null,
+      official_stale: server.official.stale === true,
+      fuel_type: "Petrol",
+      grade: server.grade ?? petrolGrade(company),
+    };
+  }
+  const zone: Zone = (company?.fuel_zone ?? live?.zone) === "COASTAL" ? "COASTAL" : "INLAND";
+  if (hasPetrolModes(company, live)) {
+    const grade = petrolGrade(company);
+    const rec = live?.petrol?.[`${zone === "COASTAL" ? "coastal" : "inland"}_${grade}` as "inland_95"] ?? null;
+    const official = rec && !FALLBACK_SOURCES.includes(String(rec.source ?? "").toUpperCase()) ? positive(rec.price) : null;
+    return {
+      zone, mode: company?.fuel_price_petrol_mode === "OWN" ? "OWN" : "LIVE",
+      own_price: positive(company?.fuel_price_petrol), own_set_at: company?.fuel_price_petrol_set_at ?? null,
+      official_price: official, official_effective_from: official != null ? rec?.effective_from ?? null : null,
+      official_stale: official != null && rec?.stale === true,
+      fuel_type: "Petrol", grade,
+    };
+  }
+  // Older backend: the own price only (no official petrol), missing = blocked.
+  const own = hybridLegacy ? positive(company?.fuel_price_hybrid) ?? positive(company?.fuel_price_petrol) : positive(company?.fuel_price_petrol);
+  return { zone, mode: "OWN", own_price: own, own_set_at: null, official_price: null, fuel_type: "Petrol" };
+}
+
+/** Electric: no official price, the company's own cost per kWh only. */
+export function electricInputFrom({ company }: { company: CompanyLike | null | undefined }): DieselInput {
+  return { zone: company?.fuel_zone === "COASTAL" ? "COASTAL" : "INLAND", mode: "OWN",
+    own_price: positive(company?.fuel_price_electric), own_set_at: null, official_price: null, fuel_type: "Electric" };
+}
+
+/** The fuel input for a truck of `fuelType`: diesel and petrol (petrol + hybrid)
+ * are Official / My own price; electric is own only. */
+export function fuelInputFor({ fuelType, company, live, now = new Date() }:
+  { fuelType: string | null | undefined; company: CompanyLike | null | undefined; live: LiveLike | null | undefined; now?: Date }): DieselInput {
+  const kind = fuelKind(fuelType);
+  if (kind === "Petrol") return petrolInputFrom({ company, live, hybridLegacy: String(fuelType).toLowerCase() === "hybrid" });
+  if (kind === "Electric") return electricInputFrom({ company });
+  return dieselInputFrom({ company, live, now });
+}
+
+/** The petrol price (and its §1 warnings) for this company today. */
+export function resolvePetrolPrice({ company, live, useOfficial = false, overridePrice = null, litres = null }:
+  { company: CompanyLike | null | undefined; live: LiveLike | null | undefined; useOfficial?: boolean; overridePrice?: number | null; litres?: number | null }): ResolvedDieselPrice {
+  const input: DieselInput = { ...petrolInputFrom({ company, live }), use_official: useOfficial, override_price: overridePrice };
+  const r = resolveDiesel(input);
+  return { ...r, officialFrom: isoDay(r.official_effective_from), ownSetAtDay: isoDay(r.own_set_at), input,
+    warnings: dieselWarnings(r, litres) as QuoteWarning[] };
 }

@@ -1,7 +1,7 @@
 // Run: node --experimental-strip-types scripts/test-diesel-price.mjs
 // QUOTE-RULES.md §1–2 for src/lib/dieselPrice.ts.
 import assert from "node:assert/strict";
-import { resolveDieselPrice as r, currentPeriodStartIso, dieselSourceNote, isoDay } from "../src/lib/dieselPrice.ts";
+import { resolveDieselPrice as r, resolvePetrolPrice as rp, fuelInputFor, fuelKind, petrolGrade, currentPeriodStartIso, dieselSourceNote, isoDay } from "../src/lib/dieselPrice.ts";
 
 const NOW = new Date("2026-10-07T10:00:00+02:00"); // first Wednesday of Oct 2026
 const live = { success: true, inland_price: 29.5551, coastal_price: 28.6831, zone: "INLAND", zone_price: 29.5551,
@@ -85,5 +85,34 @@ t("use official on this quote / override", () => {
   const own = { fuel_price_mode: "OWN", fuel_price_own: "27.00", fuel_price_own_set_at: "2026-10-07" };
   assert.equal(r({ company: own, live, now: NOW, useOfficial: true }).source, "official");
   assert.equal(r({ company: own, live, now: NOW, overridePrice: 31 }).source, "override");
+});
+// ---- petrol (petrol + hybrid trucks), same rule; electric own only ----
+const petrol = { inland_95: { price: 30.25, effective_from: "2026-10-06T22:01:00Z", source: "FIASA", stale: false },
+  inland_93: { price: 29.5, effective_from: "2026-10-06T22:01:00Z", source: "FIASA", stale: false },
+  coastal_95: { price: 29.4, effective_from: "2026-10-06T22:01:00Z", source: "FIASA", stale: false }, coastal_93: null };
+t("petrol LIVE -> official inland 95; 93 only inland; own off names petrol + grade", () => {
+  const x = rp({ company: { fuel_price_petrol_mode: "LIVE", fuel_zone: "INLAND" }, live: { ...live, petrol } });
+  assert.equal(x.source, "official"); assert.equal(x.price, 30.25); assert.equal(x.grade, "95"); assert.deepEqual(codes(x), []);
+  assert.equal(rp({ company: { fuel_price_petrol_mode: "LIVE", fuel_price_petrol_grade: "93" }, live: { ...live, petrol } }).price, 29.5);
+  assert.equal(petrolGrade({ fuel_zone: "COASTAL", fuel_price_petrol_grade: "93" }), "95");
+  assert.equal(rp({ company: { fuel_price_petrol_mode: "LIVE", fuel_zone: "COASTAL", fuel_price_petrol_grade: "93" }, live: { ...live, petrol } }).price, 29.4);
+  const o = rp({ company: { fuel_price_petrol_mode: "OWN", fuel_price_petrol: "27.00", fuel_price_petrol_set_at: "2026-10-07T08:00:00Z" }, live: { ...live, petrol } });
+  assert.equal(o.source, "own"); assert.equal(o.price, 27);
+  assert.equal(o.warnings[0].title, "Your petrol price differs from official");
+  assert.equal(o.warnings[0].detail, "Yours R 27,00/L, official R 30,25/L (inland 95).");
+  assert.equal(o.warnings[0].fuel_type, "petrol");
+});
+t("petrol: server resolution wins; old backend -> own only; hybrid uses petrol; electric own", () => {
+  const server = { fuel_type: "Petrol", grade: "95", mode: "LIVE", source: "official", price: 30.1, zone: "INLAND",
+    official: { price: 30.1, effective_from: "2026-10-06T22:01:00Z", stale: false }, own: { price: null, set_at: null } };
+  assert.equal(rp({ company: { fuel_price_petrol: "27" }, live: { ...live, company_petrol_price: server } }).price, 30.1);
+  const old1 = rp({ company: { fuel_price_petrol: "27.40" }, live });
+  assert.equal(old1.source, "own"); assert.equal(old1.price, 27.4);
+  const old2 = rp({ company: {}, live });
+  assert.equal(old2.source, "missing"); assert.equal(old2.warnings[0].title, "No petrol price available");
+  assert.equal(fuelKind("Hybrid"), "Petrol"); assert.equal(fuelKind("Electric"), "Electric"); assert.equal(fuelKind(null), "Diesel");
+  assert.equal(fuelInputFor({ fuelType: "Hybrid", company: { fuel_price_petrol_mode: "LIVE" }, live: { ...live, petrol } }).official_price, 30.25);
+  const e = fuelInputFor({ fuelType: "Electric", company: { fuel_price_electric: "3.10" }, live });
+  assert.equal(e.own_price, 3.1); assert.equal(e.fuel_type, "Electric");
 });
 console.log(`dieselPrice: ${cases.length} cases passed`);

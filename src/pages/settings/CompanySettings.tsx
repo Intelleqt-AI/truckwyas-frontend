@@ -178,6 +178,9 @@ export function CompanySettings() {
     fuel_zone: 'INLAND',
     // §1: LIVE = the official zone price; OWN = fuel_price_own. Empty own => LIVE.
     fuel_price_mode: 'LIVE', fuel_price_own: '',
+    // Petrol (petrol and hybrid trucks), same rule: LIVE = official ULP 95
+    // (93 an inland option); OWN = fuel_price_petrol. Empty own => LIVE.
+    fuel_price_petrol_mode: 'LIVE', fuel_price_petrol_grade: '95',
     fuel_price_petrol: '', fuel_price_electric: '', fuel_price_hybrid: '',
     bank_name: '', bank_account_holder: '', bank_account_number: '', bank_branch_code: '',
     bank_account_type: '', payment_reference_hint: '',
@@ -196,6 +199,12 @@ export function CompanySettings() {
   const [ownSetAt, setOwnSetAt] = useState<string | null>(null);
   // "My own price" with nothing in it is not silently official: it is an error.
   const [ownError, setOwnError] = useState<string | null>(null);
+  // Petrol Official / My own price: shown once the profile returns the mode.
+  const [hasPetrolModeField, setHasPetrolModeField] = useState(false);
+  const [hasPetrolGradeField, setHasPetrolGradeField] = useState(false);
+  const [petrolOwnSetAt, setPetrolOwnSetAt] = useState<string | null>(null);
+  const [petrolOwnError, setPetrolOwnError] = useState<string | null>(null);
+  const [petrolInUse, setPetrolInUse] = useState<{ zone?: string; grade?: string; official?: { price?: unknown; effective_from?: string | null; source?: string | null; stale?: boolean } | null } | null>(null);
   const [hasTargetField, setHasTargetField] = useState(false);
   const [costInUse, setCostInUse] = useState<CostInUse | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -272,7 +281,9 @@ export function CompanySettings() {
             const v = Number(d.fuel_price_per_litre);
             return v > 0 && Math.abs(v - 23.5) > 0.005 ? { fuel_price_mode: 'OWN', fuel_price_own: String(v) } : { fuel_price_mode: 'LIVE', fuel_price_own: '' };
           })(),
-          fuel_price_petrol: d.fuel_price_petrol != null ? String(d.fuel_price_petrol) : '',
+          fuel_price_petrol: d.fuel_price_petrol != null ? String(Number(d.fuel_price_petrol)) : '',
+          fuel_price_petrol_mode: d.fuel_price_petrol_mode === 'OWN' && d.fuel_price_petrol != null ? 'OWN' : 'LIVE',
+          fuel_price_petrol_grade: String(d.fuel_price_petrol_grade ?? '95') === '93' ? '93' : '95',
           fuel_price_electric: d.fuel_price_electric != null ? String(d.fuel_price_electric) : '',
           fuel_price_hybrid: d.fuel_price_hybrid != null ? String(d.fuel_price_hybrid) : '',
           bank_name: d.bank_name || '',
@@ -296,6 +307,10 @@ export function CompanySettings() {
         setHasReturnFields('include_empty_return_default' in d);
         setHasMinimumField('minimum_charge' in d);
         setOwnSetAt(d.fuel_price_own_set_at ?? null);
+        setHasPetrolModeField('fuel_price_petrol_mode' in d);
+        setHasPetrolGradeField('fuel_price_petrol_grade' in d);
+        setPetrolOwnSetAt(d.fuel_price_petrol_set_at ?? null);
+        setPetrolInUse(d.petrol_price_in_use ?? null);
         setCostInUse(costInUseOf(d.operating_cost_in_use));
         const range = Array.isArray(d.margin_target_range) ? d.margin_target_range.map(Number) : null;
         if (range && range.length === 2 && range.every((x: number) => Number.isFinite(x)) && range[0] < range[1]) setTargetRange([range[0], range[1]]);
@@ -345,6 +360,11 @@ export function CompanySettings() {
     if (form.fuel_price_mode === 'OWN' && !(parseFloat(form.fuel_price_own) > 0)) {
       setOwnError('Enter your price per litre, or choose Official.');
       document.getElementById('company-diesel-own')?.focus();
+      return;
+    }
+    if (hasPetrolModeField && form.fuel_price_petrol_mode === 'OWN' && !(parseFloat(form.fuel_price_petrol) > 0)) {
+      setPetrolOwnError('Enter your price per litre, or choose Official.');
+      document.getElementById('company-petrol-own')?.focus();
       return;
     }
     const validityDays = parseInt(form.default_quote_validity_days, 10);
@@ -440,7 +460,17 @@ export function CompanySettings() {
             ? { fuel_price_mode: own != null ? 'OWN' : 'LIVE', fuel_price_own: own }
             : { fuel_price_per_litre: own ?? 23.50 };
         })(),
-        fuel_price_petrol: form.fuel_price_petrol ? parseFloat(form.fuel_price_petrol) : null,
+        // Petrol, same rule as diesel: the mode with the own price. Switching
+        // to Official keeps the stored own price (not sent). An older backend
+        // only has the own petrol price. Never the official figure.
+        ...(() => {
+          const own = form.fuel_price_petrol ? Math.round(parseFloat(form.fuel_price_petrol) * 10000) / 10000 : null;
+          if (!hasPetrolModeField) return { fuel_price_petrol: own };
+          const grade = hasPetrolGradeField ? { fuel_price_petrol_grade: form.fuel_price_petrol_grade } : {};
+          return form.fuel_price_petrol_mode === 'OWN' && own != null
+            ? { fuel_price_petrol_mode: 'OWN', fuel_price_petrol: own, ...grade }
+            : { fuel_price_petrol_mode: 'LIVE', ...grade };
+        })(),
         fuel_price_electric: form.fuel_price_electric ? parseFloat(form.fuel_price_electric) : null,
         fuel_price_hybrid: form.fuel_price_hybrid ? parseFloat(form.fuel_price_hybrid) : null,
         bank_name: form.bank_name.trim() || null,
@@ -466,6 +496,9 @@ export function CompanySettings() {
       // already-open quote until the page was reloaded.
       const savedSetAt = (saved as { fuel_price_own_set_at?: string | null } | null);
       if (savedSetAt && 'fuel_price_own_set_at' in savedSetAt) setOwnSetAt(savedSetAt.fuel_price_own_set_at ?? null);
+      const savedPetrol = saved as { fuel_price_petrol_set_at?: string | null; petrol_price_in_use?: unknown } | null;
+      if (savedPetrol && 'fuel_price_petrol_set_at' in savedPetrol) setPetrolOwnSetAt(savedPetrol.fuel_price_petrol_set_at ?? null);
+      if (savedPetrol && 'petrol_price_in_use' in savedPetrol) setPetrolInUse((savedPetrol.petrol_price_in_use as typeof petrolInUse) ?? null);
       await queryClient.invalidateQueries({ queryKey: ['company-profile'] });
       queryClient.invalidateQueries({ queryKey: ['fuel-price-current'] });
       setSaved(true);
@@ -983,22 +1016,91 @@ export function CompanySettings() {
               </div>
             );
           })()}
-          <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
-            <div>
-              <label htmlFor="company-petrol-r-l" style={labelStyle}>Petrol</label>
-              <PricingInput id="company-petrol-r-l" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="Not set" value={form.fuel_price_petrol} onChange={v => set('fuel_price_petrol', v)} onBlur={() => {}} isValid={() => true} error={null} />
-            </div>
-            <div>
-              <label htmlFor="company-electric-r-kwh" style={labelStyle}>Electric</label>
-              <PricingInput id="company-electric-r-kwh" inputMode="decimal" decimals={2} prefix="R" suffix="/kWh" placeholder="Not set" value={form.fuel_price_electric} onChange={v => set('fuel_price_electric', v)} onBlur={() => {}} isValid={() => true} error={null} />
-            </div>
-          </div>
-          <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
-            <div>
-              <label htmlFor="company-hybrid-r-l" style={labelStyle}>Hybrid</label>
-              <PricingInput id="company-hybrid-r-l" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="Not set" value={form.fuel_price_hybrid} onChange={v => set('fuel_price_hybrid', v)} onBlur={() => {}} isValid={() => true} error={null} />
-            </div>
-          </div>
+          {(() => {
+            // Petrol (petrol and hybrid trucks): Official or My own price, as
+            // diesel. The official figure is only shown, never written to own.
+            const coastal = form.fuel_zone === 'COASTAL';
+            const zoneWord = coastal ? 'coastal' : 'inland';
+            const grade = !coastal && form.fuel_price_petrol_grade === '93' ? '93' : '95';
+            const rec = livePrice?.petrol?.[`${zoneWord}_${grade}`]
+              ?? (petrolInUse && petrolInUse.zone === form.fuel_zone && String(petrolInUse.grade) === grade ? petrolInUse.official : null);
+            const ok = rec && !['FALLBACK', 'FALLBACK_LATEST'].includes(String(rec.source || '').toUpperCase());
+            const official = ok ? Number(rec.price) || null : null;
+            const from = official != null ? shortDate(rec.effective_from ?? null) : null;
+            const stale = official != null && rec?.stale === true;
+            const own = form.fuel_price_petrol_mode === 'OWN';
+            const electric = (
+              <div>
+                <label htmlFor="company-electric-r-kwh" style={labelStyle}>Electricity</label>
+                <PricingInput id="company-electric-r-kwh" inputMode="decimal" decimals={2} prefix="R" suffix="/kWh" placeholder="Not set" value={form.fuel_price_electric} onChange={v => set('fuel_price_electric', v)} onBlur={() => {}} isValid={() => true} error={null} describedBy="company-electric-help" />
+                <div id="company-electric-help" style={helpTextStyle}>Your electricity cost per kWh, for electric trucks. There is no official price.</div>
+              </div>
+            );
+            if (!hasPetrolModeField) {
+              // Older backend: petrol and hybrid are the fleet's own prices only.
+              return (<>
+                <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
+                  <div>
+                    <label htmlFor="company-petrol-r-l" style={labelStyle}>Petrol</label>
+                    <PricingInput id="company-petrol-r-l" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="Not set" value={form.fuel_price_petrol} onChange={v => set('fuel_price_petrol', v)} onBlur={() => {}} isValid={() => true} error={null} />
+                  </div>
+                  {electric}
+                </div>
+                <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
+                  <div>
+                    <label htmlFor="company-hybrid-r-l" style={labelStyle}>Hybrid</label>
+                    <PricingInput id="company-hybrid-r-l" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="Not set" value={form.fuel_price_hybrid} onChange={v => set('fuel_price_hybrid', v)} onBlur={() => {}} isValid={() => true} error={null} />
+                  </div>
+                </div>
+              </>);
+            }
+            return (
+              <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
+                <div>
+                  <span id="company-petrol-mode-label" style={labelStyle}>Petrol price</span>
+                  <div className="tw-seg tw-seg--block" role="radiogroup" aria-labelledby="company-petrol-mode-label" style={{ marginTop: 6 }}>
+                    {(['LIVE', 'OWN'] as const).map(m => (
+                      <button key={m} type="button" role="radio" aria-checked={form.fuel_price_petrol_mode === m}
+                        className={`tw-seg__opt${form.fuel_price_petrol_mode === m ? ' is-active' : ''}`}
+                        onClick={() => { set('fuel_price_petrol_mode', m); setPetrolOwnError(null); }}>{m === 'LIVE' ? 'Official' : 'My own price'}</button>
+                    ))}
+                  </div>
+                  {own ? (
+                    <div style={{ marginTop: 8 }}>
+                      <PricingInput id="company-petrol-own" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="excl. VAT"
+                        value={form.fuel_price_petrol} onChange={v => { set('fuel_price_petrol', v); if (petrolOwnError && parseFloat(v) > 0) setPetrolOwnError(null); }}
+                        onBlur={() => {}} isValid={() => true} error={petrolOwnError} describedBy="company-petrol-own-help" />
+                      <div id="company-petrol-own-help">
+                        {petrolOwnError
+                          ? <div role="alert" style={fieldErrorStyle}>{petrolOwnError}</div>
+                          : <div style={helpTextStyle}>
+                              {petrolOwnSetAt && form.fuel_price_petrol ? `Set on ${longDate(petrolOwnSetAt)}` : ''}
+                              {official != null ? `${petrolOwnSetAt && form.fuel_price_petrol ? ' · ' : ''}Official ULP ${grade} is ${formatMoney(official)}/L.` : ''}
+                            </div>}
+                      </div>
+                    </div>
+                  ) : (<>
+                    <div className="cs-live" style={{ color: stale || official == null ? 'var(--status-warning-text)' : 'var(--text-secondary)' }}>
+                      {official != null
+                        ? <>{formatMoney(official)}/L · ULP {grade} {zoneWord}{from ? ` · from ${from}` : ''}{stale ? ' · may be out of date' : ''}</>
+                        : livePrice ? `No official ULP ${grade} price right now` : 'Loading…'}
+                    </div>
+                    {!coastal && hasPetrolGradeField && (
+                      <div className="tw-seg" role="radiogroup" aria-label="Petrol grade" style={{ marginTop: 8 }}>
+                        {(['95', '93'] as const).map(g => (
+                          <button key={g} type="button" role="radio" aria-checked={grade === g}
+                            className={`tw-seg__opt${grade === g ? ' is-active' : ''}`}
+                            onClick={() => set('fuel_price_petrol_grade', g)}>ULP {g}</button>
+                        ))}
+                      </div>
+                    )}
+                  </>)}
+                  <div style={helpTextStyle}>Petrol and hybrid trucks use this price.{coastal ? ' Coastal is priced on ULP 95.' : ''}</div>
+                </div>
+                {electric}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

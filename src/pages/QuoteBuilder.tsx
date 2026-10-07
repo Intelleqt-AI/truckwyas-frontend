@@ -10,7 +10,7 @@ import { postData, patchData, fetchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatMoneyWhole, formatNumber, formatDateTime, sentenceCaseLabel } from "@/lib/formatters";
 import { DatePicker } from "@/components/ui/date-picker";
-import { dieselInputFrom, dieselSourceNote, randPerLitre, currentPeriodStartIso, isoDay, type QuoteWarning } from "@/lib/dieselPrice";
+import { fuelInputFor, fuelKind, dieselSourceNote, randPerLitre, currentPeriodStartIso, isoDay, type QuoteWarning } from "@/lib/dieselPrice";
 import { compute, changesSincePriced, suggestTruck, capacityTonnes, vehicleClass, CLASS_OPERATING_DEFAULTS, cents, type CostingInputs, type DieselInput } from "@/lib/quoteRules";
 import { useCostBreakdown } from "@/components/pricing/useCostBreakdown";
 import { sendBlockedMessage, SEND_CHECK_KEY } from "@/lib/quoteWarnings";
@@ -51,15 +51,6 @@ const DRAFT_KEY = "truckwyas_newquote_draft";
 // them reopen with them (route_snapshot), and the cost lines offer a way back.
 type AiFuel = { pricePerL: number; fuelType: string };
 type AiToll = { oneWay: number; routeKey: string };
-// Which company-level default price applies, keyed by a vehicle type's own
-// fuel_type — Company stores one default per fuel type (fuel_price_per_litre
-// doubles as the Diesel default, since it predates the other three).
-const FUEL_PRICE_FIELD_BY_TYPE: Record<string, string> = {
-  Diesel: "fuel_price_per_litre",
-  Petrol: "fuel_price_petrol",
-  Electric: "fuel_price_electric",
-  Hybrid: "fuel_price_hybrid",
-};
 const extractCode = (s: string) => {
   const m: Record<string, string> = { johannesburg: "JHB", joburg: "JHB", jhb: "JHB", "cape town": "CPT", cpt: "CPT", durban: "DUR", dur: "DUR", "port elizabeth": "PE", pretoria: "PTA", bloemfontein: "BFN" };
   const k = (s || "").toLowerCase();
@@ -482,15 +473,16 @@ export default function QuoteBuilder() {
 
   // ---- fuel price (§1): own, official or a price set for this quote ----
   const fuelType = selectedVT?.fuel_type || 'Diesel';
-  const companyFuelPriceField = (FUEL_PRICE_FIELD_BY_TYPE as Record<string, string>)[fuelType] || 'fuel_price_per_litre';
-  const isDieselPricing = companyFuelPriceField === 'fuel_price_per_litre';
-  const otherFuelPrice = Number(companyProfile?.[companyFuelPriceField]) > 0 ? Number(companyProfile[companyFuelPriceField]) : null;
+  // Diesel -> diesel price; Petrol and Hybrid -> petrol price (official or
+  // own, same rule); Electric -> the company's own cost per kWh.
+  const fuelPriceKind = fuelKind(fuelType);
+  const hasOfficialFuel = fuelPriceKind !== 'Electric';
   // An applied market price (price check) overrides for this fuel type.
   const aiFuelActive = !!aiFuel && aiFuel.fuelType === fuelType;
-  const dieselInput: DieselInput = isDieselPricing
-    ? { ...dieselInputFrom({ company: companyProfile, live: liveFuel }), use_official: useOfficialDiesel, override_price: aiFuelActive ? aiFuel!.pricePerL : null }
-    // Other fuels have no official price: the company's own per-fuel price.
-    : { zone: companyProfile?.fuel_zone, mode: "OWN", own_price: otherFuelPrice, official_price: null, override_price: aiFuelActive ? aiFuel!.pricePerL : null, fuel_type: fuelType };
+  const dieselInput: DieselInput = {
+    ...fuelInputFor({ fuelType, company: companyProfile, live: liveFuel }),
+    use_official: useOfficialDiesel, override_price: aiFuelActive ? aiFuel!.pricePerL : null,
+  };
 
   const applyVehicleType = (name: string) => {
     setVehicleType(name);
@@ -1007,7 +999,7 @@ export default function QuoteBuilder() {
     durationMinutes: route?.duration_minutes ?? route?.duration_min ?? routeData?.duration_minutes ?? null,
     vehicleTypeId: selectedVT?.id ?? null, vehicleType: truckName || null,
     weightKg: weightKg > 0 ? weightKg : null,
-    fuelType, fuelZone: isDieselPricing ? (companyProfile?.fuel_zone === "COASTAL" ? "COASTAL" : "INLAND") : null,
+    fuelType, fuelZone: hasOfficialFuel ? (companyProfile?.fuel_zone === "COASTAL" ? "COASTAL" : "INLAND") : null,
     fuelCost, fuelLitres, fuelPricePerL, fuelConsumption,
     fuelPriceSource: fuelPriceSource === "missing" ? null : fuelPriceSource,
     emptyReturnCost: emptyReturn.included ? emptyReturn.total : null,
@@ -1754,8 +1746,9 @@ export default function QuoteBuilder() {
                 <span className="qb-cost__label">
                   Fuel
                   <InfoPop label="Fuel working" title="Fuel" rows={[
-                    ["Diesel", fuelPricePerL != null ? `${randPerLitre(fuelPricePerL)}/L` : "Missing"],
-                    ...(fuelPricePerL != null ? [["Source", aiFuelActive ? "price check" : !isDieselPricing ? "your price" : dieselSourceNote(costing.diesel)] as [string, string]] : []),
+                    [fuelPriceKind === "Petrol" ? `Petrol${costing.diesel.grade ? ` ${costing.diesel.grade}` : ""}` : fuelPriceKind,
+                      fuelPricePerL != null ? `${randPerLitre(fuelPricePerL)}/${fuelPriceKind === "Electric" ? "kWh" : "L"}` : "Missing"],
+                    ...(fuelPricePerL != null ? [["Source", aiFuelActive ? "price check" : !hasOfficialFuel ? "your price" : dieselSourceNote(costing.diesel)] as [string, string]] : []),
                     ["Burn", fuelConsumption != null ? `≈ ${oneDp(fuelConsumption)} L/100 km` : "Not set"],
                     ["Distance", `${formatNumber(Math.round(chargeDistance))} km${legs === 2 ? " (both ways)" : ""}`],
                     ["Litres", fuelConsumption != null ? `≈ ${formatNumber(Math.round(fuelLitres))} L` : "—"],

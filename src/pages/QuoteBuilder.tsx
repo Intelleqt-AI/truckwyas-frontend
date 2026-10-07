@@ -13,7 +13,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { dieselInputFrom, dieselSourceNote, randPerLitre, currentPeriodStartIso, isoDay, type QuoteWarning } from "@/lib/dieselPrice";
 import { compute, changesSincePriced, suggestTruck, capacityTonnes, vehicleClass, CLASS_OPERATING_DEFAULTS, cents, type CostingInputs, type DieselInput } from "@/lib/quoteRules";
 import { useCostBreakdown } from "@/components/pricing/useCostBreakdown";
-import { sendBlockedMessage } from "@/lib/quoteWarnings";
+import { sendBlockedMessage, SEND_CHECK_KEY } from "@/lib/quoteWarnings";
 import { LocationInput, type LocationCoords } from "@/components/LocationInput";
 import { RouteMapView } from "@/components/RouteMapView";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -638,7 +638,9 @@ export default function QuoteBuilder() {
         stops: stops.filter(s => s.coords).map(s => ({ lat: s.coords!.lat, lon: s.coords!.lon })),
       };
       const requestKey = routeRequestKey;
-      const data = await postData({ url: "/api/v1/route/calculate/", data: requestPayload });
+      // X-TW-Quote-Rules: the backend then says "unknown" (nulls + flags:
+      // tolls_unknown, distance_estimated) instead of the legacy guesses.
+      const data = await postData({ url: "/api/v1/route/calculate/", data: requestPayload, config: { headers: { "X-TW-Quote-Rules": "1" } } });
       if (reqId !== routeReqIdRef.current) return; // a newer calculation superseded this one
       if (data?.success !== false) {
         lastRouteRequestRef.current = requestPayload;
@@ -1297,6 +1299,8 @@ export default function QuoteBuilder() {
       } else toast.success("Quote saved as draft");
       localStorage.removeItem(DRAFT_KEY);
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      queryClient.invalidateQueries({ queryKey: [SEND_CHECK_KEY] });
+      if (quoteId) queryClient.invalidateQueries({ queryKey: ["quote", String(quoteId)] });
       navigate(quoteId ? `/bookings/quotes/${quoteId}` : "/bookings/quotes");
     } catch (e: unknown) { toast.error(sendBlockedMessage(e) || (e as { message?: string } | null)?.message || "Couldn't save the quote"); }
     finally { setSaving(false); }

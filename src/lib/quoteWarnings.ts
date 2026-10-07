@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { postData } from "@/lib/Api";
 import { currentPeriodStartIso, isoDay, shortDate, type QuoteWarning } from "./dieselPrice";
 
-interface QuoteLike { priced_at?: string | null }
+interface QuoteLike { priced_at?: string | null; updated_at?: string | null }
 type RawWarning = { code?: unknown; title?: unknown; severity?: unknown; actions?: unknown };
 
 export function savedQuoteWarnings(q: QuoteLike | null | undefined, now = new Date()): QuoteWarning[] {
@@ -23,13 +23,17 @@ const asWarnings = (v: unknown): QuoteWarning[] => (Array.isArray(v) ? (v as Raw
   .filter((w) => !!w && typeof w.code === "string" && typeof w.title === "string")
   .map((w) => ({ ...(w as QuoteWarning), severity: w.severity === "block" ? "block" : "warn", actions: Array.isArray(w.actions) ? (w.actions as QuoteWarning["actions"]) : [] }));
 
+export const SEND_CHECK_KEY = "quote-send-check";
+
 /** The server's send check for a saved quote (null id = off). */
 export function useSendCheck(quoteId: number | string | null | undefined, quote: QuoteLike | null | undefined): QuoteWarning[] {
   const { data } = useQuery({
-    queryKey: ["quote-send-check", quoteId],
+    // Keyed on the quote's version: an edit or save is never answered from
+    // the check of the quote before it (SEND_CHECK_KEY is also invalidated on save).
+    queryKey: [SEND_CHECK_KEY, quoteId, quote?.updated_at ?? null, quote?.priced_at ?? null],
     queryFn: () => postData({ url: "api/v1/quotes/cost-breakdown/", data: { quote_id: quoteId } }).catch(() => null),
     enabled: quoteId != null && quoteId !== "",
-    staleTime: 30 * 1000,
+    staleTime: 0,
     retry: false,
   });
   const server = (data as { send_check?: { warnings?: unknown } } | null)?.send_check?.warnings;

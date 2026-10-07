@@ -894,7 +894,7 @@ export default function QuoteDetail() {
                     a.click();
                     URL.revokeObjectURL(a.href);
                   })
-                  .catch((e: any) => toast.error(e?.message || 'PDF download failed'));
+                  .catch((e: unknown) => toast.error(sendBlockedMessage(e) || (e as { message?: string } | null)?.message || 'PDF download failed'));
               }}
               className="bk-btn bk-btn--quiet"
             >

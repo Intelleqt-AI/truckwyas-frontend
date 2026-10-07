@@ -1,3 +1,4 @@
+import { readBlobError } from './blobError';
 import axios from 'axios';
 import { toast } from './toast';
 
@@ -124,6 +125,20 @@ export const loginUser = async ({ username, password }: { username: string; pass
 
 export const downloadBlob = async (url: string): Promise<Blob> => {
   if (!url) throw new Error('No URL provided');
-  const response = await api.get(url, { responseType: 'blob' });
-  return response.data;
+  try {
+    const response = await api.get(url, { responseType: 'blob' });
+    return response.data;
+  } catch (e) {
+    // The error body is a Blob here: read the server's JSON back so its
+    // message (and a blocked quote's warnings) reach the caller.
+    const err = e as Error & { status?: number; data?: unknown };
+    const body = await readBlobError(err?.data);
+    if (body) {
+      const out = new Error(body.message || err.message) as Error & { status?: number; data?: unknown };
+      out.status = err.status;
+      out.data = body.data;
+      throw out;
+    }
+    throw e;
+  }
 };

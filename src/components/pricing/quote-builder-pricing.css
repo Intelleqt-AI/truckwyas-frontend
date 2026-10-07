@@ -255,3 +255,44 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
 @media (max-width: 640px) {
   .qb-controls input.qb-pricebar__input.qb-pricebar__input:not([type="checkbox"]) { font-size: 22px !important; line-height: 28px !important; }
 }
+
+/* ---- Quote rules (7 Oct): calm cost card, one-line warnings ------------ */
+.qb-cost__row:last-child { border-bottom: 0; }
+.qb-cost__meta { color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.qb-cost__meta::before { content: "·"; margin: 0 6px 0 0; }
+.qb-cost__value.is-off { color: var(--text-tertiary); }
+.qb-controls input.qb-cost__input.is-missing { border-color: var(--status-danger); }
+.qb-controls input.qb-cost__input::placeholder { color: var(--status-danger-text); opacity: 1; }
+.qb-cost__state { padding: 16px 0 4px; }
+.qb-cost__state-title { margin: 0 0 4px; font: 600 13px/20px var(--font-sans); color: var(--status-danger-text, var(--status-danger)); }
+.qb-cost__state-text { margin: 0 0 10px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.qb-check { display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); cursor: pointer; white-space: nowrap; }
+.qb-check input { width: 14px; height: 14px; margin: 0; accent-color: var(--accent-primary); }
+
+/* Info popover: label left, figure right, optional total. */
+.qb-pop { width: 272px; padding: 12px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; font: 400 13px/20px var(--font-sans); color: var(--text-primary); }
+.qb-pop__title { margin-bottom: 6px; font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }
+.qb-pop__row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+.qb-pop__row > :first-child { color: var(--text-tertiary); min-width: 0; }
+.qb-pop__row > :last-child { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.qb-pop__total { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border-subtle); font-weight: 600; }
+.qb-pop__total > :first-child { color: var(--text-primary); }
+.qb-pop__warn + .qb-pop__warn { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-row); }
+.qb-pop__warn-title { font-weight: 500; }
+.qb-pop__warn-title.is-block { color: var(--status-danger-text); }
+.qb-pop__warn-detail { color: var(--text-secondary); }
+.qb-pop__warn-actions { display: flex; gap: 12px; margin-top: 4px; }
+.qb-pop__warn-actions .qb-linkbtn { margin-left: 0; }
+
+/* Warning line in the price bar: one row, fixed height (no layout shift). */
+.qb-warn { display: inline-flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
+.qb-warn__icon { flex: none; color: var(--status-warning); }
+.qb-warn--block .qb-warn__icon { color: var(--status-danger); }
+.qb-warn__title { padding: 0; border: 0; background: none; cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  font: 500 13px/20px var(--font-sans); color: var(--text-primary); }
+.qb-warn--block .qb-warn__title { color: var(--status-danger-text); }
+.qb-warn__title:hover { text-decoration: underline; text-underline-offset: 2px; }
+.qb-warn__more { font-weight: 400; color: var(--text-tertiary); }
+.qb-warn .qb-linkbtn { margin-left: 4px; font-size: 13px; line-height: 20px; }
+.qb-pricebar__notice { gap: 10px; color: var(--text-secondary); }
+.qb-pricebar__notice .qb-linkbtn { margin-left: 0; font-size: 13px; line-height: 20px; }

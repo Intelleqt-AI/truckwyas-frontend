@@ -126,6 +126,12 @@ export interface PricingInputs {
   weightKg: number | null;
   fuelType: string | null; fuelZone: string | null;
   fuelCost: number; fuelLitres: number | null; fuelPricePerL: number | null; fuelConsumption: number | null;
+  /** §9 where the R/L came from: own | official | override. */
+  fuelPriceSource?: string | null;
+  /** §5 the empty return the builder includes (one-way ≥ min km), or null. */
+  emptyReturnCost?: number | null;
+  /** quote_costing.build_inputs flags (tolls_unknown, distance_estimated, …), sent as is. */
+  costingFlags?: Record<string, unknown>;
   tollCost: number; routePlazas: { plaza: string; route?: string; tariff: number }[];
   countryCodes: string[] | null;
   crossBorderCost: number; isInternational: boolean;
@@ -154,6 +160,8 @@ export function buildRequest(i: PricingInputs): Record<string, unknown> {
     fuel_price_used: i.fuelPricePerL,
     fuel_consumption_l_per_100km: i.fuelConsumption != null ? round2(i.fuelConsumption) : null,
     fuel_type: i.fuelType, fuel_zone: i.fuelZone,
+    ...(i.fuelPriceSource ? { fuel_price_source: i.fuelPriceSource } : {}),
+    ...(i.emptyReturnCost != null ? { empty_return_cost: round2(i.emptyReturnCost) } : {}),
     toll_cost: round2(i.tollCost),
     route: { toll_breakdown: i.routePlazas, cross_border: i.isInternational, country_codes: i.countryCodes },
     cross_border_cost: round2(i.crossBorderCost),
@@ -163,6 +171,7 @@ export function buildRequest(i: PricingInputs): Record<string, unknown> {
     ...(i.includeReturn != null ? { include_return: i.includeReturn } : {}),
     your_price: i.yourPrice != null ? round2(i.yourPrice) : null,
     pickup_date: i.pickupDate || null,
+    ...(i.costingFlags ?? {}),
   };
 }
 

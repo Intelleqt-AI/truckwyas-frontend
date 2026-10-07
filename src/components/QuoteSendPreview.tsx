@@ -3,6 +3,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import SendPreviewDialog, { type SendPreviewRow } from '@/components/SendPreviewDialog';
 import { quoteLapsed } from '@/components/overview/today';
+import type { QuoteWarning } from '@/lib/dieselPrice';
 
 export interface QuotePreviewData {
   /** Saved quotes: lets an expired quote's preview lead to its edit form. */
@@ -32,14 +33,15 @@ const safeDate = (d?: string | null) => {
 
 /**
  * Preview-and-confirm before a quote is emailed to the customer. Mirrors the
- * server's quote email (core/services/email_service.send_quote_share_email):
- * same recipient, subject and summary rows. `onConfirm` runs the caller's
- * existing send call unchanged.
+ * server's quote email (core/services/email_service.send_quote_share_email).
+ * §11: any `block` warning stops the send (one line, Edit quote leads);
+ * a `warn` is one line above the buttons.
  */
-export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send quote', onConfirm, onCancel }: {
+export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send quote', warnings = [], onConfirm, onCancel }: {
   quote: QuotePreviewData;
   sending?: boolean;
   confirmLabel?: string;
+  warnings?: QuoteWarning[];
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -52,14 +54,12 @@ export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send 
   const from = quote.pickup_location || quote.origin;
   const to = quote.delivery_location || quote.destination;
 
-  // Past its valid-until date (the board's one expiry rule): sending is still
-  // allowed, but the customer's link would open on an expired offer, so the
-  // preview says so right above the Send button (R11).
   const expired = quoteLapsed(quote);
-  // Expired (R12): "Edit quote" is the main button and sending steps down to
-  // "Send anyway" (same handler). A saved quote opens its edit form; the
-  // quote form itself (no id yet) just closes the preview back onto the form.
-  const editAction = expired
+  const block = warnings.find((w) => w.severity === 'block') ?? null;
+  const warn = warnings.find((w) => w.severity !== 'block') ?? null;
+  // Expired or blocked: "Edit quote" leads. A saved quote opens its edit
+  // form; the builder (no id yet) just closes the preview back onto it.
+  const editAction = expired || block
     ? { label: 'Edit quote', onClick: () => { if (quote.id != null && quote.id !== '') { onCancel(); navigate(`/bookings/quotes/${quote.id}/edit`); } else onCancel(); } }
     : undefined;
 
@@ -67,39 +67,37 @@ export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send 
     ...(quote.quote_number ? [{ label: 'Quote', value: quote.quote_number }] : []),
     ...(from || to ? [{ label: 'Route', value: `${from || '—'} to ${to || '—'}` }] : []),
     ...(quote.pickup_date ? [{ label: 'Collection', value: safeDate(quote.pickup_date) }] : []),
-    // As in the email: price excl. VAT, the VAT, then the total incl. VAT.
     ...(amount == null || Number.isNaN(amount)
       ? [{ label: 'Price', value: '—' }]
       : !vat
         ? [{ label: 'Price', value: `${formatCurrency(amount)} excl. VAT` }]
         : vat.vat_registered
           ? [
-              { label: 'Price excl. VAT', value: formatCurrency(amount) },
+              { label: 'Excl. VAT', value: formatCurrency(amount) },
               { label: vat.vat_label || 'VAT', value: formatCurrency(Number(vat.vat_amount)) },
-              { label: 'Total incl. VAT', value: <strong>{formatCurrency(Number(vat.total_incl_vat))}</strong> },
+              { label: 'Total', value: <strong>{formatCurrency(Number(vat.total_incl_vat))}</strong> },
             ]
-          : [{ label: 'Total', value: `${formatCurrency(Number(vat.total_incl_vat))} (no VAT charged)` }]),
+          : [{ label: 'Total', value: `${formatCurrency(Number(vat.total_incl_vat))} (no VAT)` }]),
     ...(quote.valid_until ? [{ label: 'Valid until', value: expired
       ? <>{safeDate(quote.valid_until)} <span className="send-preview__warn">· expired</span></>
       : safeDate(quote.valid_until) }] : []),
   ];
 
+  const line = block ?? (expired ? { title: `Expired ${safeDate(quote.valid_until)}` } : warn);
   return (
     <SendPreviewDialog
-      title="Send quote to customer"
+      title="Send quote"
       to={email}
       toName={quote.customer_name || undefined}
       subject={quote.quote_number ? `Your freight quote ${quote.quote_number} from ${company}` : undefined}
       rows={rows}
-      note={expired ? <>
-        <span className="send-preview__warn" role="alert" style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
-          This quote expired on {safeDate(quote.valid_until)}. Edit it to set a new valid-until date before sending.
-        </span>
-        The email links to the quote so they can accept or decline it online.
-      </> : 'The email links to the quote so they can accept or decline it online.'}
-      noEmailHint="No email will go out. The quote is marked as sent and you can share its link yourself."
-      noEmailConfirmLabel={expired ? "Mark sent anyway" : "Mark as sent"}
+      note={line
+        ? <span className={block || expired ? 'send-preview__warn' : undefined} role={block ? 'alert' : 'status'} style={{ fontWeight: 500 }}>{line.title}</span>
+        : 'They can accept or decline online.'}
+      noEmailHint="No email on file. It is marked sent; share the link yourself."
+      noEmailConfirmLabel={expired ? 'Mark sent anyway' : 'Mark as sent'}
       confirmLabel={expired ? 'Send anyway' : confirmLabel}
+      confirmBlocked={!!block}
       preferredAction={editAction}
       sending={sending}
       onConfirm={onConfirm}

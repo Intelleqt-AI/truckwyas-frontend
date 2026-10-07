@@ -14,9 +14,10 @@ assert.equal(e("minimum_charge", "20 000"), null);
 assert.match(own(""), /Official/);
 assert.match(own("4,99"), /R 5 to R 100/);
 assert.equal(own("32,80"), null);
-// Toll rate: the DB column's max, not R 1 000.
-assert.equal(e("default_toll_rate_per_km", "5 000"), null);
-assert.match(e("default_toll_rate_per_km", "1 000 000"), /999 999/);
+// Toll rate: the server's R 0–R 50 bound.
+assert.equal(e("default_toll_rate_per_km", "0,95"), null);
+assert.equal(e("default_toll_rate_per_km", "50"), null);
+assert.equal(e("default_toll_rate_per_km", "50,01"), "Enter a toll rate between R 0 and R 50 per km, or leave it empty.");
 // Only changed values block; stored ones are hints (and are not re-sent).
 const loaded = { fuel_price_electric: "25", default_base_rate_per_km: "10" };
 const same = priceFieldErrors(["fuel_price_electric", "default_base_rate_per_km"], { ...loaded }, loaded);
@@ -26,4 +27,4 @@ assert.deepEqual(Object.keys(edited.block), ["fuel_price_electric"]);
 assert.equal(fieldChanged("fuel_price_electric", { fuel_price_electric: "25" }, loaded), false);
 assert.equal(fieldChanged("fuel_price_electric", { fuel_price_electric: "3" }, loaded), true);
 assert.equal(fieldChanged("fuel_price_electric", { fuel_price_electric: "3" }, null), true);
-console.log("settingsChecks: 20 cases passed");
+console.log("settingsChecks: 21 cases passed");

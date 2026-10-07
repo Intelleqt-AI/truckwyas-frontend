@@ -9,8 +9,8 @@ export const PRICE_RULES: Record<string, Rule> = {
   fuel_price_electric: { ok: (n) => n > 0 && n <= 20, msg: "Enter more than R 0 and up to R 20 per kWh, or leave it empty." },
   fuel_price_hybrid: { ok: (n) => n > 0 && n <= 100, msg: "Enter more than R 0 and up to R 100 per litre, or leave it empty." },
   default_base_rate_per_km: { ok: (n) => n >= 0 && n <= 1000, msg: "Enter R 0 to R 1 000 per km, or leave it empty." },
-  // The DB column's own maximum (DecimalField 8,2 → 999 999,99).
-  default_toll_rate_per_km: { ok: (n) => n >= 0 && n <= 999_999, msg: "Enter R 0 to R 999 999 per km, or leave it empty." },
+  // The server's bound (2d8d5af).
+  default_toll_rate_per_km: { ok: (n) => n >= 0 && n <= 50, msg: "Enter a toll rate between R 0 and R 50 per km, or leave it empty." },
   minimum_charge: { ok: (n) => n >= 0 && n <= 5_000_000, msg: "Enter an amount in rand, or leave it empty." },
 };
 

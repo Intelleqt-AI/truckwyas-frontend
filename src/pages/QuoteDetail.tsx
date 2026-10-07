@@ -16,7 +16,7 @@ import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
 import { Download, FileSearch } from 'lucide-react';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
-import { useSendCheck, sendBlockedMessage } from '@/lib/quoteWarnings';
+import { useSendCheck, sendBlockedMessage, quoteIncomplete } from '@/lib/quoteWarnings';
 import { randPerLitre, longDate } from '@/lib/dieselPrice';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import SectionHeader from '@/components/layout/SectionHeader';
@@ -447,14 +447,20 @@ export default function QuoteDetail() {
   // Fuel: one line, the sign read from the figure (up or down).
   const fuelDelta = Number(fuelAlert?.fuel_delta_zar);
   const fuelImpact = Number(fuelAlert?.estimated_cost_impact);
-  const fuelNote = fuelAlert?.has_alert
+  // Fuel-aware: the fuel this quote was priced on (petrol, electric …), and
+  // an alert only when it is about that same fuel.
+  const quoteFuel = String(quote.costing_snapshot?.diesel?.fuel_type || quote.route_snapshot?.fuel_type_used || 'Diesel');
+  const fuelWord = quoteFuel.toLowerCase() === 'hybrid' ? 'petrol' : quoteFuel.toLowerCase();
+  const alertFuel = String(fuelAlert?.fuel_type || 'Diesel').toLowerCase();
+  const alertMatches = alertFuel === fuelWord || (alertFuel === 'hybrid' && fuelWord === 'petrol');
+  const fuelNote = fuelAlert?.has_alert && alertMatches
     ? (Number.isFinite(fuelDelta) && Number.isFinite(fuelImpact) && Math.abs(fuelDelta) >= 0.005
-      ? `Diesel ${fuelDelta > 0 ? 'up' : 'down'} ${formatMoney(Math.abs(fuelDelta))}/L since quoted: about ${formatMoneyWhole(Math.abs(fuelImpact))} ${fuelDelta > 0 ? 'more' : 'less'}.`
+      ? `${fuelWord.charAt(0).toUpperCase()}${fuelWord.slice(1)} ${fuelDelta > 0 ? 'up' : 'down'} ${formatMoney(Math.abs(fuelDelta))}/L since quoted: about ${formatMoneyWhole(Math.abs(fuelImpact))} ${fuelDelta > 0 ? 'more' : 'less'}.`
       : normaliseFigures(fuelAlert.message))
     : null;
   // §11 / PDF: "Priced on diesel R 32,80/L (official inland, 7 Oct 2026)."
   const pricedOn = Number(quote.fuel_price_used) > 0
-    ? `Priced on diesel ${randPerLitre(Number(quote.fuel_price_used))}/L (${[
+    ? `Priced on ${fuelWord} ${randPerLitre(Number(quote.fuel_price_used))}/${fuelWord === 'electric' ? 'kWh' : 'L'} (${[
         quote.fuel_price_source === 'own' ? 'your price' : quote.fuel_price_source === 'override' ? 'set on quote' : 'official',
         quote.fuel_price_source === 'official' || !quote.fuel_price_source ? (quote.fuel_zone === 'COASTAL' ? 'coastal' : 'inland') : null,
       ].filter(Boolean).join(' ')}${quote.priced_at ? `, ${longDate(quote.priced_at)}` : ''}).`
@@ -531,7 +537,8 @@ export default function QuoteDetail() {
   // Each cost once per card (R3): with a current decision that breaks the
   // floor into its parts, "How it was priced" carries fuel, tolls and the rest,
   // so the build-up lines (Base rate, Fuel, …) are not listed a second time.
-  const showBuildUp = !(decision && decision.floorLines && !decision.stale);
+  // An incomplete quote (no price) has no build-up to show (it would read as R 0 and a negative line).
+  const showBuildUp = !quoteIncomplete(quote) && !(decision && decision.floorLines && !decision.stale);
   const statusOptions: StatusOption[] = [
     { value: 'DRAFT', label: 'Draft', hint: 'Not offered to the customer yet' },
     // An expired quote can still be marked Sent (the preview warns), but the
@@ -713,7 +720,8 @@ export default function QuoteDetail() {
           <section className="bk-card" aria-labelledby="qd-price-title">
             <h2 className="bk-fact__label" id="qd-price-title" style={{ margin: 0 }}>{isRound ? 'Total, both legs' : 'Total'}{vat?.vat_registered ? ' excl. VAT' : ''}</h2>
             {/* Whole rand when the cents are zero, as in the builder's price bar. */}
-            <div className="qd-total">{formatRand(total)}</div>
+            {/* No price yet (costs incomplete): never "R 0". */}
+            <div className="qd-total">{quoteIncomplete(quote) ? <span className="bk-muted">Incomplete</span> : formatRand(total)}</div>
             {/* One readout line: "Margin R 4 688 · 20% · 51% chance to win".
                 The chance part is one unbreakable span, so a wrap comes before it. */}
             {(marginNow || chanceText) && (
@@ -776,7 +784,7 @@ export default function QuoteDetail() {
             </div>}
             {/* VAT and the total incl. VAT: what the customer is sent (same
                 figures as the PDF, email and quote page; backend quote_vat). */}
-            {vat && (
+            {vat && !quoteIncomplete(quote) && (
               <div className="qd-price-rows">
                 {vat.vat_registered ? (
                   <>

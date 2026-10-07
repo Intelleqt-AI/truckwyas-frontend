@@ -268,10 +268,10 @@ function Result(p: BodyProps & { data: PricingAnalysis }) {
       )}
       <Alerts data={data} customerName={p.customerName} onOneWay={p.returnApplicable ? () => p.onIncludeReturn(false) : null} includeReturn={includeReturn} />
       {/* The cost floor is said once, as the builder's Costs total. */}
-      {data.choices.length === 0 && data.missing.some((k) => MISSING_GATES.includes(k)) && (
-        <p className="pa-quiet pa-reveal" style={{ ["--d" as string]: "1" }}>
-          No prices until {data.missing.filter((k) => MISSING_GATES.includes(k)).map((k) => (k === "border" ? "border costs" : k)).join(" and ")} {data.missing.filter((k) => MISSING_GATES.includes(k)).length > 1 ? "are" : "is"} known.
-        </p>
+      {data.choices.length === 0 && firstGate(data.missing) && (
+        <div className="pa-sec pa-reveal" style={{ ["--d" as string]: "1" }}>
+          <p className="pa-quiet">No prices until {firstGate(data.missing)} {firstGate(data.missing) === "tolls" ? "are" : "is"} known.</p>
+        </div>
       )}
       {data.choices.length > 0 && <ChoicesSection data={data} price={p.price} onApply={p.onApplyPrice} includeReturn={includeReturn}
         returnApplicable={p.returnApplicable} onIncludeReturn={p.onIncludeReturn} />}
@@ -356,6 +356,9 @@ function Alerts({ data, customerName, onOneWay, includeReturn }: { data: Pricing
  *  costs aren't known yet — one short line (the builder's warning line says
  *  which figure and how to fix it). */
 const MISSING_GATES = ["fuel", "tolls", "border"];
+/** The first missing figure, worded: "the fuel price", "tolls", "the border costs". */
+const GATE_WORDS: Record<string, string> = { fuel: "the fuel price", tolls: "tolls", border: "the border cost" };
+const firstGate = (missing: string[]) => { const k = MISSING_GATES.find((g) => missing.includes(g)); return k ? GATE_WORDS[k] : null; };
 
 function Section({ title, aside, children, delay, label, className }: { title: string; aside?: ReactNode; children: ReactNode; delay: number; label?: string; className?: string }) {
   return (

@@ -117,11 +117,13 @@ function marginRangeNote(raw: string, [lo, hi]: [number, number]): string | null
 /* A pricing field with its unit inside the box ("R" before, "%" or "/km"
    after). Shows the saved value in the ZA format ("16,94", "650"); while
    focused it holds exactly what was typed. */
-function PricingInput({ id, value, onChange, onBlur, isValid, placeholder, decimals, inputMode, prefix, suffix, error, describedBy }: {
+function PricingInput({ id, value, onChange, onBlur, isValid, placeholder, decimals, inputMode, prefix, suffix, error, describedBy, ariaLabel }: {
   id: string; value: string; onChange: (raw: string) => void; onBlur: (raw: string) => void; placeholder?: string;
   /** An invalid entry stays exactly as typed (never reformatted into something it isn't). */
   isValid: (raw: string) => boolean;
   decimals: number; inputMode: 'numeric' | 'decimal'; prefix?: string; suffix?: string; error?: string | null; describedBy?: string;
+  /** For a field without its own <label> (e.g. the own-price box under a mode switch). */
+  ariaLabel?: string;
 }) {
   const [text, setText] = useState<string | null>(null);
   const n = Number(value);
@@ -140,6 +142,7 @@ function PricingInput({ id, value, onChange, onBlur, isValid, placeholder, decim
         value={shown}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
+        aria-label={ariaLabel}
         onFocus={() => setText(shown)}
         onChange={e => { setText(e.target.value); onChange(toRaw(e.target.value)); }}
         onBlur={e => { const raw = toRaw(e.target.value); if (isValid(raw)) setText(null); onBlur(raw); }}
@@ -159,7 +162,12 @@ function costInUseOf(v: unknown): CostInUse | null {
   const value = n(o.value);
   if (value === null) return null;
   const est = o.estimates && typeof o.estimates === 'object' ? (o.estimates as Record<string, unknown>) : {};
-  return { value, source: o.source ? String(o.source) : null, trips: n(o.trips), minTrips: n(o.min_trips), window: o.window ? String(o.window) : null, label: o.label ? String(o.label) : null, superlink: n(est.superlink) };
+  // The figure a superlink is priced at: per_class (the company figure scaled
+  // to the class) when the server sends it, else the class estimate.
+  const perClass = o.per_class && typeof o.per_class === 'object' ? (o.per_class as Record<string, { value?: unknown }>) : {};
+  const superlink = n(perClass.superlink?.value) ?? n(est.superlink);
+  const fleet = n(o.company_value) ?? value;
+  return { value: fleet, source: o.source ? String(o.source) : null, trips: n(o.trips), minTrips: n(o.min_trips), window: o.window ? String(o.window) : null, label: o.label ? String(o.label) : null, superlink };
 }
 // "Now using R 13,99/km from 37 trips (last 12 months)." / "Now using the
 // R 12,50/km superlink estimate." The saved figure needs no line: it is in the field.
@@ -216,6 +224,8 @@ export function CompanySettings() {
   const [hasPetrolGradeField, setHasPetrolGradeField] = useState(false);
   const [petrolOwnSetAt, setPetrolOwnSetAt] = useState<string | null>(null);
   const [petrolOwnError, setPetrolOwnError] = useState<string | null>(null);
+  // Inline errors for the other fields (client checks and the server's 400s).
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [petrolInUse, setPetrolInUse] = useState<{ zone?: string; grade?: string; official?: { price?: unknown; effective_from?: string | null; source?: string | null; stale?: boolean } | null } | null>(null);
   const [hasTargetField, setHasTargetField] = useState(false);
   // The target margin as loaded: an untouched field is neither checked nor
@@ -373,16 +383,33 @@ export function CompanySettings() {
   };
 
   const handleSave = async () => {
-    if (form.fuel_price_mode === 'OWN' && !(parseFloat(form.fuel_price_own) > 0)) {
-      setOwnError('Enter your price per litre, or choose Official.');
-      document.getElementById('company-diesel-own')?.focus();
+    // Own fuel prices: present and R 5 to R 100 per litre (the server's rule), inline.
+    const ownPriceError = (raw: string) => {
+      const n = parseFloat(toRaw(raw));
+      if (!(n > 0)) return 'Enter your price per litre, or choose Official.';
+      return n >= 5 && n <= 100 ? null : 'Enter R 5 to R 100 per litre.';
+    };
+    if (form.fuel_price_mode === 'OWN') {
+      const err = ownPriceError(form.fuel_price_own);
+      if (err) { setOwnError(err); document.getElementById('company-diesel-own')?.focus(); return; }
+    }
+    if (hasPetrolModeField && form.fuel_price_petrol_mode === 'OWN') {
+      const err = ownPriceError(form.fuel_price_petrol);
+      if (err) { setPetrolOwnError(err); document.getElementById('company-petrol-own')?.focus(); return; }
+    }
+    // Minimum charge: a number or empty, inline.
+    if (hasMinimumField && form.minimum_charge && !PLAIN_NUMBER.test(toRaw(form.minimum_charge.trim()))) {
+      setFieldErrors(p => ({ ...p, minimum_charge: 'Enter an amount in rand, or leave it empty.' }));
+      document.getElementById('company-minimum-charge')?.focus();
       return;
     }
-    if (hasPetrolModeField && form.fuel_price_petrol_mode === 'OWN' && !(parseFloat(form.fuel_price_petrol) > 0)) {
-      setPetrolOwnError('Enter your price per litre, or choose Official.');
-      document.getElementById('company-petrol-own')?.focus();
+    const minKm = form.empty_return_min_km === '' ? 300 : Number(form.empty_return_min_km);
+    if (hasReturnFields && !(Number.isFinite(minKm) && minKm >= 0 && minKm <= 5000)) {
+      setFieldErrors(p => ({ ...p, empty_return_min_km: 'Enter 0 to 5 000 km.' }));
+      document.getElementById('company-empty-return-min-km')?.focus();
       return;
     }
+    setFieldErrors({});
     const validityDays = parseInt(form.default_quote_validity_days, 10);
     if (isNaN(validityDays) || validityDays < 1 || validityDays > 365) {
       toast.error('Default quote validity must be between 1 and 365 days');
@@ -473,8 +500,9 @@ export function CompanySettings() {
         // fuel_price_per_litre (23.50 there means "use the live price").
         ...(() => {
           const own = form.fuel_price_mode === 'OWN' && form.fuel_price_own ? Math.round(parseFloat(form.fuel_price_own) * 10000) / 10000 : null;
+          // Switching to Official keeps the stored own price (not sent), like petrol.
           return hasModeField
-            ? { fuel_price_mode: own != null ? 'OWN' : 'LIVE', fuel_price_own: own }
+            ? (own != null ? { fuel_price_mode: 'OWN', fuel_price_own: own } : { fuel_price_mode: 'LIVE' })
             : { fuel_price_per_litre: own ?? 23.50 };
         })(),
         // Petrol, same rule as diesel: the mode with the own price. Switching
@@ -503,7 +531,8 @@ export function CompanySettings() {
         pricing_include_empty_return: form.pricing_include_empty_return === 'yes',
         ...(hasReturnFields ? {
           include_empty_return_default: form.pricing_include_empty_return === 'yes',
-          empty_return_min_km: form.empty_return_min_km ? Math.max(0, Math.round(parseFloat(form.empty_return_min_km))) : 300,
+          // 0 allowed: every one-way trip charges the empty return.
+          empty_return_min_km: form.empty_return_min_km === '' ? 300 : Math.max(0, Math.round(parseFloat(form.empty_return_min_km))),
         } : {}),
         ...(hasMinimumField ? { minimum_charge: form.minimum_charge ? Math.round(parseFloat(form.minimum_charge) * 100) / 100 : null } : {}),
         pool_pricing_data: form.pool_pricing_data === 'yes',
@@ -514,6 +543,8 @@ export function CompanySettings() {
       // already-open quote until the page was reloaded.
       const savedSetAt = (saved as { fuel_price_own_set_at?: string | null } | null);
       if (savedSetAt && 'fuel_price_own_set_at' in savedSetAt) setOwnSetAt(savedSetAt.fuel_price_own_set_at ?? null);
+      // The saved target is the new baseline, so it can be changed (and set back) again.
+      if (hasTargetField) setLoadedTarget(form.margin_target_pct);
       const savedPetrol = saved as { fuel_price_petrol_set_at?: string | null; petrol_price_in_use?: unknown } | null;
       if (savedPetrol && 'fuel_price_petrol_set_at' in savedPetrol) setPetrolOwnSetAt(savedPetrol.fuel_price_petrol_set_at ?? null);
       if (savedPetrol && 'petrol_price_in_use' in savedPetrol) setPetrolInUse((savedPetrol.petrol_price_in_use as typeof petrolInUse) ?? null);
@@ -522,8 +553,22 @@ export function CompanySettings() {
       setSaved(true);
       toast.success('Company details saved');
       setTimeout(() => setSaved(false), 2000);
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to save company details');
+    } catch (e: unknown) {
+      // A 400 with field errors ({field: [msg]}): each shows under its field.
+      const data = (e as { data?: unknown } | null)?.data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const first = (v: unknown) => (Array.isArray(v) ? String(v[0]) : typeof v === 'string' ? v : null);
+        const errs = Object.fromEntries(Object.entries(data as Record<string, unknown>).map(([k, v]) => [k, first(v)]).filter(([, v]) => v)) as Record<string, string>;
+        if (errs.fuel_price_own) setOwnError(errs.fuel_price_own);
+        if (errs.fuel_price_petrol) setPetrolOwnError(errs.fuel_price_petrol);
+        const pricing = PRICING_ORDER.filter(f => errs[f]);
+        if (pricing.length) setPricingErrors(p => ({ ...p, ...Object.fromEntries(pricing.map(f => [f, errs[f]])) }));
+        setFieldErrors(errs);
+        const firstId = errs.fuel_price_own ? 'company-diesel-own' : errs.fuel_price_petrol ? 'company-petrol-own'
+          : pricing[0] ? PRICING_INPUT_ID[pricing[0]] : errs.minimum_charge ? 'company-minimum-charge' : errs.empty_return_min_km ? 'company-empty-return-min-km' : null;
+        if (firstId) document.getElementById(firstId)?.focus();
+      }
+      toast.error((e as { message?: string } | null)?.message || 'Failed to save company details');
     }
     setSaving(false);
   };
@@ -927,14 +972,18 @@ export function CompanySettings() {
               <div>
                 <label htmlFor="company-empty-return-min-km" style={labelStyle}>Charge empty return on trips over (km)</label>
                 <input id="company-empty-return-min-km" className="settings-control" style={inputStyle} type="number" min={0} max={5000}
-                  value={form.empty_return_min_km} onChange={e => set('empty_return_min_km', e.target.value)} />
+                  value={form.empty_return_min_km} onChange={e => set('empty_return_min_km', e.target.value)}
+                  aria-invalid={fieldErrors.empty_return_min_km ? true : undefined} aria-describedby="company-empty-return-min-km-err" />
+                {fieldErrors.empty_return_min_km && <div id="company-empty-return-min-km-err" role="alert" style={fieldErrorStyle}>{fieldErrors.empty_return_min_km}</div>}
               </div>
             )}
             {hasMinimumField && (
               <div>
                 <label htmlFor="company-minimum-charge" style={labelStyle}>Minimum charge</label>
                 <PricingInput id="company-minimum-charge" inputMode="decimal" decimals={2} prefix="R" placeholder="Not set"
-                  value={form.minimum_charge} onChange={v => set('minimum_charge', v)} onBlur={() => {}} isValid={() => true} error={null} describedBy="company-minimum-charge" />
+                  value={form.minimum_charge} onChange={v => { set('minimum_charge', v); if (fieldErrors.minimum_charge) setFieldErrors(p => ({ ...p, minimum_charge: '' })); }}
+                  onBlur={() => {}} isValid={raw => !raw || PLAIN_NUMBER.test(raw)} error={fieldErrors.minimum_charge || null} describedBy="company-minimum-charge-err" />
+                {fieldErrors.minimum_charge && <div id="company-minimum-charge-err" role="alert" style={fieldErrorStyle}>{fieldErrors.minimum_charge}</div>}
               </div>
             )}
             <div className="cs-pricing-grid__wide">
@@ -1011,7 +1060,7 @@ export function CompanySettings() {
                   </div>
                   {own ? (
                     <div style={{ marginTop: 8 }}>
-                      <PricingInput id="company-diesel-own" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="excl. VAT"
+                      <PricingInput id="company-diesel-own" ariaLabel="Your diesel price per litre, excl. VAT" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="excl. VAT"
                         value={form.fuel_price_own} onChange={v => { set('fuel_price_own', v); if (ownError && parseFloat(v) > 0) setOwnError(null); }}
                         onBlur={() => {}} isValid={() => true} error={ownError} describedBy="company-diesel-own-help" />
                       <div id="company-diesel-own-help">
@@ -1086,7 +1135,7 @@ export function CompanySettings() {
                   </div>
                   {own ? (
                     <div style={{ marginTop: 8 }}>
-                      <PricingInput id="company-petrol-own" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="excl. VAT"
+                      <PricingInput id="company-petrol-own" ariaLabel="Your petrol price per litre, excl. VAT" inputMode="decimal" decimals={2} prefix="R" suffix="/L" placeholder="excl. VAT"
                         value={form.fuel_price_petrol} onChange={v => { set('fuel_price_petrol', v); if (petrolOwnError && parseFloat(v) > 0) setPetrolOwnError(null); }}
                         onBlur={() => {}} isValid={() => true} error={petrolOwnError} describedBy="company-petrol-own-help" />
                       <div id="company-petrol-own-help">

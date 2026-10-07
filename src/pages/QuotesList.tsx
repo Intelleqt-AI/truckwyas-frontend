@@ -38,7 +38,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
-import { useSendCheck, sendBlockedMessage } from '@/lib/quoteWarnings';
+import { useSendCheck, sendBlockedMessage, quoteIncomplete } from '@/lib/quoteWarnings';
 import LossReasonDialog from '@/components/LossReasonDialog';
 import { formatPct, lossReasonPayload, roundHalfAway } from '@/lib/pricing';
 import { rowLink } from '@/lib/rowLink';
@@ -126,7 +126,9 @@ function QuoteCardBody({ quote }: { quote: any }) {
       <div className="bk-qcard__customer" title={quote.customer_name || ''}>{quote.customer_name || '—'}</div>
       <div className="bk-qcard__route" title={routeOf(quote)}>{routeOf(quote)}</div>
       <div className="bk-qcard__foot">
-        <span className="bk-qcard__amount" title={`${formatCurrency(priceInclVat(quote))} incl. VAT`}>{formatMoneyWhole(priceInclVat(quote))}</span>
+        {quoteIncomplete(quote)
+          ? <span className="bk-qcard__amount bk-muted" title="No price yet: its costs aren't complete">Incomplete</span>
+          : <span className="bk-qcard__amount" title={`${formatCurrency(priceInclVat(quote))} incl. VAT`}>{formatMoneyWhole(priceInclVat(quote))}</span>}
         {/* Expired, else the date it was made. (No "Low confidence": the
             builder saves a fixed confidence, so it carried no signal.) */}
         {boardStage(quote) === 'EXPIRED' && quote.valid_until
@@ -441,7 +443,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   // One stage definition everywhere (R5): the board's, shared with Home.
   const isMarkedLost = (q: any) => String(q.status).toUpperCase() === 'SENT' && boardStage(q) === 'DECLINED';
   const movedLost = flattenColumn(sentQ).items.filter(isMarkedLost);
-  const amountOf = (q: any) => priceInclVat(q);
+  // An incomplete quote (no price yet) adds nothing to a total.
+  const amountOf = (q: any) => (quoteIncomplete(q) ? 0 : priceInclVat(q));
   const movedLostTotal = movedLost.reduce((n: number, q: any) => n + amountOf(q), 0);
   // R8: a Draft or Sent quote past its valid-until date is Expired (the same
   // boardStage rule as Home's pipeline). Without a search the exact set comes
@@ -957,9 +960,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                         </td>
                       );
                     })()}
-                    <td className="is-money bk-col-amount" title={`${formatCurrency(priceInclVat(quote))} incl. VAT`}>
+                    <td className="is-money bk-col-amount" title={quoteIncomplete(quote) ? "No price yet" : `${formatCurrency(priceInclVat(quote))} incl. VAT`}>
                       {/* Lists show whole rands; the quote itself carries the cents (R7). */}
-                      {formatMoneyWhole(priceInclVat(quote))}
+                      {quoteIncomplete(quote) ? <span className="bk-muted">—</span> : formatMoneyWhole(priceInclVat(quote))}
                     </td>
                     {anyAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
                       {!!bookedLoadOf(quote) && (

@@ -49,7 +49,8 @@ export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send 
   const navigate = useNavigate();
   const company = (user?.company_name as string | undefined) || 'TruckWys';
   const email = quote.customer_email === undefined ? undefined : (quote.customer_email ? String(quote.customer_email) : null);
-  const amount = quote.total_amount == null || quote.total_amount === '' ? null : Number(quote.total_amount);
+  // No price yet (incomplete costs) reads "—", never "R 0".
+  const amount = quote.total_amount == null || quote.total_amount === '' || !(Number(quote.total_amount) > 0) ? null : Number(quote.total_amount);
   const vat = quote.customer_price || null;
   const from = quote.pickup_location || quote.origin;
   const to = quote.delivery_location || quote.destination;
@@ -68,7 +69,7 @@ export default function QuoteSendPreview({ quote, sending, confirmLabel = 'Send 
     ...(from || to ? [{ label: 'Route', value: `${from || '—'} to ${to || '—'}` }] : []),
     ...(quote.pickup_date ? [{ label: 'Collection', value: safeDate(quote.pickup_date) }] : []),
     ...(amount == null || Number.isNaN(amount)
-      ? [{ label: 'Price', value: '—' }]
+      ? [{ label: 'Price', value: 'Incomplete' }]
       : !vat
         ? [{ label: 'Price', value: `${formatCurrency(amount)} excl. VAT` }]
         : vat.vat_registered

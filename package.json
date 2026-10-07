@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types scripts/test-quote-golden.mjs && node --experimental-strip-types scripts/test-quote-rules.mjs && node --experimental-strip-types scripts/test-diesel-price.mjs && node --experimental-strip-types scripts/test-diesel-short.mjs && node --experimental-strip-types scripts/test-blob-error.mjs"
+    "test": "node --experimental-strip-types scripts/test-quote-golden.mjs && node --experimental-strip-types scripts/test-quote-rules.mjs && node --experimental-strip-types scripts/test-diesel-price.mjs && node --experimental-strip-types scripts/test-diesel-short.mjs && node --experimental-strip-types scripts/test-blob-error.mjs && node --experimental-strip-types scripts/test-quote-status.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

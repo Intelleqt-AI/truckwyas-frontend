@@ -11,9 +11,10 @@ import { toast } from "@/lib/toast";
 import { formatCurrency, formatMoneyWhole, formatNumber, formatDateTime, sentenceCaseLabel } from "@/lib/formatters";
 import { DatePicker } from "@/components/ui/date-picker";
 import { fuelInputFor, fuelKind, dieselSourceNote, randPerLitre, currentPeriodStartIso, isoDay, type QuoteWarning } from "@/lib/dieselPrice";
-import { compute, changesSincePriced, suggestTruck, capacityTonnes, vehicleClass, CLASS_OPERATING_DEFAULTS, cents, type CostingInputs, type DieselInput } from "@/lib/quoteRules";
+import { compute, changesSincePriced, fmtNum, suggestTruck, capacityTonnes, vehicleClass, CLASS_OPERATING_DEFAULTS, cents, type CostingInputs, type DieselInput } from "@/lib/quoteRules";
 import { useCostBreakdown } from "@/components/pricing/useCostBreakdown";
 import { sendBlockedMessage, SEND_CHECK_KEY } from "@/lib/quoteWarnings";
+import { ownDieselImpactText } from "@/lib/quoteStatus";
 import { LocationInput, type LocationCoords } from "@/components/LocationInput";
 import { RouteMapView } from "@/components/RouteMapView";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -164,6 +165,8 @@ function InfoPop({ label, title, rows, total }: { label: string; title: string; 
 
 /** §10: one line per screen — the first warning's title and its first action;
  *  every warning's detail on tap. Block warnings first. */
+const impactText = ownDieselImpactText;
+
 function WarnLine({ list, onAction }: { list: QuoteWarning[]; onAction: (id: string) => void }) {
   const sorted = [...list].sort((a, b) => (a.severity === "block" ? 0 : 1) - (b.severity === "block" ? 0 : 1));
   const w = sorted[0];
@@ -174,13 +177,13 @@ function WarnLine({ list, onAction }: { list: QuoteWarning[]; onAction: (id: str
       <AlertTriangle size={13} aria-hidden="true" className="qb-warn__icon" />
       <Popover>
         <PopoverTrigger asChild>
-          <button type="button" className="qb-warn__title">{w.title}{sorted.length > 1 ? <span className="qb-warn__more"> +{sorted.length - 1} more</span> : null}</button>
+          <button type="button" className="qb-warn__title">{w.title}{impactText(w) ? <span className="qb-warn__more"> · {impactText(w)!.replace(" on this quote.", "")}</span> : null}{sorted.length > 1 ? <span className="qb-warn__more"> +{sorted.length - 1} more</span> : null}</button>
         </PopoverTrigger>
         <PopoverContent align="start" className="qb-pop qb-pop--warn">
           {sorted.map((x) => (
             <div key={x.code} className="qb-pop__warn">
               <div className={`qb-pop__warn-title is-${x.severity}`}>{x.title}</div>
-              {x.detail && <div className="qb-pop__warn-detail">{x.detail}</div>}
+              {(x.detail || impactText(x)) && <div className="qb-pop__warn-detail">{[x.detail, impactText(x)].filter(Boolean).join(" ")}</div>}
               {x.actions.length > 0 && (
                 <div className="qb-pop__warn-actions">
                   {x.actions.map(a => <button key={a.id} type="button" className="qb-linkbtn" onClick={() => onAction(a.id)}>{a.label}</button>)}
@@ -229,8 +232,6 @@ interface RouteData {
 // state or any calculation) ----
 /** Vehicle capacity at render: "20 t", "7,5 t" (house style, not "20.00t"). */
 const capLabel = (c: unknown) => `${formatNumber(Number(c), { maximumFractionDigits: 1 })}\u00a0t`;
-/** One-decimal figure in house style: "32,6". */
-const oneDp = (n: number) => formatNumber(n, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 /** True below a width (presentation only: picks a shorter placeholder). */
 function useNarrow(maxPx: number) {
   const q = `(max-width: ${maxPx}px)`;
@@ -562,7 +563,8 @@ export default function QuoteBuilder() {
     include_empty_return: returnLoadBooked ? false : null,
     settings: si?.settings ?? {
       include_empty_return_default: companyProfile?.include_empty_return_default ?? true,
-      empty_return_min_km: Number(companyProfile?.empty_return_min_km) > 0 ? Number(companyProfile.empty_return_min_km) : null,
+      // 0 is a real setting (every one-way trip): only a missing value is null.
+      empty_return_min_km: companyProfile?.empty_return_min_km != null && companyProfile.empty_return_min_km !== "" && Number.isFinite(Number(companyProfile.empty_return_min_km)) ? Number(companyProfile.empty_return_min_km) : null,
     },
     minimum_charge: minimumCharge,
     target_margin_pct: si?.target_margin_pct ?? (companyProfile?.margin_target_pct != null && companyProfile.margin_target_pct !== "" ? Number(companyProfile.margin_target_pct) : null),
@@ -765,7 +767,8 @@ export default function QuoteBuilder() {
         const legacy = `${(Number(q.weight) || 0) / 1000}t ${q.vehicle_type || ""}`.trim();
         setCargo(/^not specified$/i.test(c) || c === legacy ? "" : c); } setNotes(q.notes || "");
       // The saved driver figure is the quote's own (kept, not re-prefilled).
-      if (q.driver_allowance != null) { setDriverAllowanceInput(String(Number(q.driver_allowance))); setDriverEdited(true); }
+      // A typed driver figure comes back as typed; otherwise nights × allowance again.
+      if (q.driver_allowance != null && q.costing_inputs?.driver_cost_is_override === true) { setDriverAllowanceInput(String(Number(q.driver_allowance))); setDriverEdited(true); }
       // Theirs (53856f8): the stored pricing decision describes this quote only
       // while its final price still equals the quote's total (to 50 cents,
       // QuoteDetail's rule) and the server hasn't marked it stale. Otherwise
@@ -842,7 +845,12 @@ export default function QuoteBuilder() {
       setStops(d.stops.map((st: { location: string; coords: LocationCoords }, i: number) => ({ id: `resumed-${i}`, location: st.location, coords: st.coords })));
       setStopsExpanded(true);
     }
-    if (d.tolls != null) { setEditableTollCost(String(d.tolls)); setTollManuallyEdited(true); }
+    if (d.tolls != null && (d.tollsSource ?? "manual") === "manual") { setEditableTollCost(String(d.tolls)); setTollManuallyEdited(true); }
+    if (d.aiToll && Number(d.aiToll.oneWay) > 0) setAiToll(d.aiToll);
+    if (d.aiFuel && Number(d.aiFuel.pricePerL) > 0) setAiFuel(d.aiFuel);
+    if (d.useOfficialDiesel === true) setUseOfficialDiesel(true);
+    if (d.distanceConfirmed === true) setDistanceConfirmed(true);
+    if (typeof d.border === "string" && d.border !== "") setBorderTyped(d.border);
     if (d.driver != null) { setDriverAllowanceInput(String(d.driver)); setDriverEdited(true); }
     if (Number(d.price) > 0) setPriceSet(Number(d.price));
     if (typeof d.returnLoadBooked === "boolean") setReturnLoadBooked(d.returnLoadBooked);
@@ -896,6 +904,9 @@ export default function QuoteBuilder() {
           pickupDate, deliveryDate, validUntil, stops: stops.filter(st => st.coords).map(st => ({ location: st.location, coords: st.coords })),
           tolls: tollManuallyEdited ? editableTollCost : null, driver: driverEdited ? driverAllowanceInput : null,
           price: priceSet, returnLoadBooked, tollsNone,
+          // Restored as they were (never "manual" unless typed).
+          tollsSource: tollManuallyEdited ? "manual" : aiToll ? "market_check" : "route", aiToll, aiFuel,
+          useOfficialDiesel, distanceConfirmed, border: borderTyped,
         }));
         setLastSavedAt(new Date());
       } catch { /* ignore */ }
@@ -905,7 +916,8 @@ export default function QuoteBuilder() {
     return () => { if (draftRef.current) clearTimeout(draftRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType,
-    pickupDate, deliveryDate, validUntil, stops, tollManuallyEdited, editableTollCost, driverEdited, driverAllowanceInput, priceSet, returnLoadBooked, tollsNone]);
+    pickupDate, deliveryDate, validUntil, stops, tollManuallyEdited, editableTollCost, driverEdited, driverAllowanceInput, priceSet, returnLoadBooked, tollsNone,
+    aiToll, aiFuel, useOfficialDiesel, distanceConfirmed, borderTyped]);
 
   // Runs its cleanup ONLY on true unmount (empty deps) — unlike the effect
   // above, whose cleanup also fires on every keystroke as it re-debounces.
@@ -1207,6 +1219,10 @@ export default function QuoteBuilder() {
     vehicle_type_id: selectedVT?.id != null ? Number(selectedVT.id) : null,
     duration_minutes: durationMin != null ? Math.round(Number(durationMin)) : null,
     toll_cost_one_way: tollsOneWay != null ? round2(tollsOneWay) : null,
+    // The border line (all legs): additional_charges can't be read back as it.
+    border_cost: crossBorderCost > 0 ? round2(crossBorderCost) : null,
+    // The saved driver figure is the user's only when they typed it.
+    driver_cost_is_override: driverEdited,
   };
   // Valid until: as set, else today + the company's quote validity.
   const validUntilToSave = validUntil || (() => {
@@ -1331,7 +1347,7 @@ export default function QuoteBuilder() {
       case "enter_driver_cost": document.getElementById("qb-driver-input")?.focus(); break;
       case "enter_weight": document.getElementById("qb-weight-input")?.focus(); break;
       case "choose_vehicle": document.getElementById("qb-truck-select")?.focus(); break;
-      case "edit_vehicle": case "add_vehicle": navigate("/fleet/vehicles"); break;
+      case "edit_vehicle": case "add_vehicle": window.open("/settings/vehicle-types", "_blank", "noopener"); break;
       case "use_minimum": if (minimumCharge != null) applyPrice(minimumCharge); break;
       case "reprice": if (reopenNotice?.reprice != null) { applyPrice(reopenNotice.reprice); setReopenNotice(null); } break;
       case "keep_price": setReopenNotice(null); break;
@@ -1619,7 +1635,7 @@ export default function QuoteBuilder() {
           same template and gap, so field edges line up row to row. */}
       <div className="qb-grid qb-grid--inputs" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16, marginBottom: 16 }}>
         <div>
-          <div style={fieldLabelS}><span>Client<Req /></span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New client" onClick={() => navigate("/customers")}><Plus size={12} aria-hidden="true" />New</button>}</div>
+          <div style={fieldLabelS}><span>Client<Req /></span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New client (opens in a new tab)" onClick={() => window.open("/customers", "_blank", "noopener")}><Plus size={12} aria-hidden="true" />New</button>}</div>
           <div className="qb-select">
             <select value={customerId} onChange={e => setCustomerId(e.target.value)} style={inputS} data-empty={customerId ? undefined : ""} aria-label="Client">
               <option value="">Select client…</option>
@@ -1672,7 +1688,7 @@ export default function QuoteBuilder() {
             </div>
           ))}
           <div className="qb-vehicle">
-            <div style={fieldLabelS}><span>Truck</span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New vehicle type" onClick={() => navigate("/fleet/vehicles")}><Plus size={12} aria-hidden="true" />New</button>}</div>
+            <div style={fieldLabelS}><span>Truck</span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New vehicle type (opens in a new tab)" onClick={() => window.open("/settings/vehicle-types", "_blank", "noopener")}><Plus size={12} aria-hidden="true" />New</button>}</div>
             <div className="qb-select">
             {/* §3: always a real truck. "" = the suggested one for the load. */}
             <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS} aria-label="Truck" id="qb-truck-select">
@@ -1689,7 +1705,7 @@ export default function QuoteBuilder() {
           <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span id="qb-trip-label">Trip</span></div>
             {/* The shared segmented control: neutral track, raised active option. */}
             <div className="tw-seg tw-seg--block qb-trip" role="group" aria-labelledby="qb-trip-label">
-              {(["ONE_WAY", "ROUND_TRIP"] as const).map(t => <button key={t} type="button" onClick={() => setTripType(t)} aria-pressed={tripType === t} className={`tw-seg__opt${tripType === t ? " is-active" : ""}`}>{t === "ONE_WAY" ? "One way" : <><span className="qb-trip-long">Round trip, loaded</span><span className="qb-trip-short">Round, loaded</span></>}</button>)}
+              {(["ONE_WAY", "ROUND_TRIP"] as const).map(t => <button key={t} type="button" onClick={() => setTripType(t)} aria-pressed={tripType === t} aria-label={t === "ONE_WAY" ? "One way" : "Round trip, loaded both ways"} className={`tw-seg__opt${tripType === t ? " is-active" : ""}`}>{t === "ONE_WAY" ? "One way" : <><span className="qb-trip-long">Round trip, loaded</span><span className="qb-trip-short">Round, loaded</span></>}</button>)}
             </div>
           </div>
         </div>
@@ -1783,9 +1799,9 @@ export default function QuoteBuilder() {
                     [fuelPriceKind === "Petrol" ? `Petrol${costing.diesel.grade ? ` ${costing.diesel.grade}` : ""}` : fuelPriceKind,
                       fuelPricePerL != null ? `${randPerLitre(fuelPricePerL)}/${fuelPriceKind === "Electric" ? "kWh" : "L"}` : "Missing"],
                     ...(fuelPricePerL != null ? [["Source", aiFuelActive ? "price check" : !hasOfficialFuel ? "your price" : dieselSourceNote(costing.diesel)] as [string, string]] : []),
-                    ["Burn", fuelConsumption != null ? `≈ ${oneDp(fuelConsumption)} L/100 km` : "Not set"],
+                    ["Burn", fuelConsumption != null ? `≈ ${fmtNum(fuelConsumption, 1)} L/100 km` : "Not set"],
                     ["Distance", `${formatNumber(Math.round(chargeDistance))} km${legs === 2 ? " (both ways)" : ""}`],
-                    ["Litres", fuelConsumption != null ? `≈ ${formatNumber(Math.round(fuelLitres))} L` : "—"],
+                    ["Litres", fuelConsumption != null ? `≈ ${fmtNum(fuelLitres)} L` : "—"],
                   ]} total={lineAmt("fuel") != null ? ["Fuel", money(fuelCost)] : undefined} />
                   {aiFuelActive && <button type="button" className="qb-linkbtn" onClick={() => setAiFuel(null)}>Reset</button>}
                   {useOfficialDiesel && <button type="button" className="qb-linkbtn" onClick={() => setUseOfficialDiesel(false)}>Use mine</button>}

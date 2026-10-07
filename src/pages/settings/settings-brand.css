@@ -240,3 +240,7 @@ table.settings-table.is-inset :is(th, td):last-child { padding-right: 0; }
 .cs-affix.has-suffix input { padding-right: 44px !important; }
 .cs-affix input::placeholder { color: var(--text-tertiary); opacity: 1; }
 .cs-affix.is-invalid input { border-color: var(--status-danger) !important; }
+/* Toasts sit above the sticky save bar, never over it. */
+body:has(.cs-savebar) .Toastify__toast-container--bottom-right,
+body:has(.cs-savebar) .Toastify__toast-container--bottom-center,
+body:has(.cs-savebar) .Toastify__toast-container--bottom-left { bottom: 88px; }

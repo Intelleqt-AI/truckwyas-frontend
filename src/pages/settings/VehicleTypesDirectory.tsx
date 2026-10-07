@@ -372,13 +372,13 @@ export function VehicleTypesDirectory() {
               { key: 'capacity', label: 'Payload (tonnes)', type: 'number', required: false },
               { key: 'base_rate', label: 'Base rate (R/km)', type: 'number', required: false },
               { key: 'fuel_consumption_l_per_100km', label: 'Fuel consumption (L/100km)', type: 'number', required: false },
-              { key: 'fuel_consumption_sensitivity_pct', label: 'Fuel sensitivity (%/ton over capacity)', type: 'number', required: false },
             ] as const).map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>
+                <label style={labelStyle} htmlFor={`vt-create-${f.key}`}>
                   {f.label}{f.required && <span style={{ color: 'var(--status-danger-text)' }}> *</span>}
                 </label>
                 <input
+                  id={`vt-create-${f.key}`}
                   className="settings-control"
                   type={f.type}
                   value={(form as any)[f.key]}
@@ -388,24 +388,24 @@ export function VehicleTypesDirectory() {
                 />
                 {f.key === 'base_rate' && (
                   <p id="create-base-rate-help" style={{ margin: '4px 0 0', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                    Used to prefill quotes for this vehicle type. Check the rate on each quote.
+                    For reference: quotes price from your costs and target margin.
                   </p>
                 )}
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Fuel type</label>
+              <label style={labelStyle} htmlFor="vt-create-fuel-type">Fuel type</label>
               <Select value={form.fuel_type} onValueChange={val => setForm(prev => ({ ...prev, fuel_type: val }))}>
-                <SelectTrigger style={inputStyle}><SelectValue /></SelectTrigger>
+                <SelectTrigger id="vt-create-fuel-type" style={inputStyle}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {FUEL_TYPE_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Status</label>
+              <label style={labelStyle} htmlFor="vt-create-status">Status</label>
               <Select value={form.active} onValueChange={val => setForm(prev => ({ ...prev, active: val }))}>
-                <SelectTrigger style={inputStyle}><SelectValue /></SelectTrigger>
+                <SelectTrigger id="vt-create-status" style={inputStyle}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="true">Active</SelectItem>
                   <SelectItem value="false">Inactive</SelectItem>
@@ -459,11 +459,11 @@ export function VehicleTypesDirectory() {
               { key: 'capacity', label: 'Payload (tonnes)', type: 'number' },
               { key: 'base_rate', label: 'Base rate (R/km)', type: 'number' },
               { key: 'fuel_consumption_l_per_100km', label: 'Fuel consumption (L/100km)', type: 'number' },
-              { key: 'fuel_consumption_sensitivity_pct', label: 'Fuel sensitivity (%/ton over capacity)', type: 'number' },
             ] as const).map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>{f.label}</label>
+                <label style={labelStyle} htmlFor={`vt-edit-${f.key}`}>{f.label}</label>
                 <input
+                  id={`vt-edit-${f.key}`}
                   className="settings-control"
                   type={f.type}
                   value={editForm[f.key]}
@@ -473,24 +473,24 @@ export function VehicleTypesDirectory() {
                 />
                 {f.key === 'base_rate' && (
                   <p id="edit-base-rate-help" style={{ margin: '4px 0 0', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                    Used to prefill quotes for this vehicle type. Check the rate on each quote.
+                    For reference: quotes price from your costs and target margin.
                   </p>
                 )}
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Fuel type</label>
+              <label style={labelStyle} htmlFor="vt-edit-fuel-type">Fuel type</label>
               <Select value={editForm.fuel_type} onValueChange={val => setEditForm(prev => ({ ...prev, fuel_type: val }))}>
-                <SelectTrigger style={inputStyle}><SelectValue /></SelectTrigger>
+                <SelectTrigger id="vt-edit-fuel-type" style={inputStyle}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {FUEL_TYPE_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Status</label>
+              <label style={labelStyle} htmlFor="vt-edit-status">Status</label>
               <Select value={editForm.active} onValueChange={val => setEditForm(prev => ({ ...prev, active: val }))}>
-                <SelectTrigger style={inputStyle}><SelectValue /></SelectTrigger>
+                <SelectTrigger id="vt-edit-status" style={inputStyle}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="true">Active</SelectItem>
                   <SelectItem value="false">Inactive</SelectItem>

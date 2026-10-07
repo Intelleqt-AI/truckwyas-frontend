@@ -15,6 +15,7 @@ import { STALE_AFTER_DAYS, staleAction, staleLabel, staleLoads, staleWork } from
 import { fetchData } from '@/lib/Api';
 import { resolvePeriod, periodText, type Ledger } from '@/components/reports/data';
 import { marginFromLedger } from './margin-ledger';
+import { dieselShortRows } from './dieselShort';
 
 // ---------------------------------------------------------------- fetching
 
@@ -67,11 +68,13 @@ export interface LoadRec {
 export interface QuoteRec {
   id: number; quote_number: string; customer_name: string; status: string; total_amount: string | number;
   fuel_surcharge: string | number | null; fuel_price_at_creation: string | number | null; valid_until: string | null;
+  /** §9 snapshot (null on quotes saved before it). */
+  fuel_official_at_pricing?: string | number | null; fuel_zone?: string | null; fuel_litres?: string | number | null;
   pickup_location?: string; delivery_location?: string;
 }
 export interface FinanceRec { total_revenue?: number; total_expenses?: number }
 export interface FuelRec { inland_price?: number; coastal_price?: number; date?: string; last_updated?: string; source?: string }
-export interface CompanyRec { fuel_zone?: string; fuel_price_per_litre?: string | number | null }
+export interface CompanyRec { fuel_zone?: string; fuel_price_per_litre?: string | number | null; fuel_price_mode?: string | null; fuel_price_own?: string | number | null }
 export interface CashflowWeek { period: string; start_date: string; end_date: string; expected_in: number | string; expected_out: number | string }
 export interface CashflowRec { forecast?: CashflowWeek[] }
 
@@ -373,39 +376,31 @@ export function computeFindings(input: FindingInputs, now = new Date()): Finding
   }
 
   // 7. Quotes priced on old diesel ----------------------------------------
+  // Like for like (§9): each quote's official-at-pricing price, zone and
+  // litres against today's official price for that zone (dieselShort.ts).
   if (input.quotes && input.fuel) {
     const zone = (input.company?.fuel_zone || 'INLAND').toUpperCase();
+    const officialByZone = { INLAND: num(input.fuel.inland_price) || null, COASTAL: num(input.fuel.coastal_price) || null };
     const official = num(zone === 'COASTAL' ? input.fuel.coastal_price : input.fuel.inland_price);
     const loadByQuote = new Map((input.loads?.rows ?? []).filter(l => l.quote != null).map(l => [l.quote!, l]));
     const todayIso = saDateISO(today)!;
-    const rows = official > 0 ? input.quotes.rows.map(q => {
-      const st = (q.status || '').toUpperCase();
-      const price = num(q.fuel_price_at_creation); const fuel = num(q.fuel_surcharge);
-      if (price <= 0 || fuel <= 0) return null;
+    const rows = dieselShortRows(input.quotes.rows, officialByZone, todayIso, (q) => {
       const load = loadByQuote.get(q.id);
-      const done = load && ['DELIVERED', 'INVOICED', 'CANCELLED', 'COMPLETED'].includes((load.status || '').toUpperCase());
-      const live = (st === 'ACCEPTED' && !done) || (st === 'SENT' && !!q.valid_until && q.valid_until >= todayIso);
-      const delta = official - price;
-      if (!live || delta < 0.2) return null;
-      const litres = fuel / price;
-      return { q, price, litres, short: litres * delta };
-    }).filter(Boolean) as { q: QuoteRec; price: number; litres: number; short: number }[] : [];
+      return !(load && ['DELIVERED', 'INVOICED', 'CANCELLED', 'COMPLETED'].includes((load.status || '').toUpperCase()));
+    });
     const total = rows.reduce((s, r) => s + r.short, 0);
     if (rows.length && total >= THRESHOLD) {
       const lo = Math.min(...rows.map(r => r.price));
-      // Company settings shows the live zone price while the saved diesel is
-      // still the 23,50 factory default (CompanySettings loadLivePrice), so a
-      // default is not "your setting": only a price the company chose is quoted.
-      const saved = num(input.company?.fuel_price_per_litre);
-      const setting = saved > 0 && Math.abs(saved - 23.5) >= 0.001 ? saved : 0;
+      // Only a price the company set itself (§1 OWN) is "your setting".
+      const setting = input.company?.fuel_price_mode === 'OWN' ? num(input.company?.fuel_price_own) : 0;
       out.push({
         id: 'diesel', kind: 'diesel', category: 'Quote better', basis: 'Estimated', confidence: 'high',
         severity: 'medium',
         amount: total,
         headline: 'Quotes short on diesel',
-        line: `Diesel is ${perLitre(official)}/L; ${rows.length === 1 ? `this quote used ${perLitre(lo)}` : `these quotes used from ${perLitre(lo)}`}.${setting > 0 && Math.abs(setting - official) > 0.5 ? ` Your setting: ${perLitre(setting)}.` : ''}`,
+        line: `Diesel is ${perLitre(official)}/L; ${rows.length === 1 ? `this quote was priced at ${perLitre(lo)}` : `these quotes were priced from ${perLitre(lo)}`}.${setting > 0 && Math.abs(setting - official) > 0.5 ? ` Your setting: ${perLitre(setting)}.` : ''}`,
         action: { label: 'Update your diesel price', href: '/settings/company' },
-        method: `Accepted quotes not yet delivered, and sent quotes still valid. Litres = the quote's fuel line divided by the diesel price it used. Shortfall = litres x (today's ${zone === 'COASTAL' ? 'coastal' : 'inland'} 50ppm price ${perLitre(official)}${input.fuel.source ? `, ${input.fuel.source}` : ''} less the quote's price). An estimate.`,
+        method: `Accepted quotes not yet delivered, and sent quotes still valid. Litres = the litres priced into the quote. Shortfall = litres x (today's official 50ppm price for the quote's zone${input.fuel.source ? `, ${input.fuel.source}` : ''} less the official price when it was priced). Quotes saved before pricing snapshots are left out. An estimate.`,
         evidence: rows.sort((a, b) => b.short - a.short).map(r => ({
           id: `q-${r.q.id}`, ref: r.q.quote_number, label: r.q.customer_name,
           note: `${Math.round(r.litres)} L at ${perLitre(r.price)}`, amount: r.short, href: `/bookings/quotes/${r.q.id}`,

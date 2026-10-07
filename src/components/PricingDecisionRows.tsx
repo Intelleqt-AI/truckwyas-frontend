@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { formatMoneyWhole } from '@/lib/formatters';
-import { MARKET_RANGE_LABEL, formatRand } from '@/lib/pricing';
+import { MARKET_RANGE_LABEL } from '@/lib/pricing';
 import type { DecisionView } from '@/lib/pricingDecision';
 
 // "R 34–46k": a rough estimate is shown as roughly as it is known.
@@ -69,10 +69,6 @@ export default function PricingDecisionRows({ decision, marginInHeader = false, 
           )}
         </>
       )}
-      {d.margin && marginInHeader && d.floor !== null && (
-        // The figure is in the card's header; here only how it is made.
-        <p className="qd-decision__src qd-decision__src--formula">Margin = {formatRand(d.finalPrice)} price − {money(d.floor)} cost floor</p>
-      )}
       {d.margin && !marginInHeader && (
         <>
           <div className="bk-kv">
@@ -81,11 +77,6 @@ export default function PricingDecisionRows({ decision, marginInHeader = false, 
               {money(d.margin.amount)}{d.margin.pct !== null ? ` · ${d.margin.pct}%` : ''}
             </span>
           </div>
-          {d.floor !== null && (
-            <p className="qd-decision__src">
-              Margin = {formatRand(d.finalPrice)} price − {money(d.floor)} cost floor
-            </p>
-          )}
         </>
       )}
       {d.market && (
@@ -96,16 +87,16 @@ export default function PricingDecisionRows({ decision, marginInHeader = false, 
               <span className="bk-kv__label">Rough SA estimate</span>
               <span className="bk-kv__value">{roughRange(d.market.low, d.market.high)}</span>
             </div>
-            <p className="qd-decision__src">Not market data. It wasn't used for the prices.</p>
+            <p className="qd-decision__src">Not used.</p>
           </>
         ) : (
           <>
             <div className="bk-kv">
-              <span className="bk-kv__label">{MARKET_RANGE_LABEL}</span>
+              <span className="bk-kv__label" title={MARKET_RANGE_LABEL}>Market</span>
               {/* Market figures to the nearest R 100, as in the builder. */}
               <span className="bk-kv__value">{money(round100(d.market.low))} to {money(round100(d.market.high))}</span>
             </div>
-            <p className="qd-decision__src">{sourceLine(d.market.label)}</p>
+            {d.market.label && <p className="qd-decision__src" title={d.market.label}>{sourceLine(sourceParts(d.market.label).slice(0, 2).join(' · '))}</p>}
           </>
         )
       )}

@@ -38,6 +38,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
+import { useSendCheck, sendBlockedMessage } from '@/lib/quoteWarnings';
 import LossReasonDialog from '@/components/LossReasonDialog';
 import { formatPct, lossReasonPayload, roundHalfAway } from '@/lib/pricing';
 import { rowLink } from '@/lib/rowLink';
@@ -381,6 +382,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   // Dragging a card into Sent emails the customer (the server sends on the
   // status change), so it is previewed and confirmed first.
   const [pendingSend, setPendingSend] = useState<{ quote: any; oldColumn: string } | null>(null);
+  // §11: the server's send check for the quote being sent (block / warn).
+  const sendWarnings = useSendCheck(pendingSend ? pendingSend.quote.id : null, pendingSend?.quote);
   // Dropped on Declined: an optional loss reason first.
   const [pendingDecline, setPendingDecline] = useState<{ quote: any; oldColumn: string } | null>(null);
 
@@ -513,8 +516,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       status === 'DECLINED' || status === 'ACCEPTED'
         ? patchData({ url: `api/v1/quotes/${id}/update_status/`, data: { status, ...(extra || {}) } })
         : patchData({ url: `api/v1/quotes/${id}/`, data: { status } }),
-    onError: () => {
-      toast.error('Failed to update quote status.');
+    onError: (err: unknown) => {
+      toast.error(sendBlockedMessage(err) || 'Failed to update quote status.');
     },
   });
 
@@ -1013,6 +1016,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       {pendingSend && (
         <QuoteSendPreview
           quote={pendingSend.quote}
+          warnings={sendWarnings}
           sending={statusMutation.isPending}
           onCancel={() => setPendingSend(null)}
           onConfirm={() => {

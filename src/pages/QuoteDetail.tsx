@@ -16,6 +16,8 @@ import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
 import { Download, FileSearch } from 'lucide-react';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
+import { useSendCheck, sendBlockedMessage } from '@/lib/quoteWarnings';
+import { randPerLitre, longDate } from '@/lib/dieselPrice';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import SectionHeader from '@/components/layout/SectionHeader';
 import { StatusChip, statusMeta } from '@/components/ui/StatusChip';
@@ -142,6 +144,8 @@ export default function QuoteDetail() {
   useFocusTrap(latestModal, showOutcomeModal && !!outcomeType);
   // Sending (button or status change to Sent) emails the customer: preview first.
   const [sendPreview, setSendPreview] = useState<'button' | 'status' | null>(null);
+  // §11: the server's send check (block / warn), fetched when a send opens.
+  const sendWarnings = useSendCheck(sendPreview ? id : null, quote);
 
   const quoteFailed = loadFailed(quoteQuery);
   const quoteError = (quoteQuery.error ?? quoteQuery.failureReason) as { status?: number } | null;
@@ -195,6 +199,9 @@ export default function QuoteDetail() {
         return old?.results ? { ...old, results: updated } : updated;
       });
     },
+    onError: (error: unknown) => {
+      toast.error(sendBlockedMessage(error) || (error as { message?: string } | null)?.message || "Couldn't change the status");
+    },
   });
 
   const sendToCustomerMutation = useMutation({
@@ -225,7 +232,7 @@ export default function QuoteDetail() {
       });
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to generate share link');
+      toast.error(sendBlockedMessage(error) || error?.message || 'Failed to generate share link');
     },
   });
 
@@ -435,13 +442,20 @@ export default function QuoteDetail() {
     : lapsed ? 'expired'
     : validUntil > Date.now() && validUntil - Date.now() < 48 * 3600_000 ? `${Math.ceil((validUntil - Date.now()) / 3600_000)} h left`
     : null;
-  // Fuel: a compact note built from the numbers, in the house format.
+  // Fuel: one line, the sign read from the figure (up or down).
   const fuelDelta = Number(fuelAlert?.fuel_delta_zar);
   const fuelImpact = Number(fuelAlert?.estimated_cost_impact);
   const fuelNote = fuelAlert?.has_alert
-    ? (Number.isFinite(fuelDelta) && Number.isFinite(fuelImpact)
-      ? `Diesel is up ${formatMoney(fuelDelta)}/L since this quote was made, so the job costs about ${formatMoneyWhole(fuelImpact)} more.`
+    ? (Number.isFinite(fuelDelta) && Number.isFinite(fuelImpact) && Math.abs(fuelDelta) >= 0.005
+      ? `Diesel ${fuelDelta > 0 ? 'up' : 'down'} ${formatMoney(Math.abs(fuelDelta))}/L since quoted: about ${formatMoneyWhole(Math.abs(fuelImpact))} ${fuelDelta > 0 ? 'more' : 'less'}.`
       : normaliseFigures(fuelAlert.message))
+    : null;
+  // §11 / PDF: "Priced on diesel R 32,80/L (official inland, 7 Oct 2026)."
+  const pricedOn = Number(quote.fuel_price_used) > 0
+    ? `Priced on diesel ${randPerLitre(Number(quote.fuel_price_used))}/L (${[
+        quote.fuel_price_source === 'own' ? 'your price' : quote.fuel_price_source === 'override' ? 'set on quote' : 'official',
+        quote.fuel_price_source === 'official' || !quote.fuel_price_source ? (quote.fuel_zone === 'COASTAL' ? 'coastal' : 'inland') : null,
+      ].filter(Boolean).join(' ')}${quote.priced_at ? `, ${longDate(quote.priced_at)}` : ''}).`
     : null;
   // An expired quote, or a draft priced before the diesel rise, is edited
   // before it goes out (R8): Edit quote is the primary, Send the secondary.
@@ -737,14 +751,10 @@ export default function QuoteDetail() {
             {fuelNote && (
               <p className="qd-fuel" role="status">
                 <span className="bk-dot bk-dot--warning" aria-hidden="true" />
-                <span>{fuelNote}{quote.status === 'DRAFT' || lapsed
-                  // A draft was never offered, and an expired quote can no
-                  // longer be accepted, so there is nothing to renegotiate:
-                  // update the price before it goes out.
-                  ? ' Update the price before sending.'
-                  : fuelAlert?.action ? ` ${normaliseFigures(fuelAlert.action).replace(/\.?$/, '.')}` : ''}</span>
+                <span>{fuelNote}</span>
               </p>
             )}
+            {pricedOn && <p className="qd-priced-on">{pricedOn}</p>}
             {showBuildUp && <div className="qd-price-rows">
               {/* Lines in whole rand. */}
               {priceRows.map(r => (
@@ -795,7 +805,6 @@ export default function QuoteDetail() {
             <section className="bk-card" aria-labelledby="qd-customer-title">
               {/* A never-sent draft has nobody to be "with" yet: the card only records an answer that came another way. */}
               <h2 className="bk-card__title" id="qd-customer-title" style={{ marginBottom: 12 }}>{neverSent ? 'Record the answer' : 'With the customer'}</h2>
-              {neverSent && <p className="qd-answer-sub">Got an answer another way? Record it here.</p>}
               {effectiveShareUrl && lapsed && (
                 // The public link still opens after the valid-until date, but
                 // shows the quote as expired (ClientQuoteView), so there is
@@ -1009,6 +1018,7 @@ export default function QuoteDetail() {
         <QuoteSendPreview
           quote={quote}
           confirmLabel={quote.status === 'SENT' ? 'Resend quote' : 'Send quote'}
+          warnings={sendWarnings}
           sending={sendPreview === 'status' ? statusMutation.isPending : sendToCustomerMutation.isPending}
           onCancel={() => setSendPreview(null)}
           onConfirm={() => {

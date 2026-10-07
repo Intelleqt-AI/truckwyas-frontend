@@ -310,8 +310,8 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
       )}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button type="button" style={{ ...toggleLink, marginTop: 4 }} onClick={switchToGps}>
-          Enter GPS coordinates →
+        <button type="button" style={{ ...toggleLink, marginTop: 4 }} onClick={switchToGps} title="Enter GPS coordinates">
+          GPS
         </button>
         {resolvedText && <ResolvedInfo text={resolvedText} />}
       </div>

@@ -36,6 +36,25 @@ export interface ResolvedDieselPrice extends ResolvedDiesel {
   warnings: QuoteWarning[];
 }
 
+/** The fields read from the server's diesel resolution (company_price / diesel_price_in_use). */
+interface ServerDiesel {
+  mode?: string; zone?: string; price?: unknown; source?: string;
+  official?: { price?: unknown; effective_from?: string | null; stale?: boolean } | null;
+  own?: { price?: unknown; set_at?: string | null } | null;
+}
+/** The company profile fields read here (api/v1/company/profile/). */
+export interface CompanyLike {
+  fuel_zone?: string | null; fuel_price_mode?: string | null; fuel_price_own?: unknown;
+  fuel_price_own_set_at?: string | null; fuel_price_per_litre?: unknown; updated_at?: string | null;
+  diesel_price_in_use?: ServerDiesel | null;
+}
+/** The fuel-price response fields read here (api/v1/fuel-prices/current/). */
+export interface LiveLike {
+  success?: boolean; source?: string | null; zone?: string | null; zone_price?: unknown;
+  inland_price?: unknown; coastal_price?: unknown; diesel_500ppm_inland?: unknown; diesel_500ppm_coastal?: unknown;
+  effective_from?: string | null; last_updated?: string | null; stale?: boolean; company_price?: ServerDiesel | null;
+}
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const FALLBACK_SOURCES = ["FALLBACK", "FALLBACK_LATEST"];
 const LEGACY_DEFAULT = 23.5;
@@ -94,7 +113,7 @@ export function currentPeriodStartIso(now = new Date()): string {
 }
 
 /** §1 migration for a profile that predates fuel_price_mode. */
-function legacyMode(company: any, live: any): { mode: "LIVE" | "OWN"; own: number | null; setAt: string | null } {
+function legacyMode(company: CompanyLike | null | undefined, live: LiveLike | null | undefined): { mode: "LIVE" | "OWN"; own: number | null; setAt: string | null } {
   const v = positive(company?.fuel_price_per_litre);
   if (v == null || Math.abs(v - LEGACY_DEFAULT) < 0.005) return { mode: "LIVE", own: null, setAt: null };
   const known = [live?.inland_price, live?.coastal_price, live?.diesel_500ppm_inland, live?.diesel_500ppm_coastal, live?.zone_price]
@@ -104,7 +123,7 @@ function legacyMode(company: any, live: any): { mode: "LIVE" | "OWN"; own: numbe
 }
 
 /** The quoteRules diesel input for this company, from what the API sent. */
-export function dieselInputFrom({ company, live, now = new Date() }: { company: any; live: any; now?: Date }): DieselInput {
+export function dieselInputFrom({ company, live, now = new Date() }: { company: CompanyLike | null | undefined; live: LiveLike | null | undefined; now?: Date }): DieselInput {
   const server = live?.company_price ?? company?.diesel_price_in_use ?? null;
   if (server && typeof server === "object" && server.official && typeof server.official === "object") {
     return {
@@ -126,7 +145,7 @@ export function dieselInputFrom({ company, live, now = new Date() }: { company: 
   }
   const hasMode = company && (company.fuel_price_mode === "LIVE" || company.fuel_price_mode === "OWN");
   const m = hasMode
-    ? { mode: company.fuel_price_mode, own: positive(company.fuel_price_own), setAt: company.fuel_price_own_set_at ?? null }
+    ? { mode: company.fuel_price_mode as "LIVE" | "OWN", own: positive(company.fuel_price_own), setAt: company.fuel_price_own_set_at ?? null }
     : legacyMode(company, live);
   const fromDay = isoDay(from);
   const stale = official != null && (live?.stale === true || (fromDay != null && fromDay < currentPeriodStartIso(now)));
@@ -135,7 +154,7 @@ export function dieselInputFrom({ company, live, now = new Date() }: { company: 
 
 /** The diesel price (and its §1 warnings) for this company today. */
 export function resolveDieselPrice({ company, live, now = new Date(), useOfficial = false, overridePrice = null, litres = null }:
-  { company: any; live: any; now?: Date; useOfficial?: boolean; overridePrice?: number | null; litres?: number | null }): ResolvedDieselPrice {
+  { company: CompanyLike | null | undefined; live: LiveLike | null | undefined; now?: Date; useOfficial?: boolean; overridePrice?: number | null; litres?: number | null }): ResolvedDieselPrice {
   const input: DieselInput = { ...dieselInputFrom({ company, live, now }), use_official: useOfficial, override_price: overridePrice };
   const r = resolveDiesel(input);
   return {

@@ -328,3 +328,5 @@
   .pa-sec.pa-floor:has(.pa-hint), .pa-sec.pa-floor:has(.pa-floor__body) { padding-bottom: 10px; }
   .pa-alerts { padding-top: 0; }
 }
+/* A block warning in the builder: the status slot says so (out of flow). */
+.pa__status.is-paused { color: var(--status-danger-text); }

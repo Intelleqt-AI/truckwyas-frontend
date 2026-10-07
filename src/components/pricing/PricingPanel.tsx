@@ -42,6 +42,8 @@ export interface PricingPanelProps {
   revealKey?: string;
   /** The bar shows the build-up (its own "Use Balanced" is the next step there). */
   atBuildUp?: boolean;
+  /** A block warning is open in the builder: the result is dimmed, nothing moves. */
+  paused?: boolean;
 }
 
 const SOURCE_CHIP: Record<SourceKind, { tone: StatusTone; label: string }> = {
@@ -154,8 +156,8 @@ export function PricingPanel(p: PricingPanelProps) {
       <header className="pa__head">
         <h2 id={titleId} className="pa__title">Pricing analysis</h2>
         {/* Out of the flow: appearing never moves or re-wraps anything. */}
-        <span className={`pa__status${busy ? "" : " is-idle"}`} aria-hidden={!busy}>
-          <i className="pa-pulse" aria-hidden="true" />{loading || phase === "route" ? "Analysing" : "Updating"}
+        <span className={`pa__status${busy || p.paused ? "" : " is-idle"}${p.paused && !busy ? " is-paused" : ""}`} aria-hidden={!busy && !p.paused}>
+          {busy ? <><i className="pa-pulse" aria-hidden="true" />{loading || phase === "route" ? "Analysing" : "Updating"}</> : "Fix flagged costs"}
         </span>
         {sub && <p className="pa__sub">{sub}</p>}
       </header>
@@ -266,7 +268,7 @@ function Result(p: BodyProps & { data: PricingAnalysis }) {
   // the header. Each fact is shown once.
   const includeReturn = p.includeReturn ?? data.costFloor?.includeReturn ?? false;
   return (
-    <div className={`pa__result${state.status === "refreshing" ? " is-refreshing" : ""}`}>
+    <div className={`pa__result${state.status === "refreshing" || p.paused ? " is-refreshing" : ""}`}>
       {failedRefresh && (
         <div className="pa-notice" role="status">
           {state.status === "offline" ? "Offline. " : "Couldn't refresh. "}Showing the last result.
@@ -286,6 +288,14 @@ function Result(p: BodyProps & { data: PricingAnalysis }) {
 
 // ---- alerts: at most two, lane first, then the customer
 const LANE_CODES = ["empty_return_unpaid", "market_below_floor"];
+/** ≤ 8-word titles for the panel's alerts; the server's sentence is on tap. */
+const ALERT_TITLE: Record<string, string> = {
+  empty_return_unpaid: "Lane pays below cost with empty return",
+  market_below_floor: "Market pays below your floor",
+  lane_below_floor: "Market pays below your floor",
+  market_below_cost: "Market pays below your floor",
+  price_sensitive: "Price-sensitive client on this lane",
+};
 type Alert = { key: string; tone: "danger" | "warning" | "info"; message: string; action?: ReactNode };
 
 /** "{name} accepted 2 of their last 10 quotes on this lane. Declined at R 26 600 and R 28 700."
@@ -334,14 +344,11 @@ function Alerts({ data, customerName, onOneWay, includeReturn }: { data: Pricing
       {alerts.map((a) => {
         // One line: the first sentence (or the part before a colon); the rest on tap.
         const m = a.message.match(/^(.+?[.:])\s+(.+)$/s);
-        const head = (m ? m[1] : a.message).replace(/[.:]$/, "");
+        const head = ALERT_TITLE[a.key] ?? (m ? m[1] : a.message).replace(/[.:]$/, "");
         return (
           <p key={a.key} className={`pa-alert pa-alert--${a.tone}`}>
             <b>{tidy(head)}</b>
-            {m && <InfoTip label="More" trigger="click">{tidy(a.message)}</InfoTip>}
-            {a.key === "empty_return_unpaid" && onOneWay && includeReturn && (
-              <> <button type="button" className="pa-link pa-link--inline pa-link--strong" onClick={onOneWay}>Load back booked</button></>
-            )}
+            {(m || ALERT_TITLE[a.key]) && <InfoTip label="More" trigger="click">{tidy(a.message)}</InfoTip>}
           </p>
         );
       })}
@@ -380,7 +387,7 @@ function ChoicesSection({ data, price, onApply, includeReturn, returnApplicable,
   const target = data.targetMarginPct != null ? Math.round(data.targetMarginPct) : null;
   return (
     <Section title="Choose a price" delay={1} className="pa-choose"
-      aside={target != null ? <span className="pa-sec__hint">Your target {target}%</span> : null}>
+      aside={target != null ? <span className="pa-sec__hint">Margin · target {target}%</span> : null}>
       {!realMarket && (
         <p className="pa-choices__lead">No market data: floor{target != null ? ` + ${target}%` : ""}.</p>
       )}
@@ -410,7 +417,7 @@ function ChoiceRow({ c, lk, ariaLk, applied, onApply }: { c: Choice; lk: Likelih
         {c.label}{c.recommended && <span className="pa-choice__rec">Recommended</span>}
       </span>
       <span className="pa-choice__price">{formatMoneyWhole(c.price)}</span>
-      <span className="pa-choice__margin">Margin {formatMoneyWhole(c.margin)} · {signedPct(c.marginPct)}</span>
+      <span className="pa-choice__margin">{formatMoneyWhole(c.margin)} · {signedPct(c.marginPct)}</span>
       {lk ? <span className={`pa-lk pa-lk--${lkTone(lk)}`}>{likelihoodShort(lk)}</span> : <span aria-hidden="true" />}
     </button>
   );
@@ -455,7 +462,7 @@ function FloorSection(p: BodyProps & { data: PricingAnalysis }) {
       </div>
       {p.belowFloor && !p.atBuildUp && (
         <p className="pa-hint">
-          <span className="pa-floor__under">Below floor.</span>
+
           {wayOut && <> <button type="button" className="pa-link pa-link--inline pa-link--strong" onClick={() => p.onApplyPrice(wayOut.price, wayOut.key)}>Use {wayOut.label} {formatMoneyWhole(wayOut.price)}</button></>}
         </p>
       )}
@@ -666,11 +673,13 @@ function EvidenceSection({ data, customerName }: { data: PricingAnalysis; custom
   const c = data.customer;
   // A return trip compares against one-way history: say so on the table.
   const oneWay = !!data.market?.oneWayX2;
+  const [histOpen, setHistOpen] = useState(false);
+  const histId = useId();
   if (!c) return null;
   const name = c.name || customerName || "This client";
   const acc = c.acceptance;
   const la = c.laneAcceptance;
-  const quotes = c.recentLaneQuotes.filter((q) => q.outcome !== "draft").slice(0, 3);
+  const quotes = c.recentLaneQuotes.filter((q) => q.outcome !== "draft").slice(0, 5);
   // Payment advice is said once, in the alert; here only the chip (and the
   // basis when there is no alert).
   const inAlert = alertsFor(data, customerName).some((a) => a.key === "payment_risk");
@@ -680,7 +689,7 @@ function EvidenceSection({ data, customerName }: { data: PricingAnalysis; custom
         <div className="pa-fact">
           <span className="pa-fact__k">Accepts</span>
           <span className="pa-fact__v">{acc && acc.decided > 0
-            ? <><span className="pa-nowrap">{`${acc.won} of ${acc.decided} quotes`}</span>{la ? <>{" · "}<span className="pa-nowrap">{`${la.won} of ${la.decided} on this lane`}</span></> : null}</>
+            ? <><span className="pa-nowrap">{`${acc.won} of ${acc.decided}`}</span>{la ? <>{" · "}<span className="pa-nowrap">{`${la.won} of ${la.decided} here`}</span></> : null}</>
             : "None decided"}</span>
         </div>
         <div className="pa-fact">
@@ -690,26 +699,34 @@ function EvidenceSection({ data, customerName }: { data: PricingAnalysis; custom
             : "No history"}</span>
         </div>
       </div>
-      <h4 className="pa-sub">On this lane{oneWay ? <span className="pa-sub__note"> · one-way quotes</span> : null}</h4>
+      {/* The lane's last quotes are detail: on tap. */}
       {quotes.length > 0 ? (
-        <table className="pa-hist">
-          <caption className="pa-sr">Last quotes to {name} on this lane</caption>
-          <thead><tr><th scope="col">Date</th><th scope="col">Price</th><th scope="col">Outcome</th></tr></thead>
-          <tbody>
-            {quotes.map((q, i) => {
-              const o = OUTCOME[q.outcome] || { tone: "neutral" as StatusTone, label: q.outcome };
-              return (
-                <tr key={q.id ?? i}>
-                  <td>{q.date ? formatDate(q.date) : "—"}</td>
-                  <td className="pa-num">{formatMoneyWhole(q.price)}</td>
-                  <td><StatusChip tone={o.tone} label={o.label} /></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <>
+          <button type="button" className="pa-why" aria-expanded={histOpen} aria-controls={histId} onClick={() => setHistOpen((v) => !v)}>
+            <ChevronRight size={14} className="pa-why__chev" aria-hidden="true" />
+            On this lane · {quotes.length}{oneWay ? " one-way" : ""}
+          </button>
+          {histOpen && (
+            <table className="pa-hist" id={histId}>
+              <caption className="pa-sr">Last quotes to {name} on this lane</caption>
+              <thead className="pa-sr"><tr><th scope="col">Date</th><th scope="col">Price</th><th scope="col">Outcome</th></tr></thead>
+              <tbody>
+                {quotes.map((q, i) => {
+                  const o = OUTCOME[q.outcome] || { tone: "neutral" as StatusTone, label: q.outcome };
+                  return (
+                    <tr key={q.id ?? i}>
+                      <td>{q.date ? formatDate(q.date) : "—"}</td>
+                      <td className="pa-num">{formatMoneyWhole(q.price)}</td>
+                      <td><StatusChip tone={o.tone} label={o.label} /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </>
       ) : (
-        <p className="pa-quiet">None yet.</p>
+        <p className="pa-quiet">No quotes on this lane yet.</p>
       )}
     </Section>
   );

@@ -25,12 +25,13 @@ export function MarketRange({ market, floor, price }: { market: Market; floor: n
     const half = label.length * 3.5 + 2;
     return Math.max(half, Math.min(w - half, cx));
   };
-  const youLabel = price != null && price > 0 ? `You ${formatMoneyWhole(price)}` : null;
+  // Words only: the figures are said once elsewhere (bar, floor row).
+  const youLabel = price != null && price > 0 ? "You" : null;
   // Floor label is pinned to its tick; when "You" is within ~24 px of it,
   // the You label steps sideways so the two never collide.
   const close = floor != null && price != null && price > 0 && Math.abs(x(price) - x(floor)) < 24;
   const youX = !youLabel ? 0 : close ? clampText(x(price!) + (x(price!) >= x(floor!) ? 1 : -1) * (youLabel.length * 3.5), youLabel) : clampText(x(price!), youLabel);
-  const floorLabel = floor != null ? `Floor ${formatMoneyWhole(floor)}` : null;
+  const floorLabel = floor != null ? "Floor" : null;
 
   return (
     <div ref={ref} className="viz pa-range">

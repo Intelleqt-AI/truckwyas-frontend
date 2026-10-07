@@ -416,7 +416,7 @@ export function CompanySettings() {
     }
     setSaving(true);
     try {
-      const saved: any = await patchData({ url: '/api/v1/company/profile/', data: {
+      const saved = await patchData({ url: '/api/v1/company/profile/', data: {
         company_name: form.company_name,
         registration_number: form.registration_number,
         vat_number: form.vat_number,
@@ -467,7 +467,8 @@ export function CompanySettings() {
       // ["company-profile"] query, which has a 5 minute staleTime — so without
       // this a saved diesel price, base rate or toll rate did not reach an
       // already-open quote until the page was reloaded.
-      if (saved && 'fuel_price_own_set_at' in saved) setOwnSetAt(saved.fuel_price_own_set_at ?? null);
+      const savedSetAt = (saved as { fuel_price_own_set_at?: string | null } | null);
+      if (savedSetAt && 'fuel_price_own_set_at' in savedSetAt) setOwnSetAt(savedSetAt.fuel_price_own_set_at ?? null);
       await queryClient.invalidateQueries({ queryKey: ['company-profile'] });
       queryClient.invalidateQueries({ queryKey: ['fuel-price-current'] });
       setSaved(true);

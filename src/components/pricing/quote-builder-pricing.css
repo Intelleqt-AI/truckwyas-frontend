@@ -296,3 +296,11 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
 .qb-warn .qb-linkbtn { margin-left: 4px; font-size: 13px; line-height: 20px; }
 .qb-pricebar__notice { gap: 10px; color: var(--text-secondary); }
 .qb-pricebar__notice .qb-linkbtn { margin-left: 0; font-size: 13px; line-height: 20px; }
+/* One line, always: the notice text truncates before its actions wrap. */
+.qb-pricebar__notice { flex-wrap: nowrap; min-width: 0; max-width: 100%; }
+.qb-pricebar__notice > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qb-pricebar__notice .qb-linkbtn { flex: none; }
+@media (max-width: 640px) {
+  .qb-cost__label { flex-wrap: wrap; row-gap: 2px; }
+  .qb-check { margin-left: 0; flex-basis: 100%; }
+}

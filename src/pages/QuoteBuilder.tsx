@@ -984,7 +984,6 @@ export default function QuoteBuilder() {
     : isDemoQuotaExceeded ? "This demo session's quote is used."
     : routeBlockedMessage ? "Route not allowed for your company."
     : weightBlockedMessage ? "Load is over the truck's capacity."
-    : blockWarnings.some(w => w.code !== "below_minimum_charge") ? "Fix the flagged costs first."
     : null;
   const pricingPhase: PricingPhase = pricingBlockedReason ? "blocked"
     : !ready ? "needs"
@@ -1344,7 +1343,6 @@ export default function QuoteBuilder() {
     <>
       <div className="qb-maphead">
         <span className="qb-maphead__hint">
-          <Map size={13} aria-hidden="true" style={{ flexShrink: 0 }} />
           {(() => {
             // pickMode is "pickup", "delivery", or a stop's id — resolve
             // whichever one is currently selected to its display label and
@@ -1361,9 +1359,10 @@ export default function QuoteBuilder() {
             // Same gesture on both: Leaflet reads a double-tap as its dblclick.
             // Only the verb changes, by input type (CSS, no logic).
             const verb = <><span className="qb-hint-mouse">Double-click</span><span className="qb-hint-touch">Double-tap</span></>;
+            // Said only while a pin is still to be set (the hint box keeps its size).
             return activeFilled || !activeLabel
-              ? <span>{verb} to move a pin</span>
-              : <span>{verb} to set <b style={{ fontWeight: 500, color: "var(--text-primary)" }}>{activeLabel}</b></span>;
+              ? null
+              : <><Map size={13} aria-hidden="true" style={{ flexShrink: 0 }} /><span>{verb} to set <b style={{ fontWeight: 500, color: "var(--text-primary)" }}>{activeLabel}</b></span></>;
           })()}
         </span>
         <div className="qb-maphead__tools">
@@ -1465,7 +1464,7 @@ export default function QuoteBuilder() {
                   onClick={() => setSelectedRouteIndex(i)}
                   aria-pressed={i === selectedRouteIndex}
                   className="qb-routeopt">
-                  {/^best routes?$/i.test((r.label || "").trim()) ? "Fastest" : (r.label || r.summary || `Route ${i + 1}`)} · {formatNumber(Math.round(r.distance_km))} km
+                  {formatNumber(Math.round(r.distance_km))} km
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" style={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", fontSize: 13, lineHeight: "20px", padding: "10px 12px", maxWidth: 220, borderRadius: 8 }}>
@@ -1867,6 +1866,7 @@ export default function QuoteBuilder() {
           state={pricing}
           phase={pricingPhase}
           blockedReason={pricingBlockedReason}
+          paused={blockWarnings.length > 0}
           needs={pricingNeeds}
           customerName={customers.find((c: any) => String(c.id) === String(customerId))?.name ?? null}
           price={settledTotal}
@@ -2002,7 +2002,7 @@ export default function QuoteBuilder() {
               valid_until: validUntil,
             }}
             sending={saving}
-            warnings={[...quoteWarnings,
+            warnings={[...quoteWarnings, ...costingAtPrice.warnings.filter(w => w.code === "below_floor"),
               ...(reopenNotice && reopenNotice.since && reopenNotice.since < currentPeriodStartIso()
                 ? [{ code: "priced_earlier_period", severity: "warn" as const, title: "Priced on last period's diesel", actions: [] }] : [])]}
             onCancel={() => setSendPreviewOpen(false)}

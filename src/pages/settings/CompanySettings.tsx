@@ -1,5 +1,6 @@
 import '@/pages/settings/settings-brand.css';
-import { formatDateTime, formatMoney, formatMonth, formatNumber } from '@/lib/formatters';
+import { formatMoney, formatNumber } from '@/lib/formatters';
+import { shortDate, longDate } from '@/lib/dieselPrice';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData, postData } from "@/lib/Api";
@@ -183,16 +184,24 @@ export function CompanySettings() {
     default_base_rate_per_km: '', default_toll_rate_per_km: '', default_sla_hours: '',
     cross_border_crossings_per_year: '',
     fuel_zone: 'INLAND',
-    fuel_price_per_litre: '', fuel_price_petrol: '', fuel_price_electric: '', fuel_price_hybrid: '',
+    // §1: LIVE = the official zone price; OWN = fuel_price_own. Empty own => LIVE.
+    fuel_price_mode: 'LIVE', fuel_price_own: '',
+    fuel_price_petrol: '', fuel_price_electric: '', fuel_price_hybrid: '',
     bank_name: '', bank_account_holder: '', bank_account_number: '', bank_branch_code: '',
     bank_account_type: '', payment_reference_hint: '',
     // Pricing analysis (company profile, additive fields).
-    operating_cost_per_km: '', pricing_include_empty_return: 'no', pool_pricing_data: 'no',
+    operating_cost_per_km: '', pricing_include_empty_return: 'yes', pool_pricing_data: 'no',
+    empty_return_min_km: '300', minimum_charge: '',
     margin_target_pct: '10', driver_allowance_per_night: '',
   });
   // Round 4 fields arrive from the API as they are added: a field the
   // profile does not return is not shown (and not saved).
   const [hasDriverField, setHasDriverField] = useState(false);
+  // Quote rules fields (backend 7 Oct): shown only once the profile returns them.
+  const [hasModeField, setHasModeField] = useState(false);
+  const [hasReturnFields, setHasReturnFields] = useState(false);
+  const [hasMinimumField, setHasMinimumField] = useState(false);
+  const [ownSetAt, setOwnSetAt] = useState<string | null>(null);
   const [hasTargetField, setHasTargetField] = useState(false);
   const [costInUse, setCostInUse] = useState<CostInUse | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -216,49 +225,19 @@ export function CompanySettings() {
   const [livePrice, setLivePrice] = useState<any>(null);
   const [fetchingLivePrice, setFetchingLivePrice] = useState(false);
 
-  /** `zoneOverride` is passed when the zone selector triggers this, so the
-   *  fetch uses the zone just chosen rather than whatever is still in state.
-   *  `dieselOnly` keeps a zone switch off the petrol field — petrol has no
-   *  coastal/inland split, so a zone change has no business rewriting it. */
-  const loadLivePrice = (force: boolean, zoneOverride?: string, dieselOnly = false) => {
+  /** The official price only: never written into the own-price field
+   *  (§1: no on-load fill, Fetch and a zone change never touch it). Petrol,
+   *  which has no own/official split, is still filled when blank or fetched. */
+  const loadLivePrice = (force: boolean) => {
     setFetchingLivePrice(true);
     fetchData(`api/v1/fuel-prices/current/${force ? '?force=true' : ''}`).then((d: any) => {
       setLivePrice(d);
-      setForm(prev => {
-        const next = { ...prev };
-        // A manual "Fetch Now" always applies the fresh value. On initial
-        // load, only nudge a field when it still looks untouched — Diesel
-        // has a real factory default (23.50) to compare against; Petrol has
-        // no forced default, so "untouched" just means blank. Never silently
-        // overwrite a price a company deliberately set.
-        // Diesel is gazetted per zone: it lands at the coastal ports and the
-        // DMRE adds a transport differential to move it inland, so Gauteng runs
-        // roughly R0.87/L above Cape Town or Durban. Take the figure for this
-        // fleet's zone — reading `inland_price` unconditionally over-charged
-        // every coastal fleet by that gap on every quote.
-        const zone = zoneOverride ?? prev.fuel_zone;
-        const zonePrice = zone === 'COASTAL'
-          ? (d?.coastal_price ?? d?.inland_price)
-          : d?.inland_price;
-        if (zonePrice != null) {
-          const current = parseFloat(prev.fuel_price_per_litre);
-          const dieselUntouched = !prev.fuel_price_per_litre || Math.abs(current - 23.5) < 0.001;
-          if (force || dieselUntouched) next.fuel_price_per_litre = String(zonePrice);
-        }
-        if (d?.petrol_95 && !dieselOnly) {
-          if (force || !prev.fuel_price_petrol) next.fuel_price_petrol = String(d.petrol_95);
-        }
-        return next;
-      });
+      if (d?.petrol_95) setForm(prev => (force || !prev.fuel_price_petrol ? { ...prev, fuel_price_petrol: String(d.petrol_95) } : prev));
       if (force) {
-        const zone = zoneOverride ?? form.fuel_zone;
-        const zoneLabel = zone === 'COASTAL' ? 'coastal' : 'inland';
-        if (d?.success === false) toast.error(d?.error || 'Could not fetch live fuel prices');
-        else if (d?.inland_price == null) toast.error(d?.stale_warning || "Couldn't reach a live fuel-price source");
-        else if (dieselOnly) toast.success(`Diesel updated to the ${zoneLabel} price`);
-        else toast.success('Fuel prices refreshed');
+        if (d?.success === false || d?.inland_price == null) toast.error("Couldn't reach the official price source");
+        else toast.success('Official prices checked');
       }
-    }).catch(() => { if (force) toast.error('Could not fetch live fuel prices'); })
+    }).catch(() => { if (force) toast.error("Couldn't reach the official price source"); })
       .finally(() => setFetchingLivePrice(false));
   };
 
@@ -292,7 +271,15 @@ export function CompanySettings() {
           cross_border_crossings_per_year:
             d.cross_border_crossings_per_year != null ? String(d.cross_border_crossings_per_year) : '',
           fuel_zone: d.fuel_zone === 'COASTAL' ? 'COASTAL' : 'INLAND',
-          fuel_price_per_litre: d.fuel_price_per_litre != null ? String(d.fuel_price_per_litre) : '',
+          ...(() => {
+            // New backend: mode + own. Older one: the §1 migration rule (23.50 /
+            // empty = official; anything else = the fleet's own price).
+            if (d.fuel_price_mode === 'LIVE' || d.fuel_price_mode === 'OWN') {
+              return { fuel_price_mode: d.fuel_price_own != null ? d.fuel_price_mode : 'LIVE', fuel_price_own: d.fuel_price_own != null ? String(Number(d.fuel_price_own)) : '' };
+            }
+            const v = Number(d.fuel_price_per_litre);
+            return v > 0 && Math.abs(v - 23.5) > 0.005 ? { fuel_price_mode: 'OWN', fuel_price_own: String(v) } : { fuel_price_mode: 'LIVE', fuel_price_own: '' };
+          })(),
           fuel_price_petrol: d.fuel_price_petrol != null ? String(d.fuel_price_petrol) : '',
           fuel_price_electric: d.fuel_price_electric != null ? String(d.fuel_price_electric) : '',
           fuel_price_hybrid: d.fuel_price_hybrid != null ? String(d.fuel_price_hybrid) : '',
@@ -303,7 +290,9 @@ export function CompanySettings() {
           bank_account_type: d.bank_account_type || '',
           payment_reference_hint: d.payment_reference_hint || '',
           operating_cost_per_km: d.operating_cost_per_km != null ? String(d.operating_cost_per_km) : '',
-          pricing_include_empty_return: d.pricing_include_empty_return === true ? 'yes' : 'no',
+          pricing_include_empty_return: ('include_empty_return_default' in d ? d.include_empty_return_default !== false : d.pricing_include_empty_return === true) ? 'yes' : 'no',
+          empty_return_min_km: d.empty_return_min_km != null ? String(Number(d.empty_return_min_km)) : '300',
+          minimum_charge: d.minimum_charge != null ? String(Number(d.minimum_charge)) : '',
           pool_pricing_data: d.pool_pricing_data === true ? 'yes' : 'no',
           // "10.00" -> "10" (whole %, as everywhere in pricing).
           margin_target_pct: d.margin_target_pct != null && d.margin_target_pct !== '' ? String(Number(d.margin_target_pct)) : '10',
@@ -311,6 +300,10 @@ export function CompanySettings() {
         });
         setHasTargetField('margin_target_pct' in d);
         setHasDriverField('driver_allowance_per_night' in d);
+        setHasModeField('fuel_price_mode' in d);
+        setHasReturnFields('include_empty_return_default' in d);
+        setHasMinimumField('minimum_charge' in d);
+        setOwnSetAt(d.fuel_price_own_set_at ?? null);
         setCostInUse(costInUseOf(d.operating_cost_in_use));
         const range = Array.isArray(d.margin_target_range) ? d.margin_target_range.map(Number) : null;
         if (range && range.length === 2 && range.every((x: number) => Number.isFinite(x)) && range[0] < range[1]) setTargetRange([range[0], range[1]]);
@@ -319,9 +312,6 @@ export function CompanySettings() {
       }
       setLoaded(true);
     }).catch(() => { toast.error('Failed to load company details'); })
-      // Chained, not parallel: the live-price nudge below reads the current
-      // Diesel field to decide whether it looks untouched, so it must run
-      // after the real saved value has actually landed in form state.
       .finally(() => loadLivePrice(false));
   }, []);
 
@@ -366,7 +356,7 @@ export function CompanySettings() {
       return;
     }
     for (const [key, label] of [
-      ['fuel_price_per_litre', 'Diesel'], ['fuel_price_petrol', 'Petrol'],
+      ['fuel_price_own', 'Diesel'], ['fuel_price_petrol', 'Petrol'],
       ['fuel_price_electric', 'Electric'], ['fuel_price_hybrid', 'Hybrid'],
     ] as const) {
       const raw = (form as any)[key];
@@ -426,7 +416,7 @@ export function CompanySettings() {
     }
     setSaving(true);
     try {
-      await patchData({ url: '/api/v1/company/profile/', data: {
+      const saved: any = await patchData({ url: '/api/v1/company/profile/', data: {
         company_name: form.company_name,
         registration_number: form.registration_number,
         vat_number: form.vat_number,
@@ -445,7 +435,14 @@ export function CompanySettings() {
         default_sla_hours: slaHours ?? 48,
         cross_border_crossings_per_year: crossings ?? 24,
         fuel_zone: form.fuel_zone,
-        fuel_price_per_litre: form.fuel_price_per_litre ? parseFloat(form.fuel_price_per_litre) : 23.50,
+        // §1: own price empty => official. An older backend only has
+        // fuel_price_per_litre (23.50 there means "use the live price").
+        ...(() => {
+          const own = form.fuel_price_mode === 'OWN' && form.fuel_price_own ? Math.round(parseFloat(form.fuel_price_own) * 10000) / 10000 : null;
+          return hasModeField
+            ? { fuel_price_mode: own != null ? 'OWN' : 'LIVE', fuel_price_own: own }
+            : { fuel_price_per_litre: own ?? 23.50 };
+        })(),
         fuel_price_petrol: form.fuel_price_petrol ? parseFloat(form.fuel_price_petrol) : null,
         fuel_price_electric: form.fuel_price_electric ? parseFloat(form.fuel_price_electric) : null,
         fuel_price_hybrid: form.fuel_price_hybrid ? parseFloat(form.fuel_price_hybrid) : null,
@@ -459,13 +456,20 @@ export function CompanySettings() {
         ...(hasTargetField ? { margin_target_pct: Math.round(Number(form.margin_target_pct)) } : {}),
         ...(hasDriverField ? { driver_allowance_per_night: form.driver_allowance_per_night ? Math.round(parseFloat(form.driver_allowance_per_night)) : null } : {}),
         pricing_include_empty_return: form.pricing_include_empty_return === 'yes',
+        ...(hasReturnFields ? {
+          include_empty_return_default: form.pricing_include_empty_return === 'yes',
+          empty_return_min_km: form.empty_return_min_km ? Math.max(0, Math.round(parseFloat(form.empty_return_min_km))) : 300,
+        } : {}),
+        ...(hasMinimumField ? { minimum_charge: form.minimum_charge ? Math.round(parseFloat(form.minimum_charge) * 100) / 100 : null } : {}),
         pool_pricing_data: form.pool_pricing_data === 'yes',
       } });
       // The quote builder reads these defaults through the shared
       // ["company-profile"] query, which has a 5 minute staleTime — so without
       // this a saved diesel price, base rate or toll rate did not reach an
       // already-open quote until the page was reloaded.
+      if (saved && 'fuel_price_own_set_at' in saved) setOwnSetAt(saved.fuel_price_own_set_at ?? null);
       await queryClient.invalidateQueries({ queryKey: ['company-profile'] });
+      queryClient.invalidateQueries({ queryKey: ['fuel-price-current'] });
       setSaved(true);
       toast.success('Company details saved');
       setTimeout(() => setSaved(false), 2000);
@@ -811,7 +815,7 @@ export function CompanySettings() {
               <div>
                 <label htmlFor="company-margin-target" style={labelTipStyle}>
                   Target margin (%)
-                  <InfoTip label="About the target margin">The margin you aim for on every quote: price less the full cost floor, as a share of the price excl. VAT. The suggested prices never go below it, and go above it when the market pays more.</InfoTip>
+                  <InfoTip label="About the target margin">Price less the cost floor, as a share of the price. Suggested prices never go below it.</InfoTip>
                 </label>
                 <PricingInput id="company-margin-target" inputMode="numeric" decimals={0} suffix="%" value={form.margin_target_pct}
                   onChange={v => { set('margin_target_pct', v); if (pricingErrors.margin_target_pct) checkPricing('margin_target_pct', v); }}
@@ -819,14 +823,14 @@ export function CompanySettings() {
                 <div id="company-margin-target-help">
                   {pricingErrors.margin_target_pct
                     ? <div role="alert" style={fieldErrorStyle}>{pricingErrors.margin_target_pct}</div>
-                    : <div style={helpTextStyle}>Safe starts here. Balanced and Stretch follow the market.</div>}
+                    : null}
                 </div>
               </div>
             )}
             <div>
               <label htmlFor="company-operating-cost-per-km" style={labelTipStyle}>
                 Operating cost per km
-                <InfoTip label="About the operating cost per km">Driver wages, vehicle finance, insurance, licences, tyres, maintenance and overheads, per km. It goes into every quote's cost floor. Leave it empty and we use your costs from the last 12 months, or a typical figure for the vehicle type until you have enough costed trips.</InfoTip>
+                <InfoTip label="About the operating cost per km">Wages, finance, insurance, licences, tyres, maintenance and overheads. Empty: your last 12 months, else a typical figure per truck class.</InfoTip>
               </label>
               <PricingInput id="company-operating-cost-per-km" inputMode="decimal" decimals={2} prefix="R" suffix="/km" placeholder="Automatic"
                 value={form.operating_cost_per_km}
@@ -835,17 +839,14 @@ export function CompanySettings() {
               <div id="company-operating-cost-help">
                 {pricingErrors.operating_cost_per_km
                   ? <div role="alert" style={fieldErrorStyle}>{pricingErrors.operating_cost_per_km}</div>
-                  : <div style={helpTextStyle}>Excludes fuel, tolls, driver allowance and border fees.</div>}
-                {form.operating_cost_per_km
-                  ? !pricingErrors.operating_cost_per_km && <div style={{ ...helpTextStyle, marginTop: 2, color: 'var(--text-secondary)' }}>Your figure replaces the automatic one.</div>
-                  : costInUseLine && <div style={{ ...helpTextStyle, marginTop: 2, color: 'var(--text-secondary)' }}>{costInUseLine}</div>}
+                  : !form.operating_cost_per_km && costInUseLine ? <div style={helpTextStyle}>{costInUseLine}</div> : null}
               </div>
             </div>
             {hasDriverField && (
               <div>
                 <label htmlFor="company-driver-allowance" style={labelTipStyle}>
                   Driver allowance per night (R)
-                  <InfoTip label="About the driver allowance">What you pay a driver for each night away from base. Quotes use it for trips with nights away when no approved rate is on record; each quote can still change it.</InfoTip>
+                  <InfoTip label="About the driver allowance">Paid per night away. Each quote can change it.</InfoTip>
                 </label>
                 <PricingInput id="company-driver-allowance" inputMode="numeric" decimals={0} prefix="R" placeholder="Not set" value={form.driver_allowance_per_night}
                   onChange={v => { set('driver_allowance_per_night', v); if (pricingErrors.driver_allowance_per_night) checkPricing('driver_allowance_per_night', v); }}
@@ -853,30 +854,42 @@ export function CompanySettings() {
                 <div id="company-driver-allowance-help">
                   {pricingErrors.driver_allowance_per_night
                     ? <div role="alert" style={fieldErrorStyle}>{pricingErrors.driver_allowance_per_night}</div>
-                    : <div style={helpTextStyle}>Paid per night away. Same-day trips have none.</div>}
+                    : null}
                 </div>
               </div>
             )}
             <div>
               <label htmlFor="company-include-empty-return" style={labelTipStyle}>
-                Empty return in the cost floor
-                <InfoTip label="About the empty return">For one-way quotes: whether the cost floor includes driving home empty. Each quote can still switch it.</InfoTip>
+                Empty return
+                <InfoTip label="About the empty return">One-way quotes from this distance price the run home empty, unless a return load is booked.</InfoTip>
               </label>
               <Select value={form.pricing_include_empty_return} onValueChange={val => set('pricing_include_empty_return', val)}>
                 <SelectTrigger style={inputStyle} className="cs-select" id="company-include-empty-return">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="no">No, one way only</SelectItem>
-                  <SelectItem value="yes">Yes, include the run home</SelectItem>
+                  <SelectItem value="yes">Include</SelectItem>
+                  <SelectItem value="no">Leave out</SelectItem>
                 </SelectContent>
               </Select>
-              <div style={helpTextStyle}>Each quote can still switch it.</div>
             </div>
+            {hasReturnFields && (
+              <div>
+                <label htmlFor="company-empty-return-min-km" style={labelStyle}>Empty return from (km)</label>
+                <input id="company-empty-return-min-km" className="settings-control" style={inputStyle} type="number" min={0} max={5000}
+                  value={form.empty_return_min_km} onChange={e => set('empty_return_min_km', e.target.value)} />
+              </div>
+            )}
+            {hasMinimumField && (
+              <div>
+                <label htmlFor="company-minimum-charge" style={labelStyle}>Minimum charge (R)</label>
+                <DecimalInput id="company-minimum-charge" placeholder="None" value={form.minimum_charge} onChange={v => set('minimum_charge', v)} />
+              </div>
+            )}
             <div className="cs-pricing-grid__wide">
               <label htmlFor="company-pool-pricing-data" style={labelTipStyle}>
                 Share anonymised win/loss data
-                <InfoTip label="About sharing win/loss data">With Yes, whether your quotes were won or lost (price, lane, truck type and timing; never customer names, contacts or documents) helps train a shared pricing model, and you can use that model's chance to win while you have too few closed quotes of your own. With No, your outcomes only ever train your own model. You can switch it off at any time.</InfoTip>
+                <InfoTip label="About sharing win/loss data">Won or lost, price, lane, truck and timing; never customer names or documents. Helps chance to win where you have few quotes.</InfoTip>
               </label>
               <div className="cs-pricing-grid__half">
                 <Select value={form.pool_pricing_data} onValueChange={val => set('pool_pricing_data', val)}>
@@ -884,24 +897,21 @@ export function CompanySettings() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="no">No, keep it to us</SelectItem>
-                    <SelectItem value="yes">Yes, share anonymised outcomes</SelectItem>
+                    <SelectItem value="no">No</SelectItem>
+                    <SelectItem value="yes">Yes, anonymised</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div style={helpTextStyle}>Shares won/lost and price vs market only, never customer names. Helps chance to win on lanes where you have few quotes.</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Fuel Price Defaults */}
-      <div style={sectionStyle}>
+      {/* Fuel (QUOTE-RULES.md §1): the official zone price by default, or the
+          fleet's own. Nothing here ever copies the official price into "own". */}
+      <div style={{ ...sectionStyle, scrollMarginTop: 16 }} id="fuel">
         <div style={{ ...sectionHeaderStyle, justifyContent: 'space-between' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <h2 style={sectionTitleStyle}>Fuel prices</h2>
-            <InfoTip label="About fuel prices">Used when a vehicle type has no fuel price of its own (Settings, Vehicle types). Diesel falls back to the live national price if left blank; the other three have no live feed, so they stay unset until you add one.</InfoTip>
-          </span>
+          <h2 style={sectionTitleStyle}>Fuel</h2>
           <button
             type="button"
             onClick={() => loadLivePrice(true)}
@@ -910,80 +920,75 @@ export function CompanySettings() {
             style={{ ...settingsSecondaryButtonStyle, cursor: fetchingLivePrice ? 'wait' : 'pointer' }}
           >
             {fetchingLivePrice
-              ? <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 112 }}><Loader size={12} color="currentColor" /></span>
-              : 'Fetch live prices'}
+              ? <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 96 }}><Loader size={12} color="currentColor" /></span>
+              : 'Check now'}
           </button>
         </div>
         <div style={bodyStyle}>
-          <div style={{ marginBottom: 16 }}>
-            <div>
-              <label htmlFor="company-fuel-pricing-zone" style={labelTipStyle}>
-                Fuel pricing zone
-                <InfoTip label="About fuel zones">Diesel is gazetted at two prices: it lands at the coastal ports and costs more inland once the transport differential is added, about {formatMoney(0.87)}/L at the moment. Changing the zone fetches its current price and updates Diesel below.</InfoTip>
-              </label>
-              <Select
-                value={form.fuel_zone}
-                onValueChange={val => { set('fuel_zone', val); loadLivePrice(true, val, true); }}
-                disabled={fetchingLivePrice}
-              >
-                <SelectTrigger style={inputStyle} className="cs-select" id="company-fuel-pricing-zone">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="INLAND">Inland: Gauteng and the interior</SelectItem>
-                  <SelectItem value="COASTAL">Coastal: Cape Town, Durban, Gqeberha, East London</SelectItem>
-                </SelectContent>
-              </Select>
-              <div style={helpTextStyle}>Changing it updates Diesel below.</div>
-            </div>
-          </div>
-          <div className="cs-grid cs-grid--2">
-            <div>
-              <label htmlFor="company-diesel-r-l" style={labelStyle}>Diesel (R/L)</label>
-              <DecimalInput id="company-diesel-r-l" placeholder="e.g. 23,50" value={form.fuel_price_per_litre} onChange={v => set('fuel_price_per_litre', v)} />
-              {livePrice?.success !== false && (livePrice?.inland_price != null || livePrice?.stale_warning) && (
-                <div className="cs-live" style={{ color: livePrice.is_stale ? 'var(--status-warning-text)' : 'var(--text-tertiary)' }}
-                  title={[livePrice.last_updated && `For ${new Date(livePrice.last_updated).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}`, livePrice.last_checked_at && `checked ${formatDateTime(livePrice.last_checked_at)}`, livePrice.stale_warning].filter(Boolean).join(' · ')}>
-                  {livePrice.inland_price != null ? (
-                    <>
-                      Live: {formatMoney(Number(livePrice.inland_price))}/L
-                      {livePrice.last_updated && `, ${formatMonth(livePrice.last_updated)}`}
-                      {livePrice.stale_warning && ', may be out of date'}
-                    </>
+          {(() => {
+            const zoneWord = form.fuel_zone === 'COASTAL' ? 'coastal' : 'inland';
+            const ok = livePrice && livePrice.success !== false && !['FALLBACK', 'FALLBACK_LATEST'].includes(String(livePrice.source || '').toUpperCase());
+            const official = ok ? Number(form.fuel_zone === 'COASTAL' ? livePrice.coastal_price : livePrice.inland_price) || null : null;
+            const from = ok ? shortDate(livePrice.effective_from ?? livePrice.last_updated ?? null) : null;
+            const stale = !!livePrice && (livePrice.stale === true || livePrice.is_stale === true);
+            const own = form.fuel_price_mode === 'OWN';
+            return (
+              <div className="cs-grid cs-grid--2">
+                <div>
+                  <label htmlFor="company-fuel-pricing-zone" style={labelTipStyle}>
+                    Zone
+                    <InfoTip label="About fuel zones">Diesel costs more inland than at the coast.</InfoTip>
+                  </label>
+                  <Select value={form.fuel_zone} onValueChange={val => set('fuel_zone', val)}>
+                    <SelectTrigger style={inputStyle} className="cs-select" id="company-fuel-pricing-zone">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="INLAND">Inland</SelectItem>
+                      <SelectItem value="COASTAL">Coastal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <span id="company-diesel-mode-label" style={labelStyle}>Diesel price</span>
+                  <div className="tw-seg tw-seg--block" role="radiogroup" aria-labelledby="company-diesel-mode-label" style={{ marginTop: 6 }}>
+                    {(['LIVE', 'OWN'] as const).map(m => (
+                      <button key={m} type="button" role="radio" aria-checked={form.fuel_price_mode === m}
+                        className={`tw-seg__opt${form.fuel_price_mode === m ? ' is-active' : ''}`}
+                        onClick={() => set('fuel_price_mode', m)}>{m === 'LIVE' ? 'Official' : 'My own price'}</button>
+                    ))}
+                  </div>
+                  {own ? (
+                    <div style={{ marginTop: 8 }}>
+                      <DecimalInput id="company-diesel-own" placeholder="R/L excl. VAT" decimals={4} value={form.fuel_price_own} onChange={v => set('fuel_price_own', v)} />
+                      <div style={helpTextStyle}>
+                        {ownSetAt && form.fuel_price_own ? `Set on ${longDate(ownSetAt)}` : 'Empty uses official.'}
+                        {official != null ? ` · Official ${formatMoney(official)}/L` : ''}
+                      </div>
+                    </div>
                   ) : (
-                    <>
-                      {livePrice.stale_warning}
-                      {livePrice.last_checked_at && ` (checked ${formatDateTime(livePrice.last_checked_at)})`}
-                    </>
+                    <div className="cs-live" style={{ color: stale || official == null ? 'var(--status-warning-text)' : 'var(--text-secondary)' }}
+                      title={livePrice?.stale_warning || undefined}>
+                      {official != null
+                        ? <>{formatMoney(official)}/L · {zoneWord}{from ? ` · from ${from}` : ''}{stale ? ' · may be out of date' : ''}</>
+                        : livePrice ? 'No official price right now' : 'Loading…'}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+              </div>
+            );
+          })()}
+          <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
             <div>
               <label htmlFor="company-petrol-r-l" style={labelStyle}>Petrol (R/L)</label>
               <DecimalInput id="company-petrol-r-l" placeholder="Not set" value={form.fuel_price_petrol} onChange={v => set('fuel_price_petrol', v)} />
-              {livePrice?.success !== false && (livePrice?.petrol_95 != null || livePrice?.stale_warning) && (
-                <div className="cs-live" style={{ color: livePrice.is_stale ? 'var(--status-warning-text)' : 'var(--text-tertiary)' }}
-                  title={[livePrice.last_updated && `For ${new Date(livePrice.last_updated).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}`, livePrice.last_checked_at && `checked ${formatDateTime(livePrice.last_checked_at)}`].filter(Boolean).join(' · ')}>
-                  {livePrice.petrol_95 != null ? (
-                    <>
-                      Live (95 unleaded): {formatMoney(Number(livePrice.petrol_95))}/L
-                    </>
-                  ) : (
-                    <>
-                      {livePrice.stale_warning}
-                      {livePrice.last_checked_at && ` (checked ${formatDateTime(livePrice.last_checked_at)})`}
-                    </>
-                  )}
-                </div>
-              )}
             </div>
-          </div>
-          <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
             <div>
               <label htmlFor="company-electric-r-kwh" style={labelStyle}>Electric (R/kWh)</label>
               <DecimalInput id="company-electric-r-kwh" placeholder="Not set" value={form.fuel_price_electric} onChange={v => set('fuel_price_electric', v)} />
             </div>
+          </div>
+          <div className="cs-grid cs-grid--2" style={{ marginTop: 16 }}>
             <div>
               <label htmlFor="company-hybrid-r-l" style={labelStyle}>Hybrid (R/L)</label>
               <DecimalInput id="company-hybrid-r-l" placeholder="Not set" value={form.fuel_price_hybrid} onChange={v => set('fuel_price_hybrid', v)} />

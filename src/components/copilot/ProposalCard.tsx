@@ -31,6 +31,10 @@ export interface Proposal {
   price_warnings?: { code: string; severity?: string; title?: string; detail?: string }[];
   /** Sending with these warnings needs an explicit acknowledgement. */
   requires_acknowledgement?: boolean;
+  /** Executing this proposal sends the quote to the customer. */
+  sends?: boolean;
+  /** Older name for `sends`. */
+  will_send?: boolean;
 }
 
 const OP_LABELS: Record<Proposal['operation'], string> = { CREATE: 'Create', UPDATE: 'Update', DELETE: 'Delete', SEND: 'Send' };
@@ -59,7 +63,10 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
   const warnings = (proposal.price_warnings || []).filter(w => w && (w.title || w.code));
   const needsAck = !!proposal.requires_acknowledgement;
   // A proposal that sends the quote says "Send", whatever the generic confirm text.
-  const sends = proposal.operation === 'SEND' || (proposal.fields || []).some(f => /status/i.test(f.label) && /^sent$/i.test(String(f.value).trim()));
+  // The server says so (sends, older: will_send); else read it from the proposal.
+  const sends = typeof proposal.sends === 'boolean' ? proposal.sends
+    : typeof proposal.will_send === 'boolean' ? proposal.will_send
+    : proposal.operation === 'SEND' || (proposal.fields || []).some(f => /status/i.test(f.label) && /^sent$/i.test(String(f.value).trim()));
   const sentence = (t: string) => (/[.!?]$/.test(t.trim()) ? t.trim() : `${t.trim()}.`);
 
   return (
@@ -135,7 +142,7 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
         </div>
       ) : (
         <div className="copilot-proposal__status">
-          {proposal.status === 'executed' && <StatusChip tone="success" label={proposal.operation === 'SEND' ? 'Sent' : 'Saved'} />}
+          {proposal.status === 'executed' && <StatusChip tone="success" label={sends ? 'Sent' : 'Saved'} />}
           {proposal.status === 'dismissed' && <StatusChip tone="neutral" label="Dismissed" />}
           {proposal.status === 'expired' && <StatusChip tone="neutral" label="Expired" />}
           {proposal.status === 'failed' && (

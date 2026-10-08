@@ -775,7 +775,7 @@ export default function QuoteDetail() {
             {(() => {
               const a = actualsText(quote.actuals);
               if (!a) return null;
-              const neg = Number(quote.actuals.actual_revenue) - Number(quote.actuals.actual_cost) < 0;
+              const neg = a.negative;
               return (
                 <div className="qd-agreed">
                   <span className={`qd-agreed__line${neg ? ' qd-decision__neg' : ''}`}>{a.line}{bookedLoadQ.data?.quoted_margin_pct != null && bookedLoadQ.data.quoted_margin_pct !== '' ? <span className="qd-agreed__quoted"> (quoted {formatPct(Number(bookedLoadQ.data.quoted_margin_pct))})</span> : null}</span>

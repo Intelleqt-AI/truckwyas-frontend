@@ -3,14 +3,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData } from '@/lib/Api';
-import { formatMoneyWhole } from '@/lib/formatters';
+import { formatMoney } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import {
-  combinedBasisLabel, costBasisLabel, emptyReturnNote, linkWarnings, missingPrompts, pctText, ptsText,
-  revenueBasisLabel, roleLabel, isPending, type Candidate, type Economics, type EconomicsLeg, type LinkWarning,
+  combinedBasisLabel, costBasisLabel, costGroupsText, emptyReturnNote, linkWarnings, missingPrompts, money as moneyText, pctText,
+  ptsText, revenueBasisLabel, roleLabel, isPending, type Candidate, type Economics, type EconomicsLeg, type LinkWarning,
 } from '@/lib/tripEconomics';
 import { CandidateOption } from './CandidateOption';
 import { invalidateTrip } from './invalidateTrip';
@@ -25,7 +25,8 @@ interface LoadLike {
   vehicle?: number | null;
 }
 
-const money = (n: number | null) => (n === null ? null : formatMoneyWhole(n));
+// To the cent: revenue − cost = margin on screen, and matches the invoice.
+const money = (n: number | null) => moneyText(n);
 const tone = (n: number | null) => (n === null ? '' : n < 0 ? ' tm-neg' : '');
 
 /**
@@ -48,6 +49,12 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
   });
   const econ = econQ.data;
 
+  const closeCosts = useMutation({
+    mutationFn: (closed: boolean) => postData({ url: `api/v1/loads/${load.id}/close-costs/`, data: { closed } }),
+    onSuccess: (_r, closed) => { invalidateTrip(qc); toast.success(closed ? 'Costs closed' : 'Costs reopened'); },
+    onError: (e: Error) => toast.error(e?.message || "Couldn't update the costs"),
+  });
+
   const unlink = useMutation({
     mutationFn: () => postData({ url: `api/v1/loads/${load.id}/unlink-return/`, data: {} }),
     onSuccess: () => { setWarnings([]); invalidateTrip(qc); toast.success('Return load unlinked'); },
@@ -56,6 +63,17 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
 
   if (econQ.isLoading) return null;
   if (!econ || !Array.isArray(econ.legs) || econ.legs.length === 0) return null;
+
+  // A cancelled job has no margin to show.
+  if (load.status === 'CANCELLED') {
+    return (
+      <section className="bk-card tm-card" aria-labelledby="tm-title">
+        <div className="bk-card__head"><h2 className="bk-card__title" id="tm-title">Trip margin</h2></div>
+        <p className="tm-note"><span className="bk-dot bk-dot--neutral" aria-hidden="true" />Cancelled. No margin for this job.</p>
+      </section>
+    );
+  }
+  const thisLeg = econ.legs.find(l => l.load_id === load.id);
 
   const pairNote = emptyReturnNote(econ);
   const missing = missingPrompts(econ);
@@ -77,6 +95,8 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
       <td data-label="Cost">
         {leg.cost !== null ? money(leg.cost) : <span className="tm-muted">{(leg.missing || []).some(isPending) ? 'Working out' : 'Unknown'}</span>}
         <span className="tm-sub" title={leg.cost_basis === 'estimate' ? leg.estimate_label : undefined}>{costBasisLabel(leg)}</span>
+        {costGroupsText(leg.cost_groups).line && <span className="tm-sub">{costGroupsText(leg.cost_groups).line}</span>}
+        {costGroupsText(leg.cost_groups).recordedNote && <span className="tm-sub">{costGroupsText(leg.cost_groups).recordedNote}</span>}
       </td>
       <td data-label="Margin" className={tone(leg.margin)}>
         {leg.margin !== null ? money(leg.margin) : <span className="tm-muted">—</span>}
@@ -84,7 +104,7 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
       </td>
       <td data-label="Quoted margin">
         {leg.quoted?.margin_pct !== null && leg.quoted?.margin_pct !== undefined ? pctText(leg.quoted.margin_pct) : <span className="tm-muted">Not quoted</span>}
-        {leg.quoted?.price !== null && leg.quoted?.price !== undefined && <span className="tm-sub">on {formatMoneyWhole(leg.quoted.price)}</span>}
+        {leg.quoted?.price !== null && leg.quoted?.price !== undefined && <span className="tm-sub">on {formatMoney(leg.quoted.price)}</span>}
       </td>
       <td data-label="Vs quote" className={leg.margin_vs_quoted_pts === null ? 'tm-muted' : tone(leg.margin_vs_quoted_pts)}>{ptsText(leg.margin_vs_quoted_pts)}</td>
     </tr>
@@ -109,6 +129,16 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
               Link return load
             </button>
           )}
+          {thisLeg && (thisLeg.costs_closed ? (
+            <button type="button" className="bk-btn bk-btn--secondary bk-btn--sm" onClick={() => closeCosts.mutate(false)} disabled={closeCosts.isPending}>
+              {closeCosts.isPending ? 'Reopening…' : 'Reopen costs'}
+            </button>
+          ) : (thisLeg.actual_cost ?? 0) > 0 && (
+            <button type="button" className="bk-btn bk-btn--secondary bk-btn--sm" onClick={() => closeCosts.mutate(true)} disabled={closeCosts.isPending}
+              title="Every cost of this job is recorded: use the expenses as the whole cost">
+              {closeCosts.isPending ? 'Closing…' : 'Close costs'}
+            </button>
+          ))}
         </span>
       </div>
 

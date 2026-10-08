@@ -1,5 +1,5 @@
 import './trip.css';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData } from '@/lib/Api';
@@ -7,6 +7,7 @@ import { formatMoney, formatMoneyWhole } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { sendBlockedMessage } from '@/lib/quoteWarnings';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import { saDateISO } from '@/lib/dates';
 import {
   bookingRequest, candidateFit, candidateSummary, invoiceWhenText, linkRefusal, linkWarnings, marginText, previewMargin,
   type Candidate, type InvoicePreview, type ReturnChoice, type DEFAULT_LINK_FIELDS,
@@ -47,10 +48,11 @@ interface Preview {
 }
 interface BookedJob { id: number; load_number: string; booking?: { return_link?: unknown } }
 
-// YYYY-MM-DD in local time.
+// YYYY-MM-DD calendar arithmetic (no time zone involved).
 const iso = (t: Date) => `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-const isoInDays = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); };
 const addDays = (s: string, n: number) => { const [y, m, d] = s.split('-').map(Number); const t = new Date(y, (m || 1) - 1, d || 1); t.setDate(t.getDate() + n); return iso(t); };
+// Today in South Africa (SAST), whatever the browser's zone.
+const isoInDays = (n: number) => addDays(saDateISO() ?? iso(new Date()), n);
 // About 700 km a day on the road: a 600 km run is delivered the same day.
 const roadDays = (km?: number | null) => (km && km > 0 ? Math.floor(km / 700) : 2);
 const place = (s?: string) => (s || '').split(',')[0].trim();
@@ -75,6 +77,8 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
   const [driverId, setDriverId] = useState('');
   const [picked, setChoice] = useState<ReturnChoice>({ kind: 'none' });
   const [error, setError] = useState<string | null>(null);
+  // One booking in flight, even on a fast double tap before React re-renders.
+  const inFlight = useRef(false);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -241,7 +245,11 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
           {bookedId ? (
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => { onClose(); navigate(`/bookings/${bookedId}`); }}>Open job</button>
           ) : (
-            <button type="button" className="bk-btn bk-btn--primary" disabled={datesBad || driverWithoutTruck || book.isPending || !!blockedText} onClick={() => book.mutate()}>
+            <button type="button" className="bk-btn bk-btn--primary" disabled={datesBad || driverWithoutTruck || book.isPending || !!blockedText} onClick={() => {
+              if (inFlight.current) return;
+              inFlight.current = true;
+              book.mutate(undefined, { onSettled: () => { inFlight.current = false; } });
+            }}>
               {book.isPending ? 'Booking…' : choice.kind === 'return' || choice.kind === 'outbound' ? 'Book and link' : 'Book job'}
             </button>
           )}

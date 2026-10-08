@@ -1,13 +1,24 @@
 // Trip economics display rules: job / return-pair margins, booking choices,
 // invoice mismatch and quote actuals (backend core.services.trip_economics,
 // docs/QUOTE-RULES.md "Trip economics"). Pure: no "@/" imports, node tests it.
-import { formatMoneyWhole, formatDateShort } from "./formatters.ts";
+import { formatMoney, formatMoneyWhole, formatDateShort } from "./formatters.ts";
 
 export type Basis = "actual" | "estimate" | "mixed" | "part_actual" | null;
 
 export interface Missing { code: string; prompt: string; pending?: boolean }
 
 export interface QuotedFigures { price: number | null; cost_floor: number | null; margin_pct: number | null }
+
+/** One cost group of a leg: what was recorded vs estimated, and which counts.
+ *  basis "recorded_in_operating_estimate" = maintenance / insurance /
+ *  overhead slips, shown but already inside the running-cost estimate. */
+export interface CostGroup {
+  group: string;
+  estimated: number | null;
+  actual: number | null;
+  used: number | null;
+  basis: "actual" | "estimate" | "none" | "recorded_in_operating_estimate" | string;
+}
 
 export interface EconomicsLeg {
   load_id: number;
@@ -29,6 +40,10 @@ export interface EconomicsLeg {
   margin_vs_quoted_pts: number | null;
   empty_return_removed: number | null;
   missing: Missing[];
+  cost_groups?: CostGroup[];
+  cost_complete?: boolean;
+  costs_closed?: boolean;
+  costing_source?: string;
 }
 
 export interface EconomicsCombined {
@@ -41,6 +56,7 @@ export interface EconomicsCombined {
   quoted: QuotedFigures;
   margin_vs_quoted_pts: number | null;
   empty_return_removed: number;
+  cost_complete?: boolean;
 }
 
 export interface Economics {
@@ -78,11 +94,15 @@ export function ptsText(p: unknown): string {
   return `${n < 0 ? MINUS : "+"}${body} pts`;
 }
 
-/** "R 2 710 · 8%", or null when the margin isn't known. */
+/** Money on trip figures is to the cent so revenue − cost = margin on screen
+ *  and matches the invoice ("R 31 234,56"). */
+export const money = (v: unknown): string | null => (num(v) === null ? null : formatMoney(num(v)));
+
+/** "R 2 710,40 · 8%", or null when the margin isn't known. */
 export function marginText(margin: unknown, pct: unknown): string | null {
   const m = num(margin);
   if (m === null) return null;
-  return `${formatMoneyWhole(m)} · ${pctText(pct)}`;
+  return `${formatMoney(m)} · ${pctText(pct)}`;
 }
 
 export function roleLabel(role: EconomicsLeg["role"]): string {
@@ -90,20 +110,55 @@ export function roleLabel(role: EconomicsLeg["role"]): string {
 }
 
 // Short names for the estimate bases (the server's label is the long form).
+// A job never quoted (TMS) is costed from its own data, not "quote costing".
 const ESTIMATE_SHORT: Record<string, string> = {
   snapshot: "quote costing",
   snapshot_return_linked: "no empty return",
   legacy_deadhead: "standard, empty return",
   legacy_paired: "standard, no empty return",
 };
+const ESTIMATE_SHORT_COMPUTED: Record<string, string> = {
+  snapshot: "job costing",
+  snapshot_return_linked: "job costing, no empty return",
+};
+
+/** THE cost label (job card and quote outcome use it alike): what the cost
+ *  rests on, and whether it is final. Operating (running cost) estimated =
+ *  never "Actual", unless the costs are closed (the server's basis says so). */
+export function costLabel(basis: Basis | string | null | undefined, complete: boolean | undefined): string {
+  if (basis === "actual") return complete ? "Actual costs" : "Actual so far · not final";
+  if (basis === "part_actual" || basis === "mixed") return complete ? "Part actual · running cost estimated" : "Part actual · not final";
+  if (basis === "estimate") return "Estimate";
+  return "No estimate";
+}
 
 /** What the cost figure is: actual expenses, or which estimate. */
-export function costBasisLabel(leg: Pick<EconomicsLeg, "cost_basis" | "estimate_label" | "estimate_basis">): string {
-  if (leg.cost_basis === "actual") return "Actual costs";
-  // Actual where recorded, the estimate for the rest.
-  if (leg.cost_basis === "part_actual" || leg.cost_basis === "mixed") return "Part actual · estimate for the rest";
-  if (leg.cost_basis === "estimate") return `Estimate · ${ESTIMATE_SHORT[leg.estimate_basis] ?? leg.estimate_label ?? "quote costing"}`;
-  return "No estimate";
+export function costBasisLabel(leg: Pick<EconomicsLeg, "cost_basis" | "estimate_label" | "estimate_basis"> & Partial<Pick<EconomicsLeg, "cost_complete" | "costing_source">>): string {
+  if (leg.cost_basis === "estimate") {
+    const short = leg.costing_source === "computed" ? ESTIMATE_SHORT_COMPUTED[leg.estimate_basis] : undefined;
+    return `Estimate · ${short ?? ESTIMATE_SHORT[leg.estimate_basis] ?? leg.estimate_label ?? "quote costing"}`;
+  }
+  return costLabel(leg.cost_basis, leg.cost_complete);
+}
+
+const GROUP_NAMES: Record<string, string> = {
+  fuel: "fuel", tolls: "tolls", driver: "driver", operating: "running cost", border: "border",
+  other: "other", subcontractor: "subcontractor",
+};
+
+/** Which cost groups are actual and which are estimated, plus slips already
+ *  inside the running-cost estimate: "Actual: fuel, tolls · Estimated: running cost". */
+export function costGroupsText(groups: CostGroup[] | null | undefined): { line: string | null; recordedNote: string | null } {
+  const g = groups ?? [];
+  const actual = g.filter((x) => x.basis === "actual").map((x) => GROUP_NAMES[x.group] ?? x.group);
+  const est = g.filter((x) => x.basis === "estimate").map((x) => GROUP_NAMES[x.group] ?? x.group);
+  const parts = [actual.length ? `Actual: ${actual.join(", ")}` : "", est.length ? `Estimated: ${est.join(", ")}` : ""].filter(Boolean);
+  const rec = g.find((x) => x.basis === "recorded_in_operating_estimate");
+  const recAmt = rec ? num(rec.actual) : null;
+  return {
+    line: actual.length ? parts.join(" · ") : null,
+    recordedNote: recAmt ? `Maintenance and overheads recorded ${formatMoney(recAmt)}: inside the running cost, not added again` : null,
+  };
 }
 
 export function revenueBasisLabel(basis: Basis): string {
@@ -121,7 +176,7 @@ export function emptyReturnNote(e: Pick<Economics, "pair" | "combined"> | null |
   if (!e?.pair) return null;
   const saved = num(e.combined?.empty_return_removed) ?? 0;
   if (saved <= 0) return null;
-  return `Empty return removed: return load linked (${formatMoneyWhole(saved)} less cost)`;
+  return `Empty return removed: return load linked (${formatMoney(saved)} less cost)`;
 }
 
 /** One list of what to add to cost the job(s), each prompt once. */
@@ -277,7 +332,7 @@ export function invoiceMismatchText(m: InvoiceMismatch | null | undefined): { ti
   const diff = num(m.difference) ?? (inv !== null && job !== null ? job - inv : null);
   const name = m.invoice_number ? `Invoice ${m.invoice_number}` : "The invoice";
   const detail = inv !== null && job !== null
-    ? `${name} is ${formatMoneyWhole(inv)} excl. VAT; the job is now ${formatMoneyWhole(job)}${diff ? ` (${formatMoneyWhole(Math.abs(diff))} ${diff > 0 ? "more" : "less"})` : ""}. Issue a credit note or a new invoice.`
+    ? `${name} is ${formatMoney(inv)} excl. VAT; the job is now ${formatMoney(job)}${diff ? ` (${formatMoney(Math.abs(diff))} ${diff > 0 ? "more" : "less"})` : ""}. Issue a credit note or a new invoice.`
     : `${name} no longer matches the job's rate. Issue a credit note or a new invoice.`;
   return { title: "Invoice differs from the job's rate", detail };
 }
@@ -285,19 +340,33 @@ export function invoiceMismatchText(m: InvoiceMismatch | null | undefined): { ti
 export interface QuoteActuals {
   actual_margin_pct: number | null; actual_revenue: number | null; actual_cost: number | null;
   actual_cost_basis: string; backhaul_found: boolean | null; recorded_at?: string | null;
+  /** Costs final (delivered + key costs recorded, or closed): actual_* set. */
+  complete?: boolean;
+  estimated_cost?: number | null; estimated_margin_pct?: number | null;
 }
 
-/** "Actual margin R 2 010 · 6%" with what it rests on, or null. */
-export function actualsText(a: QuoteActuals | null | undefined): { line: string; basis: string } | null {
+/** One decimal, comma: "22,5%". */
+const pct1 = (p: number) => `${p < 0 ? MINUS : ""}${Math.abs(Math.round(p * 10) / 10).toFixed(1).replace(".", ",")}%`;
+
+/** Quote outcome: "Actual margin R 2 010,01 · 6%" once costs are final, else
+ *  "Margin so far ~22,5% · costs not final"; the basis uses the job card's rule. */
+export function actualsText(a: QuoteActuals | null | undefined): { line: string; basis: string; final: boolean; negative: boolean } | null {
   if (!a) return null;
+  const back = a.backhaul_found === true ? "came back loaded" : a.backhaul_found === false ? "came back empty" : null;
   const rev = num(a.actual_revenue);
   const cost = num(a.actual_cost);
-  if (rev === null || cost === null) return null;
-  const line = `Actual margin ${formatMoneyWhole(rev - cost)} · ${pctText(a.actual_margin_pct ?? (rev ? ((rev - cost) / rev) * 100 : null))}`;
-  const costWord = a.actual_cost_basis === "actual" ? "Actual costs"
-    : a.actual_cost_basis === "mixed" || a.actual_cost_basis === "part_actual" ? "Part actual costs" : "Estimated costs";
-  const back = a.backhaul_found === true ? "came back loaded" : a.backhaul_found === false ? "came back empty" : null;
-  return { line, basis: [costWord, back].filter(Boolean).join(" · ") };
+  const complete = a.complete ?? (rev !== null && cost !== null);
+  if (complete && rev !== null && cost !== null) {
+    const line = `Actual margin ${formatMoney(rev - cost)} · ${pctText(a.actual_margin_pct ?? (rev ? ((rev - cost) / rev) * 100 : null))}`;
+    return { line, basis: [costLabel(a.actual_cost_basis, true), back].filter(Boolean).join(" · "), final: true, negative: rev - cost < 0 };
+  }
+  const est = num(a.estimated_margin_pct);
+  if (est === null) return null;
+  return {
+    line: `Margin so far ~${pct1(est)} · costs not final`,
+    basis: [costLabel(a.actual_cost_basis || "estimate", false), back].filter(Boolean).join(" · "),
+    final: false, negative: est < 0,
+  };
 }
 
 /** The lane's return-load history sentence from the pricing analysis. */

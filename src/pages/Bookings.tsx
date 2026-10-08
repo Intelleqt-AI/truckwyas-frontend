@@ -203,7 +203,7 @@ export default function Bookings() {
     if (newStatus === 'CANCELLED' && !['PENDING', 'LOADING'].includes(currentStatus)) {
       setConfirmOpts({
         title: 'Cancel load',
-        message: `Cancel this load? The load is currently ${currentStatus.replace('_', ' ')}. This action is difficult to reverse.`,
+        message: `Cancel this load? The load is currently ${currentStatus.replace('_', ' ')}. This action is difficult to reverse. If it is in a return pair, the pair is unlinked.`,
         confirmLabel: 'Cancel load',
         danger: true,
         onConfirm: async () => {

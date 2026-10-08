@@ -2,11 +2,13 @@ import "@/components/layout/section-header.css";
 import { isForeignCountry, tripIsInternational } from "@/lib/tripInternational";
 import { savedRouteMatches } from "@/lib/savedRoute";
 import { borderCostsUnknown } from "@/lib/borderUnknown";
+import { routeChipLabel, borderTotalWithAgentFee, borderEstimate, type TollItem, type BorderItem } from "@/lib/routeTolls";
+import { TollPop, BorderPop } from "@/components/pricing/RouteCostPops";
 import SectionHeader from "@/components/layout/SectionHeader";
 import "./quote-invoice-roles.css";
 import { localDateISO } from '@/lib/dates';
 import "./quote-builder-controls.css";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, patchData, fetchData } from "@/lib/Api";
@@ -62,7 +64,7 @@ const extractCode = (s: string) => {
   return (s || "").slice(0, 3).toUpperCase();
 };
 
-interface TollBreakdownItem { plaza: string; route: string; location_km: number; tariff: number; }
+type TollBreakdownItem = TollItem & { route: string; location_km: number };
 interface QuoteStop { id: string; location: string; coords: LocationCoords | null; }
 
 // One draggable stop row — a plain grip + location input + remove button,
@@ -205,6 +207,15 @@ interface RouteOption {
   label?: string; geometry?: { lat: number; lon: number }[];
   road_type?: string; motorway_pct?: number; traffic_status?: string; congested_km?: number; terrain?: string[];
   fuel_usage_litres?: number; country_codes?: string[]; tolls_unavailable?: boolean; tolls_unknown?: boolean;
+  /** "Fastest · via N17/N3 (plazas) · tolls R 887" (the server's). */
+  toll_summary?: string | null; toll_plazas?: string[]; tolls_unavailable_reason?: string | null;
+}
+/** The way home, priced on its own TomTom route (include_return). */
+interface ReturnLeg {
+  available?: boolean; distance_km?: number; toll_cost_zar?: number | null; tolls_unknown?: boolean;
+  tolls_unavailable_reason?: string | null; toll_breakdown?: TollBreakdownItem[];
+  additional_costs?: { border_fees?: number; weighbridge_fees?: number; non_sa_tolls?: number };
+  cross_border_breakdown?: BorderItem[];
 }
 const formatDuration = (min?: number) => {
   if (!min || min <= 0) return "—";
@@ -220,7 +231,7 @@ interface RouteData {
   // country's weighbridge and tolls. A sibling of additional_costs, not a key
   // inside it: that dict is summed server-side, so a list in there breaks the
   // whole route calculation. Absent on route responses cached before this.
-  cross_border_breakdown?: { type: string; description: string; amount: number }[];
+  cross_border_breakdown?: BorderItem[];
   /** Countries / crossings on the route with no border figures on file (codes). */
   border_costs_unknown?: { countries?: string[]; crossings?: string[] } | null;
   border_costs_complete?: boolean;
@@ -230,6 +241,12 @@ interface RouteData {
   /** "estimated" = straight-line fallback (routing failed). */
   source?: string; distance_estimated?: boolean;
   tolls_unavailable?: boolean; tolls_unknown?: boolean; toll_warning?: string | null;
+  tolls_unavailable_reason?: string | null;
+  /** Toll amounts are incl. VAT (a company not registered for VAT). */
+  toll_cost_includes_vat?: boolean; toll_sanral_class?: number | null;
+  /** The trip date is after the newest published toll schedule. */
+  toll_schedule_warning?: { message?: string } | string | null;
+  return_leg?: ReturnLeg | null;
 }
 
 // ---- display-only formatting (render strings only; never read back into
@@ -346,6 +363,8 @@ export default function QuoteBuilder() {
   const [tollsNone, setTollsNone] = useState(false);
   // Border costs typed for this quote (all legs); "" = the route's.
   const [borderTyped, setBorderTyped] = useState("");
+  // The user's own clearing-agent fee (per crossing), in place of the route's agent estimate.
+  const [agentFee, setAgentFee] = useState<number | null>(null);
   // Tolls are a figure, not a box: an explicit edit (pencil) opens the input.
   const [tollEditing, setTollEditing] = useState(false);
   const [fuelRefreshing, setFuelRefreshing] = useState(false);
@@ -540,9 +559,23 @@ export default function QuoteBuilder() {
     ? (editableTollCost === "" ? null : (Number(editableTollCost) || 0) / legs)
     : aiTollActive ? aiToll!.oneWay
     : routeTollsUnknown || routeToll == null ? null : Number(routeToll);
-  const tollBreakdownOneWay = tollBreakdown.reduce((s, b) => s + Number(b.tariff), 0);
-  const routeBorderOneWay = (routeData?.additional_costs?.border_fees || 0) + (routeData?.additional_costs?.weighbridge_fees || 0) + (routeData?.additional_costs?.non_sa_tolls || 0);
-  const borderOneWay = borderTyped !== "" ? (Number(borderTyped) || 0) / legs : routeBorderOneWay;
+  // The way home on its own route (asked for with include_return): its own
+  // plazas and the exit-only border charges.
+  const returnLeg = routeData?.return_leg?.available ? routeData.return_leg : null;
+  const returnTolls: number | null = returnLeg && !returnLeg.tolls_unknown && returnLeg.toll_cost_zar != null ? Number(returnLeg.toll_cost_zar) : null;
+  // The route's own toll figure (not a typed or market one) can use the return leg's.
+  const routeTollsInUse = !tollManuallyEdited && !aiTollActive;
+  const borderSum = (ac?: { border_fees?: number; weighbridge_fees?: number; non_sa_tolls?: number }) =>
+    (ac?.border_fees || 0) + (ac?.weighbridge_fees || 0) + (ac?.non_sa_tolls || 0);
+  const routeBorderOut = borderTotalWithAgentFee(routeData?.cross_border_breakdown, borderSum(routeData?.additional_costs), agentFee);
+  const routeBorderBack: number | null = returnLeg?.additional_costs
+    ? borderTotalWithAgentFee(returnLeg.cross_border_breakdown, borderSum(returnLeg.additional_costs), agentFee) : null;
+  // Loaded leg(s): a round trip's way back on its own charges when priced.
+  const routeBorderLoaded = tripType === "ROUND_TRIP" ? routeBorderOut + (routeBorderBack ?? routeBorderOut) : routeBorderOut;
+  const borderLoaded = borderTyped !== "" ? (Number(borderTyped) || 0) : routeBorderLoaded;
+  const borderEmptyBack: number | null = tripType !== "ROUND_TRIP" && borderTyped === "" ? routeBorderBack : null;
+  const borderEstimated: number | null = borderTyped !== "" ? null
+    : (borderEstimate(routeData?.cross_border_breakdown, agentFee) + (tripType === "ROUND_TRIP" ? borderEstimate(returnLeg?.cross_border_breakdown ?? routeData?.cross_border_breakdown, agentFee) : 0)) || null;
   const weightKg = loadT * 1000;
 
   // ---- company figures the costing needs: the server's resolution
@@ -551,9 +584,20 @@ export default function QuoteBuilder() {
   // the truck was chosen). Its company figures are used only for that truck.
   const serverBreakdown = useCostBreakdown(breakdownPayload && selectedVT
     ? { ...breakdownPayload, vehicle_type_id: selectedVT.id ?? null, vehicle_type: selectedVT.name,
-        cross_border_cost: Math.round(borderOneWay * legs * 100) / 100,
+        cross_border_cost: Math.round(borderLoaded * 100) / 100,
+        ...(borderEmptyBack != null ? { cross_border_cost_empty_return: borderEmptyBack } : {}),
+        ...(borderEstimated ? { cross_border_estimate_zar: borderEstimated } : {}),
+        ...(pickupDate ? { pickup_date: pickupDate } : {}),
         ...(borderUnknown ? { border_costs_unknown: borderUnknown } : {}), border_cost_is_override: borderCostIsOverride } : null);
   const siRaw = serverBreakdown?.inputs ?? null;
+  // The trip runs after the newest published toll schedule (route or server says so).
+  const tollScheduleWarning: string | null = (() => {
+    const w = routeData?.toll_schedule_warning;
+    const fromRoute = typeof w === "string" ? w : w?.message ?? null;
+    const fromServer = (serverBreakdown?.warnings as { code?: string; detail?: string; message?: string }[] | undefined)
+      ?.find((x) => x?.code === "toll_tariffs_not_published");
+    return fromRoute || fromServer?.detail || fromServer?.message || null;
+  })();
   const si = siRaw && (siRaw as { vehicle?: { id?: unknown } | null }).vehicle?.id != null
     && String((siRaw as { vehicle?: { id?: unknown } }).vehicle!.id) === String(selectedVT?.id) ? siRaw : null;
   const opInUse = companyProfile?.operating_cost_in_use;
@@ -581,10 +625,14 @@ export default function QuoteBuilder() {
     diesel: dieselInput,
     operating_cost_per_km: opPerKm,
     operating_cost_source: si?.operating_cost_source ?? localOp?.source ?? null,
-    tolls: { one_way: tollsOneWay, empty_return: null, lookup_failed: tollsOneWay == null && routeTollsUnknown, confirmed_none: tollsNone },
+    tolls: { one_way: tollsOneWay, lookup_failed: tollsOneWay == null && routeTollsUnknown, confirmed_none: tollsNone,
+      empty_return: routeTollsInUse && tripType !== "ROUND_TRIP" ? returnTolls : null,
+      return_leg: routeTollsInUse && tripType === "ROUND_TRIP" ? returnTolls : null },
     driver: { allowance_per_night: allowancePerNight, nights: null, amount: driverEdited ? (driverAllowanceInput === "" ? null : Number(driverAllowanceInput) || 0) : null },
     hours_per_day: si?.hours_per_day ?? null,
-    border_cost: borderOneWay * legs,
+    border_cost: borderLoaded,
+    border_cost_empty_return: borderEmptyBack,
+    border_estimate: borderEstimated,
     border_costs_unknown: borderUnknown,
     border_cost_is_override: borderCostIsOverride,
     international: tripInternational,
@@ -688,6 +736,10 @@ export default function QuoteBuilder() {
         // TomTom limitation, not ours), so `routes` comes back with exactly
         // one entry in that case — see the single-route summary below.
         stops: stops.filter(s => s.coords).map(s => ({ lat: s.coords!.lat, lon: s.coords!.lon })),
+        // Tariffs in force on the trip date (SANRAL years run from 1 March).
+        ...(pickupDate ? { trip_date: pickupDate } : {}),
+        // The way home on its own route: a round trip's back leg, or the empty return.
+        ...(wantReturnLeg ? { include_return: true } : {}),
       };
       const requestKey = routeRequestKey;
       // X-TW-Quote-Rules: the backend then says "unknown" (nulls + flags:
@@ -732,8 +784,10 @@ export default function QuoteBuilder() {
   // edited quote starts with.
   // The truck priced (chosen or suggested) shapes the route's tolls and class:
   // a change of truck is a new route, so a save is never priced on the old one.
+  // A round trip, or a company whose one-way quotes include the empty return.
+  const wantReturnLeg = tripType === "ROUND_TRIP" || companyProfile?.include_empty_return_default !== false;
   const routeRequestKey = JSON.stringify([pickupCoords?.lat, pickupCoords?.lon, deliveryCoords?.lat, deliveryCoords?.lon,
-    truckName || "Flatbed", selectedVT?.id ?? null, stopsRouteKey]);
+    truckName || "Flatbed", selectedVT?.id ?? null, stopsRouteKey, pickupDate || null, wantReturnLeg]);
   const routeIsCurrent = !!route && !calculatingRoute && lastRouteKeyRef.current === routeRequestKey;
 
   useEffect(() => {
@@ -757,7 +811,7 @@ export default function QuoteBuilder() {
     calcRef.current = setTimeout(() => { calculateRoute(); }, 500);
     return () => { if (calcRef.current) clearTimeout(calcRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, pickupCoords, deliveryCoords, truckName, selectedVT?.id, billingBlocked, stopsRouteKey]);
+  }, [ready, pickupCoords, deliveryCoords, truckName, selectedVT?.id, billingBlocked, stopsRouteKey, pickupDate, wantReturnLeg]);
 
   // ---- natural-language input (typed or transcribed from voice) ----
   // Shared by the top quick-fill bar and the AI chat panel — both are just
@@ -944,7 +998,7 @@ export default function QuoteBuilder() {
     setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
     setPickupDate(""); setDeliveryDate(""); setNlText("");
     setEditableTollCost(""); setTollManuallyEdited(false); setDriverAllowanceInput("");
-    setDriverEdited(false); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setDistanceConfirmed(false); setUseOfficialDiesel(false);
+    setDriverEdited(false); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setAgentFee(null); setDistanceConfirmed(false); setUseOfficialDiesel(false);
     restoreRouteRef.current = null;
     savedFinalPriceRef.current = null; savedPricingRef.current = null; savedBorderRef.current = null; borderRestoreRef.current = null; setReopenNotice(null); setPriceSet(null); setSavedPriceShown(false);
     setRouteError(false);
@@ -1108,6 +1162,13 @@ export default function QuoteBuilder() {
       ...(borderUnknown ? { border_costs_unknown: borderUnknown } : {}), border_cost_is_override: borderCostIsOverride,
       ...(aiFuelActive ? { fuel_price_override: aiFuel!.pricePerL } : {}),
       ...(emptyReturn.applicable ? { include_empty_return: emptyReturn.included } : {}),
+      // The way home on its own route's tolls and border charges (one way
+      // stated, so the server never splits a total that includes them).
+      ...(tollsOneWay != null ? { toll_cost_one_way: round2(tollsOneWay) } : {}),
+      ...(costingInputs.tolls?.return_leg != null ? { toll_cost_return: costingInputs.tolls.return_leg } : {}),
+      ...(costingInputs.tolls?.empty_return != null ? { toll_cost_empty_return: costingInputs.tolls.empty_return } : {}),
+      ...(borderEmptyBack != null ? { cross_border_cost_empty_return: borderEmptyBack } : {}),
+      ...(borderEstimated ? { cross_border_estimate_zar: borderEstimated } : {}),
     },
     tollCost, routePlazas: tollBreakdown.map(b => ({ plaza: b.plaza, route: b.route, tariff: Number(b.tariff) })),
     countryCodes: route?.country_codes ?? routeData?.countries ?? null,
@@ -1175,7 +1236,7 @@ export default function QuoteBuilder() {
     const saved = savedBorderRef.current;
     if (saved == null || !routeIsCurrent) return;
     savedBorderRef.current = null;
-    if (Math.abs(routeBorderOneWay * legs - saved) < 0.5) return;
+    if (Math.abs(routeBorderLoaded - saved) < 0.5) return;
     const typed = String(round2(saved));
     borderRestoreRef.current = typed;
     setBorderTyped(typed);
@@ -1328,6 +1389,8 @@ export default function QuoteBuilder() {
     vehicle_type_id: selectedVT?.id != null ? Number(selectedVT.id) : null,
     duration_minutes: durationMin != null ? Math.round(Number(durationMin)) : null,
     toll_cost_one_way: tollsOneWay != null ? round2(tollsOneWay) : null,
+    // The empty return's own tolls (its route home), when that leg was priced.
+    tolls_empty_return: costingInputs.tolls?.empty_return ?? null,
     // The border line (all legs): additional_charges can't be read back as it.
     border_cost: crossBorderCost > 0 ? round2(crossBorderCost) : null,
     border_costs_unknown: borderUnknown,
@@ -1647,14 +1710,20 @@ export default function QuoteBuilder() {
                   onClick={() => setSelectedRouteIndex(i)}
                   aria-pressed={i === selectedRouteIndex}
                   className="qb-routeopt">
-                  {formatNumber(Math.round(r.distance_km))} km
+                  {/* "Fastest · via N17/N3 · tolls R 887" (fastest is the default). */}
+                  {routeChipLabel(r, i)}
+                  <span className="qb-routeopt__sub"> · {formatNumber(Math.round(r.distance_km))} km</span>
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top" style={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", fontSize: 13, lineHeight: "20px", padding: "10px 12px", maxWidth: 220, borderRadius: 8 }}>
+              <TooltipContent side="top" style={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", fontSize: 13, lineHeight: "20px", padding: "10px 12px", maxWidth: 280, borderRadius: 8 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "3px 12px" }}>
                   <span style={{ color: "var(--text-tertiary)" }}>Distance</span><span>{Math.round(r.distance_km)} km</span>
                   <span style={{ color: "var(--text-tertiary)" }}>Duration</span><span>{formatDuration(r.duration_minutes ?? r.duration_min)}</span>
                   <span style={{ color: "var(--text-tertiary)" }}>Tolls</span><span>{r.tolls_unavailable || r.tolls_unknown || r.toll_cost_zar == null ? "Unknown" : formatCurrency(r.toll_cost_zar)}</span>
+                  {/* This option's own plazas, in driving order. */}
+                  {(r.toll_breakdown ?? []).map((b, j) => (
+                    <Fragment key={`${b.plaza}-${j}`}><span style={{ color: "var(--text-tertiary)", paddingLeft: 8 }}>{b.plaza}</span><span>{formatCurrency(Number(b.tariff))}</span></Fragment>
+                  ))}
                   {r.road_type && (<><span style={{ color: "var(--text-tertiary)" }}>Road</span><span>{r.road_type}</span></>)}
                   {r.terrain && r.terrain.length > 0 && (<><span style={{ color: "var(--text-tertiary)" }}>Terrain</span><span>{r.terrain.join(", ")}</span></>)}
                 </div>
@@ -1958,10 +2027,17 @@ export default function QuoteBuilder() {
               <div className="qb-cost__row">
                 <span className="qb-cost__label">
                   Tolls
-                  <InfoPop label="Toll plazas" title="Toll plazas" rows={tollBreakdown.length
-                    ? tollBreakdown.map(b => [b.plaza, formatCurrency(b.tariff)] as [string, string])
-                    : [[routeTollsUnknown ? "Lookup failed" : "No toll plazas on this route", ""]]}
-                    total={tollBreakdown.length ? [legs === 2 ? "Both ways" : "One way", money(tollBreakdownOneWay * legs)] : undefined} />
+                  <TollPop sanralClass={routeData?.toll_sanral_class ?? null} includesVat={routeData?.toll_cost_includes_vat === true}
+                    scheduleWarning={tollScheduleWarning}
+                    legs={[
+                      { title: tripType === "ROUND_TRIP" || returnLeg ? "Out" : "One way", items: tollBreakdown,
+                        total: routeTollsUnknown || routeToll == null ? null : Number(routeToll),
+                        unknownReason: routeTollsUnknown ? (route?.tolls_unavailable_reason ?? routeData?.tolls_unavailable_reason ?? "unknown") : null },
+                      ...(returnLeg && (tripType === "ROUND_TRIP" || emptyReturn.included) ? [{
+                        title: tripType === "ROUND_TRIP" ? "Back" : "Back, empty", items: returnLeg.toll_breakdown ?? [],
+                        total: returnTolls, unknownReason: returnLeg.tolls_unknown ? (returnLeg.tolls_unavailable_reason ?? "unknown") : null }] : []),
+                    ]} />
+                  {tollScheduleWarning && <span className="qb-cost__tag" title={tollScheduleWarning}>Tariffs not published</span>}
                   {aiTollActive && !tollManuallyEdited && <button type="button" className="qb-linkbtn" onClick={() => setAiToll(null)}>Reset</button>}
                   {tollManuallyEdited && <button type="button" className="qb-linkbtn" onClick={() => { setTollManuallyEdited(false); setEditableTollCost(""); setTollEditing(false); }}>Use route</button>}
                 </span>
@@ -2002,11 +2078,11 @@ export default function QuoteBuilder() {
                     {/* Part of the route has no border figures on file: what is known, what is missing.
                         The figure entered here is the whole border cost (every crossing). */}
                     {borderUnknown && (
-                      <InfoPop label="Border costs on file" title="Border costs" rows={[
-                        ...borderUnknown.known.map(k => [k.label, formatCurrency(k.amount)] as [string, string]),
-                        [`Not on file: ${(borderUnknown.crossings.length ? borderUnknown.crossings : borderUnknown.countries).join(", ")}`, "—"] as [string, string],
-                        ["Enter the total for every crossing.", ""] as [string, string],
-                      ]} />)}
+                      <BorderPop title={routeData?.countries?.length ? routeData.countries.join(" → ") : "Border charges"}
+                        agentFee={agentFee} onAgentFee={setAgentFee}
+                        note={`Not on file: ${(borderUnknown.crossings.length ? borderUnknown.crossings : borderUnknown.countries).join(", ")}. Enter the total for every crossing.`}
+                        legs={(routeData?.cross_border_breakdown || []).length
+                          ? [{ title: "On file", items: (routeData?.cross_border_breakdown || []).filter(it => Number(it.amount) > 0), total: routeBorderOut }] : []} />)}
                     {borderTyped !== "" && <button type="button" className="qb-linkbtn" onClick={() => setBorderTyped("")}>Reset</button>}</span>
                   {rIn(<NumberField id="qb-border-input" decimals={0} value={borderTyped === "" ? null : Number(borderTyped)} placeholder="Needed"
                     onValue={(n) => setBorderTyped(n == null ? "" : String(n))}
@@ -2014,17 +2090,21 @@ export default function QuoteBuilder() {
                 </div>
               )}
               {crossBorderCost > 0 && borderTyped === "" && !borderNotSet && (() => {
-                const items = routeData?.cross_border_breakdown || [];
-                const rows = items.length
-                  ? items.filter(it => it.amount > 0).map(it => [it.description, formatCurrency(it.amount)] as [string, string])
-                  : ([["Border fees", routeData?.additional_costs?.border_fees || 0], ["Weighbridge", routeData?.additional_costs?.weighbridge_fees || 0], ["Non-SA tolls", routeData?.additional_costs?.non_sa_tolls || 0]] as [string, number][])
-                    .filter(([, v]) => v > 0).map(([k, v]) => [k, formatCurrency(v)] as [string, string]);
+                const outItems = (routeData?.cross_border_breakdown || []).filter(it => Number(it.amount) > 0);
+                const backItems = (returnLeg?.cross_border_breakdown || []).filter(it => Number(it.amount) > 0);
+                const showBack = !!returnLeg && routeBorderBack != null && (tripType === "ROUND_TRIP" || emptyReturn.included);
+                const estimates = [...outItems, ...(showBack ? backItems : [])].some(it => !it.verified);
                 return (
                   <div className="qb-cost__row">
                     <span className="qb-cost__label">
                       Border fees
-                      <InfoPop label="Border charges" title={routeData?.countries?.length ? routeData.countries.join(" → ") : "Border charges"} rows={rows}
-                        total={["Border fees", money(crossBorderCost)]} />
+                      <BorderPop title={routeData?.countries?.length ? routeData.countries.join(" → ") : "Border charges"}
+                        agentFee={agentFee} onAgentFee={setAgentFee}
+                        legs={[
+                          { title: showBack ? "Out" : "Border fees", items: outItems, total: routeBorderOut },
+                          ...(showBack ? [{ title: tripType === "ROUND_TRIP" ? "Back" : "Back, empty", items: backItems, total: routeBorderBack! }] : []),
+                        ]} />
+                      {estimates && <span className="qb-cost__tag" title="Some charges are estimates: see the list">Includes estimates</span>}
                     </span>
                     <span className="qb-cost__value">{money(crossBorderCost)}</span>
                   </div>

@@ -362,3 +362,22 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
   border: 0; border-radius: 4px; background: none; color: var(--text-tertiary); cursor: pointer; opacity: .6; vertical-align: -3px; }
 .qb-cost__row:hover .qb-cost__edit, .qb-cost__edit:focus-visible { opacity: 1; }
 .qb-cost__edit:hover { color: var(--text-primary); background: var(--bg-raised); }
+
+/* Toll and border popovers: one item per plaza / charge, a quiet meta line. */
+.qb-pop--wide { width: 340px; max-width: calc(100vw - 32px); max-height: min(480px, var(--radix-popover-content-available-height, 70vh)); overflow-y: auto; }
+.qb-pop__note { margin: -2px 0 6px; font-size: 12px; line-height: 18px; color: var(--text-tertiary); }
+.qb-pop__note--warn { margin: 8px 0 0; color: var(--status-warning-text); }
+.qb-pop__leg + .qb-pop__leg { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-row); }
+.qb-pop__leg-title { margin-bottom: 2px; font-weight: 500; color: var(--text-secondary); }
+.qb-pop__item { padding: 3px 0; }
+.qb-pop__item .qb-pop__row { padding: 0; }
+.qb-pop__item .qb-pop__row > :first-child { color: var(--text-primary); }
+.qb-pop__meta { font-size: 12px; line-height: 18px; color: var(--text-tertiary); }
+.qb-pop__kind { font-weight: 500; }
+.qb-pop__kind.is-published { color: var(--status-success-text); }
+.qb-pop__kind.is-estimate, .qb-pop__kind.is-agent { color: var(--status-warning-text); }
+.qb-pop__kind.is-unverified { color: var(--status-danger-text); }
+.qb-pop__src { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
+.qb-pop__fee { display: inline-flex; align-items: center; gap: 4px; }
+.qb-pop__input { width: 84px; }
+.qb-routeopt__sub { color: var(--text-tertiary); }

@@ -121,7 +121,6 @@ export function fmtNum(v: number, dp = 0): string {
   const txt = int.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + (dec ? `,${dec}` : "");
   return (v < 0 && /[1-9]/.test(txt) ? "−" : "") + txt;
 }
-/** "R 32,80" / "R 1 050" (whole rand half-up when dp = 0). */
 /** Offered prices in whole amounts: UP to the next R 50 below R 20 000, else
  *  the next R 100 (never below the price it was built from). */
 export function roundPriceUp(price: number): number {
@@ -130,6 +129,7 @@ export function roundPriceUp(price: number): number {
   return Math.ceil(p / unit - 1e-9) * unit;
 }
 
+/** "R 32,80" / "R 1 050" (whole rand half-up when dp = 0). */
 export function fmtRand(v: number, dp = 0): string {
   const shown = halfUp(v, dp);
   const sign = v < 0 && shown !== 0 ? "−" : "";
@@ -161,10 +161,15 @@ export interface CostingInputs {
   diesel?: DieselInput | null;
   operating_cost_per_km?: number | null;
   operating_cost_source?: string | null;
-  tolls?: { one_way?: number | null; empty_return?: number | null; lookup_failed?: boolean; confirmed_none?: boolean } | null;
+  /** return_leg: a round trip's way back on its own route's plazas (else the outbound again). */
+  tolls?: { one_way?: number | null; empty_return?: number | null; return_leg?: number | null; lookup_failed?: boolean; confirmed_none?: boolean } | null;
   driver?: { allowance_per_night?: number | null; nights?: number | null; amount?: number | null } | null;
   hours_per_day?: number | null;
   border_cost?: number | null;
+  /** The empty return's own border charges (exit rules), when the route priced that leg. */
+  border_cost_empty_return?: number | null;
+  /** The estimated part of border_cost (said in the line's basis). */
+  border_estimate?: number | null;
   /** Cross-border trip: no border cost → incomplete floor (block). */
   international?: boolean;
   /** Parts of the route with no border figures on file (the route's
@@ -401,10 +406,17 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
   }
   // R 0 from a toll lookup that worked is a known R 0: the route has no
   // plazas (owner rule: we know every toll; no "check / add your own").
-  const tollAmt = tollOneWay !== null ? cents(tollOneWay * legsLoaded) : null;
+  // A round trip's way back is priced on its own route's plazas when the
+  // route calculation gave them (tolls.return_leg); otherwise the same plazas again.
+  const tollBack = roundTrip ? num(tolls.return_leg) : null;
+  const tollAmt = tollOneWay === null ? null
+    : roundTrip && tollBack !== null ? cents(tollOneWay + tollBack)
+    : cents(tollOneWay * legsLoaded);
   add("tolls", "loaded", tollAmt,
-    tollAmt === null ? "Unknown" : tollOneWay === 0 ? "No toll plazas on this route" : roundTrip ? `${fmtRand(tollOneWay as number, 2)} × 2 legs` : `${fmtRand(tollOneWay as number, 2)} one way`,
-    { one_way: tollOneWay, legs: legsLoaded });
+    tollAmt === null ? "Unknown" : tollOneWay === 0 && !tollBack ? "No toll plazas on this route"
+      : tollBack !== null ? `${fmtRand(tollOneWay as number, 2)} out + ${fmtRand(tollBack, 2)} back`
+      : roundTrip ? `${fmtRand(tollOneWay as number, 2)} × 2 legs` : `${fmtRand(tollOneWay as number, 2)} one way`,
+    { one_way: tollOneWay, legs: legsLoaded, ...(tollBack !== null ? { return_leg: tollBack } : {}) });
 
   // --- driver nights (§6) ---
   const driver = i.driver || {};
@@ -455,7 +467,11 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
       : `Missing: ${missing}`;
     add("border", "loaded", null, `Not known for ${names.join(" and ")}`, { status: "needs_input" });
     warnings.push(warning("border_costs_missing", "block", `Border costs for ${names.join(" and ")} not known`, detail, null, ["enter_border_costs"]));
-  } else if (border !== null && border > 0) add("border", "loaded", cents(border), "Border, permit and non-SA toll costs");
+  } else if (border !== null && border > 0) {
+    const est = num(i.border_estimate);
+    add("border", "loaded", cents(border), "Border, permit and non-SA toll costs" + (est ? ` (includes ${fmtRand(est, 2)} estimated)` : ""),
+      est ? { estimate: est } : {});
+  }
   else if (i.international) {
     // An international trip always has border costs: without them the floor is incomplete.
     add("border", "loaded", null, "Not worked out yet", { status: "needs_input" });
@@ -495,8 +511,11 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
     if (i.international && borderUnknown) {
       add("border_return", "empty_return", null, "Not known crossing back", { status: "needs_input" });
     } else if (i.international && border !== null && border > 0) {
-      // The empty truck crosses the border(s) back: the same costs per crossing.
-      add("border_return", "empty_return", cents(border), "Border costs crossing back, empty");
+      // The empty truck crosses back. The route calculation prices that leg
+      // itself (exit-only charges, the way back's own km); without it, the
+      // loaded leg's figure is the stand-in.
+      const back = num(i.border_cost_empty_return);
+      add("border_return", "empty_return", cents(back !== null ? back : border), "Border costs crossing back, empty");
     }
   }
 

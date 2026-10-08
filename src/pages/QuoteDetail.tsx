@@ -33,6 +33,7 @@ import PricingDecisionRows from '@/components/PricingDecisionRows';
 import { LOSS_REASONS, formatPct, formatRand, lossReasonPayload, type LossReason } from '@/lib/pricing';
 import { agreedMarginOf, agreedPriceOf, pricingDecisionOf } from '@/lib/pricingDecision';
 import { cargoText } from '@/lib/cargo';
+import { TonnageTerms } from '@/components/pricing/TonnageTerms';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   DRAFT: 'neutral',
@@ -477,7 +478,11 @@ export default function QuoteDetail() {
   // load status (In transit, Completed) with no load found offer no Send
   // either: the chip says where the job stands.
   const booking = (quote.booked_load ?? mapLoadsByQuoteId(loadsQ.data).get(String(quote.id))) as { id: number | string; load_number?: string; status?: string } | undefined;
-  const booked = !!booking;
+  // A volume contract books call-off loads until its tonnes are used up.
+  const perTonne = quote.pricing_basis === 'per_tonne';
+  const contract = perTonne ? quote.volume_contract ?? null : null;
+  const contractOpen = !!contract && contract.remaining_tonnes > 0;
+  const booked = !!booking && !contractOpen;
   const loadStateOnly = !booked && (quote.status === 'IT' || quote.status === 'COMPLETED');
   // Only an alert about this quote's own fuel can demote Send (fuelNote is fuel-aware).
   const fuelDemotes = quote.status === 'DRAFT' && !!fuelNote;
@@ -554,7 +559,8 @@ export default function QuoteDetail() {
   // floor into its parts, "How it was priced" carries fuel, tolls and the rest,
   // so the build-up lines (Base rate, Fuel, …) are not listed a second time.
   // An incomplete quote (no price) has no build-up to show (it would read as R 0 and a negative line).
-  const showBuildUp = !quoteIncomplete(quote) && !(decision && decision.floorLines && !decision.stale);
+  // A tonnage quote is a rate per tonne: no per-load build-up.
+  const showBuildUp = quote.pricing_basis !== 'per_tonne' && !quoteIncomplete(quote) && !(decision && decision.floorLines && !decision.stale);
   const statusOptions: StatusOption[] = [
     { value: 'DRAFT', label: 'Draft', hint: 'Not offered to the customer yet' },
     // An expired quote can still be marked Sent (the preview warns), but the
@@ -624,9 +630,9 @@ export default function QuoteDetail() {
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate(`/bookings/${booking!.id}`)} aria-label="View booking">
               <span className="qd-label-long" data-short="Booking">View booking</span>
             </button>
-          ) : quote.status === 'ACCEPTED' ? (
-            <button type="button" className="bk-btn bk-btn--primary" onClick={handleConvertToLoad} aria-label="Book job">
-              <span className="qd-label-long" data-short="Book">Book job</span>
+          ) : quote.status === 'ACCEPTED' || (contractOpen && !!booking) ? (
+            <button type="button" className="bk-btn bk-btn--primary" onClick={handleConvertToLoad} aria-label={contract ? 'Book a load' : 'Book job'}>
+              {contract ? <span className="qd-label-long" data-short="Book">Book a load</span> : <span className="qd-label-long" data-short="Book">Book job</span>}
             </button>
           ) : (
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending || !!sendBlock} title={sendBlock ? sendBlock.title : undefined} aria-label={sendToCustomerMutation.isPending ? undefined : (quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer')}>
@@ -734,7 +740,7 @@ export default function QuoteDetail() {
         {/* RIGHT: the price (the only place the total appears), then tools. */}
         <div ref={railRef} className="quote-detail-rail">
           <section className="bk-card" aria-labelledby="qd-price-title">
-            <h2 className="bk-fact__label" id="qd-price-title" style={{ margin: 0 }}>{isRound ? 'Total, both legs' : 'Total'}{vat?.vat_registered ? ' excl. VAT' : ''}</h2>
+            <h2 className="bk-fact__label" id="qd-price-title" style={{ margin: 0 }}>{perTonne ? (contract ? 'Contract, estimated' : 'Estimated total') : isRound ? 'Total, both legs' : 'Total'}{vat?.vat_registered ? ' excl. VAT' : ''}</h2>
             {/* Whole rand when the cents are zero, as in the builder's price bar. */}
             {/* No price yet (costs incomplete): never "R 0". */}
             <div className="qd-total">{quoteIncomplete(quote) ? <span className="bk-muted">Incomplete</span> : formatRand(total)}</div>
@@ -798,6 +804,7 @@ export default function QuoteDetail() {
               {fuelNote && <span className="bk-dot bk-dot--warning" aria-hidden="true" />}
               <span>{pricedOn}{fuelNote && Number.isFinite(fuelDelta) && Math.abs(fuelDelta) >= 0.005 ? ` Now ${fuelDelta > 0 ? 'up' : 'down'} ${formatMoney(Math.abs(fuelDelta))}/L.` : ''}</span>
             </p>}
+            {perTonne && <div className="qd-price-rows"><TonnageTerms quote={quote} /></div>}
             {sendBlock && openStatus && <p className="qd-block" role="alert">{sendBlock.title}</p>}
             {!sendBlock && demoteReason && <p className="qd-demote" role="status">{demoteReason}</p>}
             {showBuildUp && <div className="qd-price-rows">

@@ -23,6 +23,9 @@ import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import { staleWork, staleLabel, staleAction } from './bookings-stale';
 import { useMapFill } from './useMapFill';
 import { cargoText as cargoOf } from '@/lib/cargo';
+import { WeighbridgeCard, WeighbridgeFields } from '@/components/pricing/WeighbridgeCard';
+import { parseTonnes, saveWeighbridge } from '@/components/pricing/weighbridge';
+import { fmtRatePerTonne, fmtTonnes } from '@/lib/tonnage';
 import { TripMarginCard } from '@/components/trip/TripMarginCard';
 import { invoiceMismatchText } from '@/lib/tripEconomics';
 
@@ -91,6 +94,9 @@ export default function Bookings() {
   const [podSkipping, setPodSkipping] = useState(false);
   const [podButtonUploading, setPodButtonUploading] = useState(false);
   const [podPreviewOpen, setPodPreviewOpen] = useState(false);
+  // Per-tonne loads: the weighbridge tonnes (and slip) taken with the delivery.
+  const [wbTonnes, setWbTonnes] = useState('');
+  const [wbSlip, setWbSlip] = useState('');
   // Dialogs: focus moves in, Tab stays inside, focus returns on close.
   useFocusTrap(latestModal, assignModalOpen);
   useFocusTrap(latestModal, podModalOpen);
@@ -243,9 +249,20 @@ export default function Bookings() {
     }
   };
 
+  // Per-tonne load: weighbridge tonnes typed in the delivery dialog are saved
+  // first, so the delivery invoice uses them (else planned, flagged).
+  const saveDeliveryTonnes = async (): Promise<boolean> => {
+    if (load?.pricing_basis !== 'per_tonne' || wbTonnes.trim() === '') return true;
+    const t = parseTonnes(wbTonnes);
+    if (t == null) { toast.error('Enter the weighbridge tonnes, up to 100 t'); return false; }
+    await saveWeighbridge(id as string, t, wbSlip);
+    return true;
+  };
+
   const uploadPODFromModal = async (file: File) => {
     setPodUploading(true);
     try {
+      if (!(await saveDeliveryTonnes())) return;
       const data = await postData({
         url: `api/v1/loads/${id}/upload_pod/`,
         data: (() => { const fd = new FormData(); fd.append('pod_document', file); return fd; })(),
@@ -263,6 +280,7 @@ export default function Bookings() {
   const skipPodMarkDelivered = async () => {
     setPodSkipping(true);
     try {
+      if (!(await saveDeliveryTonnes())) return;
       await patchData({ url: `api/v1/loads/${id}/`, data: { status: 'DELIVERED' } });
       invalidateLoad();
       setPodModalOpen(false);
@@ -634,7 +652,12 @@ export default function Bookings() {
               // note under Base rate rather than among the lines (R10).
               const dist = parseFloat(load.distance || '0') || 0;
               const perKm = dist > 0 ? `${formatMoney(rate / Math.max(dist, 1))}/km` : null;
-              const rows: { label: React.ReactNode; key?: string; value: string; note?: React.ReactNode; noteTitle?: string; muted?: boolean }[] = [
+              const perTonneLoad = load.pricing_basis === 'per_tonne' && load.tonnage;
+              const rows: { label: React.ReactNode; key?: string; value: string; note?: React.ReactNode; noteTitle?: string; muted?: boolean }[] = perTonneLoad ? [
+              { label: 'Rate', value: fmtRatePerTonne(load.tonnage.rate_per_tonne) },
+              { label: load.tonnage.tonnes_source === 'actual' ? 'Billed tonnes' : 'Billed tonnes (planned)', value: fmtTonnes(load.tonnage.billable_tonnes),
+                note: load.tonnage.min_tonnes != null && load.tonnage.billable_tonnes > load.tonnage.tonnes ? `minimum ${fmtTonnes(load.tonnage.min_tonnes)}` : null },
+              ] : [
               { label: 'Base rate', value: formatCurrency(rate), note: perKm, noteTitle: 'Base rate divided by distance, before surcharges' },
               { label: 'Fuel', value: formatCurrency(fuel) },
               ...(tolls > 0 ? [{ label: 'Tolls', value: formatCurrency(tolls) }] : []),
@@ -643,7 +666,7 @@ export default function Bookings() {
               ];
               // Normal weight: when it is a large share of the total it is the
               // line a reader most needs to see, never the faintest one.
-              if (Math.abs(gap) > 0.5) rows.push({
+              if (!perTonneLoad && Math.abs(gap) > 0.5) rows.push({
                 key: 'not-itemised',
                 label: <>Not itemised <InfoTip>{load.quote_number
                   ? `The order total includes charges not broken down here. Quote ${load.quote_number} has the full breakdown.`
@@ -724,6 +747,10 @@ export default function Bookings() {
               );
             })()}
           </section>
+
+          {load.pricing_basis === 'per_tonne' && (
+            <WeighbridgeCard key={`${load.actual_tonnes}-${load.weighbridge_slip}`} load={load} onSaved={invalidateLoad} disabled={billingBlocked} />
+          )}
 
           {/* Job figures join the rail when the main column would otherwise
               run long even with the smallest map (Pending loads have no
@@ -951,6 +978,12 @@ export default function Bookings() {
           <p className="bk-dialog__body">
             Attach a POD before marking this order <b>Delivered</b>, or skip and mark it delivered anyway.
           </p>
+          {load.pricing_basis === 'per_tonne' && (
+            <div style={{ marginBottom: 16 }}>
+              <WeighbridgeFields tonnes={wbTonnes} slip={wbSlip} onTonnes={setWbTonnes} onSlip={setWbSlip} planned={load.planned_tonnes} />
+              <p className="bk-help" style={{ marginTop: 6 }}>{wbTonnes.trim() ? 'Invoiced on these tonnes, minimum applied.' : `Leave empty to invoice the planned ${fmtTonnes(load.planned_tonnes)} for now.`}</p>
+            </div>
+          )}
 
           <input
             ref={podModalFileRef}

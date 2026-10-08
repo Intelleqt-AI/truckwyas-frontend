@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { compute, changesSincePriced } from "../src/lib/quoteRules.ts";
+import { compute, changesSincePriced, computeTonnage } from "../src/lib/quoteRules.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const file = join(here, "fixtures/quote_golden.json");
@@ -60,5 +60,12 @@ for (const c of golden.reopen_cases ?? []) {
   try { cmp(c.expected, got, ""); } catch (e) { e.message = `reopen ${c.name}: ${e.message}`; throw e; }
   r++;
 }
+let t = 0;
+for (const c of golden.tonnage_cases ?? []) {
+  const got = JSON.parse(JSON.stringify(computeTonnage(c.inputs)));
+  try { cmp(c.expected, got, ""); } catch (e) { e.message = `tonnage ${c.name}: ${e.message}`; throw e; }
+  t++;
+}
+assert.ok(t >= 8, "at least 8 tonnage cases");
 if (copyDiffs.length) console.log(`(copy differences, not compared: ${copyDiffs.length})\n  ${copyDiffs.slice(0, 10).join("\n  ")}`);
-console.log(`quote golden vectors: ${n} cases and ${r} reopen cases match to the cent`);
+console.log(`quote golden vectors: ${n} cases, ${r} reopen cases and ${t} tonnage cases match to the cent`);

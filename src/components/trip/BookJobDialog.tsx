@@ -14,6 +14,7 @@ import {
 } from '@/lib/tripEconomics';
 import { CandidateOption, ChoiceOption } from './CandidateOption';
 import { invalidateTrip } from './invalidateTrip';
+import { callOffCap, checkCallOff, fmtRatePerTonne, fmtTonnes, type VolumeContract } from '@/lib/tonnage';
 
 export interface BookableQuote {
   id: number | string;
@@ -27,6 +28,10 @@ export interface BookableQuote {
   pickup_date?: string | null;
   delivery_date?: string | null;
   distance?: string | number | null;
+  /** Tonnage quotes: per_tonne; a volume contract books call-off loads. */
+  pricing_basis?: string;
+  rate_per_tonne?: string | number | null;
+  volume_contract?: VolumeContract | null;
 }
 
 interface BookingBlock {
@@ -76,6 +81,15 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
   const [vehicleId, setVehicleId] = useState('');
   const [driverId, setDriverId] = useState('');
   const [picked, setChoice] = useState<ReturnChoice>({ kind: 'none' });
+  // A contract call-off: this load's tonnes (default the planned load, capped
+  // at what is left); the preview and the booking use them.
+  const callOff = quote.pricing_basis === 'per_tonne' ? quote.volume_contract ?? null : null;
+  const cap = callOff ? callOffCap(callOff) : 0;
+  const [tonnesText, setTonnesText] = useState(() => callOff
+    ? String(Math.min(callOff.tonnes_per_load ?? cap, cap)).replace('.', ',') : '');
+  const check = callOff ? checkCallOff(tonnesText, cap) : { tonnes: null, error: null };
+  const tonnes = check.tonnes ?? 0;
+  const tonnesBad = !!callOff && !!check.error;
   const [error, setError] = useState<string | null>(null);
   // One booking in flight, even on a fast double tap before React re-renders.
   const inFlight = useRef(false);
@@ -102,9 +116,9 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
 
   // What booking would give, for these dates (suggestions depend on them).
   const previewQ = useQuery({
-    queryKey: ['booking-preview', String(quote.id), pickup, delivery],
-    queryFn: () => fetchData(`api/v1/quotes/${quote.id}/booking-preview/?pickup_date=${pickup}&delivery_date=${delivery}`) as Promise<Preview>,
-    enabled: !datesBad,
+    queryKey: ['booking-preview', String(quote.id), pickup, delivery, callOff ? tonnes : null],
+    queryFn: () => fetchData(`api/v1/quotes/${quote.id}/booking-preview/?pickup_date=${pickup}&delivery_date=${delivery}${callOff ? `&tonnes=${tonnes}` : ''}`) as Promise<Preview>,
+    enabled: !datesBad && !tonnesBad,
     placeholderData: keepPreviousData,
   });
   const pv = previewQ.data;
@@ -119,7 +133,7 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
 
   const book = useMutation({
     mutationFn: async () => {
-      const req = bookingRequest(choice, quote.id, { vehicle_id: vehicleId, driver_id: driverId, pickup_date: pickup, delivery_date: delivery }, b?.link_fields);
+      const req = bookingRequest(choice, quote.id, { vehicle_id: vehicleId, driver_id: driverId, pickup_date: pickup, delivery_date: delivery, ...(callOff ? { tonnes } : {}) }, b?.link_fields);
       const job = await postData(req) as BookedJob;
       return { job, linkRes: job as unknown };
     },
@@ -152,18 +166,27 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
   return (
     <div className="bk-dialog-backdrop" onClick={onClose}>
       <div className="bk-dialog bj-dialog" role="dialog" aria-modal="true" aria-labelledby="bj-title" onClick={e => e.stopPropagation()}>
-        <h2 className="bk-dialog__title" id="bj-title">Book job</h2>
+        <h2 className="bk-dialog__title" id="bj-title">{callOff ? 'Book a load' : 'Book job'}</h2>
         <div className="bj-summary">
           <div>
             <div className="bj-summary__lane">{lane || quote.quote_number}</div>
             <div className="bj-summary__sub">{[quote.quote_number, customer].filter(Boolean).join(' · ')}</div>
           </div>
-          {Number.isFinite(total) && total > 0 && <div className="bj-summary__price"><div className="bj-summary__total">{formatMoneyWhole(total)}</div><div className="bj-summary__sub">excl. VAT</div></div>}
+          {callOff ? (
+            <div className="bj-summary__price"><div className="bj-summary__total">{fmtRatePerTonne(quote.rate_per_tonne)}</div><div className="bj-summary__sub">{fmtTonnes(callOff.remaining_tonnes)} left</div></div>
+          ) : Number.isFinite(total) && total > 0 && <div className="bj-summary__price"><div className="bj-summary__total">{formatMoneyWhole(total)}</div><div className="bj-summary__sub">excl. VAT</div></div>}
         </div>
 
         {bookedId ? (
           <p className="bj-done"><span className="bk-dot bk-dot--success" aria-hidden="true" />Already booked. Open the job to see its margin and return load.</p>
         ) : (<>
+        {callOff && (
+          <div className="bk-field" style={{ marginBottom: 12 }}>
+            <label className="bk-field__label" htmlFor="bj-tonnes">Tonnes on this load</label>
+            <input id="bj-tonnes" className="bj-input" inputMode="decimal" value={tonnesText} onChange={e => setTonnesText(e.target.value)} aria-invalid={tonnesBad} />
+            {tonnesBad && <p className="bk-help bk-help--warning">{check.error}</p>}
+          </div>
+        )}
         <div className="bj-grid">
           <div className="bk-field">
             <label className="bk-field__label" htmlFor="bj-pickup">Collection</label>
@@ -245,12 +268,12 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
           {bookedId ? (
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => { onClose(); navigate(`/bookings/${bookedId}`); }}>Open job</button>
           ) : (
-            <button type="button" className="bk-btn bk-btn--primary" disabled={datesBad || driverWithoutTruck || book.isPending || !!blockedText} onClick={() => {
+            <button type="button" className="bk-btn bk-btn--primary" disabled={datesBad || tonnesBad || driverWithoutTruck || book.isPending || !!blockedText} onClick={() => {
               if (inFlight.current) return;
               inFlight.current = true;
               book.mutate(undefined, { onSettled: () => { inFlight.current = false; } });
             }}>
-              {book.isPending ? 'Booking…' : choice.kind === 'return' || choice.kind === 'outbound' ? 'Book and link' : 'Book job'}
+              {book.isPending ? 'Booking…' : choice.kind === 'return' || choice.kind === 'outbound' ? 'Book and link' : callOff ? 'Book load' : 'Book job'}
             </button>
           )}
         </div>

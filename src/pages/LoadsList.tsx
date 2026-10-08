@@ -126,6 +126,7 @@ export const BOOKINGS_TABS: SectionTab[] = [
   { label: 'Quotes', to: '/bookings/quotes' },
   { label: 'Orders', to: '/bookings/orders' },
   { label: 'History', to: '/bookings/history' },
+  { label: 'Contracts', to: '/bookings/contracts' },
 ];
 
 const TAB_TITLES: Record<BookingTab, string> = {

@@ -122,6 +122,14 @@ export function fmtNum(v: number, dp = 0): string {
   return (v < 0 && /[1-9]/.test(txt) ? "−" : "") + txt;
 }
 /** "R 32,80" / "R 1 050" (whole rand half-up when dp = 0). */
+/** Offered prices in whole amounts: UP to the next R 50 below R 20 000, else
+ *  the next R 100 (never below the price it was built from). */
+export function roundPriceUp(price: number): number {
+  const p = Number(price) || 0;
+  const unit = p < 20000 ? 50 : 100;
+  return Math.ceil(p / unit - 1e-9) * unit;
+}
+
 export function fmtRand(v: number, dp = 0): string {
   const shown = halfUp(v, dp);
   const sign = v < 0 && shown !== 0 ? "−" : "";
@@ -385,14 +393,11 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
     warnings.push(warning("tolls_unknown", "block", "Tolls could not be worked out",
       "Enter the tolls, or confirm there are none on this route.", null, ["enter_tolls", "confirm_no_tolls"]));
   }
-  if (tollOneWay === 0 && !tolls.confirmed_none) {
-    // R 0 from the route means no plazas were FOUND, not that the road has none.
-    warnings.push(warning("tolls_none_found", "warn", "No tolls found on this route",
-      "Check it if the trip uses toll roads.", null, ["enter_tolls", "confirm_no_tolls"]));
-  }
+  // R 0 from a toll lookup that worked is a known R 0: the route has no
+  // plazas (owner rule: we know every toll; no "check / add your own").
   const tollAmt = tollOneWay !== null ? cents(tollOneWay * legsLoaded) : null;
   add("tolls", "loaded", tollAmt,
-    tollAmt === null ? "Unknown" : roundTrip ? `${fmtRand(tollOneWay as number, 2)} × 2 legs` : `${fmtRand(tollOneWay as number, 2)} one way`,
+    tollAmt === null ? "Unknown" : tollOneWay === 0 ? "No toll plazas on this route" : roundTrip ? `${fmtRand(tollOneWay as number, 2)} × 2 legs` : `${fmtRand(tollOneWay as number, 2)} one way`,
     { one_way: tollOneWay, legs: legsLoaded });
 
   // --- driver nights (§6) ---
@@ -506,7 +511,9 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
   // per km > 0 is set, on the billable (loaded) km. No floor → none.
   const ratePerKm = pos(i.default_price_per_km);
   const ratePrice = ratePerKm !== null && kmLoaded !== null ? cents(ratePerKm * kmLoaded) : null;
-  const defaultPrice = targetPrice !== null ? Math.ceil(Math.max(ratePrice ?? 0, targetPrice) - 1e-9) : null;
+  // The same rounding as the pricing analysis' choices: with no market the
+  // suggested price IS the Safe choice.
+  const defaultPrice = targetPrice !== null ? roundPriceUp(Math.max(ratePrice ?? 0, targetPrice)) : null;
   // The same quote with a return load booked (one-way, empty return included).
   let alternative: { floor: number | null; target_price: number | null; default_price: number | null } | null = null;
   if (emptyReturn && requested !== false) {

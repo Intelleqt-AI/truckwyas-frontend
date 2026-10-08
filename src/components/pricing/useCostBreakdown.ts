@@ -16,7 +16,9 @@ export interface ServerCosting {
   } | null;
   floor: number | null;
   warnings: unknown[];
-  resolution?: { vehicle_type_id?: number | null; suggested_vehicle_type_id?: number | null } | null;
+  resolution?: { vehicle_type_id?: number | null; suggested_vehicle_type_id?: number | null;
+    /** Where an approved allowance rate comes from, e.g. 'NBCRFLI minimum R 243,63/night (from 1 Mar 2026)'. */
+    driver_rate_detail?: string | null } | null;
 }
 
 /**

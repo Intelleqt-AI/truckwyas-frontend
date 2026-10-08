@@ -1029,8 +1029,7 @@ export default function QuoteBuilder() {
   // call of its own; the request is debounced and stale ones are cancelled.
   // ---- warnings (§10): one list, block first ----
   // The margin line already says "Loss"; the weight is a required field.
-  // tolls_none_found: a known R 0 is just "no toll plazas" (said on the line).
-  const HIDDEN_WARNINGS = ["below_floor", "load_missing", "tolls_none_found"];
+  const HIDDEN_WARNINGS = ["below_floor", "load_missing"];
   const quoteWarnings: QuoteWarning[] = ready && !routeBlockedMessage && distance > 0 && !calculatingRoute
     ? costingAtPrice.warnings.filter(w => !HIDDEN_WARNINGS.includes(w.code)) : [];
   const blockWarnings = quoteWarnings.filter(w => w.severity === "block");
@@ -1407,17 +1406,21 @@ export default function QuoteBuilder() {
     setFuelRefreshing(true);
     const before = costing.diesel.official_effective_from;
     try {
-      await postData({ url: "api/v1/fuel-prices/refresh/", data: {} }).catch(async (e: unknown) => {
-        // Older backend: the forced GET does the same re-check.
-        if ((e as { status?: number } | null)?.status === 404) return fetchData("api/v1/fuel-prices/current/?force=true");
-        throw e;
-      });
+      // POST /fuel-prices/refresh/: answers like GET current/ plus
+      // refresh {attempted, ok, throttled, changed, message}.
+      const res = await postData({ url: "api/v1/fuel-prices/refresh/", data: {} }) as
+        { refresh?: { ok?: boolean; changed?: boolean; throttled?: boolean; message?: string }; effective_from?: string | null;
+          company_price?: { official?: { effective_from?: string | null } } } | null;
       await queryClient.invalidateQueries({ queryKey: ["fuel-price-current"] });
       await queryClient.invalidateQueries({ queryKey: ["company-profile"] });
-      const fresh = queryClient.getQueryData<{ effective_from?: string | null; company_price?: { official?: { effective_from?: string | null; price?: unknown } } }>(["fuel-price-current"]);
-      const after = fresh?.company_price?.official?.effective_from ?? fresh?.effective_from ?? null;
-      if (after && after !== before && isoDay(after) !== isoDay(before)) toast.success(`New official price loaded, from ${shortDate(after)}.`);
-      else toast.info(`Still the latest official price${before ? ` (from ${shortDate(before)})` : ""}.`);
+      const r = res?.refresh;
+      const after = res?.company_price?.official?.effective_from ?? res?.effective_from ?? null;
+      const fallback = r?.changed && after ? `New official price loaded, from ${shortDate(after)}.`
+        : `Still the latest official price${(after ?? before) ? ` (from ${shortDate((after ?? before)!)})` : ""}.`;
+      const msg = r?.message || fallback;
+      if (r?.changed) toast.success(msg);
+      else if (r && r.ok === false && !r.throttled) toast.warning(msg);
+      else toast.info(msg);
     } catch (e: unknown) {
       toast.error((e as { message?: string } | null)?.message || "Couldn't reach the official price source");
     } finally {
@@ -1864,7 +1867,7 @@ export default function QuoteBuilder() {
               // "Check" for R 0 tolls / flagged operating costs, "Not set" for
               // border costs an international trip still needs (server flags).
               const paLine = (k: string) => (pricing.isCurrent ? pricing.data?.costFloor?.lines.find(l => l.key === k) : null) ?? null;
-              // The costing's own codes: tolls_none_found, border_costs_missing
+              // The costing's own code border_costs_missing
               // (border line needs_input); the server's operating_cost_overlap.
               const opCheck = !!currentData?.warnings.some(w => w.code === "operating_cost_overlap") || !!paLine("fixed_cost")?.check;
               const borderLine = costing.lines.find(l => l.key === "border") ?? null;
@@ -1932,6 +1935,8 @@ export default function QuoteBuilder() {
               <div className="qb-cost__row">
                 <span className="qb-cost__label">
                   Driver allowance{driverNights != null && driverNights > 0 && <span className="qb-cost__meta">{driverNights} night{driverNights === 1 ? "" : "s"}</span>}
+                  {!driverEdited && serverBreakdown?.resolution?.driver_rate_detail && (
+                    <InfoPop label="Driver allowance rate" title="Driver allowance" rows={[[serverBreakdown.resolution.driver_rate_detail, ""]]} />)}
                   {costing.warnings.some(w => w.code === "driver_allowance_missing") && (<>
                     <span className="qb-cost__tag">No rate set</span>
                     <button type="button" className="qb-linkbtn" onClick={() => runWarningAction("update_allowance")}>Set allowance</button>

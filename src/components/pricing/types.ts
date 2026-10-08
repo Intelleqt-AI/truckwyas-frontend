@@ -361,7 +361,7 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
     version: str(r.version) || "pa-1",
     computedMs: num(r.computed_ms),
     missing: arr(r.missing).map(str).filter((s): s is string => !!s),
-    targetMarginPct: num(r.target_margin_pct),
+    targetMarginPct: num(obj(r.target_margin)?.pct) ?? num(r.target_margin_pct),
     costFloor,
     market,
     choices,
@@ -377,15 +377,12 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
     })(),
     r5: !!str(lk?.headline),
     modelProgress: (() => {
-      // Tolerant of the shapes the server may send (top level or under likelihood).
-      const mp = obj(r.model_progress) ?? obj(lk?.model_progress);
+      // win_prediction.model_progress {accepted, rejected, accepted_needed, rejected_needed}.
+      const mp = obj(obj(r.win_prediction)?.model_progress);
       if (!mp) return null;
-      const tier = obj(mp.company) ?? obj(mp.user) ?? mp;
-      const won = num(tier.accepted ?? tier.won);
-      const lost = num(tier.rejected ?? tier.lost);
-      return { won, lost, wonNeeded: num(tier.accepted_needed ?? tier.won_needed ?? tier.needed) ?? 200, lostNeeded: num(tier.rejected_needed ?? tier.lost_needed ?? tier.needed) ?? 200 };
+      return { won: num(mp.accepted), lost: num(mp.rejected), wonNeeded: num(mp.accepted_needed) ?? 200, lostNeeded: num(mp.rejected_needed) ?? 200 };
     })(),
-    targetMarginSource: str(r.target_margin_source) ?? str(obj(r.target_margin)?.source),
+    targetMarginSource: str(obj(r.target_margin)?.source),
     floorWithReturn: num(cf?.floor_with_return ?? r.floor_with_return),
     attention: arr(r.attention).map(obj).filter(Boolean).map((a) => ({ code: String(a!.code ?? ""), level: String(a!.level ?? "medium"), message: str(a!.message) || "" })).filter((a) => a.message),
     recommendation: obj(r.recommendation) ? { key: str(obj(r.recommendation)!.key), reason: str(obj(r.recommendation)!.reason), short: str(obj(r.recommendation)!.short) } : null,

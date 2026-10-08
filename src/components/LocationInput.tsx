@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { fetchData, postData } from '@/lib/Api';
-import { History } from 'lucide-react';
+import { History, LocateFixed } from 'lucide-react';
 
 interface Suggestion {
   label: string;
@@ -310,8 +310,9 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
       )}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button type="button" style={{ ...toggleLink, marginTop: 4 }} onClick={switchToGps}>
-          Enter GPS coordinates →
+        <button type="button" style={{ ...toggleLink, marginTop: 4, display: 'inline-flex', alignItems: 'center' }} onClick={switchToGps}
+          title="Enter GPS coordinates" aria-label="Enter GPS coordinates">
+          <LocateFixed size={12} aria-hidden="true" />
         </button>
         {resolvedText && <ResolvedInfo text={resolvedText} />}
       </div>

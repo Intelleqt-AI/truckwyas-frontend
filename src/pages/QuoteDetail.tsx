@@ -6,17 +6,18 @@ import { useMapFill } from './useMapFill';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchData, patchData, deleteData, postData, downloadBlob } from '@/lib/Api';
-import { formatCurrency, formatDate, formatDistance, formatMoney, formatMoneyWhole, formatNumber, formatPercent, normaliseFigures, sentenceCaseLabel } from '@/lib/formatters';
+import { formatCurrency, formatDate, formatDistance, formatMoney, formatMoneyWhole, formatNumber, normaliseFigures, sentenceCaseLabel } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ConvertToBookingModal } from '@/components/ConvertToBookingModal';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/AuthContext';
 import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
 import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
 import { Download, FileSearch } from 'lucide-react';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
+import { useSendCheck, sendBlockedMessage, quoteIncomplete } from '@/lib/quoteWarnings';
+import { randPerLitre, longDate } from '@/lib/dieselPrice';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import SectionHeader from '@/components/layout/SectionHeader';
 import { StatusChip, statusMeta } from '@/components/ui/StatusChip';
@@ -26,6 +27,11 @@ import { StatusMenu, type StatusOption } from '@/components/fleet-detail/StatusM
 import { BlockSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { loadsQuery, mapLoadsByQuoteId } from './QuotesList';
 import { InfoTip } from '@/components/ui/InfoTip';
+import LossReasonDialog from '@/components/LossReasonDialog';
+import PricingDecisionRows from '@/components/PricingDecisionRows';
+import { LOSS_REASONS, formatPct, formatRand, lossReasonPayload, type LossReason } from '@/lib/pricing';
+import { agreedMarginOf, agreedPriceOf, pricingDecisionOf } from '@/lib/pricingDecision';
+import { cargoText } from '@/lib/cargo';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   DRAFT: 'neutral',
@@ -45,10 +51,6 @@ const STATUS_LABEL: Record<string, string> = {
   COMPLETED: 'Completed',
 };
 
-// Sentence-case a single-word token for display: "HIGH" → "High".
-const sentenceCase = (s?: string) =>
-  s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '';
-
 // wa.me wants digits only, with country code, no leading 0 or '+'. Customer
 // numbers are stored in whatever format staff typed them in (spaces, dashes,
 // a leading 0, sometimes already a country code) — normalise to South
@@ -66,12 +68,36 @@ function toWhatsAppNumber(raw?: string): string | null {
   return digits;
 }
 
+// The WhatsApp text: price excl. VAT, the VAT and the total incl. VAT
+// (backend customer_price, the same figures as the PDF and email), then the link.
+function whatsAppQuoteMessage(quote: { customer_name?: string; quote_number?: string; total_amount?: string; customer_price?: { vat_registered: boolean; vat_label?: string; vat_rate_percent: string | null; subtotal_excl_vat: string; vat_amount: string; total_incl_vat: string } }, link: string): string {
+  const hello = `Hi${quote.customer_name ? ` ${quote.customer_name}` : ''}, here's your freight quote${quote.quote_number ? ` (${quote.quote_number})` : ''} from TruckWys.`;
+  const p = quote.customer_price;
+  const money = (v?: string) => formatCurrency(parseFloat(v || '0'));
+  const price = !p
+    ? `Price: ${money(quote.total_amount)} excl. VAT`
+    : p.vat_registered
+      ? [`Price: ${money(p.subtotal_excl_vat)} excl. VAT`, `${p.vat_label || `VAT (${Number(p.vat_rate_percent)}%)`}: ${money(p.vat_amount)}`, `Total: ${money(p.total_incl_vat)} incl. VAT`].join('\n')
+      : `Total: ${money(p.total_incl_vat)} (no VAT charged)`;
+  return `${hello}\n\n${price}\n\nView and respond: ${link}`;
+}
+
 function buildWhatsAppShareUrl(phone: string | undefined, message: string): string {
   const number = toWhatsAppNumber(phone);
   const text = encodeURIComponent(message);
   // No number on file — still open WhatsApp so the user can pick a contact,
   // rather than hiding the button entirely.
   return number ? `https://wa.me/${number}?text=${text}` : `https://wa.me/?text=${text}`;
+}
+
+// The stored loss reason: the code's label and the note, else the free text.
+// Detail responses carry loss_reason as {reason, note} (null when none).
+function lossReasonText(quote: { loss_reason?: { reason?: string; note?: string } | null; rejection_reason?: string | null }): string {
+  const lr = quote.loss_reason;
+  const label = LOSS_REASONS.find((r) => r.code === lr?.reason)?.label;
+  const text = label ? [label, (lr?.note || '').trim()].filter(Boolean).join(': ') : String(quote.rejection_reason || '');
+  // Amounts typed in a note ("R 21 500") never split across lines.
+  return text.replace(/\bR (?=\d)/g, 'R\u00A0').replace(/(\d) (?=\d{3}\b)/g, '$1\u00A0');
 }
 
 export default function QuoteDetail() {
@@ -108,8 +134,9 @@ export default function QuoteDetail() {
   // Sprint 1 features
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
   const [outcomeType, setOutcomeType] = useState<'accepted' | 'rejected' | null>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [customRejectionReason, setCustomRejectionReason] = useState('');
+  // Declining (the Rejected answer, or the status menu's Declined) asks for
+  // an optional reason first.
+  const [lossFor, setLossFor] = useState<'outcome' | 'status' | null>(null);
   const [finalPrice, setFinalPrice] = useState('');
   const [fuelAlert, setFuelAlert] = useState<any>(null);
   const [confirmOpts, setConfirmOpts] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void; danger?: boolean } | null>(null);
@@ -117,6 +144,12 @@ export default function QuoteDetail() {
   useFocusTrap(latestModal, showOutcomeModal && !!outcomeType);
   // Sending (button or status change to Sent) emails the customer: preview first.
   const [sendPreview, setSendPreview] = useState<'button' | 'status' | null>(null);
+  // §11: the server's send check (block / warn), fetched when a send opens.
+  // Fetched up front for an open quote, so a block shows on Send itself.
+  const sendWarnings = useSendCheck(quote && ['DRAFT', 'SENT', 'ACCEPTED'].includes(quote.status) ? id : null, quote);
+  const sendBlock = sendWarnings.find((w) => w.severity === 'block') ?? null;
+  // Copy link / WhatsApp are sends too: blocked like Send on an open quote.
+  const shareBlocked = !!sendBlock && !!quote && (quote.status === 'DRAFT' || quote.status === 'SENT');
 
   const quoteFailed = loadFailed(quoteQuery);
   const quoteError = (quoteQuery.error ?? quoteQuery.failureReason) as { status?: number } | null;
@@ -152,8 +185,16 @@ export default function QuoteDetail() {
   }, [quote, id]);
 
   const statusMutation = useMutation({
-    mutationFn: (newStatus: string) => patchData({ url: `api/v1/quotes/${id}/`, data: { status: newStatus } }),
-    onSuccess: (_data, newStatus) => {
+    mutationFn: (arg: string | { status: string; extra?: Record<string, unknown> }) => {
+      const { status, extra } = typeof arg === 'string' ? { status: arg, extra: undefined } : arg;
+      // Accepted and Declined go through update_status: it records the outcome
+      // (the win model's label) and the optional loss reason; a plain PATCH
+      // does neither.
+      if (status === 'DECLINED' || status === 'ACCEPTED') return patchData({ url: `api/v1/quotes/${id}/update_status/`, data: { status, ...(extra || {}) } });
+      return patchData({ url: `api/v1/quotes/${id}/`, data: { status } });
+    },
+    onSuccess: (_data, arg) => {
+      const newStatus = typeof arg === 'string' ? arg : arg.status;
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
       queryClient.setQueryData(['quotes'], (old: any) => {
         if (!old) return old;
@@ -161,6 +202,9 @@ export default function QuoteDetail() {
         const updated = items.map((q: any) => String(q.id) === String(id) ? { ...q, status: newStatus } : q);
         return old?.results ? { ...old, results: updated } : updated;
       });
+    },
+    onError: (error: unknown) => {
+      toast.error(sendBlockedMessage(error) || (error as { message?: string } | null)?.message || "Couldn't change the status");
     },
   });
 
@@ -192,7 +236,7 @@ export default function QuoteDetail() {
       });
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to generate share link');
+      toast.error(sendBlockedMessage(error) || error?.message || 'Failed to generate share link');
     },
   });
 
@@ -204,10 +248,11 @@ export default function QuoteDetail() {
   });
 
   const convertToLoadMutation = useMutation({
-    mutationFn: ({ driverId, vehicleId }: { driverId: string; vehicleId: string }) =>
+    mutationFn: ({ driverId, vehicleId, dates }: { driverId: string; vehicleId: string; dates?: { pickup_date: string; delivery_date: string } }) =>
       postData({
         url: `api/v1/quotes/${id}/convert_to_load/`,
-        data: { driver_id: driverId, vehicle_id: vehicleId },
+        // dates: only when the quote had none and the modal showed suggested ones.
+        data: { driver_id: driverId, vehicle_id: vehicleId, ...(dates || {}) },
       }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['loads'] });
@@ -223,15 +268,28 @@ export default function QuoteDetail() {
   });
 
   const outcomeMutation = useMutation({
-    mutationFn: (data: { outcome: string; rejection_reason?: string; final_price?: number }) =>
-      patchData({ url: `api/v1/quotes/${id}/outcome/`, data }),
+    // The answer moves the quote too: Accepted -> ACCEPTED (so Convert to
+    // booking shows straight away), Rejected -> DECLINED. The outcome endpoint
+    // does that itself on newer APIs; when its reply doesn't show the new
+    // status, update_status follows (idempotent: the outcome row is kept).
+    mutationFn: async (data: { outcome: string; final_price?: number } & Record<string, unknown>) => {
+      const res = await patchData({ url: `api/v1/quotes/${id}/outcome/`, data });
+      const target = data.outcome === 'accepted' ? 'ACCEPTED' : 'DECLINED';
+      const current = (res as { status?: string } | null)?.status ?? quote?.status;
+      const moved = target === 'ACCEPTED' ? ['ACCEPTED', 'IT', 'COMPLETED'].includes(String(current)) : current === 'DECLINED';
+      if (!moved) {
+        const { outcome: _o, final_price: _f, ...extra } = data;
+        await patchData({ url: `api/v1/quotes/${id}/update_status/`, data: { status: target, ...(target === 'DECLINED' ? extra : {}) } });
+      }
+      return res;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['quotes-column'] });
       setShowOutcomeModal(false);
       setOutcomeType(null);
-      setRejectionReason('');
-      setCustomRejectionReason('');
+      setLossFor(null);
       setFinalPrice('');
     },
     onError: (error: any) => {
@@ -350,6 +408,7 @@ export default function QuoteDetail() {
 
   // One figure system: "R 28 662,00", "55,0%", "12 000 kg", "1 234 km".
   const total = parseFloat(quote.total_amount || '0');
+  const vat = quote.customer_price as { vat_registered: boolean; vat_label: string; vat_amount: string; total_incl_vat: string } | undefined;
   const isRound = quote.trip_type === 'ROUND_TRIP';
   // Company first; the contact name only when it is a different person.
   const company = (quote.customer_company || '').trim() || quote.customer_name || '';
@@ -357,8 +416,21 @@ export default function QuoteDetail() {
   const placeShort = (city?: string, loc?: string) => (city || '').trim() || String(loc || '').split(',')[0].trim();
   const routeFrom = placeShort(quote.pickup_city, quote.pickup_location);
   const routeTo = placeShort(quote.delivery_city, quote.delivery_location);
-  // No chance to win on a dead offer (R9): expired quotes show none.
-  const showWinChance = !!quote.win_probability && (quote.status === 'DRAFT' || quote.status === 'SENT') && boardStage(quote) !== 'EXPIRED';
+  // The pricing decision stored with the quote (cost floor, margin, market,
+  // chance to win), exactly as saved. Older quotes have none and show no
+  // margin or chance to win: the saved heuristic win_probability is never shown.
+  const decision = pricingDecisionOf(quote);
+  // Every quote starts with outcome "pending" (the model default), so the
+  // answer is still open unless it reads accepted or rejected.
+  const undecided = quote.outcome !== 'accepted' && quote.outcome !== 'rejected';
+  // A declined quote is a closed offer: nothing to send (Edit stays).
+  const declined = quote.status === 'DECLINED' || quote.outcome === 'rejected';
+  // What the customer agreed when it differs from the quote (display only:
+  // the booking and invoice bill the quote total).
+  const agreed = agreedPriceOf(quote);
+  const agreedMargin = agreed !== null ? agreedMarginOf(quote) : null;
+  // A draft that has never gone out (was_sent is server-owned; DRAFT is enough).
+  const neverSent = quote.status === 'DRAFT';
   const routeSummary = routeFrom && routeTo ? `${routeFrom} → ${routeTo}` : '';
   const contact = (quote.customer_name || '').trim();
   const showContact = !!contact && contact.toLowerCase() !== company.toLowerCase();
@@ -374,13 +446,26 @@ export default function QuoteDetail() {
     : lapsed ? 'expired'
     : validUntil > Date.now() && validUntil - Date.now() < 48 * 3600_000 ? `${Math.ceil((validUntil - Date.now()) / 3600_000)} h left`
     : null;
-  // Fuel: a compact note built from the numbers, in the house format.
+  // Fuel: one line, the sign read from the figure (up or down).
   const fuelDelta = Number(fuelAlert?.fuel_delta_zar);
   const fuelImpact = Number(fuelAlert?.estimated_cost_impact);
-  const fuelNote = fuelAlert?.has_alert
-    ? (Number.isFinite(fuelDelta) && Number.isFinite(fuelImpact)
-      ? `Diesel is up ${formatMoney(fuelDelta)}/L since this quote was made, so the job costs about ${formatMoneyWhole(fuelImpact)} more.`
+  // Fuel-aware: the fuel this quote was priced on (petrol, electric …), and
+  // an alert only when it is about that same fuel.
+  const quoteFuel = String(quote.costing_snapshot?.diesel?.fuel_type || quote.route_snapshot?.fuel_type_used || 'Diesel');
+  const fuelWord = quoteFuel.toLowerCase() === 'hybrid' ? 'petrol' : quoteFuel.toLowerCase();
+  const alertFuel = String(fuelAlert?.fuel_type || 'Diesel').toLowerCase();
+  const alertMatches = alertFuel === fuelWord || (alertFuel === 'hybrid' && fuelWord === 'petrol');
+  const fuelNote = fuelAlert?.has_alert && alertMatches
+    ? (Number.isFinite(fuelDelta) && Number.isFinite(fuelImpact) && Math.abs(fuelDelta) >= 0.005
+      ? `${fuelWord.charAt(0).toUpperCase()}${fuelWord.slice(1)} ${fuelDelta > 0 ? 'up' : 'down'} ${formatMoney(Math.abs(fuelDelta))}/L since quoted: about ${formatMoneyWhole(Math.abs(fuelImpact))} ${fuelDelta > 0 ? 'more' : 'less'}.`
       : normaliseFigures(fuelAlert.message))
+    : null;
+  // §11 / PDF: "Priced on diesel R 32,80/L (official inland, 7 Oct 2026)."
+  const pricedOn = Number(quote.fuel_price_used) > 0
+    ? `Priced on ${fuelWord} ${randPerLitre(Number(quote.fuel_price_used))}/${fuelWord === 'electric' ? 'kWh' : 'L'} (${[
+        quote.fuel_price_source === 'own' ? 'your price' : quote.fuel_price_source === 'override' ? 'set on quote' : 'official',
+        quote.fuel_price_source === 'official' || !quote.fuel_price_source ? (quote.fuel_zone === 'COASTAL' ? 'coastal' : 'inland') : null,
+      ].filter(Boolean).join(' ')}${quote.priced_at ? `, ${longDate(quote.priced_at)}` : ''}).`
     : null;
   // An expired quote, or a draft priced before the diesel rise, is edited
   // before it goes out (R8): Edit quote is the primary, Send the secondary.
@@ -393,7 +478,12 @@ export default function QuoteDetail() {
   const booking = (quote.booked_load ?? mapLoadsByQuoteId(loadsQ.data).get(String(quote.id))) as { id: number | string; load_number?: string; status?: string } | undefined;
   const booked = !!booking;
   const loadStateOnly = !booked && (quote.status === 'IT' || quote.status === 'COMPLETED');
-  const needsEdit = !booked && openStatus && (lapsed || (quote.status === 'DRAFT' && !!fuelAlert?.has_alert));
+  // Only an alert about this quote's own fuel can demote Send (fuelNote is fuel-aware).
+  const fuelDemotes = quote.status === 'DRAFT' && !!fuelNote;
+  const needsEdit = !booked && openStatus && (lapsed || fuelDemotes);
+  // Said where Send stepped down, so the change of button is explained.
+  const demoteReason = !needsEdit ? null : lapsed ? 'Expired: edit it to set a new valid-until date before sending.'
+    : `${fuelWord.charAt(0).toUpperCase()}${fuelWord.slice(1)} price changed since this was priced: edit to re-price before sending.`;
   const sendLabel = quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer';
   // Booked (R12): the chip follows the booking, so it can never contradict
   // the "Booked as" line (legacy quotes still carry In transit themselves).
@@ -413,9 +503,9 @@ export default function QuoteDetail() {
   // route on one-leg quotes, under both legs on round trips.
   const loadFacts = (
             <dl className="qd-facts qd-facts--load">
-              {fact('Cargo', quote.cargo_description ? String(quote.cargo_description).replace(/^\s*\S/, (c: string) => c.toUpperCase()) : 'Not recorded')}
+              {fact('Cargo', cargoText(quote.cargo_description, quote.vehicle_type) || 'Not specified')}
               {fact('Truck type', sentenceCaseLabel(quote.vehicle_type) || 'Not recorded')}
-              {fact('Weight', quote.weight ? `${formatNumber(parseFloat(quote.weight))} kg` : 'Not recorded')}
+              {fact('Weight', quote.weight ? `${formatNumber(parseFloat(quote.weight) / 1000, { maximumFractionDigits: 1 })} t` : 'Not recorded')}
               {fact('Distance', quote.distance ? formatDistance(parseFloat(quote.distance)) : 'Not recorded')}
               {quote.pickup_date && fact('Pickup date', formatDate(quote.pickup_date))}
               {quote.vehicle_display && fact('Vehicle', quote.vehicle_display)}
@@ -426,10 +516,11 @@ export default function QuoteDetail() {
   );
   const priceRows = [
     { label: 'Base rate', value: parseFloat(quote.base_rate || '0') },
-    { label: 'Fuel surcharge', value: parseFloat(quote.fuel_surcharge || '0') },
-    { label: 'Toll charges', value: parseFloat(quote.toll_charges || '0') },
+    // The builder's line names (Fuel, Tolls), not the stored field names.
+    { label: 'Fuel', value: parseFloat(quote.fuel_surcharge || '0') },
+    { label: 'Tolls', value: parseFloat(quote.toll_charges || '0') },
     { label: 'Driver allowance', value: parseFloat(quote.driver_allowance || '0') },
-    ...(parseFloat(quote.additional_charges || '0') > 0 ? [{ label: 'Additional charges', value: parseFloat(quote.additional_charges) }] : []),
+    ...(parseFloat(quote.additional_charges || '0') > 0 ? [{ label: 'Cross-border and other charges', value: parseFloat(quote.additional_charges) }] : []),
     ...(isRound && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0
       ? [{ label: `Return leg (${quote.return_cargo ? 'with cargo' : 'empty'})`, value: parseFloat(quote.return_base_rate) }] : []),
   ];
@@ -438,19 +529,40 @@ export default function QuoteDetail() {
   const linesSum = priceRows.reduce((a, r) => a + (Number.isFinite(r.value) ? r.value : 0), 0);
   const notItemised = Math.round((total - linesSum) * 100) / 100;
   const hasGap = Math.abs(notItemised) > 0.5;
-  // Margin only when the costs behind it are itemised: no unexplained gap and
-  // more than a bare base rate. Otherwise a stored 0 reads as "0,0% margin".
-  const costsItemised = !hasGap && priceRows.some(r => r.label !== 'Base rate' && r.value > 0);
-  const marginSet = quote.margin_percentage != null && quote.margin_percentage !== '';
-  const marginText = marginSet && costsItemised ? formatPercent(quote.margin_percentage, 1) : null;
-  const marginUnknown = !marginText && (marginSet || hasGap);
+  // One margin definition (price − full cost floor), from the stored
+  // decision only. The legacy margin_percentage is the markup share of the
+  // price, a different figure, so it is not shown as the margin.
+  // The margin at the quote's current total: the saved decision's while it
+  // still describes this price, else the server's own floor (cost_floor, e.g.
+  // after a copilot price change or with no decision saved).
+  const serverFloor = quote.cost_floor != null && quote.cost_floor !== '' && Number.isFinite(Number(quote.cost_floor)) ? Number(quote.cost_floor) : null;
+  const serverMargin = serverFloor != null && total > 0 && !quoteIncomplete(quote) ? {
+    amount: total - serverFloor,
+    pct: quote.margin_percentage != null && quote.margin_percentage !== '' ? Math.round(Number(quote.margin_percentage)) : Math.round((total - serverFloor) / total * 100),
+  } : null;
+  const marginNow = decision && !decision.stale ? decision.margin : serverMargin;
+  // No chance to win on a dead offer (R9), nor once decided: then it shows
+  // once, as "when priced", under How it was priced.
+  const showChance = !!decision?.likelihood && openStatus && !lapsed && undecided;
+  // "51% chance to win" (model) or "Likely to win" / "Even chance" / "Less likely to win" (rules).
+  const chanceText = showChance && decision?.likelihood
+    ? decision.likelihood.model ? `${decision.likelihood.text} chance to win`
+      : decision.likelihood.text === 'Even chance' ? decision.likelihood.text : `${decision.likelihood.text} to win`
+    : null;
+  // Each cost once per card (R3): with a current decision that breaks the
+  // floor into its parts, "How it was priced" carries fuel, tolls and the rest,
+  // so the build-up lines (Base rate, Fuel, …) are not listed a second time.
+  // An incomplete quote (no price) has no build-up to show (it would read as R 0 and a negative line).
+  const showBuildUp = !quoteIncomplete(quote) && !(decision && decision.floorLines && !decision.stale);
   const statusOptions: StatusOption[] = [
     { value: 'DRAFT', label: 'Draft', hint: 'Not offered to the customer yet' },
     // An expired quote can still be marked Sent (the preview warns), but the
     // menu says to edit it first (R11).
     ...(booked
       ? [{ value: 'SENT', label: 'Sent', hint: `Already booked as ${booking?.load_number || 'a load'}`, disabledReason: `Already booked as ${booking?.load_number || 'a load'}` }]
-      : [{ value: 'SENT', label: 'Sent', hint: lapsed ? 'Quote has expired, edit first' : 'Emails the quote to the customer' }]),
+      : sendBlock
+        ? [{ value: 'SENT', label: 'Sent', hint: sendBlock.title, disabledReason: sendBlock.title }]
+        : [{ value: 'SENT', label: 'Sent', hint: lapsed ? 'Quote has expired, edit first' : 'Emails the quote to the customer' }]),
     { value: 'ACCEPTED', label: 'Accepted', hint: booked ? 'Won and booked' : 'Ready to convert to a booking' },
     { value: 'DECLINED', label: 'Declined' },
     // In transit and Completed live on the order created by "Convert to
@@ -482,14 +594,19 @@ export default function QuoteDetail() {
             busy={statusMutation.isPending}
             disabledReason={billingBlocked ? `Status changes are blocked. ${subscriptionStatusDetail(authUser?.subscription_status) || ''}`.trim() : undefined}
             // Moving to Sent emails the customer: preview and confirm there.
-            intercept={(v) => { if (v === 'SENT' && quote.status !== 'SENT') { setSendPreview('status'); return true; } return false; }}
+            intercept={(v) => {
+              if (v === 'SENT' && quote.status !== 'SENT') { setSendPreview('status'); return true; }
+              // Declined: an optional loss reason first (one calm step).
+              if (v === 'DECLINED' && quote.status !== 'DECLINED') { setLossFor('status'); return true; }
+              return false;
+            }}
             onChange={(v) => statusMutation.mutate(v)}
           />
           {needsEdit ? (<>
             {/* An expired quote is not sent again as it stands: the body card
                 offers "Send an updated quote", so the head holds Edit only.
                 A price-stale draft that is still valid keeps Send beside it. */}
-            {!lapsed && <button type="button" className="bk-btn bk-btn--secondary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending}>
+            {!lapsed && <button type="button" className="bk-btn bk-btn--secondary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending || !!sendBlock} title={sendBlock ? sendBlock.title : undefined}>
               {sendToCustomerMutation.isPending ? (quote.status === 'SENT' ? 'Resending…' : 'Generating…') : sendLabel}
             </button>}
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate(`/bookings/quotes/${id}/edit`)} aria-label="Edit quote">
@@ -502,7 +619,7 @@ export default function QuoteDetail() {
             Edit quote
           </button>
           )}
-          {needsEdit || loadStateOnly ? null : booked ? (
+          {needsEdit || loadStateOnly || (declined && !booked) ? null : booked ? (
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate(`/bookings/${booking!.id}`)} aria-label="View booking">
               <span className="qd-label-long" data-short="Booking">View booking</span>
             </button>
@@ -511,7 +628,7 @@ export default function QuoteDetail() {
               {convertToLoadMutation.isPending ? 'Converting…' : <span className="qd-label-long" data-short="Convert">Convert to booking</span>}
             </button>
           ) : (
-            <button type="button" className="bk-btn bk-btn--primary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending} aria-label={sendToCustomerMutation.isPending ? undefined : (quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer')}>
+            <button type="button" className="bk-btn bk-btn--primary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending || !!sendBlock} title={sendBlock ? sendBlock.title : undefined} aria-label={sendToCustomerMutation.isPending ? undefined : (quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer')}>
               {sendToCustomerMutation.isPending
                 ? (quote.status === 'SENT' ? 'Resending…' : 'Generating…')
                 // Phones: the short label keeps it on the title row (R5); the
@@ -616,18 +733,36 @@ export default function QuoteDetail() {
         {/* RIGHT: the price (the only place the total appears), then tools. */}
         <div ref={railRef} className="quote-detail-rail">
           <section className="bk-card" aria-labelledby="qd-price-title">
-            <h2 className="bk-fact__label" id="qd-price-title" style={{ margin: 0 }}>{isRound ? 'Total, both legs' : 'Total'}</h2>
-            <div className="qd-total">{formatMoney(total)}</div>
-            <div className="qd-sub">
-              {marginText && <span>{marginText} margin</span>}
-              {marginUnknown && (
-                <span className="qd-margin-na">— margin <InfoTip label="Why no margin">The costs behind this price aren't itemised, so its margin can't be worked out.</InfoTip></span>
-              )}
-              {showWinChance && (
-                // Stored 0 to 100 already; do not multiply again.
-                <span title="Estimated chance of winning at this price">{Math.round(Number(quote.win_probability))}% chance to win</span>
-              )}
-            </div>
+            <h2 className="bk-fact__label" id="qd-price-title" style={{ margin: 0 }}>{isRound ? 'Total, both legs' : 'Total'}{vat?.vat_registered ? ' excl. VAT' : ''}</h2>
+            {/* Whole rand when the cents are zero, as in the builder's price bar. */}
+            {/* No price yet (costs incomplete): never "R 0". */}
+            <div className="qd-total">{quoteIncomplete(quote) ? <span className="bk-muted">Incomplete</span> : formatRand(total)}</div>
+            {/* One readout line: "Margin R 4 688 · 20% · 51% chance to win".
+                The chance part is one unbreakable span, so a wrap comes before it. */}
+            {(marginNow || chanceText) && (
+              <p className="qd-readout">
+                {marginNow && (
+                  <span className={decision?.belowFloor ? 'qd-decision__neg' : undefined}>
+                    Margin {formatMoneyWhole(marginNow.amount)}{marginNow.pct !== null ? ` · ${formatPct(marginNow.pct)}` : ''}{(decision && !decision.stale ? decision.belowFloor : marginNow.amount < 0) ? ', below the cost floor' : ''}
+                  </span>
+                )}
+                {chanceText && <>{marginNow ? ' ' : ''}<span className="qd-readout__chance">{marginNow ? '· ' : ''}{chanceText}</span></>}
+              </p>
+            )}
+            {agreed !== null && (
+              <div className="qd-agreed">
+                <span className="qd-agreed__line">
+                  Agreed {formatRand(agreed)} <span className="qd-agreed__quoted">(quoted {formatRand(total)})</span>
+                  <InfoTip label="About the agreed price">The price the customer agreed when they accepted, excl. VAT. The booking and invoice use the quoted total.</InfoTip>
+                </span>
+                {/* Worked out by the server (agreed price − stored cost floor). */}
+                {agreedMargin && (
+                  <span className="qd-agreed__margin">
+                    Margin at the agreed price: {formatMoneyWhole(agreedMargin.amount)}{agreedMargin.pct !== null ? ` · ${formatPct(agreedMargin.pct)}` : ''}
+                  </span>
+                )}
+              </div>
+            )}
             {booked && (
               <p className="qd-booked">
                 Booked as{' '}
@@ -640,27 +775,50 @@ export default function QuoteDetail() {
                 Marked {STATUS_LABEL[quote.status].toLowerCase()} on an older record. No booking is linked to this quote.
               </p>
             )}
-            {fuelNote && (
+            {fuelNote && !pricedOn && (
               <p className="qd-fuel" role="status">
                 <span className="bk-dot bk-dot--warning" aria-hidden="true" />
-                <span>{fuelNote}{quote.status === 'DRAFT' || lapsed
-                  // A draft was never offered, and an expired quote can no
-                  // longer be accepted, so there is nothing to renegotiate:
-                  // update the price before it goes out.
-                  ? ' Update the price before sending.'
-                  : fuelAlert?.action ? ` ${normaliseFigures(fuelAlert.action).replace(/\.?$/, '.')}` : ''}</span>
+                <span>{fuelNote}</span>
               </p>
             )}
-            <div className="qd-price-rows">
+            {pricedOn && <p className={fuelNote ? 'qd-fuel' : 'qd-priced-on'} role={fuelNote ? 'status' : undefined}>
+              {fuelNote && <span className="bk-dot bk-dot--warning" aria-hidden="true" />}
+              <span>{pricedOn}{fuelNote && Number.isFinite(fuelDelta) && Math.abs(fuelDelta) >= 0.005 ? ` Now ${fuelDelta > 0 ? 'up' : 'down'} ${formatMoney(Math.abs(fuelDelta))}/L.` : ''}</span>
+            </p>}
+            {sendBlock && openStatus && <p className="qd-block" role="alert">{sendBlock.title}</p>}
+            {!sendBlock && demoteReason && <p className="qd-demote" role="status">{demoteReason}</p>}
+            {showBuildUp && <div className="qd-price-rows">
+              {/* Lines in whole rand. */}
               {priceRows.map(r => (
-                <div key={r.label} className="bk-kv"><span className="bk-kv__label">{r.label}</span><span className="bk-kv__value">{formatMoney(r.value)}</span></div>
+                <div key={r.label} className="bk-kv"><span className="bk-kv__label">{r.label}</span><span className="bk-kv__value">{formatMoneyWhole(r.value)}</span></div>
               ))}
               {/* Normal weight: when it is a large share of the total it is the
                   line a reader most needs to see (as on Booking detail). */}
               {hasGap && (
-                <div className="bk-kv"><span className="bk-kv__label">Not itemised <InfoTip label="About this line">Set on the quote; its total includes charges not broken down here.</InfoTip></span><span className="bk-kv__value">{formatMoney(notItemised)}</span></div>
+                <div className="bk-kv"><span className="bk-kv__label">Not itemised <InfoTip label="About this line">Set on the quote; its total includes charges not broken down here.</InfoTip></span><span className="bk-kv__value">{formatMoneyWhole(notItemised)}</span></div>
               )}
-            </div>
+            </div>}
+            {/* VAT and the total incl. VAT: what the customer is sent (same
+                figures as the PDF, email and quote page; backend quote_vat). */}
+            {vat && !quoteIncomplete(quote) && (
+              <div className="qd-price-rows">
+                {vat.vat_registered ? (
+                  <>
+                    {/* Whole rand like the price; cents only when there are some. */}
+                    <div className="bk-kv"><span className="bk-kv__label">{vat.vat_label}</span><span className="bk-kv__value">{formatRand(vat.vat_amount)}</span></div>
+                    <div className="bk-kv bk-kv--total"><span className="bk-kv__label">Total incl. VAT</span><span className="bk-kv__value">{formatRand(vat.total_incl_vat)}</span></div>
+                  </>
+                ) : (
+                  <div className="bk-kv"><span className="bk-kv__label">VAT</span><span className="bk-kv__value bk-muted">Not charged (not VAT-registered)</span></div>
+                )}
+              </div>
+            )}
+            {decision && <PricingDecisionRows decision={decision} marginInHeader={!!marginNow} likelihoodInHeader={showChance} />}
+            {(!decision || decision.stale) && serverFloor != null && !quoteIncomplete(quote) && (
+              <div className="qd-price-rows">
+                <div className="bk-kv"><span className="bk-kv__label">Cost floor now</span><span className="bk-kv__value">{formatMoneyWhole(serverFloor)}</span></div>
+              </div>
+            )}
             <div className="qd-price-rows">
               {quote.valid_until && (
                 <div className="bk-kv">
@@ -672,14 +830,18 @@ export default function QuoteDetail() {
                 </div>
               )}
               {quote.created_at && <div className="bk-kv"><span className="bk-kv__label">Created</span><span className="bk-kv__value">{formatDate(quote.created_at)}</span></div>}
-              {/* One uncertainty signal: the chance to win when it is shown, else the price confidence. */}
-              {quote.confidence && !showWinChance && <div className="bk-kv"><span className="bk-kv__label">Price confidence</span><span className="bk-kv__value">{sentenceCase(quote.confidence)}</span></div>}
+              {(quote.status === 'DECLINED' || quote.outcome === 'rejected') && (quote.rejection_reason || quote.loss_reason?.reason) && (
+                <div className="bk-kv qd-kv-stack"><span className="bk-kv__label">Why it was lost</span><span className="bk-kv__value">{lossReasonText(quote)}</span></div>
+              )}
+              {/* No "Price confidence" row: the builder saves a fixed MEDIUM, so it
+                  carried no signal. The stored pricing decision is the one signal. */}
             </div>
           </section>
 
-          {!booked && (effectiveShareUrl || ((quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome)) && (
+          {!booked && !declined && !neverSent && (effectiveShareUrl || (quote.status === 'SENT' && undecided)) && (
             <section className="bk-card" aria-labelledby="qd-customer-title">
-              <h2 className="bk-card__title" id="qd-customer-title" style={{ marginBottom: 12 }}>With the customer</h2>
+              {/* A never-sent draft has nobody to be "with" yet: the card only records an answer that came another way. */}
+              <h2 className="bk-card__title" id="qd-customer-title" style={{ marginBottom: 12 }}>{neverSent ? 'Record the answer' : 'With the customer'}</h2>
               {effectiveShareUrl && lapsed && (
                 // The public link still opens after the valid-until date, but
                 // shows the quote as expired (ClientQuoteView), so there is
@@ -705,32 +867,43 @@ export default function QuoteDetail() {
                           : 'No email on file for this customer. Share the link instead.'}
                     </p>
                   )}
+                  {/* Sharing the link is sending it (QUOTE-RULES §11): the same
+                      block as Send, so a quote that fails the send check
+                      can't go out by link or WhatsApp either. */}
                   <div className="qd-btn-row">
                     <button
                       type="button"
                       onClick={() => { navigator.clipboard.writeText(effectiveShareUrl); toast.success('Link copied to clipboard'); }}
                       className="bk-btn bk-btn--secondary"
+                      disabled={shareBlocked}
+                      title={shareBlocked ? sendBlock!.title : undefined}
                     >
                       Copy link
                     </button>
-                    <a
-                      href={buildWhatsAppShareUrl(
-                        quote.customer_phone,
-                        `Hi${quote.customer_name ? ` ${quote.customer_name}` : ''}, here's your freight quote${quote.quote_number ? ` (${quote.quote_number})` : ''} from TruckWys: ${effectiveShareUrl}`
-                      )}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bk-btn bk-btn--secondary"
-                      style={{ boxSizing: 'border-box' }}
-                    >
-                      WhatsApp
-                    </a>
+                    {shareBlocked ? (
+                      <button type="button" className="bk-btn bk-btn--secondary" disabled title={sendBlock!.title}>
+                        WhatsApp
+                      </button>
+                    ) : (
+                      <a
+                        href={buildWhatsAppShareUrl(
+                          quote.customer_phone,
+                          whatsAppQuoteMessage(quote, effectiveShareUrl)
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bk-btn bk-btn--secondary"
+                        style={{ boxSizing: 'border-box' }}
+                      >
+                        WhatsApp
+                      </a>
+                    )}
                   </div>
                 </div>
               )}
-              {(quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome && (
+              {(quote.status === 'SENT' || quote.status === 'DRAFT') && undecided && (
                 <>
-                  <div className="bk-fact__label" style={{ marginBottom: 8 }}>Record their answer</div>
+                  {!neverSent && <div className="bk-fact__label" style={{ marginBottom: 8 }}>Record their answer</div>}
                   <div className="qd-btn-row">
                     <button
                       type="button"
@@ -741,7 +914,7 @@ export default function QuoteDetail() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setOutcomeType('rejected'); setShowOutcomeModal(true); }}
+                      onClick={() => setLossFor('outcome')}
                       className="bk-btn bk-btn--secondary"
                     >
                       Rejected
@@ -769,14 +942,14 @@ export default function QuoteDetail() {
                     a.click();
                     URL.revokeObjectURL(a.href);
                   })
-                  .catch((e: any) => toast.error(e?.message || 'PDF download failed'));
+                  .catch((e: unknown) => toast.error(sendBlockedMessage(e) || (e as { message?: string } | null)?.message || 'PDF download failed'));
               }}
               className="bk-btn bk-btn--quiet"
             >
               <Download size={16} aria-hidden="true" /> Download PDF
             </button>
             {quote.status === 'ACCEPTED' && !booked && (
-              <button type="button" className="bk-btn bk-btn--quiet" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending}>
+              <button type="button" className="bk-btn bk-btn--quiet" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending || !!sendBlock} title={sendBlock ? sendBlock.title : undefined}>
                 Send to customer
               </button>
             )}
@@ -821,8 +994,10 @@ export default function QuoteDetail() {
 
             {outcomeType === 'accepted' && (
               <div style={{ marginBottom: 0 }}>
-                {label('Final price agreed (optional)')}
+                {label('Final price agreed, excl. VAT (optional)')}
                 <input
+                  aria-label="Final price agreed, excl. VAT (optional)"
+                  inputMode="decimal"
                   className="qi-input"
                   type="number"
                   value={finalPrice}
@@ -831,35 +1006,11 @@ export default function QuoteDetail() {
                   style={inputStyle}
                 />
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 6 }}>
-                  Leave blank to use quote total: {formatCurrency(parseFloat(quote?.total_amount || '0'))}
+                  {/* The agreed price is kept with the outcome only (pricing
+                      insights): convert_to_load and the invoice bill the
+                      quote total, so say so rather than imply otherwise. */}
+                  Kept with the outcome for pricing insights. The booking and invoice use the quote total, {formatRand(quote?.total_amount)} excl. VAT; edit the quote to change it.
                 </div>
-              </div>
-            )}
-
-            {outcomeType === 'rejected' && (
-              <div style={{ marginBottom: 0 }}>
-                {label('Rejection reason')}
-                <Select value={rejectionReason} onValueChange={setRejectionReason}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select reason..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Price too high">Price too high</SelectItem>
-                    <SelectItem value="Went with competitor">Went with competitor</SelectItem>
-                    <SelectItem value="Job cancelled">Job cancelled</SelectItem>
-                    <SelectItem value="Other">Other (please specify)</SelectItem>
-                  </SelectContent>
-                </Select>
-                {rejectionReason === 'Other' && (
-                  <input
-                    className="qi-input"
-                    type="text"
-                    placeholder="Please specify reason"
-                    value={customRejectionReason}
-                    onChange={e => setCustomRejectionReason(e.target.value)}
-                    style={{ ...inputStyle, marginTop: 12 }}
-                  />
-                )}
               </div>
             )}
 
@@ -868,8 +1019,6 @@ export default function QuoteDetail() {
                 onClick={() => {
                   setShowOutcomeModal(false);
                   setOutcomeType(null);
-                  setRejectionReason('');
-                  setCustomRejectionReason('');
                   setFinalPrice('');
                 }}
                 type="button"
@@ -880,16 +1029,13 @@ export default function QuoteDetail() {
               </button>
               <button
                 onClick={() => {
-                  const data: any = { outcome: outcomeType };
-                  if (outcomeType === 'rejected' && rejectionReason) {
-                    data.rejection_reason = rejectionReason === 'Other' ? customRejectionReason : rejectionReason;
-                  }
+                  const data: { outcome: string; final_price?: number } = { outcome: outcomeType };
                   if (outcomeType === 'accepted' && finalPrice) {
                     data.final_price = parseFloat(finalPrice);
                   }
                   outcomeMutation.mutate(data);
                 }}
-                disabled={outcomeType === 'rejected' && (!rejectionReason || (rejectionReason === 'Other' && !customRejectionReason))}
+                disabled={outcomeMutation.isPending}
                 type="button"
                 className={`bk-btn ${outcomeType === 'accepted' ? 'bk-btn--primary' : 'bk-btn--danger'}`}
                 style={{ flex: 1 }}
@@ -901,10 +1047,26 @@ export default function QuoteDetail() {
         </div>
       )}
 
+      {lossFor && (
+        <LossReasonDialog
+          quoteNumber={quote.quote_number}
+          title={lossFor === 'outcome' ? 'Mark quote as rejected' : 'Mark quote as declined'}
+          confirmLabel={lossFor === 'outcome' ? 'Mark rejected' : 'Mark declined'}
+          busy={lossFor === 'outcome' ? outcomeMutation.isPending : statusMutation.isPending}
+          onCancel={() => setLossFor(null)}
+          onConfirm={(reason: LossReason) => {
+            const extra = lossReasonPayload(reason);
+            if (lossFor === 'outcome') outcomeMutation.mutate({ outcome: 'rejected', ...extra });
+            else statusMutation.mutate({ status: 'DECLINED', extra }, { onSettled: () => setLossFor(null) });
+          }}
+        />
+      )}
+
       {sendPreview && (
         <QuoteSendPreview
           quote={quote}
           confirmLabel={quote.status === 'SENT' ? 'Resend quote' : 'Send quote'}
+          warnings={sendWarnings}
           sending={sendPreview === 'status' ? statusMutation.isPending : sendToCustomerMutation.isPending}
           onCancel={() => setSendPreview(null)}
           onConfirm={() => {
@@ -930,7 +1092,10 @@ export default function QuoteDetail() {
           quoteNumber={quote?.quote_number}
           vehicleType={quote?.vehicle_type}
           busy={convertToLoadMutation.isPending}
-          onConfirm={(driverId, vehicleId) => convertToLoadMutation.mutate({ driverId, vehicleId })}
+          pickupDate={quote?.pickup_date}
+          deliveryDate={quote?.delivery_date}
+          distanceKm={quote?.distance ? parseFloat(quote.distance) : null}
+          onConfirm={(driverId, vehicleId, dates) => convertToLoadMutation.mutate({ driverId, vehicleId, dates })}
           onCancel={() => setShowConvertModal(false)}
         />
       )}

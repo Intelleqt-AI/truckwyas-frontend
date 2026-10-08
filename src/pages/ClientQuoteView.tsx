@@ -7,6 +7,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
 import { Loader } from '@/components/Loader';
 import { formatDate, formatDistance, formatMoney, formatNumber } from '@/lib/formatters';
+import { cargoText } from '@/lib/cargo';
 
 // House formats: "R 20 505,65", "5 Apr 2026", "30 000 kg", "1 234 km".
 function formatCurrencyLocal(n: number) {
@@ -117,6 +118,7 @@ export default function ClientQuoteView() {
   const hoursLeft = Math.ceil((validUntilDate.getTime() - Date.now()) / (1000 * 60 * 60));
   const pickup = quote.pickup_location || quote.origin;
   const delivery = quote.delivery_location || quote.destination;
+  const vatShown = !!quote?.total_incl_vat && quote?.vat_registered !== false;
   const isRoundTrip = quote.trip_type === 'ROUND_TRIP';
 
   return (
@@ -138,9 +140,22 @@ export default function ClientQuoteView() {
         {/* The price first: one all-in amount, no internal cost breakdown. */}
         <section className="pd-section pd-hero">
           <div>
-            <div className="pd-label">{isRoundTrip ? 'Total price, round trip' : 'Total price'}</div>
-            <div className="pd-hero__amount">{formatCurrencyLocal(parseFloat(quote.total_amount || '0'))}</div>
-            <div className="pd-hero__line">Excluding VAT. Prepared for {quote.customer_name}.</div>
+            {/* Price excl. VAT, the VAT on it and the total incl. VAT: the same
+                figures as the PDF and the email (backend quote_vat). */}
+            <div className="pd-label">
+              {isRoundTrip ? 'Total price, round trip' : 'Total price'}{vatShown ? ', incl. VAT' : ''}
+            </div>
+            <div className="pd-hero__amount">{formatCurrencyLocal(parseFloat((vatShown ? quote.total_incl_vat : quote.total_amount) || '0'))}</div>
+            {vatShown ? (
+              <dl className="pd-price">
+                <div><dt>Price excl. VAT</dt><dd>{formatCurrencyLocal(parseFloat(quote.subtotal_excl_vat || '0'))}</dd></div>
+                <div><dt>{quote.vat_label || `VAT (${Number(quote.vat_rate_percent)}%)`}</dt><dd>{formatCurrencyLocal(parseFloat(quote.vat_amount || '0'))}</dd></div>
+                <div className="pd-price__total"><dt>Total incl. VAT</dt><dd>{formatCurrencyLocal(parseFloat(quote.total_incl_vat || '0'))}</dd></div>
+              </dl>
+            ) : null}
+            <div className="pd-hero__line">
+              {quote.vat_registered === false ? 'No VAT charged. ' : vatShown ? '' : 'Excluding VAT. '}Prepared for {quote.customer_name}.
+            </div>
           </div>
           {alreadyActioned
             ? <StatusChip status={quote.status === 'ACCEPTED' ? 'ACCEPTED' : 'DECLINED'} />
@@ -198,7 +213,7 @@ export default function ClientQuoteView() {
         <section className="pd-section">
           <h2 className="pd-h2">Cargo and schedule</h2>
           <div className="pd-grid">
-            <Field label="Description">{quote.cargo_description || '—'}</Field>
+            <Field label="Description">{cargoText(quote.cargo_description, quote.vehicle_type) || 'Not specified'}</Field>
             <Field label="Vehicle type">{quote.vehicle_type || '—'}</Field>
             <Field label="Weight"><span className="pd-num">{quote.weight ? `${formatNumber(parseFloat(quote.weight))} kg` : 'Not set'}</span></Field>
             <Field label="Distance"><span className="pd-num">{quote.distance ? formatDistance(parseFloat(quote.distance)) : 'Not set'}</span></Field>

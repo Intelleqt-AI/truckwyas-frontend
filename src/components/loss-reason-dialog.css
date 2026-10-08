@@ -1,0 +1,24 @@
+/* Decline / lost: optional reason pills and a one-line note. */
+.lr-reasons { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.lr-reason {
+  min-height: 36px; padding: 0 14px;
+  border: 1px solid var(--border-control, var(--border-subtle)); border-radius: 999px;
+  background: var(--bg-surface); color: var(--text-primary);
+  font: 500 13px/20px var(--font-sans); cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+}
+.lr-reason:hover { background: var(--bg-surface-hover); }
+.lr-reason[aria-pressed="true"] {
+  background: var(--accent-dim, var(--bg-raised)); border-color: var(--accent-primary); color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--accent-primary);
+}
+.lr-reason:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.lr-note-label { display: block; margin-bottom: 6px; font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }
+.lr-note {
+  width: 100%; min-height: 40px; padding: 9px 12px; box-sizing: border-box;
+  background: var(--bg-surface); color: var(--text-primary);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-control, 8px);
+  font: 400 14px/20px var(--font-sans);
+}
+@media (pointer: coarse) { .lr-reason { min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .lr-reason { transition: none; } }

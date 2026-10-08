@@ -2,7 +2,7 @@ import '@/pages/table-heading-roles.css';
 import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import '@/pages/admin/admin-brand.css';
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
@@ -31,6 +31,9 @@ interface Company {
   subscription_status: string;
   is_demo: boolean;
   is_deleted: boolean;
+  /** VAT vendor: quotes and invoices carry VAT. Off = no VAT, invoices titled INVOICE. */
+  vat_registered: boolean;
+  has_vat_number: boolean;
   created_at: string;
   next_billing_date: string | null;
   grace_period_expires_at: string | null;
@@ -50,9 +53,21 @@ interface BillingChargeRow {
   created_at: string;
 }
 
-type CompanyActionType = 'suspend' | 'reactivate' | 'delete';
+type CompanyActionType = 'suspend' | 'reactivate' | 'delete' | 'vat_on' | 'vat_off';
 
 const formatCurrency = (n: number) => formatMoney(n || 0);
+
+// Row actions that ask first.
+const CONFIRM_COPY: Record<'suspend' | 'delete' | 'vat_on' | 'vat_off', { title: string; label: string; message: (name: string) => string }> = {
+  delete: { title: 'Delete company', label: 'Delete',
+    message: n => `Mark ${n} as deleted? Its users immediately lose access. This can't be undone from here.` },
+  suspend: { title: 'Suspend company', label: 'Suspend',
+    message: n => `Suspend ${n}? Its users lose access to quoting and invoicing until reactivated or a payment is recorded.` },
+  vat_on: { title: 'Mark as VAT registered', label: 'Mark VAT registered',
+    message: n => `${n} will charge 15% VAT (0% on international trips) on quotes, and new invoices will be tax invoices. Invoices already issued don't change.` },
+  vat_off: { title: 'Mark as not VAT registered', label: 'Mark not VAT registered',
+    message: n => `${n} will show no VAT on quotes, and new invoices will be titled INVOICE without VAT. Invoices already issued don't change. Only do this for a business that isn't a SARS VAT vendor.` },
+};
 
 const fmtDateTime = (dateStr?: string | null) => (dateStr ? formatDateTime(dateStr) : 'Not recorded');
 
@@ -161,7 +176,7 @@ const panelLabelStyle: React.CSSProperties = {
   fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6,
 };
 
-const COLUMN_COUNT = 8;
+const COLUMN_COUNT = 9;
 
 export function CompaniesTable() {
   const qc = useQueryClient();
@@ -170,7 +185,7 @@ export function CompaniesTable() {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [confirmAction, setConfirmAction] = useState<{ company: Company; action: 'suspend' | 'delete' } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ company: Company; action: 'suspend' | 'delete' | 'vat_on' | 'vat_off' } | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -194,6 +209,8 @@ export function CompaniesTable() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-companies-full', debouncedSearch, statusFilter, page],
+    // New search or page: keep the current rows until the new ones land.
+    placeholderData: keepPreviousData,
     queryFn: () => fetchData(`api/v1/admin/companies/${queryString}`),
   });
 
@@ -203,8 +220,11 @@ export function CompaniesTable() {
     mutationFn: ({ id, action }: { id: number; action: CompanyActionType }) =>
       postData({ url: `api/v1/admin/companies/${id}/action/`, data: { action } }),
     onSuccess: (_result, variables) => {
-      const verb = variables.action === 'suspend' ? 'suspended' : variables.action === 'reactivate' ? 'reactivated' : 'deleted';
-      toast.success(`Company ${verb}`);
+      const done: Record<CompanyActionType, string> = {
+        suspend: 'Company suspended', reactivate: 'Company reactivated', delete: 'Company deleted',
+        vat_on: 'Marked as VAT registered', vat_off: 'Marked as not VAT registered',
+      };
+      toast.success(done[variables.action]);
       qc.invalidateQueries({ queryKey: ['admin-companies-full'] });
     },
     onError: (e: any) => toast.error(e?.message || 'Action failed'),
@@ -242,6 +262,7 @@ export function CompaniesTable() {
                 <th className="num adm-col-phone" style={thStyle}>Users</th>
                 <th className="num adm-col-phone" style={thStyle}>Quotes</th>
                 <th className="num" style={thStyle}>Orders</th>
+                <th className="adm-col-phone" style={thStyle}>VAT</th>
                 <th className="adm-col-low" style={thStyle}>Created</th>
                 <th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th>
               </tr>
@@ -284,6 +305,12 @@ export function CompaniesTable() {
                       <td className="num adm-col-phone" style={tdStyle}>{c.user_count}</td>
                       <td className="num adm-col-phone" style={tdStyle}>{c.quote_count}</td>
                       <td className="num" style={tdStyle}>{c.load_count}</td>
+                      <td className="adm-col-phone" style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                        {c.vat_registered ? 'Registered' : <span style={{ color: 'var(--text-tertiary)' }}>Not registered</span>}
+                        {c.vat_registered && !c.has_vat_number && (
+                          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>No VAT number</div>
+                        )}
+                      </td>
                       <td className="adm-col-low" style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{c.created_at ? formatDate(c.created_at) : 'Not recorded'}</td>
                       <td style={actionTdStyle}>
                         <RowActions
@@ -292,6 +319,9 @@ export function CompaniesTable() {
                             { label: isExpanded ? 'Hide billing' : 'Billing history', onSelect: () => setExpandedId(isExpanded ? null : c.id) },
                             ...(!c.is_deleted && isDownState ? [{ label: 'Reactivate', onSelect: () => runAction(c.id, 'reactivate'), disabled: actionMutation.isPending }] : []),
                             ...(!c.is_deleted && !isDownState ? [{ label: 'Suspend', danger: true, onSelect: () => setConfirmAction({ company: c, action: 'suspend' }), disabled: actionMutation.isPending }] : []),
+                            ...(!c.is_deleted ? [c.vat_registered
+                              ? { label: 'Mark not VAT registered', onSelect: () => setConfirmAction({ company: c, action: 'vat_off' }), disabled: actionMutation.isPending }
+                              : { label: 'Mark VAT registered', onSelect: () => setConfirmAction({ company: c, action: 'vat_on' }), disabled: actionMutation.isPending }] : []),
                             ...(!c.is_deleted ? [{ label: 'Delete', danger: true, onSelect: () => setConfirmAction({ company: c, action: 'delete' }), disabled: actionMutation.isPending }] : []),
                           ]}
                         />
@@ -321,13 +351,9 @@ export function CompaniesTable() {
 
       {confirmAction && (
         <ConfirmModal
-          title={confirmAction.action === 'delete' ? 'Delete company' : 'Suspend company'}
-          message={
-            confirmAction.action === 'delete'
-              ? `Mark ${confirmAction.company.company_name} as deleted? Its users immediately lose access. This can't be undone from here.`
-              : `Suspend ${confirmAction.company.company_name}? Its users lose access to quoting and invoicing until reactivated or a payment is recorded.`
-          }
-          confirmLabel={confirmAction.action === 'delete' ? 'Delete' : 'Suspend'}
+          title={CONFIRM_COPY[confirmAction.action].title}
+          message={CONFIRM_COPY[confirmAction.action].message(confirmAction.company.company_name)}
+          confirmLabel={CONFIRM_COPY[confirmAction.action].label}
           danger={confirmAction.action === 'delete'}
           onConfirm={() => runAction(confirmAction.company.id, confirmAction.action)}
           onCancel={() => setConfirmAction(null)}

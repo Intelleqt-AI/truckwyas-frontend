@@ -13,7 +13,7 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type InvoiceLike = Record<string, any>;
 
-const NOT_SENT = new Set(['DRAFT', 'CANCELLED', 'VOID']);
+const NOT_SENT = new Set(['DRAFT', 'CANCELLED', 'VOID', 'CREDITED']);
 
 /** Statuses the backend's send_reminder endpoint accepts (core/views_finance.py). */
 export const REMINDER_STATUSES = new Set(['SENT', 'VIEWED', 'OVERDUE', 'PARTIALLY_PAID']);
@@ -24,15 +24,16 @@ const toNumber = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-/** Unpaid balance incl. VAT: the API's `balance`, else total minus paid. */
+/** Unpaid balance incl. VAT: the API's `balance`, else total minus paid and credited. */
 export function invoiceBalance(inv: InvoiceLike): number {
   const status = String(inv.status ?? '').toUpperCase();
-  if (status === 'PAID') return 0;
+  if (status === 'PAID' || status === 'CREDITED' || status === 'CANCELLED') return 0;
   const balance = toNumber(inv.balance);
   if (balance !== null) return balance;
   const total = toNumber(inv.total_amount ?? inv.amount) ?? 0;
   const paid = toNumber(inv.paid_amount) ?? 0;
-  return total - paid;
+  const credited = toNumber(inv.credited_amount) ?? 0;
+  return total - paid - credited;
 }
 
 /** Start of today, local time. A due date of today is not yet late. */

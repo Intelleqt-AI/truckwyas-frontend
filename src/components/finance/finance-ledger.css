@@ -1,0 +1,151 @@
+/* Finance ledger (Foundation): invoice line editor, totals breakdown, lock
+   notices, credit notes and suppliers. Built on the v3 finance roles in
+   pages/finance-brand.css (.fin-*), using the same tokens only. */
+
+/* ---- Line editor ---- */
+.fl-lines { display: flex; flex-direction: column; gap: 0; }
+.fl-lines__table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.fl-lines__table th {
+  text-align: left; padding: 0 8px 8px; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-row); white-space: nowrap;
+}
+.fl-lines__table th.num, .fl-lines__table td.num { text-align: right; }
+.fl-lines__table td { padding: 8px; vertical-align: top; border-bottom: 1px solid var(--border-row); }
+.fl-lines__table th:first-child, .fl-lines__table td:first-child { padding-left: 0; }
+.fl-lines__table th:last-child, .fl-lines__table td:last-child { padding-right: 0; }
+.fl-col-qty { width: 68px; }
+.fl-col-price { width: 108px; }
+.fl-col-disc { width: 132px; }
+.fl-col-tax { width: 124px; }
+.fl-col-amt { width: 132px; }
+.fl-col-del { width: 40px; }
+.fl-lines .fin-control { width: 100%; min-height: var(--field-h, 40px); height: var(--field-h, 40px); box-sizing: border-box; }
+.fl-lines input.fl-num { text-align: right; font-variant-numeric: tabular-nums; }
+.fl-disc { display: flex; gap: 4px; align-items: center; }
+.fl-disc > input { flex: 1 1 auto; min-width: 0; }
+.fl-disc .tw-seg { flex: none; }
+.fl-amt { padding-top: 10px; font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.fl-amt__sub { display: block; white-space: normal; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fl-del {
+  width: 40px; height: var(--field-h, 40px); display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: transparent; color: var(--text-tertiary); border-radius: var(--radius-control, 8px); cursor: pointer;
+}
+.fl-del:hover:not(:disabled) { color: var(--status-danger-text); background: var(--bg-surface-hover); }
+.fl-del:disabled { opacity: 0.4; cursor: not-allowed; }
+.fl-del:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.fl-lines__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; flex-wrap: wrap; }
+.fl-label-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.fl-mobile-label { display: none; }
+/* Line type: a compact select under the description (all widths). */
+.fl-type { display: flex; align-items: center; gap: 8px; margin-top: 6px; min-width: 0; }
+.fl-type__label { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); flex: none; }
+.fl-line-type { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+
+/* Cards narrower than the full table (the new-invoice main column beside
+   the rail, tablets): each line is two rows, description and amount over
+   qty / price / discount / tax, each with its own label. */
+@container (max-width: 940px) {
+  .fl-lines__table thead { display: none; }
+  .fl-lines__table, .fl-lines__table tbody { display: block; }
+  .fl-lines__table tr {
+    display: grid;
+    grid-template-columns: minmax(56px, 0.6fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.1fr) 40px;
+    gap: 8px 12px; padding: 12px 0; border-bottom: 1px solid var(--border-row);
+  }
+  .fl-lines__table td { display: block; padding: 0; border: 0; width: auto; }
+  .fl-lines__table td.fl-cell-desc { grid-column: 1 / 4; grid-row: 1; }
+  .fl-lines__table td.fl-cell-amt { grid-column: 4; grid-row: 1; text-align: right; }
+  .fl-lines__table td.fl-cell-del { grid-column: 5; grid-row: 1; align-self: end; }
+  .fl-lines__table td:first-child { padding-left: 0; }
+  .fl-mobile-label { display: block; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); margin-bottom: 4px; }
+  .fl-cell-amt .fl-amt { padding-top: 20px; white-space: normal; }
+}
+/* Phones: description, then two fields a row, amount last. */
+@container (max-width: 520px) {
+  .fl-lines__table tr { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px; }
+  .fl-lines__table td.fl-cell-desc { grid-column: 1 / 3; }
+  .fl-lines__table td.fl-cell-del { grid-column: 3; }
+  .fl-lines__table td.fl-cell-amt { grid-column: 1 / -1; grid-row: auto; }
+  .fl-cell-amt .fl-amt { padding-top: 0; }
+  /* Qty / price, then discount / tax, two to a row: never the 40px delete
+     column (the discount used to land there and was cut off). */
+  .fl-lines__table td:nth-child(2), .fl-lines__table td:nth-child(4) { grid-column: 1; }
+  .fl-lines__table td:nth-child(3), .fl-lines__table td:nth-child(5) { grid-column: 2 / 4; }
+}
+.fl-lines-card { container-type: inline-size; }
+/* The new-invoice details card keeps its three-across container rule inside the main column. */
+.fin-create-grid > .fin-main-col > .card { container-type: inline-size; }
+
+/* ---- Totals breakdown (rail and documents) ---- */
+.fl-totals { margin: 12px 0 0; }
+.fl-totals .fin-dl__row { min-height: 32px; padding: 6px 0; }
+.fl-totals .fin-dl__row dd { font-variant-numeric: tabular-nums; }
+.fl-totals .fl-totals__sub dt { padding-left: 12px; color: var(--text-tertiary); }
+.fl-totals .fl-totals__sub dt, .fl-totals .fl-totals__sub dd { font-size: 13px; }
+.fl-totals .is-total dt, .fl-totals .is-total dd { font-weight: 600; color: var(--text-primary); }
+.fl-totals .is-rule { border-top: 1px solid var(--border-subtle); margin-top: 4px; padding-top: 10px; }
+
+/* ---- Lock / status notices on documents ---- */
+.fl-notice {
+  display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 12px; row-gap: 12px; align-items: start;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-nested, 8px);
+  padding: 12px 16px; background: var(--bg-surface);
+  font: 400 13px/20px var(--font-sans); color: var(--text-secondary);
+}
+.fl-notice > svg { flex: none; margin-top: 2px; color: var(--text-tertiary); }
+.fl-notice strong { display: block; font-weight: 500; color: var(--text-primary); }
+.fl-notice--warning > svg { color: var(--status-warning-text); }
+.fl-notice--danger > svg { color: var(--status-danger-text); }
+.fl-notice__action { align-self: center; }
+@media (max-width: 560px) {
+  .fl-notice { grid-template-columns: 16px minmax(0, 1fr); }
+  .fl-notice__action { grid-column: 2; justify-self: start; margin-left: 0; }
+}
+
+/* Tax code tag in document tables. */
+.fl-tax { display: inline-block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; }
+
+/* ---- Credit note dialog ---- */
+.fl-dialog--wide { width: min(760px, 100%); }
+.fl-credit-lines { width: 100%; border-collapse: collapse; }
+.fl-credit-lines th { text-align: left; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); padding: 0 8px 8px; border-bottom: 1px solid var(--border-row); }
+.fl-credit-lines td { padding: 8px; border-bottom: 1px solid var(--border-row); vertical-align: middle; font: 400 14px/20px var(--font-sans); color: var(--text-primary); }
+.fl-credit-lines th:first-child, .fl-credit-lines td:first-child { padding-left: 0; }
+.fl-credit-lines th:last-child, .fl-credit-lines td:last-child { padding-right: 0; }
+.fl-credit-lines .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fl-credit-lines input.fin-control { width: 88px; text-align: right; min-height: 36px; height: 36px; }
+.fl-credit-lines input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent-primary); }
+.fl-credit-lines .is-off td { color: var(--text-tertiary); }
+.fl-check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+@media (max-width: 560px) {
+  .fl-credit-lines .m-hide { display: none; }
+}
+
+/* ---- Payments list rows with actions ---- */
+.fin-paylist__row .fl-pay-actions { display: inline-flex; align-items: center; gap: 4px; }
+.fl-source { display: inline-block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+
+/* ---- Inline "add supplier" under the picker ---- */
+.fl-inline-add { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-nested, 8px); }
+.fl-inline-add__fields { display: flex; flex-direction: column; gap: 12px; }
+.fl-inline-add__fields .fin-control { width: 100%; }
+.fl-inline-add__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.fl-field-row { display: flex; gap: 8px; align-items: center; }
+.fl-field-row > :first-child { flex: 1 1 auto; min-width: 0; }
+
+/* Supplier picker (SupplierPicker): a select-style trigger that opens a
+   server-searched list. */
+.sp-combo__trigger { display: flex; text-align: left; }
+.sp-combo__trigger > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sp-combo__placeholder { color: var(--text-secondary); }
+.sp-combo__pop { width: var(--radix-popover-trigger-width); min-width: 240px; padding: 8px; }
+.sp-combo__search { width: 100%; margin-bottom: 4px; }
+.sp-combo__list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.sp-combo__opt {
+  padding: 8px 10px; min-height: 36px; box-sizing: border-box; font-size: 14px; line-height: 20px;
+  border-radius: var(--radius-chip); cursor: pointer; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sp-combo__opt.is-active { background: var(--surface-tint-active); }
+.sp-combo__opt--add { border-top: 1px solid var(--border-subtle); margin-top: 4px; color: var(--text-primary); }
+.sp-combo__note { margin: 6px 10px 2px; font-size: 13px; line-height: 20px; color: var(--text-tertiary); }

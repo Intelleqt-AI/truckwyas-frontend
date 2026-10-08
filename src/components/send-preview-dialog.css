@@ -37,3 +37,7 @@
   .send-preview__actions .tw-btn { flex: 1 1 0; min-height: 48px; }
 }
 .send-preview__title:focus { outline: none; }
+/* A block on sending (QUOTE-RULES §11): red, with its figures. */
+.send-preview__block { color: var(--status-danger-text); }
+.send-preview__block .send-preview__detail { color: var(--text-secondary); }
+.send-preview__detail { color: var(--text-secondary); }

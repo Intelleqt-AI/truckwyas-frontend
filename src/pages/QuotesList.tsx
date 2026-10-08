@@ -1,11 +1,12 @@
 import './bookings-typography.css';
 import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import './table-heading-roles.css';
+import './quotes-list-table.css';
 import './bookings-section.css';
 import { useState, useEffect, useMemo, useRef } from "react";
 import { BoardScrollbar } from "@/components/BoardScrollbar";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { fetchData, patchData, postData } from "@/lib/Api";
 import { formatCurrency, formatDate, formatDateShort, formatMoneyWhole } from "@/lib/formatters";
 import { Loader } from "@/components/Loader";
@@ -37,6 +38,9 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
+import { useSendCheck, sendBlockedMessage, quoteIncomplete } from '@/lib/quoteWarnings';
+import LossReasonDialog from '@/components/LossReasonDialog';
+import { formatPct, lossReasonPayload, roundHalfAway } from '@/lib/pricing';
 import { rowLink } from '@/lib/rowLink';
 import { StatusChip, statusTone } from '@/components/ui/StatusChip';
 import { Segmented } from '@/components/ui/Segmented';
@@ -122,12 +126,13 @@ function QuoteCardBody({ quote }: { quote: any }) {
       <div className="bk-qcard__customer" title={quote.customer_name || ''}>{quote.customer_name || '—'}</div>
       <div className="bk-qcard__route" title={routeOf(quote)}>{routeOf(quote)}</div>
       <div className="bk-qcard__foot">
-        <span className="bk-qcard__amount" title={formatCurrency(parseFloat(quote.total_amount || '0'))}>{formatMoneyWhole(parseFloat(quote.total_amount || '0'))}</span>
-        {/* Only a low price confidence is worth a word on the card; otherwise the date it was made. */}
+        {quoteIncomplete(quote)
+          ? <span className="bk-qcard__amount bk-muted" title="No price yet: its costs aren't complete">Incomplete</span>
+          : <span className="bk-qcard__amount" title={`${formatCurrency(priceInclVat(quote))} incl. VAT`}>{formatMoneyWhole(priceInclVat(quote))}</span>}
+        {/* Expired, else the date it was made. (No "Low confidence": the
+            builder saves a fixed confidence, so it carried no signal.) */}
         {boardStage(quote) === 'EXPIRED' && quote.valid_until
           ? <span className="bk-qcard__meta" title={`${String(quote.status).toUpperCase() === 'SENT' ? 'Sent' : 'Draft'}, valid until ${formatDate(quote.valid_until)}`}>Expired {formatDateShort(quote.valid_until)}</span>
-          : String(quote.confidence).toUpperCase() === 'LOW'
-          ? <span className="bk-qcard__meta">Low confidence</span>
           : quote.created_at ? <span className="bk-qcard__meta">{formatDateShort(quote.created_at)}</span> : null}
       </div>
     </>
@@ -262,6 +267,7 @@ interface QuotePage {
   count: number;
   next: string | null;
   total_amount?: string | number;
+  total_incl_vat?: string | number;
 }
 
 // One pipeline column's data, fetched independently from the backend —
@@ -286,6 +292,9 @@ function useQuoteColumn(status: string | null, search: string, enabled: boolean 
     getNextPageParam: (lastPage, allPages) => (lastPage?.next ? allPages.length + 1 : undefined),
     enabled,
     retry: 1,
+    // A new search keeps each column's current cards until its results land
+    // (no blank board while typing); the search box shows it's working.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -296,7 +305,8 @@ function flattenColumn(q: ReturnType<typeof useQuoteColumn>) {
   return {
     items: q.data?.pages.flatMap(p => p.results) ?? [],
     count: q.data?.pages[0]?.count ?? 0,
-    totalAmount: Number(q.data?.pages[0]?.total_amount ?? 0),
+    // Column total incl. VAT, as the cards show (server-summed over every page).
+    totalAmount: Number(q.data?.pages[0]?.total_incl_vat ?? q.data?.pages[0]?.total_amount ?? 0),
     hasNextPage: !!q.hasNextPage,
     isLoading: q.isLoading,
     isFetchingNextPage: q.isFetchingNextPage,
@@ -323,6 +333,7 @@ interface QuotesListProps {
  */
 export { idTail, RecordNo, RecordId } from './recordNo';
 import { RecordNo } from './recordNo';
+import { priceInclVat } from "@/lib/vat";
 
 export function StatusFilter<V extends string>({ label, value, onChange, options, className, compactOnPhone }: {
   label: string; value: V; onChange: (v: V) => void;
@@ -373,6 +384,10 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   // Dragging a card into Sent emails the customer (the server sends on the
   // status change), so it is previewed and confirmed first.
   const [pendingSend, setPendingSend] = useState<{ quote: any; oldColumn: string } | null>(null);
+  // §11: the server's send check for the quote being sent (block / warn).
+  const sendWarnings = useSendCheck(pendingSend ? pendingSend.quote.id : null, pendingSend?.quote);
+  // Dropped on Declined: an optional loss reason first.
+  const [pendingDecline, setPendingDecline] = useState<{ quote: any; oldColumn: string } | null>(null);
 
   // Search is sent to the backend (it searches across every quote, not just
   // whatever's already loaded on screen) — debounced so typing doesn't fire
@@ -413,6 +428,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   const bookedQ = useQuoteColumn('BOOKED', debouncedSearch);
   const declinedQ = useQuoteColumn('DECLINED', debouncedSearch);
   const allQ = useQuoteColumn(null, debouncedSearch, view === 'list' && statusFilter === 'ALL');
+  // Typing ahead of the debounce, or a column still fetching the new search.
+  const searchBusy = search !== debouncedSearch
+    || [draftQ, sentQ, acceptedQ, bookedQ, declinedQ, allQ].some((q) => q.isFetching && q.isPlaceholderData);
   const columnQueries = useMemo(
     () => ({ DRAFT: draftQ, SENT: sentQ, ACCEPTED: acceptedQ, BOOKED: bookedQ, DECLINED: declinedQ }),
     [draftQ, sentQ, acceptedQ, bookedQ, declinedQ]
@@ -425,7 +443,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   // One stage definition everywhere (R5): the board's, shared with Home.
   const isMarkedLost = (q: any) => String(q.status).toUpperCase() === 'SENT' && boardStage(q) === 'DECLINED';
   const movedLost = flattenColumn(sentQ).items.filter(isMarkedLost);
-  const amountOf = (q: any) => parseFloat(q.total_amount || '0') || 0;
+  // An incomplete quote (no price yet) adds nothing to a total.
+  const amountOf = (q: any) => (quoteIncomplete(q) ? 0 : priceInclVat(q));
   const movedLostTotal = movedLost.reduce((n: number, q: any) => n + amountOf(q), 0);
   // R8: a Draft or Sent quote past its valid-until date is Expired (the same
   // boardStage rule as Home's pipeline). Without a search the exact set comes
@@ -493,18 +512,24 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   }, [queryClient]);
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      patchData({ url: `api/v1/quotes/${id}/`, data: { status } }),
-    onError: () => {
-      toast.error('Failed to update quote status.');
+    mutationFn: ({ id, status, extra }: { id: string; status: string; extra?: Record<string, unknown> }) =>
+      // Accepted and Declined go through update_status: it records the outcome
+      // (the win model's label) and the optional loss reason; a plain PATCH
+      // does neither.
+      status === 'DECLINED' || status === 'ACCEPTED'
+        ? patchData({ url: `api/v1/quotes/${id}/update_status/`, data: { status, ...(extra || {}) } })
+        : patchData({ url: `api/v1/quotes/${id}/`, data: { status } }),
+    onError: (err: unknown) => {
+      toast.error(sendBlockedMessage(err) || 'Failed to update quote status.');
     },
   });
 
   const convertToLoadMutation = useMutation({
-    mutationFn: ({ quote, driverId, vehicleId }: { quote: any; driverId: string; vehicleId: string }) =>
+    mutationFn: ({ quote, driverId, vehicleId, dates }: { quote: any; driverId: string; vehicleId: string; dates?: { pickup_date: string; delivery_date: string } }) =>
       postData({
         url: `api/v1/quotes/${quote.id}/convert_to_load/`,
-        data: { driver_id: driverId, vehicle_id: vehicleId },
+        // dates: only when the quote had none and the modal showed suggested ones.
+        data: { driver_id: driverId, vehicle_id: vehicleId, ...(dates || {}) },
       }).then(data => ({ data, quote })),
     onSuccess: ({ quote }) => {
       // Invalidate both keys — QuotesList uses 'loads', LoadsList uses 'loads-list'
@@ -579,11 +604,15 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       const quote = allLoadedBoardItems.find((q: any) => String(q.id) === quoteId);
       if (quote) { setPendingSend({ quote, oldColumn }); return; }
     }
+    if (newStatus === 'DECLINED') {
+      const quote = allLoadedBoardItems.find((q: any) => String(q.id) === quoteId);
+      if (quote) { setPendingDecline({ quote, oldColumn }); return; }
+    }
     moveQuote(quoteId, oldColumn, newStatus);
   };
 
-  const moveQuote = (quoteId: string, oldColumn: string, newStatus: string, onDone?: () => void) => {
-    statusMutation.mutate({ id: quoteId, status: newStatus }, {
+  const moveQuote = (quoteId: string, oldColumn: string, newStatus: string, onDone?: () => void, extra?: Record<string, unknown>) => {
+    statusMutation.mutate({ id: quoteId, status: newStatus, extra }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['quotes-column', oldColumn] });
         queryClient.invalidateQueries({ queryKey: ['quotes-column', newStatus] });
@@ -643,14 +672,18 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       {/* Toolbar — search, Board/List toggle and count sit on their own row
           under the shared Bookings header, so the tab row keeps one geometry. */}
       <div className="bk-toolbar">
-        <input
-          type="search"
-          className="bk-search"
-          aria-label="Search quotes"
-          placeholder={isPhone ? 'Search quotes' : 'Search quotes, customers, routes'}
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+        <span className={`bk-search-wrap${searchBusy ? ' is-busy' : ''}`}>
+          <input
+            type="search"
+            className="bk-search"
+            aria-label="Search quotes"
+            aria-busy={searchBusy || undefined}
+            placeholder={isPhone ? 'Search quotes' : 'Search quotes, customers, routes'}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {searchBusy && <span className="tw-search__busy" role="status" aria-label="Searching" />}
+        </span>
         {isPhone ? (
           <>
             {view === 'list' && (
@@ -684,6 +717,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
         <span className="bk-toolbar__end">
           {view === 'board' && !billingBlocked ? 'Drag a card to change its status' : ''}
           {failedColumns.length === 0 && <>{view === 'board' && !billingBlocked ? ' · ' : ''}{totalQuotesCount} {totalQuotesCount === 1 ? 'quote' : 'quotes'}</>}
+          {/* The board's card and column amounts are incl. VAT (R13): said once, visibly. */}
+          {view === 'board' && ' · amounts incl. VAT'}
         </span>
         {/* List view (R6): the status filter shares the search row, as on
             Orders and History, so the table starts at the same height. */}
@@ -742,7 +777,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       {COLUMN_LABELS[col]}
                       {!colFailed && <span className="bk-col__count">{colCount}</span>}
                     </span>
-                    {colTotal > 0 && <span className="bk-col__total" title={formatCurrency(colTotal)}>{formatMoneyWhole(colTotal)}</span>}
+                    {colTotal > 0 && <span className="bk-col__total" title={`${formatCurrency(colTotal)} incl. VAT`} aria-label={`${formatMoneyWhole(colTotal)} incl. VAT`}>{formatMoneyWhole(colTotal)}</span>}
                   </div>
                   <div className="kanban-col-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
                     {colFailed ? (
@@ -850,20 +885,30 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           ) : (
           (() => {
           // Columns with nothing in them on any row step aside (R9).
-          const anyOutcome = listItems.some((q: any) => q.outcome === 'accepted' || q.outcome === 'rejected');
           const anyAction = listItems.some((q: any) => q.status === 'ACCEPTED' || !!bookedLoadOf(q));
+          // Margin from the stored pricing decision (price − full cost floor,
+          // on the price excl. VAT); older quotes have none and show a dash.
+          const marginPctOf = (q: any): number | null => {
+            const v = q.pricing_margin_pct;
+            if (v === null || v === undefined || v === '') return null;
+            const n = Number(v);
+            return Number.isFinite(n) ? roundHalfAway(n) : null;
+          };
+          const anyMargin = listItems.some((q: any) => marginPctOf(q) !== null);
           return (
           <div className="bk-table-wrap bk-qlist-fill" style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-            <table className="table-heading-roles bk-table">
+            {/* Fixed layout: every column has its width (quotes-list-table.css), so
+                Amount and Action never leave the card at 1024 or 1440. */}
+            <table className={`table-heading-roles bk-table bk-table--quotes${anyMargin ? ' has-margin' : ''}${anyAction ? ' has-action' : ''}`}>
               <thead>
                 <tr style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                   <th scope="col" className="bk-col-load">Quote #</th>
-                  <th scope="col">Customer</th>
+                  <th scope="col" className="bk-col-customer">Customer</th>
                   <th scope="col" className="bk-col-route">Route</th>
-                  <th scope="col">Status</th>
-                  {anyOutcome && <th scope="col" className="bk-col-phone">Outcome</th>}
-                  <th scope="col" className="bk-col-phone">Created</th>
-                  <th scope="col" className="is-num">Amount</th>
+                  <th scope="col" className="bk-col-status">Status</th>
+                  <th scope="col" className="bk-col-phone bk-col-created">Created</th>
+                  {anyMargin && <th scope="col" className="is-num bk-col-phone bk-col-margin" title="Margin on the price excl. VAT, after the full cost floor">Margin</th>}
+                  <th scope="col" className="is-num bk-col-amount">Amount incl. VAT</th>
                   {anyAction && <th scope="col" className="is-num bk-col-action"><span className="sr-only">Action</span></th>}
                 </tr>
               </thead>
@@ -887,29 +932,37 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       <RecordNo value={quote.quote_number} />
                     </td>
                     <td className="is-truncate bk-col-route" title={routeOf(quote)}>{routeOf(quote)}</td>
-                    <td>
-                      {/* The board's stage: a sent quote marked lost reads Declined here too. */}
+                    <td className="bk-col-status">
+                      {/* One chip per row (R5): the board's stage, which follows the
+                          outcome, so Status and Outcome are one column. */}
                       {(() => {
                         // Converted into a load: "Booked", as on the quote page (its tone follows the load).
                         const booked = bookedLoadOf(quote);
                         if (booked || quote.converted) return <StatusChip status={booked?.status || 'BOOKED'} label="Booked" size="sm" />;
-                        const stage = boardStage(quote);
+                        const raw = boardStage(quote);
+                        // Marked won or lost but the status not moved yet: the outcome wins.
+                        const stage = raw && raw !== 'ACCEPTED' && raw !== 'DECLINED' && quote.outcome === 'accepted' ? 'ACCEPTED'
+                          : raw && raw !== 'DECLINED' && raw !== 'ACCEPTED' && quote.outcome === 'rejected' ? 'DECLINED' : raw;
                         return stage
                           ? <StatusChip status={stage} label={COLUMN_LABELS[stage]} size="sm" />
                           : <StatusChip status={quote.status === 'IT' ? 'IN_TRANSIT' : quote.status} label={COLUMN_LABELS[quote.status]} size="sm" />;
                       })()}
                     </td>
-                    {anyOutcome && <td className="bk-col-phone">
-                      {quote.outcome === 'accepted' && <StatusChip status="WON" size="sm" />}
-                      {quote.outcome === 'rejected' && <StatusChip status="LOST" size="sm" />}
-                      {(!quote.outcome || quote.outcome === 'pending') && <span>—</span>}
-                    </td>}
-                    <td className="is-date bk-col-phone">
+                    <td className="is-date bk-col-phone bk-col-created">
                       {quote.created_at ? formatDate(quote.created_at) : '—'}
                     </td>
-                    <td className="is-money" title={formatCurrency(parseFloat(quote.total_amount || '0'))}>
+                    {anyMargin && (() => {
+                      const m = marginPctOf(quote);
+                      return (
+                        <td className="is-num bk-col-phone bk-col-margin" style={m !== null && m < 0 ? { color: 'var(--status-danger-text)' } : undefined}
+                          title={m === null ? 'Priced before the pricing analysis' : 'Margin on the price excl. VAT, after the full cost floor'}>
+                          {m === null ? <span className="bk-muted">—</span> : formatPct(m)}
+                        </td>
+                      );
+                    })()}
+                    <td className="is-money bk-col-amount" title={quoteIncomplete(quote) ? "No price yet" : `${formatCurrency(priceInclVat(quote))} incl. VAT`}>
                       {/* Lists show whole rands; the quote itself carries the cents (R7). */}
-                      {formatMoneyWhole(parseFloat(quote.total_amount || '0'))}
+                      {quoteIncomplete(quote) ? <span className="bk-muted">—</span> : formatMoneyWhole(priceInclVat(quote))}
                     </td>
                     {anyAction && <td className="is-num bk-col-action" onClick={(e) => e.stopPropagation()}>
                       {!!bookedLoadOf(quote) && (
@@ -926,8 +979,11 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                           type="button"
                           className="bk-btn bk-btn--secondary bk-btn--sm"
                           onClick={(e) => handleConvertToLoad(e, quote)}
+                          aria-label="Convert to booking"
+                          title="Convert to booking"
                         >
-                          Convert to booking
+                          {/* Short in the table so the column keeps its width (R5). */}
+                          Convert
                         </button>
                       )}
                     </td>}
@@ -963,11 +1019,24 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       {pendingSend && (
         <QuoteSendPreview
           quote={pendingSend.quote}
+          warnings={sendWarnings}
           sending={statusMutation.isPending}
           onCancel={() => setPendingSend(null)}
           onConfirm={() => {
             const { quote, oldColumn } = pendingSend;
             moveQuote(String(quote.id), oldColumn, 'SENT', () => setPendingSend(null));
+          }}
+        />
+      )}
+
+      {pendingDecline && (
+        <LossReasonDialog
+          quoteNumber={pendingDecline.quote.quote_number}
+          busy={statusMutation.isPending}
+          onCancel={() => setPendingDecline(null)}
+          onConfirm={(reason) => {
+            const { quote, oldColumn } = pendingDecline;
+            moveQuote(String(quote.id), oldColumn, 'DECLINED', () => setPendingDecline(null), lossReasonPayload(reason));
           }}
         />
       )}
@@ -987,7 +1056,10 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           quoteNumber={pendingConvertQuote.quote_number}
           vehicleType={pendingConvertQuote.vehicle_type}
           busy={convertToLoadMutation.isPending}
-          onConfirm={(driverId, vehicleId) => convertToLoadMutation.mutate({ quote: pendingConvertQuote, driverId, vehicleId })}
+          pickupDate={pendingConvertQuote?.pickup_date}
+          deliveryDate={pendingConvertQuote?.delivery_date}
+          distanceKm={pendingConvertQuote?.distance ? parseFloat(pendingConvertQuote.distance) : null}
+          onConfirm={(driverId, vehicleId, dates) => convertToLoadMutation.mutate({ quote: pendingConvertQuote, driverId, vehicleId, dates })}
           onCancel={() => setPendingConvertQuote(null)}
         />
       )}

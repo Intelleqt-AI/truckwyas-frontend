@@ -69,8 +69,9 @@ export interface Perf {
 }
 
 /**
- * Twelve months of delivered work. Costs follow the P&L rule: approved
- * expenses count, pending ones are reported but not deducted.
+ * Twelve months of delivered work. Costs follow the P&L rule: every expense
+ * that is not rejected counts (approved and pending), excl. VAT; `pending`
+ * is the part still awaiting approval, shown for information.
  */
 export function performance(loads: any[], expenses: any[] | null, now = new Date()): Perf {
   const from = windowStart(now);
@@ -86,7 +87,11 @@ export function performance(loads: any[], expenses: any[] | null, now = new Date
   for (const e of expenses ?? []) {
     if (!inWin(e.expense_date)) continue;
     const st = String(e.status || '').toUpperCase();
-    if (st === 'APPROVED') { costs += num(e.amount); costCount += 1; } else if (st === 'PENDING') { pending += num(e.amount); pendingCount += 1; }
+    // Costs excl. their input VAT (load prices are excl. VAT too).
+    const net = num(e.amount) - num((e as { vat_amount?: unknown }).vat_amount);
+    // Every expense that is not rejected is a cost (the P&L rule); pending is the part awaiting approval.
+    if (st === 'APPROVED' || st === 'PENDING') { costs += net; costCount += 1; }
+    if (st === 'PENDING') { pending += net; pendingCount += 1; }
   }
   return {
     delivered,
@@ -240,29 +245,16 @@ export function perfFigures(perf: Perf, opts: { revenueLabel: string; thin: bool
     { label: opts.revenueLabel, value: randWhole(perf.revenue), note: opts.thin ? undefined : plural(n, 'load'), lead: true },
   ];
   if (opts.costs && opts.costsKnown) {
-    if (perf.costCount === 0 && perf.pendingCount === 0) {
+    if (perf.costCount === 0) {
       figs.push({ label: 'Margin after truck costs', value: 'No costs logged', quiet: true, note: 'On this truck in the last 12 months' });
-    } else if (perf.costCount === 0) {
-      // Only pending costs: no margin to show yet, only what approval would leave.
-      const after = perf.revenue - perf.pending;
-      figs.push({
-        label: 'Margin after truck costs',
-        value: 'No approved costs',
-        quiet: true,
-        note: <span className="fd-perf__if"><span className={after < 0 ? 'fd-perf__if-figure is-loss' : 'fd-perf__if-figure'}>{randWhole(after)}</span> if the {randWhole(perf.pending)} pending is approved</span>,
-      });
     } else {
       const margin = perf.revenue - perf.costs;
-      const after = margin - perf.pending;
-      // One consequence line (R6: the note stays within two lines). With
-      // pending costs it names what approval would leave; the approved total
-      // is in the Performance tip. Without, it names the approved total.
       figs.push({
         label: 'Margin after truck costs',
         value: randWhole(margin),
         note: perf.pending > 0
-          ? <span className="fd-perf__if"><span className={after < 0 ? 'fd-perf__if-figure is-loss' : 'fd-perf__if-figure'}>{randWhole(after)}</span> if the {randWhole(perf.pending)} pending is approved</span>
-          : `After ${randWhole(perf.costs)} approved costs`,
+          ? `After ${randWhole(perf.costs)} costs, incl. ${randWhole(perf.pending)} awaiting approval`
+          : `After ${randWhole(perf.costs)} costs`,
       });
     }
   }

@@ -280,3 +280,7 @@
   .td-table td { height: 56px; }
   .td-recent .td-recent__skel { height: calc(33px + 5 * 56px - var(--card-pad) + 8px); }
 }
+
+/* Revenue vs costs head: the basis switch (Cash | Accrual) beside the legend. */
+.td-chart-tools { display: flex; align-items: center; gap: 12px; flex: none; }
+.td-chart-tools .td-legend { padding-top: 0; }

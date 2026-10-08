@@ -355,3 +355,12 @@
   .fr-stack__pairs dd { margin: 0; font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .fr-stack__pairs > .is-last dt, .fr-stack__pairs > .is-last dd { font-weight: 600; color: var(--text-primary); }
 }
+
+/* Estimated (modelled) figures: never drawn like recorded ones. Muted,
+   italic, with an "est." tag; the cell's title says how it was modelled. */
+.fr-table td.is-est { color: var(--text-tertiary); font-style: italic; }
+.fr-est {
+  display: inline-block; margin-left: 4px; padding: 0 4px; vertical-align: 1px;
+  border: 1px dashed var(--border-strong, var(--border-subtle)); border-radius: 4px;
+  font: italic 500 10px/14px var(--font-sans); letter-spacing: 0.02em; color: var(--text-tertiary);
+}

@@ -50,6 +50,9 @@ const STATUS_MAP: Record<string, Entry> = {
   CANCELLED: { tone: 'neutral', label: 'Cancelled' },
   CANCELED: { tone: 'neutral', label: 'Cancelled' },
   VOID: { tone: 'neutral', label: 'Void' },
+  // Invoices fully credited, and credit notes once issued
+  CREDITED: { tone: 'neutral', label: 'Credited' },
+  ISSUED: { tone: 'info', label: 'Issued' },
   REFUNDED: { tone: 'neutral', label: 'Refunded' },
   // Loads and bookings
   BOOKED: { tone: 'neutral', label: 'Booked' },

@@ -38,11 +38,15 @@ export function Toolbar({
 }
 
 /** 36px search field with the magnifier inside (`.tw-search-wrap` / `.tw-search`). */
-export function SearchInput({ className, wrapClassName, ...props }: InputHTMLAttributes<HTMLInputElement> & { wrapClassName?: string }) {
+/** `busy`: new results for what's typed are loading. The page keeps showing
+ *  the previous results meanwhile (keepPreviousData), so the cue lives here,
+ *  a small ring at the end of the box, instead of blanking the list. */
+export function SearchInput({ className, wrapClassName, busy = false, ...props }: InputHTMLAttributes<HTMLInputElement> & { wrapClassName?: string; busy?: boolean }) {
   return (
-    <label className={['tw-search-wrap', wrapClassName ?? ''].filter(Boolean).join(' ')}>
+    <label className={['tw-search-wrap', busy ? 'is-busy' : '', wrapClassName ?? ''].filter(Boolean).join(' ')}>
       <Search aria-hidden="true" strokeWidth={1.75} />
-      <input type="search" className={['tw-search', className ?? ''].filter(Boolean).join(' ')} {...props} />
+      <input type="search" className={['tw-search', className ?? ''].filter(Boolean).join(' ')} aria-busy={busy || undefined} {...props} />
+      {busy && <span className="tw-search__busy" role="status" aria-label="Searching" />}
     </label>
   );
 }

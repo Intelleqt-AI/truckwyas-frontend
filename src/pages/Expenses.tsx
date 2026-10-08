@@ -4,8 +4,8 @@ import './table-heading-roles.css';
 import './finance-brand.css';
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { useQuery } from '@tanstack/react-query';
-import { postData, putData, deleteData } from '@/lib/Api';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { fetchData, postData, putData, deleteData } from '@/lib/Api';
 import { fetchAllPages } from '@/components/insights/findings';
 import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
 import { KpiStats } from '@/components/ui/KpiTile';
@@ -23,8 +23,14 @@ import { Segmented } from '@/components/ui/Segmented';
 import { StatusChip } from '@/components/ui/StatusChip';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import '@/components/finance/finance-ledger.css';
+import { SupplierPicker } from '@/components/finance/SupplierPicker';
+import { CATEGORY_FILTERS, EXPENSE_CATEGORIES, categoryLabel } from '@/lib/finance/categories';
+import { useTaxCodes } from '@/lib/finance/api';
+import { normaliseDecimalInput, subtractDecimals, taxCodeShort, toNumber, vatFromGross } from '@/lib/finance/tax';
+import type { ExpenseTaxFields, TaxCode } from '@/lib/finance/types';
 
-interface Expense {
+interface Expense extends ExpenseTaxFields {
   id: number;
   expense_number?: string;
   category: string;
@@ -58,22 +64,14 @@ const amountOf = (e: Pick<Expense, 'amount'>) => {
 const formatStatus = (s?: string) =>
   s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
 
-// Filter / display categories. DRIVER is a legacy value still present in
-// stored data; new expenses use the API's DRIVER_COST choice.
-const CATS = [
-  { value: 'All', label: 'All categories' },
-  { value: 'FUEL', label: 'Fuel' },
-  { value: 'TOLLS', label: 'Tolls' },
-  { value: 'MAINTENANCE', label: 'Maintenance' },
-  { value: 'DRIVER_COST', label: 'Driver cost' },
-  { value: 'DRIVER', label: 'Driver' },
-  { value: 'INSURANCE', label: 'Insurance' },
-  { value: 'OVERHEAD', label: 'Overhead' },
-  { value: 'OTHER', label: 'Other' },
-];
+// Filter / display categories (lib/finance/categories). DRIVER is a legacy
+// value still present in stored data; new expenses use DRIVER_COST.
+const CATS = CATEGORY_FILTERS;
 // Choices accepted by POST/PUT /api/v1/expenses/.
-const FORM_CATS = CATS.filter(c => c.value !== 'All' && c.value !== 'DRIVER');
-const catLabel = (v: string) => CATS.find(c => c.value === v)?.label ?? formatStatus(v);
+const FORM_CATS = EXPENSE_CATEGORIES;
+const catLabel = (v: string) => categoryLabel(v);
+/** The supplier record's name, else the old free-text vendor. */
+const supplierOf = (e: Expense) => e.supplier_name || e.vendor || '';
 
 const DATE_FILTERS = [
   { value: 'all', label: 'All dates' },
@@ -111,31 +109,18 @@ function FilterSelect({ label, value, onChange, options, short, allValue }: {
 
 const expenseDate = (e: Expense) => new Date(e.expense_date || e.date);
 
+// GET expenses/summary/ (core/services/expense_list.py): the overview over
+// every expense, so the page never downloads them all.
+type ExpenseSummary = {
+  spend_total: number; spend_count: number;
+  approved_year_amount: number; approved_year_count: number;
+  pending_amount: number; pending_count: number;
+  months: { year: number; month: number; amount: number; count: number }[];
+  by_category: { category: string; amount: number; count: number }[];
+  status_counts: Record<string, number>;
+};
+
 export default function Expenses() {
-  // Every expense (all pages), so tiles, charts and counts agree with the
-  // P&L and Insights, never "the latest 20". Vehicles too (filter options).
-  const expensesQuery = useQuery({
-    queryKey: ["expenses-page"],
-    queryFn: async () => {
-      const [exp, veh] = await Promise.all([
-        fetchAllPages<Expense>('api/v1/expenses/'),
-        // A vehicles failure must not hide the expenses list.
-        fetchAllPages<Vehicle>('api/v1/vehicles/').catch(() => ({ rows: [] as Vehicle[], count: 0, complete: true })),
-      ]);
-      return { expenses: exp.rows, total: exp.count, complete: exp.complete, vehicles: veh.rows };
-    },
-  });
-  const { data, isError, refetch } = expensesQuery;
-  // Failed (or failing and retrying) with nothing to show: say so, never R 0 figures.
-  const failed = loadFailed(expensesQuery);
-  const loading = expensesQuery.isLoading && !failed;
-
-  const expenses = data?.expenses ?? [];
-  const totalExpenseCount: number = data?.total ?? expenses.length;
-  // Only false past 50 pages (1 000 expenses): then the figures say so.
-  const complete = data?.complete ?? true;
-  const vehicles = data?.vehicles ?? [];
-
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [vehicleFilter, setVehicleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -153,6 +138,62 @@ export default function Expenses() {
   } | null>(null);
   const perPage = 10;
 
+  // Server-side list: the filters, search and page go to the API (it sorts
+  // newest first); the overview comes from the summary over every expense
+  // (GET expenses/summary/, the same rules the page used to apply to its
+  // full download). The previous page stays on screen while the next loads.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+  const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const dateRange = (() => {
+    const t = new Date();
+    if (dateFilter === 'this_month') return [ymd(new Date(t.getFullYear(), t.getMonth(), 1)), ymd(new Date(t.getFullYear(), t.getMonth() + 1, 0))];
+    if (dateFilter === 'last_month') return [ymd(new Date(t.getFullYear(), t.getMonth() - 1, 1)), ymd(new Date(t.getFullYear(), t.getMonth(), 0))];
+    if (dateFilter === 'custom') return [customFrom, customTo];
+    return ['', ''];
+  })();
+  const filterParams = (() => {
+    const q = new URLSearchParams();
+    if (categoryFilter !== 'All') q.set('category', categoryFilter);
+    if (vehicleFilter !== 'All') q.set('vehicle', vehicleFilter);
+    if (statusFilter !== 'ALL') q.set('status', statusFilter);
+    if (dateRange[0]) q.set('expense_date__gte', dateRange[0]);
+    if (dateRange[1]) q.set('expense_date__lte', dateRange[1]);
+    if (debouncedSearch.trim()) q.set('search', debouncedSearch.trim());
+    return q;
+  })();
+  const expensesQuery = useQuery({
+    queryKey: ['expenses-page', filterParams.toString(), page],
+    queryFn: () => {
+      const q = new URLSearchParams(filterParams);
+      q.set('page', String(page)); q.set('page_size', String(perPage));
+      return fetchData(`api/v1/expenses/?${q.toString()}`);
+    },
+    placeholderData: keepPreviousData,
+  });
+  const summaryQuery = useQuery<ExpenseSummary>({
+    queryKey: ['expenses-summary'],
+    queryFn: () => fetchData('api/v1/expenses/summary/'),
+  });
+  // Vehicles only feed the vehicle filter's options.
+  const vehiclesQuery = useQuery({
+    queryKey: ['expenses-vehicles'],
+    queryFn: () => fetchAllPages<Vehicle>('api/v1/vehicles/').catch(() => ({ rows: [] as Vehicle[], count: 0, complete: true })),
+  });
+  const refetch = () => { expensesQuery.refetch(); summaryQuery.refetch(); };
+  // Failed (or failing and retrying) with nothing to show: say so, never R 0 figures.
+  const failed = loadFailed(expensesQuery);
+  const loading = (expensesQuery.isLoading || summaryQuery.isLoading) && !failed;
+  const listData = expensesQuery.data;
+  const rows: Expense[] = Array.isArray(listData) ? listData : (listData?.results ?? []);
+  const matchCount: number = typeof listData?.count === 'number' ? listData.count : rows.length;
+  const summary = summaryQuery.data ?? null;
+  const vehicles = vehiclesQuery.data?.rows ?? [];
+  const searching = search !== debouncedSearch || (expensesQuery.isFetching && expensesQuery.isPlaceholderData);
+
   useEffect(() => {
     document.title = "Expenses - TruckWys";
   }, []);
@@ -160,21 +201,7 @@ export default function Expenses() {
   // Live-refresh on the auto-refresh tick / focus / live events.
   useAutoRefresh(() => { refetch(); });
 
-  // Calculate date range
   const now = new Date();
-  let startDate: Date | null = null;
-  let endDate: Date | null = null;
-
-  if (dateFilter === 'this_month') {
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-  } else if (dateFilter === 'last_month') {
-    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-  } else if (dateFilter === 'custom') {
-    startDate = customFrom ? new Date(customFrom) : null;
-    endDate = customTo ? new Date(`${customTo}T23:59:59`) : null;
-  }
 
   const vehicleLabel = (e: Expense) => {
     if (!e.vehicle) return '—';
@@ -182,31 +209,7 @@ export default function Expenses() {
     return e.vehicle_registration || v?.plate || v?.registration || v?.vehicle_number || e.vehicle_info || '—';
   };
 
-  // Filter expenses
-  const q = search.trim().toLowerCase();
-  const filtered = expenses.filter(e => {
-    const catOk = categoryFilter === 'All' || e.category === categoryFilter;
-    const vehOk = vehicleFilter === 'All' || (e.vehicle && e.vehicle.toString() === vehicleFilter);
-    const srchOk = !q
-      || e.description?.toLowerCase().includes(q)
-      || e.vendor?.toLowerCase().includes(q)
-      || e.expense_number?.toLowerCase().includes(q);
-    const statOk = statusFilter === 'ALL' || (e.status || 'PENDING').toUpperCase() === statusFilter;
-
-    let dateOk = true;
-    if (startDate || endDate) {
-      const eDate = expenseDate(e);
-      dateOk = (!startDate || eDate >= startDate) && (!endDate || eDate <= endDate);
-    }
-
-    return catOk && vehOk && srchOk && statOk && dateOk;
-  });
-
-  // Sort by date desc
-  const sorted = [...filtered].sort((a, b) => expenseDate(b).getTime() - expenseDate(a).getTime());
-
-  const totalPages = Math.ceil(sorted.length / perPage);
-  const rows = sorted.slice((page - 1) * perPage, page * perPage);
+  const totalPages = Math.ceil(matchCount / perPage);
 
   const handleDelete = (exp: Expense) => {
     setConfirmOpts({
@@ -243,16 +246,27 @@ export default function Expenses() {
     }
   };
 
-  const handleExportCSV = () => {
-    const headers = ['Date', 'Category', 'Description', 'Vehicle', 'Amount', 'Status'];
+  const handleExportCSV = async () => {
+    // Every expense matching the filters, fetched only when exporting.
+    let sorted: Expense[] = [];
+    try {
+      sorted = (await fetchAllPages<Expense>(`api/v1/expenses/?${filterParams.toString()}`)).rows;
+    } catch {
+      toast.error('Could not export the expenses. Try again.');
+      return;
+    }
+    const headers = ['Date', 'Category', 'Description', 'Supplier', 'Vehicle', 'Tax code', 'Amount incl. VAT', 'VAT', 'Status'];
     const csvRows = [
       headers.join(','),
       ...sorted.map(e => [
         formatDate(e.expense_date || e.date),
         e.category,
-        `"${e.description}"`,
+        `"${(e.description || '').replace(/"/g, '""')}"`,
+        `"${supplierOf(e).replace(/"/g, '""')}"`,
         e.vehicle_registration || '',
+        e.tax_code || '',
         e.amount,
+        e.vat_amount ?? '',
         e.status || 'PENDING',
       ].join(','))
     ];
@@ -287,22 +301,20 @@ export default function Expenses() {
 
   // The toolbar renders at once (also while loading) so nothing below the
   // overview moves when the data arrives.
-  const statusCount = (s: string) => (loading ? undefined : expenses.filter(e => s === 'ALL' || (e.status || 'PENDING').toUpperCase() === s).length);
+  const statusCount = (s: string) => (summary ? summary.status_counts[s] : undefined);
   const toolbar = (
     <Toolbar
       className="fin-toolbar exp-toolbar"
       aria-label="Filter expenses"
       meta={loading ? ' ' : (
-        <>
-          {sorted.length} {sorted.length === 1 ? 'expense' : 'expenses'}
-          {!complete && ` · first ${expenses.length} of ${totalExpenseCount}`}
-        </>
+        <>{matchCount} {matchCount === 1 ? 'expense' : 'expenses'}</>
       )}
     >
       <SearchInput
         wrapClassName="exp-search"
         placeholder="Search expenses"
-        aria-label="Search expenses by description, vendor or reference"
+        aria-label="Search expenses by description, supplier or reference"
+        busy={searching}
         value={search}
         onChange={e => { setSearch(e.target.value); resetPage(); }}
       />
@@ -365,10 +377,9 @@ export default function Expenses() {
     );
   }
 
-  // Money that counts as spend: approved and pending (rejected is not spend).
-  const isRejected = (e: Expense) => (e.status || '').toUpperCase() === 'REJECTED';
-  const spend = expenses.filter(e => !isRejected(e));
-  const spendTotal = spend.reduce((sum, e) => sum + amountOf(e), 0);
+  // Spend is approved and pending (rejected is not spend), from the summary.
+  const spendTotal = summary?.spend_total ?? 0;
+  const spendCount = summary?.spend_count ?? 0;
   const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
   // Calendar months by expense date.
@@ -378,24 +389,24 @@ export default function Expenses() {
   const monthShort = (key: number) => MONTHS[((key % 12) + 12) % 12];
   const yearOf = (key: number) => Math.floor(key / 12);
   const monthText = (key: number) => `${monthShort(key)} ${yearOf(key)}`;
-  const inMonth = (e: Expense, key: number) => monthKey(expenseDate(e)) === key;
-  const sumOf = (list: Expense[]) => list.reduce((s, e) => s + amountOf(e), 0);
+  // Spend per calendar month (13 months from the server, keyed like monthKey).
+  const monthTotals = new Map<number, { amount: number; count: number }>(
+    (summary?.months ?? []).map(m => [m.year * 12 + (m.month - 1), { amount: m.amount, count: m.count }]),
+  );
+  const monthOf = (key: number) => monthTotals.get(key) ?? { amount: 0, count: 0 };
 
   // Last 12 months (this month and the 11 before), as in Reports.
   const yearKeys = Array.from({ length: 12 }, (_, i) => nowKey - 11 + i);
-  const inYear = (e: Expense) => { const k = monthKey(expenseDate(e)); return k >= yearKeys[0] && k <= nowKey; };
-  const approvedYear = expenses.filter(e => (e.status || '').toUpperCase() === 'APPROVED' && inYear(e));
-  const pendingExpenses = expenses.filter(e => (e.status || 'PENDING').toUpperCase() === 'PENDING');
-  const pendingAmount = sumOf(pendingExpenses);
+  const approvedYearAmount = summary?.approved_year_amount ?? 0;
+  const approvedYearCount = summary?.approved_year_count ?? 0;
+  const pendingCount = summary?.pending_count ?? 0;
+  const pendingAmount = summary?.pending_amount ?? 0;
 
   // Months with spend inside the 12: leading and trailing empty months are
   // not drawn (inner empty months stay, a real zero), as in Reports.
-  const withSpend = yearKeys.filter(k => spend.some(e => inMonth(e, k)));
+  const withSpend = yearKeys.filter(k => monthOf(k).count > 0);
   const chartKeys = withSpend.length ? yearKeys.slice(yearKeys.indexOf(withSpend[0]), yearKeys.indexOf(withSpend[withSpend.length - 1]) + 1) : [];
-  const monthlyTrend = chartKeys.map(key => {
-    const list = spend.filter(e => inMonth(e, key));
-    return { key, amount: sumOf(list), count: list.length };
-  });
+  const monthlyTrend = chartKeys.map(key => ({ key, ...monthOf(key) }));
   const maxMonthlyAmount = Math.max(1, ...monthlyTrend.map(m => m.amount));
   // Phones label only the highest and the latest month (the others are in
   // each bar's title and name); two neighbours would touch, so the highest wins.
@@ -405,19 +416,18 @@ export default function Expenses() {
     return new Set(last < 0 ? [] : last - top === 1 ? [top] : [top, last]);
   })();
   const latestKey = withSpend[withSpend.length - 1];
-  const latestList = latestKey != null ? spend.filter(e => inMonth(e, latestKey)) : [];
-  const prevList = latestKey != null ? spend.filter(e => inMonth(e, latestKey - 1)) : [];
+  const latestTotals = latestKey != null ? monthOf(latestKey) : { amount: 0, count: 0 };
   const vsPrev = (() => {
     if (latestKey == null) return null;
-    const cur = sumOf(latestList); const prev = sumOf(prevList);
+    const cur = latestTotals.amount; const prev = monthOf(latestKey - 1).amount;
     if (prev === 0) return `None in ${monthLong(latestKey - 1)}`;
     const pct = ((cur - prev) / prev) * 100;
     return `${pct >= 0 ? '+' : '−'}${formatPercent(Math.abs(pct), 0)} vs ${monthLong(latestKey - 1)}`;
   })();
 
   // Category totals across every expense, approved and pending.
-  const byCategory = spend.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + amountOf(e); return acc; }, {} as Record<string, number>);
-  const categoryCounts = spend.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + 1; return acc; }, {} as Record<string, number>);
+  const byCategory: Record<string, number> = Object.fromEntries((summary?.by_category ?? []).map(c => [c.category, c.amount]));
+  const categoryCounts: Record<string, number> = Object.fromEntries((summary?.by_category ?? []).map(c => [c.category, c.count]));
   const categoryBreakdown = Object.entries(byCategory)
     .map(([category, total]) => ({ category, label: catLabel(category), total }))
     .filter(c => c.total > 0)
@@ -441,23 +451,23 @@ export default function Expenses() {
             ...(latestKey != null ? [{
               label: latestKey === nowKey ? `Spent in ${monthLong(latestKey)}` : `Spent in ${monthText(latestKey)}`,
               aside: <InfoTip>{`Approved and pending expenses dated ${monthText(latestKey)}, amounts as entered.${latestKey !== nowKey ? ` Nothing is dated after ${monthText(latestKey)} yet.` : ''}`}</InfoTip>,
-              figure: <span title={formatCurrency(sumOf(latestList))}>{wholeRand(sumOf(latestList))}</span>,
-              note: vsPrev ?? plural(latestList.length, 'expense'),
+              figure: <span title={formatCurrency(latestTotals.amount)}>{wholeRand(latestTotals.amount)}</span>,
+              note: vsPrev ?? plural(latestTotals.count, 'expense'),
             }] : []),
             {
               label: 'Approved, 12 months',
               aside: <InfoTip>{`Approved expenses dated ${monthText(yearKeys[0])} to ${monthText(nowKey)}: the costs in the profit and loss for the same period.`}</InfoTip>,
-              figure: <span title={formatCurrency(sumOf(approvedYear))}>{wholeRand(sumOf(approvedYear))}</span>,
-              note: plural(approvedYear.length, 'expense'),
+              figure: <span title={formatCurrency(approvedYearAmount)}>{wholeRand(approvedYearAmount)}</span>,
+              note: plural(approvedYearCount, 'expense'),
             },
             {
               label: 'To approve',
               aside: <InfoTip>Pending expenses, any date, amounts as entered. They are not in the profit and loss until approved.</InfoTip>,
               figure: <span title={formatCurrency(pendingAmount)}>{wholeRand(pendingAmount)}</span>,
-              note: pendingExpenses.length === 0 ? 'Nothing waiting' : (
+              note: pendingCount === 0 ? 'Nothing waiting' : (
                 statusFilter !== 'PENDING'
-                  ? <button type="button" className="exp-stat-link" onClick={() => { setStatusFilter('PENDING'); resetPage(); }}>{`Show ${plural(pendingExpenses.length, 'expense')}`}</button>
-                  : plural(pendingExpenses.length, 'expense')
+                  ? <button type="button" className="exp-stat-link" onClick={() => { setStatusFilter('PENDING'); resetPage(); }}>{`Show ${plural(pendingCount, 'expense')}`}</button>
+                  : plural(pendingCount, 'expense')
               ),
             },
           ]}
@@ -467,9 +477,9 @@ export default function Expenses() {
             <div className="fin-panel-head__text">
               <h2 id="exp-cat-title" className="fin-panel-title fin-panel-title--tip">
                 Spend by category
-                <InfoTip align="end">{formatCurrency(spendTotal)} across {plural(spend.length, 'expense')}, approved and pending, amounts as entered. Rejected expenses are left out.</InfoTip>
+                <InfoTip align="end">{formatCurrency(spendTotal)} across {plural(spendCount, 'expense')}, approved and pending, amounts as entered. Rejected expenses are left out.</InfoTip>
               </h2>
-              <p className="fin-panel-desc">All {plural(spend.length, 'expense')}, approved and pending</p>
+              <p className="fin-panel-desc">All {plural(spendCount, 'expense')}, approved and pending</p>
             </div>
           </div>
           {categoryBreakdown.length === 0 ? (
@@ -546,6 +556,7 @@ export default function Expenses() {
                 <th>Date</th>
                 <th className="fin-cell-fill">Expense</th>
                 <th>Category</th>
+                <th className="fin-col-mid">Supplier</th>
                 <th className="fin-col-mid">Vehicle</th>
                 <th>Status</th>
                 <th className="num">Amount</th>
@@ -555,14 +566,14 @@ export default function Expenses() {
             <tbody>
               {rows.length === 0 ? (
                 <tr className="is-empty">
-                  <td colSpan={7} style={{ padding: 0 }}>
-                    {isError ? (
+                  <td colSpan={8} style={{ padding: 0 }}>
+                    {expensesQuery.isError && !listData ? (
                       <div className="fin-empty">
                         <p className="fin-empty__title">Couldn’t load expenses</p>
                         <p className="fin-empty__body">Check your connection and try again.</p>
                         <button className="btn-action" onClick={() => refetch()}>Retry loading</button>
                       </div>
-                    ) : expenses.length === 0 ? (
+                    ) : summary?.status_counts?.ALL === 0 ? (
                       <div className="fin-empty">
                         <p className="fin-empty__title">No expenses yet</p>
                         <p className="fin-empty__body">Add your first expense to track costs.</p>
@@ -582,14 +593,19 @@ export default function Expenses() {
                     <td className="fin-strong m-party m-span2 fin-cell-2 fin-cell-fill">
                       <div className="fin-truncate fin-truncate--fill" title={exp.description}>{exp.description}</div>
                       <span className="fin-cell-sub">
-                        <span className="fin-mobile-only">{formatDate(exp.expense_date || exp.date)} · {catLabel(exp.category)}</span>
+                        <span className="fin-mobile-only">{formatDate(exp.expense_date || exp.date)} · {catLabel(exp.category)}{supplierOf(exp) ? ` · ${supplierOf(exp)}` : ''}</span>
                         <span className="m-hide-inline">{exp.expense_number ? <span className="fin-id">{exp.expense_number}</span> : 'No reference'}</span>
                       </span>
                     </td>
                     <td className="m-hide" style={{ whiteSpace: 'nowrap' }}>{catLabel(exp.category)}</td>
+                    <td className="m-hide fin-col-mid"><div className="fin-truncate" title={supplierOf(exp)}>{supplierOf(exp) || '—'}</div></td>
                     <td className="m-hide fin-col-mid fin-nowrap">{vehicleLabel(exp)}</td>
                     <td className="m-status"><StatusChip status={status} size="sm" /></td>
-                    <td className="num m-amount" title={formatCurrency(amountOf(exp))}>{wholeRand(amountOf(exp))}</td>
+                    <td className={`num m-amount${toNumber(exp.vat_amount) > 0 ? ' fin-cell-2' : ''}`} title={`${formatCurrency(amountOf(exp))} incl. VAT`}>
+                      {wholeRand(amountOf(exp))}
+                      {/* Input VAT inside the amount, when there is any to claim. */}
+                      {toNumber(exp.vat_amount) > 0 && <span className="fin-cell-sub" title={`${taxCodeShort(exp.tax_code)}: ${formatCurrency(exp.vat_amount)} VAT`}>VAT {formatCurrency(exp.vat_amount)}</span>}
+                    </td>
                     <td className="actions">
                       <RowActions
                         label={`Expense ${exp.expense_number || exp.description || exp.id}`}
@@ -614,7 +630,7 @@ export default function Expenses() {
 
         {totalPages > 1 && (
           <div className="fin-table-foot">
-            <span>{(page - 1) * perPage + 1} to {Math.min(page * perPage, sorted.length)} of {sorted.length}</span>
+            <span>{(page - 1) * perPage + 1} to {Math.min(page * perPage, matchCount)} of {matchCount}</span>
             <div className="fin-table-foot__nav">
               <button type="button" className="tw-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</button>
               <button type="button" className="tw-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</button>
@@ -653,7 +669,17 @@ function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expen
   const [date, setDate] = useState(expense?.expense_date || expense?.date || localDateISO());
   const [description, setDescription] = useState(expense?.description || '');
   const [vehicleId, setVehicleId] = useState(expense?.vehicle ? String(expense.vehicle) : '');
-  const [vendor, setVendor] = useState(expense?.vendor || '');
+  const vendor = expense?.vendor || '';
+  const [supplierId, setSupplierId] = useState<number | null>(expense?.supplier ?? null);
+  const [categoryTouched, setCategoryTouched] = useState(!!expense);
+  const { codes, defaultCode } = useTaxCodes();
+  const [taxCode, setTaxCode] = useState<TaxCode>(expense?.tax_code ?? defaultCode);
+  // VAT follows the amount (gross × 15 ÷ 115 for standard rate) until the
+  // user types their own figure. A saved figure that differs from the
+  // calculation was typed, so it stays typed.
+  const savedVatTyped = !!expense && (expense.tax_code ?? 'STANDARD') === 'STANDARD' && expense.vat_amount != null && expense.vat_amount !== ''
+    && Math.abs(toNumber(expense.vat_amount) - toNumber(vatFromGross(String(expense.amount ?? 0), expense.tax_code ?? 'STANDARD'))) > 0.004;
+  const [vatOverride, setVatOverride] = useState<string | null>(savedVatTyped ? String(expense!.vat_amount) : null);
   const [receiptNumber, setReceiptNumber] = useState(expense?.receipt_number || '');
   const [notes, setNotes] = useState(expense?.notes ? expense.notes.replace(FUEL_NOTE, '') : '');
   const [litres, setLitres] = useState(fuelMatch ? parseLocaleNumber(fuelMatch[1]) : '');
@@ -691,9 +717,12 @@ function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expen
       expense_date: date,
       description,
       vehicle: vehicleId ? parseInt(vehicleId) : null,
+      supplier: supplierId,
+      tax_code: taxCode,
     };
-    // Optional text fields: send when filled, or when clearing a stored value.
-    if (vendor || expense?.vendor) data.vendor = vendor;
+    // Omitted, the server works VAT out from the amount; a typed figure is sent.
+    // Only standard-rated expenses carry input VAT (the server refuses VAT on other codes).
+    if (vatOverride != null && taxCode === 'STANDARD') data.vat_amount = normaliseDecimalInput(vatOverride) || '0';
     if (receiptNumber || expense?.receipt_number) data.receipt_number = receiptNumber;
     let fullNotes = notes;
     if (fuelComputed) {
@@ -711,8 +740,10 @@ function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expen
         toast.success('Expense added');
       }
       onSaved();
-    } catch {
-      toast.error('Could not save the expense. Check the fields and try again.');
+    } catch (err) {
+      toast.error(err instanceof Error && err.message && !/^HTTP error/.test(err.message)
+        ? err.message
+        : 'Could not save the expense. Check the fields and try again.');
       setSubmitting(false);
     }
   };
@@ -729,7 +760,7 @@ function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expen
         <form onSubmit={handleSubmit} className="fin-form">
           <div>
             <label className="fin-label" id="exp-cat-label">Category</label>
-            <Select value={category} onValueChange={setCategory}>
+            <Select value={category} onValueChange={v => { setCategory(v); setCategoryTouched(true); }}>
               <SelectTrigger aria-labelledby="exp-cat-label">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
@@ -758,7 +789,7 @@ function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expen
           )}
           <div className="fin-form__row">
             <div>
-              <label className="fin-label" htmlFor="exp-amount">Amount (ZAR)</label>
+              <label className="fin-label" htmlFor="exp-amount">Amount incl. VAT (ZAR)</label>
               <input id="exp-amount" className="fin-control" type="number" step="0.01" inputMode="decimal" placeholder="0.00" value={amount}
                 onChange={e => setAmount(e.target.value)} readOnly={fuelComputed} required aria-describedby={fuelComputed ? 'exp-amount-help' : undefined}
                 style={{ fontVariantNumeric: 'tabular-nums' }} />
@@ -789,8 +820,46 @@ function ExpenseModal({ expense, vehicles, onClose, onSaved }: { expense?: Expen
               </Select>
             </div>
             <div>
-              <label className="fin-label" htmlFor="exp-vendor">Vendor (optional)</label>
-              <input id="exp-vendor" className="fin-control" type="text" value={vendor} onChange={e => setVendor(e.target.value)} placeholder="e.g. Shell, Engen" />
+              <label className="fin-label" id="exp-supplier-label">Supplier (optional)</label>
+              <SupplierPicker
+                labelId="exp-supplier-label"
+                value={supplierId}
+                fallbackName={vendor}
+                category={category}
+                onChange={sup => {
+                  setSupplierId(sup?.id ?? null);
+                  // A new expense starts in the supplier's usual category.
+                  if (sup?.category && !categoryTouched) setCategory(sup.category);
+                }}
+              />
+            </div>
+          </div>
+          <div className="fin-form__row">
+            <div>
+              <label className="fin-label" id="exp-tax-label">Tax code</label>
+              <Select value={taxCode} onValueChange={v => { setTaxCode(v as TaxCode); if (v !== 'STANDARD') setVatOverride(null); }}>
+                <SelectTrigger aria-labelledby="exp-tax-label"><SelectValue /></SelectTrigger>
+                <SelectContent>{codes.map(c => <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="fin-label" htmlFor="exp-vat">
+                VAT included (ZAR) {vatOverride == null && <span className="fin-label__hint">Calculated</span>}
+              </label>
+              <input id="exp-vat" className="fin-control" type="text" inputMode="decimal"
+                value={vatOverride ?? vatFromGross(normaliseDecimalInput(amount) || '0', taxCode, codes)}
+                onChange={e => setVatOverride(e.target.value)} aria-describedby="exp-vat-help"
+                readOnly={taxCode !== 'STANDARD'}
+                style={{ fontVariantNumeric: 'tabular-nums' }} />
+              <p id="exp-vat-help" className="fin-help">
+                {(() => {
+                  const vat = vatOverride != null ? (normaliseDecimalInput(vatOverride) || '0') : vatFromGross(normaliseDecimalInput(amount) || '0', taxCode, codes);
+                  const net = subtractDecimals(normaliseDecimalInput(amount) || '0', vat);
+                  return <>Excl. VAT {formatCurrency(net)}. {vatOverride != null
+                    ? <button type="button" className="exp-stat-link" onClick={() => setVatOverride(null)}>Use the calculated VAT</button>
+                    : taxCode === 'STANDARD' ? 'Amount × 15 ÷ 115; type to change it.' : 'No VAT on this code.'}</>;
+                })()}
+              </p>
             </div>
           </div>
           <div>

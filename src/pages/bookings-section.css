@@ -37,6 +37,11 @@
   line-height: 20px;
 }
 .bk-search::placeholder { color: var(--text-tertiary); }
+/* Wrapper for the busy ring (theme.css .tw-search__busy); it takes the
+   input's sizing so the toolbar layout is unchanged. */
+.bk-search-wrap { position: relative; display: inline-flex; align-items: center; width: 280px; max-width: 100%; min-width: 0; }
+.bk-search-wrap > .bk-search { width: 100%; }
+.bk-search-wrap.is-busy > .bk-search { padding-right: 34px; }
 .bk-search:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 
 /* Filter chips and segmented toggles share one control geometry. */
@@ -237,7 +242,7 @@
 }
 @media (max-width: 480px) {
   .bk-metrics { gap: 12px; }
-  .bk-search { width: 100%; }
+  .bk-search, .bk-search-wrap { width: 100%; }
 }
 
 /* ---- Detail pages (booking, quote, customer) ---- */
@@ -633,7 +638,9 @@
 .bk-view-toggle:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 @media (max-width: 767px) {
   .bk-toolbar:has(.bk-view-toggle) { flex-wrap: nowrap; gap: 8px; margin-bottom: 12px; }
-  .bk-toolbar:has(.bk-view-toggle) .bk-search { flex: 1 1 0; width: auto; min-width: 0; }
+  .bk-toolbar:has(.bk-view-toggle) .bk-search,
+  .bk-toolbar:has(.bk-view-toggle) .bk-search-wrap { flex: 1 1 0; width: auto; min-width: 0; }
+  .bk-toolbar:has(.bk-view-toggle) .bk-search-wrap > .bk-search { width: 100%; }
   .bk-toolbar:has(.bk-view-toggle) .bk-toolbar__end { display: none; }
   .bk-toolbar .bk-toolbar__status { flex: 0 1 136px; width: 136px; min-width: 0; height: var(--control-h, 44px); }
 }

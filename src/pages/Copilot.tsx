@@ -308,11 +308,12 @@ export default function Copilot() {
     setMessages(prev => prev.map((m, i) =>
       i === msgIndex && m.proposal ? { ...m, proposal: { ...m.proposal, ...patch } } : m));
 
-  const executeProposal = async (msgIndex: number, id: number) => {
+  const executeProposal = async (msgIndex: number, id: number, acknowledged = false) => {
     if (proposalBusy) return;
     setProposalBusy(true);
     try {
-      const res: any = await postData({ url: `api/v1/agent/proposals/${id}/execute/`, data: {} });
+      // Price warnings on a send are executed only with an explicit acknowledgement.
+      const res: any = await postData({ url: `api/v1/agent/proposals/${id}/execute/`, data: acknowledged ? { acknowledge_price_warnings: true } : {} });
       if (res?.status === 'executed') {
         setMessages(prev => {
           const next = prev.map((m, i) =>
@@ -332,7 +333,15 @@ export default function Copilot() {
       // (proposal_status): a 409 from a card that already executed in another
       // tab must show "Saved", not "Failed". Fall back to failed otherwise.
       const serverStatus = e?.data?.proposal_status as Proposal['status'] | undefined;
-      if (serverStatus === 'executed' || serverStatus === 'dismissed') {
+      if (e?.data?.status === 'needs_acknowledgement') {
+        // Still pending: show the warnings and ask for the tick.
+        patchProposal(msgIndex, {
+          status: 'pending',
+          price_warnings: e.data.price_warnings || [],
+          requires_acknowledgement: true,
+          result: { error: 'Check the price warnings, then confirm.' },
+        });
+      } else if (serverStatus === 'executed' || serverStatus === 'dismissed') {
         patchProposal(msgIndex, { status: serverStatus });
       } else {
         patchProposal(msgIndex, {
@@ -523,7 +532,7 @@ export default function Copilot() {
                         {m.proposal && (
                           <ProposalCard
                             proposal={m.proposal}
-                            onConfirm={() => executeProposal(realIndex, m.proposal!.id)}
+                            onConfirm={(ack) => executeProposal(realIndex, m.proposal!.id, ack)}
                             onDismiss={() => dismissProposal(realIndex, m.proposal!.id)}
                             busy={proposalBusy || loading}
                           />

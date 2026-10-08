@@ -33,6 +33,8 @@ interface SendPreviewDialogProps {
    *  When set, it is the primary button and the send button steps down to
    *  secondary; the send handler itself is unchanged. */
   preferredAction?: { label: string; onClick: () => void };
+  /** Sending is not allowed (a block warning); the confirm button is off. */
+  confirmBlocked?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -45,7 +47,7 @@ interface SendPreviewDialogProps {
  */
 export default function SendPreviewDialog({
   title, to, toName, toError, subject, rows, note, confirmLabel, noEmailConfirmLabel, noEmailHint,
-  sending = false, preferredAction, onConfirm, onCancel,
+  sending = false, preferredAction, confirmBlocked = false, onConfirm, onCancel,
 }: SendPreviewDialogProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -59,7 +61,7 @@ export default function SendPreviewDialog({
 
   const loadingTo = to === undefined && !toError;
   const noEmail = to === null;
-  const blocked = loadingTo || (noEmail && !noEmailConfirmLabel);
+  const blocked = confirmBlocked || loadingTo || (noEmail && !noEmailConfirmLabel);
   const label = sending ? 'Sending…' : noEmail && noEmailConfirmLabel ? noEmailConfirmLabel : confirmLabel;
 
   return createPortal(
@@ -117,14 +119,15 @@ export default function SendPreviewDialog({
 
         <div className="send-preview__actions">
           <button type="button" className="tw-btn" onClick={onCancel} disabled={sending}>Cancel</button>
-          <button
+          {/* Blocked: no disabled Send to stare at; the reason is above. */}
+          {!confirmBlocked && <button
             type="button"
             className={preferredAction ? 'tw-btn' : 'tw-btn tw-btn--primary'}
             onClick={onConfirm}
             disabled={blocked || sending}
           >
             {label}
-          </button>
+          </button>}
           {preferredAction && (
             <button type="button" className="tw-btn tw-btn--primary" onClick={preferredAction.onClick} disabled={sending}>
               {preferredAction.label}

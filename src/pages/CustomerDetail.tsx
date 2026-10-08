@@ -18,13 +18,17 @@ import { FileSearch, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BlockSkeleton, TilesSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { boardStage, usePipeline } from '@/components/overview/today';
-import { useLedger, isOpen, num, todayISO, daysBetween } from '@/components/reports/data';
+import { isOpen, num, todayISO, daysBetween, type Invoice } from '@/components/reports/data';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import { fetchAllPages } from '@/components/insights/findings';
 import { staleWork, staleLabel } from './bookings-stale';
 import { RecordId } from './recordNo';
+import { CustomerTaxFields } from '@/components/finance/CustomerTaxFields';
+import { customerTaxFrom, customerTaxPayload, customerTaxProblem } from '@/lib/finance/customerTax';
+import { countryLabel } from '@/lib/finance/validation';
+import { priceInclVat } from "@/lib/vat";
 
 type OpenLoad = {
   id: number; customer?: number | null; status: string; load_number: string; total_amount?: string;
@@ -124,14 +128,26 @@ export default function CustomerDetail() {
   // accepted or turned into a load, out of quotes actually sent. Drafts were
   // never offered, so they are neither won nor lost.
   const pipeline = usePipeline(quotes);
-  // Their open orders (R6): from the same list as Orders (shared cache), so a
+  // Their open orders (R6): the Orders list for this customer only, so a
   // stale load is visible here too, with the same rule and words.
   const loadsQuery = useQuery({
-    queryKey: ["loads-list"],
-    queryFn: () => fetchAllPages<OpenLoad>('api/v1/loads/').then(r => r.rows),
+    queryKey: ["loads-list", "customer", id],
+    queryFn: () => (fetchData(`api/v1/loads/?tab=orders&customer=${id}&page_size=100`) as Promise<{ results: OpenLoad[] }>)
+      .then(r => r.results ?? []),
+    enabled: !!id,
   });
-  // Their invoices, from the same ledger as Invoices and the Debtors report.
-  const ledger = useLedger(['invoices']);
+  // Their invoices only (same list and rules as Invoices and the Debtors
+  // report), not the whole ledger.
+  const invoicesQuery = useQuery({
+    queryKey: ["invoices", "customer", id],
+    queryFn: () => fetchAllPages<Invoice>(`api/v1/invoices/?customer=${id}`).then(r => r.rows),
+    enabled: !!id,
+  });
+  const ledger = {
+    data: invoicesQuery.data ? { invoices: invoicesQuery.data } : undefined,
+    error: invoicesQuery.error,
+    retry: () => { invoicesQuery.refetch(); },
+  };
 
   // A failed request is not a missing record: only a 404 says "not found".
   if (customerFailed && customerError?.status !== 404) return (
@@ -211,6 +227,7 @@ export default function CustomerDetail() {
       payment_terms_default: customer.payment_terms_default || "NET30",
       credit_limit: customer.credit_limit ?? "",
       status: isActive ? "ACTIVE" : "INACTIVE",
+      ...customerTaxFrom(customer),
     });
     setShowEdit(true);
   }
@@ -229,9 +246,11 @@ export default function CustomerDetail() {
   }
 
   async function handleSave() {
+    const taxProblem = customerTaxProblem(customerTaxFrom(editForm));
+    if (taxProblem) { toast.warning(taxProblem); return; }
     setSaving(true);
     try {
-      const payload: any = { ...editForm };
+      const payload: any = { ...editForm, ...customerTaxPayload(customerTaxFrom(editForm)) };
       if (payload.credit_limit === "") payload.credit_limit = null;
       else if (payload.credit_limit) payload.credit_limit = parseFloat(String(payload.credit_limit));
       payload.is_active = payload.status !== "INACTIVE";
@@ -345,6 +364,9 @@ export default function CustomerDetail() {
                 { label: "Postal code", value: customer.zip_code },
                 { label: "Address", value: customer.address, wide: true },
                 { label: "Billing address", value: customer.billing_address || customer.address, wide: true },
+                { label: "Country", value: customer.country ? countryLabel(customer.country) : undefined },
+                { label: "VAT number", value: customer.vat_number },
+                { label: "Registration number", value: customer.registration_number },
               ].map((r: { label: string; value?: string; wide?: boolean }) => (
                 <div key={r.label} className={r.wide ? 'bk-fact--wide' : undefined}>
                   <dt className="bk-fact__label">{r.label}</dt>
@@ -503,8 +525,8 @@ export default function CustomerDetail() {
                             ? <StatusChip status="EXPIRED" label="Expired" size="sm" />
                             : <StatusChip status={q.status} size="sm" />}
                     </td>
-                    <td className="is-money" title={q.total_amount || q.quote_price ? formatZAR(parseFloat(q.total_amount || q.quote_price)) : undefined}>
-                      {q.total_amount || q.quote_price ? wholeRand(parseFloat(q.total_amount || q.quote_price)) : "—"}
+                    <td className="is-money" title={q.total_amount || q.quote_price ? `${formatZAR(q.customer_price ? priceInclVat(q) : parseFloat(q.total_amount || q.quote_price))} incl. VAT` : undefined}>
+                      {q.total_amount || q.quote_price ? wholeRand(q.customer_price ? priceInclVat(q) : parseFloat(q.total_amount || q.quote_price)) : "—"}
                     </td>
                   </tr>
                 ))}
@@ -556,7 +578,7 @@ export default function CustomerDetail() {
                           <StatusChip status={l.status} size="sm" />
                           {st && <span className="bk-status-flag bk-status-flag--stale"><span className="bk-stale-long">{staleLabel(st).text}</span><span className="bk-stale-short">{staleLabel(st).text.replace(` ${new Date().getFullYear()} (`, ' (')}</span></span>}
                         </td>
-                        <td className="is-money" title={formatCurrency(parseFloat(l.total_amount || '0'))}>{formatMoneyWhole(parseFloat(l.total_amount || '0'))}</td>
+                        <td className="is-money" title={`${formatCurrency(priceInclVat(l))} incl. VAT`}>{formatMoneyWhole(priceInclVat(l))}</td>
                       </tr>
                     );
                   })}
@@ -608,6 +630,14 @@ export default function CustomerDetail() {
                 />
               </div>
             ))}
+
+            <CustomerTaxFields
+              idPrefix="cd-edit"
+              value={customerTaxFrom(editForm)}
+              onChange={v => setEditForm((p: Record<string, unknown>) => ({ ...p, ...v }))}
+              fieldStyle={fieldStyle}
+              labelStyle={labelStyle}
+            />
 
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle} id="cd-edit-terms">Payment terms</label>

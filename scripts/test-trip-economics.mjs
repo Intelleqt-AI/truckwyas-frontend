@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import {
   pctText, ptsText, marginText, costBasisLabel, emptyReturnNote, missingPrompts, combineLegs,
-  returnChoiceRequest, linkWarnings, linkRefusal, invoiceWhenText, invoiceMismatchText, actualsText,
+  bookingPlan, isPending, previewMargin, linkWarnings, linkRefusal, invoiceWhenText, invoiceMismatchText, actualsText,
   returnHistoryText, candidateFit, candidateSummary,
 } from "../src/lib/tripEconomics.ts";
 
@@ -53,11 +53,23 @@ eq(c.marginPct, 43.97);
 eq(c.quotedMarginPct, -10.33);
 eq(combineLegs([{ revenue: 100, cost: null, quoted: { price: 100, cost_floor: 50 } }]).margin, null, "no cost, no margin");
 
-// The booking choice maps to one idempotent request.
-eq(returnChoiceRequest({ kind: "none" }, 26, 40), null);
-assert.deepEqual(returnChoiceRequest({ kind: "return", loadId: 29 }, 26, 40), { url: "api/v1/loads/40/link-return/", data: { return_load_id: 29 } }); n++;
-assert.deepEqual(returnChoiceRequest({ kind: "outbound", loadId: 7 }, 26, 40), { url: "api/v1/quotes/26/convert_to_load/", data: { return_of_load_id: 7 } }); n++;
-assert.deepEqual(returnChoiceRequest({ kind: "expect" }, 26, 40), { url: "api/v1/quotes/26/convert_to_load/", data: { expect_return: true } }); n++;
+// The booking choice: one convert_to_load; only a job bringing the truck home links after.
+const base = { vehicle_id: "3", driver_id: "", pickup_date: "2026-10-10", delivery_date: "2026-10-11" };
+let plan = bookingPlan({ kind: "none" }, 26, base);
+assert.deepEqual(plan.convert, { url: "api/v1/quotes/26/convert_to_load/", data: { vehicle_id: "3", pickup_date: "2026-10-10", delivery_date: "2026-10-11" } }); n++;
+eq(plan.after, null);
+plan = bookingPlan({ kind: "outbound", loadId: 7 }, 26, base);
+eq(plan.convert.data.return_of_load_id, 7); eq(plan.after, null);
+plan = bookingPlan({ kind: "expect" }, 26, base);
+eq(plan.convert.data.expect_return, true);
+plan = bookingPlan({ kind: "return", loadId: 29 }, 26, base);
+eq(plan.convert.data.return_of_load_id, undefined);
+assert.deepEqual(plan.after(40), { url: "api/v1/loads/40/link-return/", data: { return_load_id: 29 } }); n++;
+eq(isPending({ code: "tolls_pending", prompt: "Working out tolls…", pending: true }), true);
+eq(isPending({ code: "no_vehicle", prompt: "Add the truck to cost this job" }), false);
+eq(Math.round(previewMargin(32500, 29789.99).amount), 2710);
+eq(Math.round(previewMargin(32500, 29789.99).pct), 8);
+eq(previewMargin(32500, null), null);
 eq(linkWarnings({ warnings: [{ code: "long_gap", title: "Long wait before the return" }] }).length, 1);
 eq(linkWarnings({ booking: { return_link: { linked: true, warnings: [{ code: "x", title: "T" }] } } })[0].title, "T");
 eq(linkWarnings(null).length, 0);

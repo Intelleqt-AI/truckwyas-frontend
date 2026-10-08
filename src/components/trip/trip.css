@@ -81,3 +81,7 @@
 }
 .bj-dialog .bk-kv__value { white-space: nowrap; flex-shrink: 0; }
 .bj-dialog .bk-kv__label { flex-shrink: 1; min-width: 0; }
+/* Tolls being worked out: a calm, slow pulse (none with reduced motion). */
+.tm-pulse { animation: tm-pulse 1.6s ease-in-out infinite; }
+@keyframes tm-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .tm-pulse { animation: none; } }

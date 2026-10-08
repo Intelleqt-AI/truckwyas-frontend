@@ -5,7 +5,7 @@ import { formatMoneyWhole, formatDateShort } from "./formatters.ts";
 
 export type Basis = "actual" | "estimate" | "mixed" | null;
 
-export interface Missing { code: string; prompt: string }
+export interface Missing { code: string; prompt: string; pending?: boolean }
 
 export interface QuotedFigures { price: number | null; cost_floor: number | null; margin_pct: number | null }
 
@@ -195,17 +195,38 @@ export type ReturnChoice =
   | { kind: "return"; loadId: number }    // an existing job brings this one's truck home
   | { kind: "outbound"; loadId: number }; // this job is the return of an existing one
 
-/** The one request that applies the choice after booking, or null. Both
- *  booking calls are idempotent: a repeat convert_to_load on the same quote
- *  answers with its job and makes the requested link / flag. */
-export function returnChoiceRequest(choice: ReturnChoice, quoteId: number | string, loadId: number | string):
-  { url: string; data: Record<string, unknown> } | null {
+/** How a booking is made for a choice: ONE convert_to_load call carries
+ *  return_of_load_id / expect_return; only "an existing job brings this
+ *  truck home" needs a follow-up link on the new job (convert_to_load has no
+ *  parameter for it). Both calls are idempotent. */
+export function bookingPlan(choice: ReturnChoice, quoteId: number | string, base: Record<string, unknown>): {
+  convert: { url: string; data: Record<string, unknown> };
+  after: ((loadId: number | string) => { url: string; data: Record<string, unknown> }) | null;
+} {
+  const url = `api/v1/quotes/${quoteId}/convert_to_load/`;
+  const clean = Object.fromEntries(Object.entries(base).filter(([, v]) => v !== undefined && v !== null && v !== ""));
   switch (choice.kind) {
-    case "return": return { url: `api/v1/loads/${loadId}/link-return/`, data: { return_load_id: choice.loadId } };
-    case "outbound": return { url: `api/v1/quotes/${quoteId}/convert_to_load/`, data: { return_of_load_id: choice.loadId } };
-    case "expect": return { url: `api/v1/quotes/${quoteId}/convert_to_load/`, data: { expect_return: true } };
-    default: return null;
+    case "outbound": return { convert: { url, data: { ...clean, return_of_load_id: choice.loadId } }, after: null };
+    case "expect": return { convert: { url, data: { ...clean, expect_return: true } }, after: null };
+    case "return": {
+      const ret = choice.loadId;
+      return { convert: { url, data: clean }, after: (loadId) => ({ url: `api/v1/loads/${loadId}/link-return/`, data: { return_load_id: ret } }) };
+    }
+    default: return { convert: { url, data: clean }, after: null };
   }
+}
+
+/** A costing-missing item that is being worked out (no action, refresh). */
+export function isPending(m: Missing | null | undefined): boolean {
+  return !!m?.pending;
+}
+
+/** Margin of the job as it would be booked: price − cost floor. */
+export function previewMargin(price: unknown, floor: unknown): { amount: number; pct: number } | null {
+  const p = num(price);
+  const f = num(floor);
+  if (p === null || f === null || p <= 0) return null;
+  return { amount: Math.round((p - f) * 100) / 100, pct: ((p - f) / p) * 100 };
 }
 
 /** Warnings from either answer (link-return, or booking.return_link). */

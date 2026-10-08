@@ -10,7 +10,7 @@ import { InfoTip } from '@/components/ui/InfoTip';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import {
   combinedBasisLabel, costBasisLabel, emptyReturnNote, linkWarnings, missingPrompts, pctText, ptsText,
-  revenueBasisLabel, roleLabel, type Candidate, type Economics, type EconomicsLeg, type LinkWarning,
+  revenueBasisLabel, roleLabel, isPending, type Candidate, type Economics, type EconomicsLeg, type LinkWarning,
 } from '@/lib/tripEconomics';
 import { CandidateOption } from './CandidateOption';
 import { invalidateTrip } from './invalidateTrip';
@@ -43,6 +43,8 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
   const econQ = useQuery({
     queryKey: ['load-economics', String(load.id)],
     queryFn: () => fetchData(`api/v1/loads/${load.id}/economics/`) as Promise<Economics>,
+    // Tolls being worked out in the background: look again until they land.
+    refetchInterval: (q) => (missingPrompts(q.state.data as Economics | undefined).some(isPending) ? 5000 : false),
   });
   const econ = econQ.data;
 
@@ -73,7 +75,7 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
       </td>
       <td>{money(leg.revenue) ?? <span className="tm-muted">—</span>}<span className="tm-sub">{revenueBasisLabel(leg.revenue_basis)}</span></td>
       <td>
-        {leg.cost !== null ? money(leg.cost) : <span className="tm-muted">Unknown</span>}
+        {leg.cost !== null ? money(leg.cost) : <span className="tm-muted">{(leg.missing || []).some(isPending) ? 'Working out' : 'Unknown'}</span>}
         <span className="tm-sub" title={leg.cost_basis === 'estimate' ? leg.estimate_label : undefined}>{costBasisLabel(leg)}</span>
       </td>
       <td className={tone(leg.margin)}>
@@ -157,7 +159,10 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
           {warnings.map(w => <li key={w.code}><span className="bk-dot bk-dot--warning" aria-hidden="true" /><span><b>{w.title}.</b> {w.detail}</span></li>)}
         </ul>
       )}
-      {missing.map(m => (
+      {missing.filter(isPending).map(m => (
+        <p key={m.code} className="tm-note" role="status" aria-live="polite"><span className="bk-dot bk-dot--neutral tm-pulse" aria-hidden="true" />{m.prompt}</p>
+      ))}
+      {missing.filter(m => !isPending(m)).map(m => (
         <div key={m.code} className="tm-missing" role="status">
           <p>{m.prompt}</p>
           {m.code === 'no_vehicle' && onAddTruck && (

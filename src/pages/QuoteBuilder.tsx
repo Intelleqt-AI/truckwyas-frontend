@@ -931,6 +931,7 @@ export default function QuoteBuilder() {
           : null;
         savedBorderRef.current = Number(ci.border_cost) > 0 ? Number(ci.border_cost) : null;
         setAgentFee(ci.clearing_agent_fee != null && Number.isFinite(Number(ci.clearing_agent_fee)) ? Number(ci.clearing_agent_fee) : null);
+        setAbnormalLoad(ci.abnormal_load === true);
         setReturnLoadBooked(ci.include_empty_return === false);
         setTollsNone(ci.tolls_confirmed_none === true);
         setDistanceConfirmed(ci.distance_confirmed === true);
@@ -1421,6 +1422,9 @@ export default function QuoteBuilder() {
     border_cost_empty_return: borderEmptyBack,
     border_estimate: borderEstimated,
     clearing_agent_fee: agentFee,
+    // Zimbabwe abnormal load (56 t+ GCM): saved so a reopened quote prices the
+    // same. Only when on: a server without the key refuses unknown keys.
+    ...(abnormalLoad ? { abnormal_load: true } : {}),
     // The border line (all legs): additional_charges can't be read back as it.
     border_cost: crossBorderCost > 0 ? round2(crossBorderCost) : null,
     border_costs_unknown: borderUnknown,

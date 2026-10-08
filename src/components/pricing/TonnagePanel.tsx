@@ -26,6 +26,8 @@ export interface TonnagePanelProps {
   onPeriod: (start: string, end: string) => void;
   /** The truck chosen (vehicle type id), null = safest. */
   chosenId: number | null;
+  /** The builder holds the auto truck (lib/tonnage nextAutoBasis). */
+  held?: boolean;
   onChooseTruck: (id: number | null) => void;
   market?: TonnageMarket | null;
   choices?: TonnageChoice[];
@@ -38,7 +40,7 @@ const pct = (n: number | null | undefined) => (n == null ? "—" : `${n < 0 && M
  *  carry it (cost per tonne, loads, margin at the rate) and the basis truck. */
 export function TonnagePanel(p: TonnagePanelProps) {
   const t = p.tonnage;
-  const reason = basisReason(t);
+  const reason = basisReason(t, !!p.held);
   const minPlaceholder = t?.min_tonnes_source === "basis_load" && t.min_tonnes_per_load ? fmtTonnes(t.min_tonnes_per_load).replace(" t", "") : "";
   return (
     <section className="pa tn" aria-labelledby="tn-title">
@@ -79,6 +81,7 @@ export function TonnagePanel(p: TonnagePanelProps) {
             <div className="tn-field">
               <span className="tn-field__label">To</span>
               <DatePicker value={p.periodEnd} onChange={(v: string) => p.onPeriod(p.periodStart, v)} />
+              {p.periodStart && p.periodEnd && p.periodEnd < p.periodStart && <span className="wb-err" role="alert">Ends before it starts.</span>}
             </div>
           </div>
         )}
@@ -93,8 +96,8 @@ export function TonnagePanel(p: TonnagePanelProps) {
                 return (
                   <button key={tr.vehicle_type_id ?? tr.name} type="button" role="listitem"
                     className={`tn-truck${chosen ? " is-basis" : ""}`} aria-pressed={chosen}
-                    onClick={() => p.onChooseTruck(chosen && t.basis_reason === "chosen" ? null : tr.vehicle_type_id)}
-                    title={chosen && t.basis_reason === "chosen" ? "Back to the safest truck" : "Price on this truck"}>
+                    onClick={() => p.onChooseTruck(chosen && t.basis_reason === "chosen" && !p.held ? null : tr.vehicle_type_id)}
+                    title={chosen && t.basis_reason === "chosen" && !p.held ? "Back to the safest truck" : "Price on this truck"}>
                     <span className="tn-truck__name">{truckText(tr)}</span>
                     <span className="tn-truck__cpt">{tr.cost_per_tonne != null ? fmtRatePerTonne(tr.cost_per_tonne, true) : "—"}</span>
                     <span className="tn-truck__meta">{loadsText(tr.loads_needed)}{tr.partial_last_load ? `, last ${fmtTonnes(tr.last_load_t)}` : ""}</span>
@@ -103,7 +106,7 @@ export function TonnagePanel(p: TonnagePanelProps) {
                 );
               })}
             </div>
-            {reason && <p className="pa-note tn-reason">{reason}{t.basis_reason === "chosen" && <> <button type="button" className="pa-link" onClick={() => p.onChooseTruck(null)}>Use safest</button></>}</p>}
+            {reason && <p className="pa-note tn-reason">{reason}{t.basis_reason === "chosen" && !p.held && <> <button type="button" className="pa-link" onClick={() => p.onChooseTruck(null)}>Use safest</button></>}</p>}
             <dl className="tn-sum">
               <div><dt>Cost</dt><dd>{t.cost_per_tonne != null ? fmtRatePerTonne(t.cost_per_tonne, true) : "—"}</dd></div>
               <div><dt>Target</dt><dd>{t.default_rate_per_tonne != null ? fmtRatePerTonne(t.default_rate_per_tonne) : "—"}</dd></div>

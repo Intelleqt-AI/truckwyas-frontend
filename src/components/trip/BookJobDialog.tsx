@@ -14,7 +14,7 @@ import {
 } from '@/lib/tripEconomics';
 import { CandidateOption, ChoiceOption } from './CandidateOption';
 import { invalidateTrip } from './invalidateTrip';
-import { fmtRatePerTonne, fmtTonnes, type VolumeContract } from '@/lib/tonnage';
+import { callOffCap, checkCallOff, fmtRatePerTonne, fmtTonnes, type VolumeContract } from '@/lib/tonnage';
 
 export interface BookableQuote {
   id: number | string;
@@ -84,10 +84,12 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
   // A contract call-off: this load's tonnes (default the planned load, capped
   // at what is left); the preview and the booking use them.
   const callOff = quote.pricing_basis === 'per_tonne' ? quote.volume_contract ?? null : null;
+  const cap = callOff ? callOffCap(callOff) : 0;
   const [tonnesText, setTonnesText] = useState(() => callOff
-    ? String(Math.min(callOff.tonnes_per_load ?? callOff.remaining_tonnes, callOff.remaining_tonnes)).replace('.', ',') : '');
-  const tonnes = Number(tonnesText.replace(/\s/g, '').replace(',', '.'));
-  const tonnesBad = !!callOff && !(tonnes > 0 && tonnes <= callOff.remaining_tonnes + 1e-9);
+    ? String(Math.min(callOff.tonnes_per_load ?? cap, cap)).replace('.', ',') : '');
+  const check = callOff ? checkCallOff(tonnesText, cap) : { tonnes: null, error: null };
+  const tonnes = check.tonnes ?? 0;
+  const tonnesBad = !!callOff && !!check.error;
   const [error, setError] = useState<string | null>(null);
   // One booking in flight, even on a fast double tap before React re-renders.
   const inFlight = useRef(false);
@@ -182,7 +184,7 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
           <div className="bk-field" style={{ marginBottom: 12 }}>
             <label className="bk-field__label" htmlFor="bj-tonnes">Tonnes on this load</label>
             <input id="bj-tonnes" className="bj-input" inputMode="decimal" value={tonnesText} onChange={e => setTonnesText(e.target.value)} aria-invalid={tonnesBad} />
-            {tonnesBad && <p className="bk-help bk-help--warning">Enter up to {fmtTonnes(callOff.remaining_tonnes)}.</p>}
+            {tonnesBad && <p className="bk-help bk-help--warning">{check.error}</p>}
           </div>
         )}
         <div className="bj-grid">

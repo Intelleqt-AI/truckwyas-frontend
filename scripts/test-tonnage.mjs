@@ -2,7 +2,7 @@
 // Tonnage display helpers (src/lib/tonnage.ts): SA format, basis reason, periods.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { fmtTonnes, fmtRatePerTonne, periodText, basisReason, contractPct, loadsText } from "../src/lib/tonnage.ts";
+import { fmtTonnes, fmtRatePerTonne, periodText, basisReason, contractPct, loadsText, nextAutoBasis, AUTO_BASIS_START, callOffCap, checkCallOff } from "../src/lib/tonnage.ts";
 import { computeTonnage } from "../src/lib/quoteRules.ts";
 
 assert.equal(fmtTonnes(30), "30 t");
@@ -37,4 +37,37 @@ for (const c of golden.tonnage_cases) {
     assert.ok(!/[—–]/.test(`${x.title} ${x.detail}`), `no dashes in copy: ${x.code}`);
   }
 }
+
+// Truck unknown: the builder follows the safest truck only on known costs, and
+// never holds on to one picked while costs were unknown.
+{
+  let st = nextAutoBasis(AUTO_BASIS_START, "k1", "8 ton rigid", "costs_unknown");
+  assert.equal(st.name, null, "a costs-unknown basis is not followed");
+  st = nextAutoBasis(st, "k1", "Superlink", "safest");
+  assert.equal(st.name, "Superlink");
+  // Costs unknown again for a moment (e.g. tolls reloading): stays put.
+  st = nextAutoBasis(st, "k1", "8 ton rigid", "costs_unknown");
+  assert.equal(st.name, "Superlink");
+  // A real change on known costs is followed.
+  st = nextAutoBasis(st, "k1", "Tautliner", "safest");
+  assert.equal(st.name, "Tautliner");
+  // Back again to the Superlink in the same inputs: held (no ping-pong), and
+  // the builder then prices on the held truck by id.
+  st = nextAutoBasis(st, "k1", "Superlink", "safest");
+  assert.deepEqual([st.name, st.held], ["Tautliner", true]);
+  // New inputs start afresh.
+  st = nextAutoBasis(st, "k2", "Superlink", "safest");
+  assert.deepEqual([st.name, st.held], ["Superlink", false]);
+  // The reason line names the held truck without claiming why.
+  assert.equal(basisReason(chosenTonnage(), true), "Priced on Tri-axle 30 t.");
+}
+function chosenTonnage() { return computeTonnage(byName.chosen_truck.inputs).tonnage; }
+
+// Call-off tonnes: the server's cap (what is left, and the largest truck).
+assert.equal(callOffCap({ remaining_tonnes: 70, max_tonnes_per_load: 34 }), 34);
+assert.equal(callOffCap({ remaining_tonnes: 12, max_tonnes_per_load: 34 }), 12);
+assert.deepEqual(checkCallOff("28,5", 34), { tonnes: 28.5, error: null });
+for (const bad of ["", "abc", "NaN", "Infinity", "1e9", "28,1234", "-1"]) assert.ok(checkCallOff(bad, 34).error, bad);
+assert.equal(checkCallOff("0,05", 34).error, "A load is at least 0,1 t.");
+assert.equal(checkCallOff("35", 34).error, "Up to 34 t on this load.");
 console.log("tonnage helpers: ok");

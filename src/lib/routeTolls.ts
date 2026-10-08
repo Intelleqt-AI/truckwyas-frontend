@@ -72,7 +72,8 @@ export function tripBorderEstimate(out: BorderItem[] | null | undefined, back: B
   return est ? Math.round(est * 100) / 100 : null;
 }
 
-/** Zimbabwe charges an abnormal (56 t+ GCM) access toll: the toggle shows only there. */
+/** Zimbabwe has an Abnormal access-toll class (e.g. a low-bed carrying machinery; legal
+ *  interlinks up to 56 t pay the goods vehicle toll): the toggle shows only there. */
 export const abnormalLoadRelevant = (countries: string[] | null | undefined) => (countries || []).some((c) => ["ZW", "ZWE"].includes(String(c).toUpperCase()));
 
 /** Route option chip: "Fastest · via N17/N3 · tolls R 887" (plazas on hover). */

@@ -19,3 +19,12 @@ export function savedRouteMatches(request: Record<string, unknown> | null | unde
   if (savedStops.length !== now.stops.length) return false;
   return savedStops.every((st, i) => same(st?.lat, now.stops[i].lat) && same(st?.lon, now.stops[i].lon));
 }
+
+/** A reopened quote's border figure to restore as typed: only the user's own
+ *  (costing_inputs.border_cost_is_override); else null, so the fresh route's
+ *  border lines stand. */
+export function savedBorderOverride(ci: Record<string, unknown> | null | undefined): number | null {
+  if (!ci || ci.border_cost_is_override !== true) return null;
+  const v = Number(ci.border_cost);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}

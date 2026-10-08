@@ -1,6 +1,6 @@
 import "@/components/layout/section-header.css";
 import { isForeignCountry, tripIsInternational } from "@/lib/tripInternational";
-import { savedRouteMatches } from "@/lib/savedRoute";
+import { savedRouteMatches, savedBorderOverride } from "@/lib/savedRoute";
 import { borderCostsUnknown } from "@/lib/borderUnknown";
 import { routeChipLabel, borderTotalWithAgentFee, tripBorderEstimate, borderEstimate, abnormalLoadRelevant, type TollItem, type BorderItem } from "@/lib/routeTolls";
 import { TollPop, BorderPop } from "@/components/pricing/RouteCostPops";
@@ -375,7 +375,8 @@ export default function QuoteBuilder() {
   const [borderTyped, setBorderTyped] = useState("");
   // The user's own clearing-agent fee (per crossing), in place of the route's agent estimate.
   const [agentFee, setAgentFee] = useState<number | null>(null);
-  // Zimbabwe: an abnormal load (56 t+ GCM) pays the higher border access toll.
+  // Zimbabwe: an abnormal load (e.g. a low-bed carrying machinery) pays the
+  // Abnormal border access toll; legal interlinks up to 56 t pay the goods vehicle toll.
   const [abnormalLoad, setAbnormalLoad] = useState(false);
   // Tolls are a figure, not a box: an explicit edit (pencil) opens the input.
   const [tollEditing, setTollEditing] = useState(false);
@@ -934,7 +935,9 @@ export default function QuoteBuilder() {
         savedPricingRef.current = floor > 0 && price > 0
           ? { price, floor, pricedAt: isoDay(q.priced_at), pricedAtRaw: q.priced_at ?? null, fuelPrice: Number(q.fuel_price_used) || null }
           : null;
-        savedBorderRef.current = Number(ci.border_cost) > 0 ? Number(ci.border_cost) : null;
+        // Only the user's own border figure comes back as typed; otherwise the
+        // fresh route's border lines stand and the "costs changed" notice says so.
+        savedBorderRef.current = savedBorderOverride(ci);
         setAgentFee(ci.clearing_agent_fee != null && Number.isFinite(Number(ci.clearing_agent_fee)) ? Number(ci.clearing_agent_fee) : null);
         setAbnormalLoad(ci.abnormal_load === true);
         setReturnLoadBooked(ci.include_empty_return === false);
@@ -1262,8 +1265,8 @@ export default function QuoteBuilder() {
     setSavedPriceShown(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeIsCurrent]);
-  // A reopened quote's typed border fees: once the route is in, keep the saved
-  // figure when the route's own one differs (else the route figure is it).
+  // A reopened quote's own border figure (border_cost_is_override): once the
+  // route is in, keep it when the route's own one differs.
   useEffect(() => {
     const saved = savedBorderRef.current;
     if (saved == null || !routeIsCurrent) return;
@@ -1430,7 +1433,7 @@ export default function QuoteBuilder() {
     border_estimate: borderEstimated,
     border_estimate_empty_return: borderEstimatedBack,
     clearing_agent_fee: agentFee,
-    // Zimbabwe abnormal load (56 t+ GCM): saved so a reopened quote prices the same.
+    // Zimbabwe abnormal load (Abnormal access-toll class): saved so a reopened quote prices the same.
     abnormal_load: abnormalLoad,
     // The border line (all legs): additional_charges can't be read back as it.
     border_cost: crossBorderCost > 0 ? round2(crossBorderCost) : null,
@@ -2147,7 +2150,7 @@ export default function QuoteBuilder() {
                         ]} />
                       {estimates && <span className="qb-cost__tag" title="Some charges are estimates: see the list">Includes estimates</span>}
                       {abnormalLoadRelevant(routeB?.countries) && (
-                        <label className="qb-cost__check" title="56 t or more gross combination mass: Zimbabwe charges the abnormal border access toll">
+                        <label className="qb-cost__check" title="Tick only for an abnormal load (e.g. a low-bed carrying machinery). Legal interlinks up to 56 t pay the goods vehicle toll.">
                           <input type="checkbox" checked={abnormalLoad} onChange={(e) => setAbnormalLoad(e.target.checked)} /> Abnormal load
                         </label>)}
                     </span>

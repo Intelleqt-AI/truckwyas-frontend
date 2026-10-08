@@ -2462,6 +2462,9 @@ export default function QuoteBuilder() {
                     )}
                   </span>
                   <span className={`qb-cost__value${emptyReturn.included ? "" : " is-off"}`}>{emptyReturn.included ? money(emptyReturn.total) : "—"}</span>
+                  {/* How often this lane found a return load: context for the
+                      switch only; the default stays Empty. */}
+                  {pricing.data?.returnLoadHistory && <span className="qb-cost__history">{pricing.data.returnLoadHistory}</span>}
                 </div>
               )}
               <div className="qb-cost__row qb-cost__total-row">

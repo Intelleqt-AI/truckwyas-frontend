@@ -23,6 +23,8 @@ import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import { staleWork, staleLabel, staleAction } from './bookings-stale';
 import { useMapFill } from './useMapFill';
 import { cargoText as cargoOf } from '@/lib/cargo';
+import { TripMarginCard } from '@/components/trip/TripMarginCard';
+import { invoiceMismatchText } from '@/lib/tripEconomics';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   PENDING: 'neutral',
@@ -161,6 +163,10 @@ export default function Bookings() {
     qc.invalidateQueries({ queryKey: ['load', id] });
     qc.invalidateQueries({ queryKey: ['loads-list'] });
     qc.invalidateQueries({ queryKey: ['loads'] });
+    // Assigning a truck re-costs the job on the server: its margin and
+    // return-load suggestions change with it.
+    qc.invalidateQueries({ queryKey: ['load-economics'] });
+    qc.invalidateQueries({ queryKey: ['return-candidates'] });
   };
 
   const updateStatus = async (newStatus: string) => {
@@ -197,7 +203,7 @@ export default function Bookings() {
     if (newStatus === 'CANCELLED' && !['PENDING', 'LOADING'].includes(currentStatus)) {
       setConfirmOpts({
         title: 'Cancel load',
-        message: `Cancel this load? The load is currently ${currentStatus.replace('_', ' ')}. This action is difficult to reverse.`,
+        message: `Cancel this load? The load is currently ${currentStatus.replace('_', ' ')}. This action is difficult to reverse. If it is in a return pair, the pair is unlinked.`,
         confirmLabel: 'Cancel load',
         danger: true,
         onConfirm: async () => {
@@ -504,6 +510,23 @@ export default function Bookings() {
         );
       })()}
 
+
+      {/* The rate changed after invoicing (TMS update): invoices are never
+          edited, so say it once with the way to fix it. */}
+      {(() => {
+        const mm = invoiceMismatchText(load.invoice_mismatch);
+        if (!mm) return null;
+        const invId = load.invoice_mismatch?.invoice_id ?? invoiceId;
+        return (
+          <div className="bk-notice bk-notice--warning" role="alert">
+            <div>
+              <p className="bk-notice__text">{mm.title}</p>
+              <p className="bk-notice__sub">{mm.detail}</p>
+            </div>
+            {invId && <button type="button" className="bk-btn bk-btn--secondary bk-btn--sm" onClick={() => navigate(`/finance/invoices/${invId}`)}>View invoice</button>}
+          </div>
+        );
+      })()}
 
       {/* Main column plus a sticky rail, so unequal heights read as a rail. */}
       <div className="bk-detail-grid bk-detail-grid--rail">
@@ -841,6 +864,14 @@ export default function Bookings() {
           </section>
         </div>
       </div>
+
+      <TripMarginCard
+        load={load}
+        onAddTruck={!assignmentLocked && !billingBlocked ? () => {
+          startEditAssignment();
+          document.getElementById('bk-assign-title')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } : undefined}
+      />
     </div>
 
     {confirmOpts && (

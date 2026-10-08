@@ -9,7 +9,8 @@ import { fetchData, patchData, deleteData, postData, downloadBlob } from '@/lib/
 import { formatCurrency, formatDate, formatDistance, formatMoney, formatMoneyWhole, formatNumber, normaliseFigures, sentenceCaseLabel } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { ConvertToBookingModal } from '@/components/ConvertToBookingModal';
+import { BookJobDialog } from '@/components/trip/BookJobDialog';
+import { actualsText } from '@/lib/tripEconomics';
 import { useAuth } from '@/lib/AuthContext';
 import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
 import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
@@ -117,6 +118,16 @@ export default function QuoteDetail() {
   // The board's quote -> load lookup (same cached GET), so a converted quote
   // offers "View booking" here exactly as its board card does (R11).
   const loadsQ = useQuery(loadsQuery);
+  // Delivered: the actual margin is compared with the margin the job was
+  // booked at (its quoted_margin_pct), never today's cost floor.
+  const bookedLoadId = quote?.actuals
+    ? (quote?.booked_load?.id ?? (mapLoadsByQuoteId(loadsQ.data).get(String(quote?.id)) as { id?: number | string } | undefined)?.id)
+    : undefined;
+  const bookedLoadQ = useQuery({
+    queryKey: ['load', String(bookedLoadId)],
+    queryFn: () => fetchData(`api/v1/loads/${bookedLoadId}/`),
+    enabled: bookedLoadId != null,
+  });
   // The route map grows to end level with the rail when the rail is the
   // longer column, but never drops below a readable floor (R10): 320px on
   // desktop, 240px on phones. When the Job card is long, the main column
@@ -248,26 +259,6 @@ export default function QuoteDetail() {
     mutationFn: () => deleteData({ url: `api/v1/quotes/${id}/` }),
     onSuccess: () => {
       navigate('/bookings/quotes');
-    },
-  });
-
-  const convertToLoadMutation = useMutation({
-    mutationFn: ({ driverId, vehicleId, dates }: { driverId: string; vehicleId: string; dates?: { pickup_date: string; delivery_date: string } }) =>
-      postData({
-        url: `api/v1/quotes/${id}/convert_to_load/`,
-        // dates: only when the quote had none and the modal showed suggested ones.
-        data: { driver_id: driverId, vehicle_id: vehicleId, ...(dates || {}) },
-      }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['loads'] });
-      setShowConvertModal(false);
-      toast.success('Quote converted to booking');
-      if (data?.id) {
-        navigate(`/bookings/${data.id}`);
-      }
-    },
-    onError: (error: any) => {
-      toast.error(error?.message || 'Failed to convert quote to booking');
     },
   });
 
@@ -573,7 +564,7 @@ export default function QuoteDetail() {
       : sendBlock
         ? [{ value: 'SENT', label: 'Sent', hint: sendBlock.title, disabledReason: sendBlock.title }]
         : [{ value: 'SENT', label: 'Sent', hint: lapsed ? 'Quote has expired, edit first' : 'Emails the quote to the customer' }]),
-    { value: 'ACCEPTED', label: 'Accepted', hint: booked ? 'Won and booked' : 'Ready to convert to a booking' },
+    { value: 'ACCEPTED', label: 'Accepted', hint: booked ? 'Won and booked' : 'Ready to book' },
     { value: 'DECLINED', label: 'Declined' },
     // In transit and Completed live on the order created by "Convert to
     // booking"; the backend rejects a direct write. Listed only so a legacy
@@ -634,8 +625,8 @@ export default function QuoteDetail() {
               <span className="qd-label-long" data-short="Booking">View booking</span>
             </button>
           ) : quote.status === 'ACCEPTED' ? (
-            <button type="button" className="bk-btn bk-btn--primary" onClick={handleConvertToLoad} disabled={convertToLoadMutation.isPending} aria-label={convertToLoadMutation.isPending ? undefined : 'Convert to booking'}>
-              {convertToLoadMutation.isPending ? 'Converting…' : <span className="qd-label-long" data-short="Convert">Convert to booking</span>}
+            <button type="button" className="bk-btn bk-btn--primary" onClick={handleConvertToLoad} aria-label="Book job">
+              <span className="qd-label-long" data-short="Book">Book job</span>
             </button>
           ) : (
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending || !!sendBlock} title={sendBlock ? sendBlock.title : undefined} aria-label={sendToCustomerMutation.isPending ? undefined : (quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer')}>
@@ -780,6 +771,18 @@ export default function QuoteDetail() {
                 {booking!.status && <> · {statusMeta(booking!.status).label}</>}
               </p>
             )}
+            {/* Once delivered: what the job really made (server actuals). */}
+            {(() => {
+              const a = actualsText(quote.actuals);
+              if (!a) return null;
+              const neg = a.negative;
+              return (
+                <div className="qd-agreed">
+                  <span className={`qd-agreed__line${neg ? ' qd-decision__neg' : ''}`}>{a.line}{bookedLoadQ.data?.quoted_margin_pct != null && bookedLoadQ.data.quoted_margin_pct !== '' ? <span className="qd-agreed__quoted"> (quoted {formatPct(Number(bookedLoadQ.data.quoted_margin_pct))})</span> : null}</span>
+                  <span className="qd-agreed__margin">{a.basis}</span>
+                </div>
+              );
+            })()}
             {loadStateOnly && (
               <p className="qd-booked">
                 Marked {STATUS_LABEL[quote.status].toLowerCase()} on an older record. No booking is linked to this quote.
@@ -1097,17 +1100,8 @@ export default function QuoteDetail() {
         />
       )}
 
-      {showConvertModal && (
-        <ConvertToBookingModal
-          quoteNumber={quote?.quote_number}
-          vehicleType={quote?.vehicle_type}
-          busy={convertToLoadMutation.isPending}
-          pickupDate={quote?.pickup_date}
-          deliveryDate={quote?.delivery_date}
-          distanceKm={quote?.distance ? parseFloat(quote.distance) : null}
-          onConfirm={(driverId, vehicleId, dates) => convertToLoadMutation.mutate({ driverId, vehicleId, dates })}
-          onCancel={() => setShowConvertModal(false)}
-        />
+      {showConvertModal && quote && (
+        <BookJobDialog quote={quote} onClose={() => setShowConvertModal(false)} />
       )}
     </div>
   );

@@ -139,7 +139,7 @@ export function FuelAlertPanel() {
       {q.data?.quotes && q.data.quotes.length > 0 && (
         <table className="fu-alert__table">
           <thead>
-            <tr><th>Quote</th><th>Customer</th><th className="num">Price</th><th className="num">Cost floor</th><th className="num">Margin</th><th><span className="sr-only">Target</span></th></tr>
+            <tr><th>Quote</th><th>Customer</th><th className="num">Price excl. VAT</th><th className="num">Cost floor excl. VAT</th><th className="num">Margin</th><th><span className="sr-only">Target</span></th></tr>
           </thead>
           <tbody>
             {sortAlertQuotes(q.data.quotes).map(r => (
@@ -149,8 +149,8 @@ export function FuelAlertPanel() {
                   {!r.still_open && <span> · {statusWord(r.status_now)}</span>}
                 </td>
                 <td>{r.customer || '—'}</td>
-                <td className="num" data-label="Price">{formatMoney(r.price, 0)}</td>
-                <td className="num" data-label="Cost floor">{floorChange(r)}</td>
+                <td className="num" data-label="Price excl. VAT">{formatMoney(r.price, 0)}</td>
+                <td className="num" data-label="Cost floor excl. VAT">{floorChange(r)}</td>
                 <td className="num" data-label="Margin">{marginChange(r)}</td>
                 <td>{r.under_target && r.still_open && <span className="fu-tag">Under target</span>}</td>
               </tr>

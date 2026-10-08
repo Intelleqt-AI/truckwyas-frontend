@@ -49,6 +49,8 @@ export interface FuelAdjustment {
   trip_date_source?: string;
   provisional?: boolean;
   invoiced?: { invoice_id: number; line_id: number | null; amount_zar: number | null } | null;
+  /** Quote endpoint: the PDF's fuel line ("Priced on diesel at R 32,80/L (official inland, 7 Oct 2026)."). */
+  reference?: string | null;
 }
 
 export interface FollowUpState {
@@ -140,9 +142,14 @@ export interface PricingSetup {
 
 /** The backend's `message` ({success: false, code, message}) else the error text. */
 export function apiMessage(err: unknown, fallback: string): string {
-  const e = err as { data?: { message?: unknown }; message?: unknown } | null;
-  const m = e?.data?.message;
-  if (typeof m === 'string' && m.trim()) return m;
+  const e = err as { data?: { message?: unknown; detail?: unknown; error?: unknown }; status?: unknown } | null;
+  for (const m of [e?.data?.message, e?.data?.detail, e?.data?.error]) {
+    if (typeof m === 'string' && m.trim()) return m;
+  }
+  const status = Number(e?.status);
+  if (status === 403) return 'You don’t have permission to do this.';
+  if (status === 404) return 'Not found. It may have been deleted.';
+  if (Number.isInteger(status) && status >= 500) return `${fallback} (server error ${status})`;
   return fallback;
 }
 
@@ -222,6 +229,8 @@ export interface AdjustmentRow {
 /** The "Fuel price adjustment" row on a sent quote or a load. Null = hide it. */
 export function adjustmentRow(a: FuelAdjustment | null | undefined): AdjustmentRow | null {
   if (!a || a.reason === 'no_clause' || a.reason === 'no_quote') return null;
+  // Only a clause the customer was sent (stamped) ever changes an invoice.
+  if (a.stamped === false) return null;
   if (a.reason === 'no_official_price') {
     return { title: 'No official price for the trip date yet.', amount: null, sub: null, invoiceId: null, tone: 'neutral' };
   }

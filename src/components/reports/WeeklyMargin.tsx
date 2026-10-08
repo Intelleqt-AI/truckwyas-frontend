@@ -19,7 +19,7 @@ interface Block {
   by_lane: GroupRow[]; lanes_total: number; by_customer: GroupRow[]; customers_total: number;
 }
 interface QuoteStats {
-  won: number; lost: number; won_value_zar: number; win_rate_pct: number | null;
+  created?: number; won: number; lost: number; won_value_zar: number; win_rate_pct: number | null;
   avg_quoted_margin_won_pct: number | null; target_margin_pct: number; vs_target_pts: number | null;
 }
 interface WeeklyMarginData {
@@ -31,6 +31,12 @@ interface WeeklyMarginData {
 }
 
 type Span = 'week' | 'four';
+
+/** No loads and nothing won or lost: say whether quotes were still made. */
+function undecidedText(created: number | undefined): string {
+  if (!created) return 'Nothing quoted or delivered in the last 4 weeks.';
+  return `${created} ${created === 1 ? 'quote' : 'quotes'} made in the last 4 weeks, none won or lost yet.`;
+}
 const range = (a: string, b: string) => `${formatDateShort(a)} to ${formatDate(b)}`;
 
 function groupTable(rows: GroupRow[], first: string, block: Block): Statement {
@@ -77,7 +83,7 @@ export function WeeklyMargin({ companyName }: { companyName?: string }) {
       csv={() => [...statementCsv('Weekly margin by lane', period, lanes), [], ...statementCsv('Weekly margin by customer', period, customers)]}
       csvName="weekly-margin"
     >
-      {!d.has_activity ? <Empty line="Nothing quoted or delivered in the last 4 weeks." action={{ label: 'See quotes', to: '/bookings/quotes' }} />
+      {!d.has_activity ? <Empty line={undecidedText(d.quotes.last_4_weeks.created)} action={{ label: 'See quotes', to: '/bookings/quotes' }} />
         : !block.enough_data ? <Empty line="Not enough data yet." />
         : (
           <>

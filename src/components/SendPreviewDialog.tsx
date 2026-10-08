@@ -35,6 +35,8 @@ interface SendPreviewDialogProps {
   preferredAction?: { label: string; onClick: () => void };
   /** Sending is not allowed (a block warning); the confirm button is off. */
   confirmBlocked?: boolean;
+  /** The confirm button shows but can't be pressed yet (e.g. the preview is updating). */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -47,7 +49,7 @@ interface SendPreviewDialogProps {
  */
 export default function SendPreviewDialog({
   title, to, toName, toError, subject, rows, note, confirmLabel, noEmailConfirmLabel, noEmailHint,
-  sending = false, preferredAction, confirmBlocked = false, onConfirm, onCancel,
+  sending = false, preferredAction, confirmBlocked = false, confirmDisabled = false, onConfirm, onCancel,
 }: SendPreviewDialogProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -61,7 +63,7 @@ export default function SendPreviewDialog({
 
   const loadingTo = to === undefined && !toError;
   const noEmail = to === null;
-  const blocked = confirmBlocked || loadingTo || (noEmail && !noEmailConfirmLabel);
+  const blocked = confirmBlocked || confirmDisabled || loadingTo || (noEmail && !noEmailConfirmLabel);
   const label = sending ? 'Sending…' : noEmail && noEmailConfirmLabel ? noEmailConfirmLabel : confirmLabel;
 
   return createPortal(

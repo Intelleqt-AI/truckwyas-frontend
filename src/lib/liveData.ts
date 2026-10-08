@@ -77,7 +77,7 @@ export function invalidateTopics(queryClient: QueryClient, topics: Iterable<stri
     k.roots.forEach((r) => roots.add(r));
     k.sources.forEach((s) => sources.add(s));
   }
-  queryClient.invalidateQueries({
+  return queryClient.invalidateQueries({
     predicate: ({ queryKey }) => {
       const [root, sub] = queryKey as unknown[];
       if (typeof root !== 'string') return false;

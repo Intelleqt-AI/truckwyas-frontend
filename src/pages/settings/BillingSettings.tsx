@@ -4,6 +4,7 @@ import '@/pages/settings/settings-brand.css';
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { fetchData, postData } from "@/lib/Api";
+import { useLiveEvent, eventPrefix } from '@/hooks/useLiveEvent';
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { useAuth } from "@/lib/AuthContext";
@@ -237,26 +238,11 @@ export function BillingSettings() {
   // check_pending_cancellations finalising a cancellation) sits stale here
   // until a manual reload, even though AuthContext's own subscription_status
   // already updates live via the same event.
-  useEffect(() => {
-    const onLiveEvent = (e: Event) => {
-      const { detail } = e as CustomEvent;
-      if (typeof detail?.event === 'string' && detail.event.startsWith('subscription.')) {
-        loadStatus();
-        loadHistory();
-      }
-    };
-    window.addEventListener('tw:live-event', onLiveEvent);
-    return () => window.removeEventListener('tw:live-event', onLiveEvent);
-  }, [loadStatus, loadHistory]);
-
+  //
   // Also re-fetch once, right after the WebSocket reconnects post-drop (see
   // components/LiveEvents.tsx) — catches anything pushed while this page's
-  // socket was down, without polling on a fixed schedule.
-  useEffect(() => {
-    const onReconnect = () => { loadStatus(); loadHistory(); };
-    window.addEventListener('tw:live-reconnected', onReconnect);
-    return () => window.removeEventListener('tw:live-reconnected', onReconnect);
-  }, [loadStatus, loadHistory]);
+  // socket was down. Coalesced (useLiveEvent): a burst is one reload.
+  useLiveEvent(eventPrefix('subscription.'), () => Promise.all([loadStatus(), loadHistory()]), { onReconnect: true });
 
   const handleSubscribe = async () => {
     setSubscribing(true);

@@ -26,6 +26,10 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from "@/components/ui/dialog";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import { DescribeFeedback, VoiceListening } from "@/components/pricing/DescribeFeedback";
+import { vt, uiLangFrom, loadLangMode, saveLangMode, nextLangMode, langModeText, isConflict, samePlace, sameText, saNum,
+  shortDate as nlDate, borderPostShort, spokenPlace, FIELD_LABELS, didntCatchLine, isLow,
+  type UiLang, type VoiceLangMode, type FieldTarget, type ConflictLine, type AppliedSummary, type FillInfo } from "@/lib/voiceQuote";
 import { AIChatPanel, type ChatMessage } from "@/components/AIChatPanel";
 import { useAuth } from "@/lib/AuthContext";
 import { isSubscriptionBlocked, subscriptionStatusDetail } from "@/lib/subscriptionStatus";
@@ -263,18 +267,22 @@ interface RouteData {
 // state or any calculation) ----
 /** Vehicle capacity at render: "20 t", "7,5 t" (house style, not "20.00t"). */
 const capLabel = (c: unknown) => `${formatNumber(Number(c), { maximumFractionDigits: 1 })}\u00a0t`;
-/** True below a width (presentation only: picks a shorter placeholder). */
-function useNarrow(maxPx: number) {
-  const q = `(max-width: ${maxPx}px)`;
-  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia(q).matches);
+/** prefers-reduced-motion: the recording bars become a static level dot. */
+function useReducedMotion() {
+  const q = "(prefers-reduced-motion: reduce)";
+  const [reduce, setReduce] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.(q).matches);
   useEffect(() => {
-    const mq = window.matchMedia(q);
-    const on = () => setNarrow(mq.matches);
-    on(); mq.addEventListener("change", on);
+    const mq = window.matchMedia?.(q);
+    if (!mq) return;
+    const on = () => setReduce(mq.matches);
+    mq.addEventListener("change", on);
     return () => mq.removeEventListener("change", on);
-  }, [q]);
-  return narrow;
+  }, []);
+  return reduce;
 }
+
+/** One field a Fill would set: applied now, or after Replace when it is a conflict. */
+interface NlChange { target: FieldTarget; conflict: ConflictLine | null; apply: () => void; revert: () => void; filled: string | null; summary: AppliedSummary }
 
 export default function QuoteBuilder() {
   const navigate = useNavigate();
@@ -366,6 +374,10 @@ export default function QuoteBuilder() {
   // True once the user typed a driver figure (or a saved quote had one).
   // Until then it is nights away × the company's allowance per night (§6).
   const [driverEdited, setDriverEdited] = useState(false);
+  // Nights out set for this quote (Describe the load "3 nights out — Apply"):
+  // the costing prices these nights at the allowance, and the line reads
+  // "3 nights". A typed driver figure still wins. Saved as driver_nights.
+  const [driverNightsSet, setDriverNightsSet] = useState<number | null>(null);
   // §5: a one-way trip ≥ the company's minimum km includes the empty return
   // unless a return load is booked.
   const [returnLoadBooked, setReturnLoadBooked] = useState(false);
@@ -426,6 +438,37 @@ export default function QuoteBuilder() {
   const [routeBlockedMessage, setRouteBlockedMessage] = useState<string | null>(null);
   const [nlText, setNlText] = useState("");
   const [nlBusy, setNlBusy] = useState(false);
+  // ---- Describe the load: language, what a Fill set, Replace / Keep, Undo ----
+  // Voice language chip (Auto / English / Afrikaans), remembered per device.
+  const [langMode, setLangModeState] = useState<VoiceLangMode>(() => loadLangMode());
+  const setLangMode = (m: VoiceLangMode) => { setLangModeState(m); saveLangMode(m); };
+  // The voice UI and chips speak Afrikaans after an Afrikaans answer.
+  const [uiLang, setUiLang] = useState<UiLang>("en");
+  // "Heard in Afrikaans" under the bar after a voice clip.
+  const [heard, setHeard] = useState<{ label: string | null; confidence: string | null } | null>(null);
+  // What the last Fill set (chips), what it didn't catch, and its suggestions.
+  const [fillInfo, setFillInfo] = useState<FillInfo | null>(null);
+  // Fields the user had set that the last Fill would change: Replace / Keep mine.
+  const [nlConflict, setNlConflict] = useState<{ lines: ConflictLine[]; changes: NlChange[] } | null>(null);
+  // Undo for 8 s after a Fill: restores the exact pre-Fill values it changed.
+  const [nlUndo, setNlUndo] = useState<{ reverts: (() => void)[]; at: number } | null>(null);
+  // The one polite live region's text (status, then the reply once).
+  const [nlLive, setNlLive] = useState("");
+  // The value each field last got from a Fill: equal to it = Fill-set, so a
+  // follow-up ("make it 30 ton") replaces it without asking.
+  const nlFilledRef = useRef<Partial<Record<FieldTarget, string>>>({});
+  // Toggles have a default, so only a click makes them the user's own.
+  const nlTouchedRef = useRef<Set<FieldTarget>>(new Set());
+  // Cross-border as said, used only while no geocoded country is known; the
+  // border post shows in the border line's hint.
+  const [nlInternational, setNlInternational] = useState<boolean | null>(null);
+  const [nlBorderPost, setNlBorderPost] = useState<string | null>(null);
+  // How a filled place was said, when it differs from the geocoded name
+  // ("Kaapstad" for Cape Town): a small hint under the field.
+  const [nlSaid, setNlSaid] = useState<{ pickup?: string; delivery?: string }>({});
+  const nlInputRef = useRef<HTMLInputElement | null>(null);
+  const nlReplaceRef = useRef<HTMLButtonElement | null>(null);
+  const reducedMotion = useReducedMotion();
   // Persistent AI conversation — every message and reply lands here (see
   // AIChatPanel) instead of a one-shot toast with no way to reply to it.
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -450,7 +493,6 @@ export default function QuoteBuilder() {
     const r = requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
     return () => cancelAnimationFrame(r);
   }, [inlineMapH]);
-  const narrowNl = useNarrow(1280);
   // In-progress "create this client/vehicle type" mini-conversation (see
   // backend/core/services/quote_entity_chat.py) — round-tripped every turn
   // since the endpoint is otherwise stateless. declinedEntities remembers
@@ -508,7 +550,11 @@ export default function QuoteBuilder() {
   // them for the fastest route only, at the top level.
   const optB = routeData?.routes?.[selectedRouteIndex];
   const routeB: RouteOption | RouteData | null = optB && "cross_border" in optB ? optB : routeData;
-  const tripInternational = tripIsInternational(routeB, [pickupCoords?.country_code, deliveryCoords?.country_code, ...stops.map(st => st.coords?.country_code)]);
+  const tripPoints = [pickupCoords?.country_code, deliveryCoords?.country_code, ...stops.map(st => st.coords?.country_code)];
+  // A cross-border trip said in Describe the load counts only while nothing
+  // geocoded or routed says which countries the trip touches.
+  const countryKnown = !!routeB || tripPoints.some(Boolean);
+  const tripInternational = tripIsInternational(routeB, tripPoints) || (!countryKnown && nlInternational === true);
   // Parts of the route with no border figures on file (e.g. Angola): the
   // costing blocks until the user enters the border costs (their own figure
   // then covers every crossing). Sent on every costing call and saved.
@@ -653,7 +699,7 @@ export default function QuoteBuilder() {
     tolls: { one_way: tollsOneWay, lookup_failed: tollsOneWay == null && routeTollsUnknown, confirmed_none: tollsNone,
       empty_return: routeTollsInUse && tripType !== "ROUND_TRIP" ? returnTolls : null,
       return_leg: routeTollsInUse && tripType === "ROUND_TRIP" ? returnTolls : null },
-    driver: { allowance_per_night: allowancePerNight, nights: null, amount: driverEdited ? (driverAllowanceInput === "" ? null : Number(driverAllowanceInput) || 0) : null },
+    driver: { allowance_per_night: allowancePerNight, nights: driverEdited ? null : driverNightsSet, amount: driverEdited ? (driverAllowanceInput === "" ? null : Number(driverAllowanceInput) || 0) : null },
     hours_per_day: si?.hours_per_day ?? null,
     border_cost: borderLoaded,
     border_cost_empty_return: borderEmptyBack,
@@ -847,13 +893,69 @@ export default function QuoteBuilder() {
   // different entry points into the same conversation, so every message
   // (whichever surface it came from) is recorded in chatMessages with real
   // history/current_fields sent to the backend for follow-up context.
-  const submitNL = async (textOverride?: string, detectedLanguage?: string | null) => {
+  // The place a Fill names, geocoded the same way as a picked one: the field
+  // shows the geocoded label (Cape Town), the coords carry the country.
+  const geocodeNL = async (q: string): Promise<{ label: string; coords: LocationCoords } | null> => {
+    const g = await fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(q)}`).catch(() => null);
+    const s = g?.results?.[0] || g?.[0];
+    return s ? { label: typeof s.label === "string" && s.label.trim() ? s.label.trim() : q,
+      coords: { lat: Number(s.lat), lon: Number(s.lon), ...(s.country_code ? { country_code: s.country_code } : {}) } } : null;
+  };
+
+  // Scrolls to a field and focuses it (the filled chips and the truck hint).
+  const focusNlField = (target: FieldTarget, openPicker = false) => {
+    const el = document.querySelector<HTMLElement>(`[data-nl-field="${target}"]`)
+      ?? document.querySelector<HTMLElement>(`[data-nl-field="${target === "return" || target === "abnormal" ? "trip" : "pickup"}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: reducedMotion ? "auto" : "smooth" });
+    const f = el.matches("input, select, textarea, button") ? el : el.querySelector<HTMLElement>("input:not([type=hidden]), select, textarea, button");
+    f?.focus({ preventScroll: true });
+    if (openPicker && f instanceof HTMLSelectElement) { try { (f as HTMLSelectElement & { showPicker?: () => void }).showPicker?.(); } catch { /* not supported: focused is enough */ } }
+  };
+
+  // Undo lasts 8 s from the last Fill (or Replace).
+  useEffect(() => {
+    if (!nlUndo) return;
+    const t = setTimeout(() => setNlUndo(null), Math.max(0, nlUndo.at + 8000 - Date.now()));
+    return () => clearTimeout(t);
+  }, [nlUndo]);
+  // The confirm takes focus when it appears, and gives it back to the bar after.
+  useEffect(() => { if (nlConflict) nlReplaceRef.current?.focus(); }, [nlConflict]);
+
+  const applyNlChanges = (changes: NlChange[]) => {
+    for (const c of changes) { c.apply(); if (c.filled !== null) nlFilledRef.current[c.target] = c.filled; }
+  };
+  const undoNl = () => {
+    if (!nlUndo) return;
+    [...nlUndo.reverts].reverse().forEach(r => r());
+    setNlUndo(null); setNlConflict(null); setFillInfo(null);
+    nlInputRef.current?.focus();
+  };
+  const resolveNlConflict = (replace: boolean) => {
+    const c = nlConflict;
+    setNlConflict(null);
+    if (c && replace) {
+      applyNlChanges(c.changes);
+      setFillInfo(prev => prev ? { ...prev, applied: c.changes.reduce((a, ch) => ({ ...a, ...ch.summary }), prev.applied) } : prev);
+      setNlUndo(prev => ({ reverts: [...(prev?.reverts ?? []), ...c.changes.map(ch => ch.revert)], at: Date.now() }));
+    }
+    requestAnimationFrame(() => nlInputRef.current?.focus());
+  };
+
+  const submitNL = async (textOverride?: string, detectedLanguage?: string | null, alternateText?: string | null) => {
     const text = (textOverride ?? nlText).trim();
     if (!text) return;
-    const history = chatMessages.map(m => ({ role: m.role, content: m.text }));
+    // Only the user's own turns go back as history: the assistant's replies
+    // can name clients, and current_fields already carries the form.
+    const history = chatMessages.filter(m => m.role === "user").map(m => ({ role: m.role, content: m.text }));
     setChatMessages(prev => [...prev, { role: "user", text }]);
-    setChatOpen(true);
+    // The panel isn't opened for a Fill: the chips say what happened. It
+    // opens only when the reply needs an answer (see below), or on request.
     setNlBusy(true);
+    setNlLive(vt(uiLang, "reading"));
+    setNlConflict(null);
+    // A typed Fill: the last clip's badges no longer describe what is in the bar.
+    if (!textOverride) { setHeard(null); voiceNoticeRef.current?.(); }
     try {
       const selectedCustomerName = customers.find((c: any) => String(c.id) === customerId)?.name || "";
       const current_fields = {
@@ -868,33 +970,179 @@ export default function QuoteBuilder() {
         // assistant's reply matches it instead of guessing from the text.
         // Typed messages omit this — the backend runs its own text detector.
         ...(detectedLanguage ? { detected_language: detectedLanguage } : {}),
+        // The other language's transcript (mixed speech): the backend fills
+        // only what the main one missed from it, at lower confidence.
+        ...(alternateText ? { alternate_text: alternateText } : {}),
       } });
       setPendingEntity(res?.pending_entity ?? null);
       if (res?.declined_entity) setDeclinedEntities(prev => [...prev, String(res.declined_entity).toLowerCase()]);
       const f = res?.extracted_fields || {};
+      const conf: Record<string, number> = res?.field_confidence && typeof res.field_confidence === "object" ? res.field_confidence : {};
+      const L = res?.language ? uiLangFrom(res.language) : uiLang;
+      setUiLang(L);
       // A client/vehicle type just created via chat isn't in the cached
       // dropdown list yet — refetch so it actually appears as a selectable option.
       if (f.customer_id) queryClient.invalidateQueries({ queryKey: ["customers"] });
       if (f.vehicle_type) queryClient.invalidateQueries({ queryKey: ["vehicle-types"] });
-      if (f.pickup_location) { setPickup(f.pickup_location); const g = await fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(f.pickup_location)}`).catch(() => null); const s = g?.results?.[0] || g?.[0]; if (s) setPickupCoords({ lat: s.lat, lon: s.lon }); }
-      if (f.delivery_location) { setDelivery(f.delivery_location); const g = await fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(f.delivery_location)}`).catch(() => null); const s = g?.results?.[0] || g?.[0]; if (s) setDeliveryCoords({ lat: s.lat, lon: s.lon }); }
-      if (f.cargo_description) setCargo(f.cargo_description);
-      if (f.weight) setWeight(String((f.weight / 1000) || ""));
-      if (f.vehicle_type) applyVehicleType(f.vehicle_type);
-      if (f.customer_id) setCustomerId(String(f.customer_id));
-      if (f.pickup_date) setPickupDate(f.pickup_date);
-      if (f.delivery_date) setDeliveryDate(f.delivery_date);
-      if (f.valid_until) setValidUntil(f.valid_until);
-      if (f.trip_type === "ONE_WAY" || f.trip_type === "ROUND_TRIP") setTripType(f.trip_type);
-      setChatMessages(prev => [...prev, { role: "assistant", text: res?.reply || "Got it. I updated the form.", link: res?.link || undefined }]);
+
+      // §4: every field this answer sets, compared with what the form holds.
+      // Empty or Fill-set fields change now; the user's own values wait for
+      // Replace / Keep mine. Same place written two ways is not a change.
+      const labels = FIELD_LABELS[L];
+      // Optional: how each place was said, when the server sends it.
+      const spoken: Record<string, string | undefined> = res?.spoken_places && typeof res.spoken_places === "object" ? res.spoken_places : {};
+      const filled = nlFilledRef.current;
+      const changes: NlChange[] = [];
+      const text_ = (target: FieldTarget, cur: string, next: string, from: string, to: string, set: (v: string) => void, summary: AppliedSummary) => {
+        if (sameText(cur, next)) return;
+        changes.push({ target, filled: next, summary, apply: () => set(next), revert: () => set(cur),
+          conflict: isConflict(cur, next, filled[target]) ? { label: labels[target], from, to } : null });
+      };
+      const place = async (target: "pickup" | "delivery", next: string) => {
+        const cur = target === "pickup" ? pickup : delivery;
+        const curCoords = target === "pickup" ? pickupCoords : deliveryCoords;
+        const setText = target === "pickup" ? setPickup : setDelivery;
+        const setCoords = target === "pickup" ? setPickupCoords : setDeliveryCoords;
+        if (sameText(cur, next)) return;
+        const g = await geocodeNL(next);
+        const shown = g?.label ?? next;
+        if (sameText(cur, shown)) return;
+        if (cur.trim() && samePlace(curCoords, g?.coords)) return; // Kaapstad = Cape Town
+        // spoken_places is keyed { pickup, delivery } (older: pickup_location).
+        const said = spokenPlace(next, text, spoken[target] ?? spoken[`${target}_location`]);
+        const prevSaid = nlSaid[target];
+        changes.push({ target, filled: shown, summary: { [target]: said },
+          apply: () => { setText(shown); setCoords(g?.coords ?? null); setNlSaid(p => ({ ...p, [target]: sameText(said, shown) ? undefined : said })); },
+          revert: () => { setText(cur); setCoords(curCoords); setNlSaid(p => ({ ...p, [target]: prevSaid })); },
+          conflict: isConflict(cur, shown, filled[target]) ? { label: labels[target], from: cur, to: said } : null });
+      };
+      const toggle = (target: FieldTarget, cur: boolean | string, next: boolean | string, from: string, to: string, set: (v: never) => void, summary: AppliedSummary) => {
+        if (cur === next) return;
+        const own = nlTouchedRef.current.has(target) && filled[target] !== String(cur);
+        changes.push({ target, filled: String(next), summary, apply: () => (set as (v: typeof next) => void)(next),
+          revert: () => (set as (v: typeof cur) => void)(cur), conflict: own ? { label: labels[target], from, to } : null });
+      };
+      if (typeof f.pickup_location === "string" && f.pickup_location) await place("pickup", f.pickup_location);
+      if (typeof f.delivery_location === "string" && f.delivery_location) await place("delivery", f.delivery_location);
+      // Stops are appended, never replacing the user's own.
+      const newStopNames: string[] = Array.isArray(f.stops)
+        ? f.stops.filter((s: unknown): s is string => typeof s === "string" && !!s.trim()
+          && !stops.some(st => sameText(st.location, s)) && !sameText(s, f.pickup_location || pickup) && !sameText(s, f.delivery_location || delivery))
+        : [];
+      if (newStopNames.length) {
+        const added = await Promise.all(newStopNames.map(async (name) => {
+          stopIdRef.current += 1;
+          const id = `stop-${stopIdRef.current}`;
+          const g = await geocodeNL(name);
+          return { id, location: g?.label ?? name, coords: g?.coords ?? null };
+        }));
+        const ids = added.map(a => a.id);
+        changes.push({ target: "stops", filled: null, summary: { stops: newStopNames.map(n => spokenPlace(n, text)) }, conflict: null,
+          apply: () => { setStops(prev => [...prev, ...added]); setStopsExpanded(true); },
+          revert: () => setStops(prev => prev.filter(s => !ids.includes(s.id))) });
+      }
+      if (Number(f.weight) > 0) {
+        const t = String(Number(f.weight) / 1000);
+        if (Number(weight) !== Number(t)) text_("weight", weight, t, `${saNum(Number(weight))} t`, `${saNum(Number(t))} t`, setWeight, { weightKg: Number(f.weight) });
+      }
+      if (typeof f.cargo_description === "string" && f.cargo_description) text_("cargo", cargo, f.cargo_description, cargo, f.cargo_description, setCargo, { cargo: f.cargo_description });
+      if (typeof f.vehicle_type === "string" && f.vehicle_type) text_("truck", vehicleType, f.vehicle_type, sentenceCaseLabel(vehicleType), sentenceCaseLabel(f.vehicle_type), applyVehicleType, { truck: sentenceCaseLabel(f.vehicle_type) });
+      {
+        const byName = typeof f.customer_name === "string" ? customers.find((c: { name?: unknown }) => sameText(String(c.name), f.customer_name)) : null;
+        const cid = f.customer_id ? String(f.customer_id) : byName ? String(byName.id) : "";
+        if (cid) {
+          const nameOf = (id: string) => customers.find((c: { id?: unknown }) => String(c.id) === id)?.name || f.customer_name || "";
+          text_("client", customerId, cid, nameOf(customerId), nameOf(cid), setCustomerId, { client: nameOf(cid) });
+        }
+      }
+      const iso = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "";
+      // trip_date is always the pickup date (already sent as trip_date to the route).
+      if (iso(f.pickup_date)) text_("pickup_date", pickupDate, f.pickup_date, nlDate(pickupDate, L), nlDate(f.pickup_date, L), setPickupDate, { pickupDate: f.pickup_date });
+      if (iso(f.delivery_date)) text_("delivery_date", deliveryDate, f.delivery_date, nlDate(deliveryDate, L), nlDate(f.delivery_date, L), setDeliveryDate, { deliveryDate: f.delivery_date });
+      if (iso(f.valid_until)) text_("valid_until", validUntil, f.valid_until, nlDate(validUntil, L), nlDate(f.valid_until, L), setValidUntil, { validUntil: f.valid_until });
+      const tripWord = (t: string) => L === "af" ? (t === "ROUND_TRIP" ? "heen en terug" : "eenrigting") : (t === "ROUND_TRIP" ? "round trip" : "one way");
+      const nextTrip: "ONE_WAY" | "ROUND_TRIP" = f.trip_type === "ONE_WAY" || f.trip_type === "ROUND_TRIP" ? f.trip_type : tripType;
+      if (nextTrip !== tripType) toggle("trip", tripType, nextTrip, tripWord(tripType), tripWord(nextTrip), setTripType as (v: never) => void, { tripType: nextTrip });
+      else if (f.trip_type) changes.push({ target: "trip", filled: nextTrip, summary: { tripType: nextTrip }, conflict: null, apply: () => {}, revert: () => {} });
+      // A booked return load applies to one-way trips only.
+      if (typeof f.return_load_booked === "boolean" && nextTrip === "ONE_WAY") {
+        const backWord = (b: boolean) => L === "af" ? (b ? "gelaai" : "leeg") : (b ? "loaded" : "empty");
+        if (f.return_load_booked !== returnLoadBooked) toggle("return", returnLoadBooked, f.return_load_booked, backWord(returnLoadBooked), backWord(f.return_load_booked), setReturnLoadBooked as (v: never) => void, { returnLoadBooked: f.return_load_booked, tripType: nextTrip });
+        else changes.push({ target: "return", filled: String(f.return_load_booked), summary: { returnLoadBooked: f.return_load_booked, tripType: nextTrip }, conflict: null, apply: () => {}, revert: () => {} });
+      }
+      if (typeof f.abnormal_load === "boolean") {
+        const yes = (b: boolean) => L === "af" ? (b ? "ja" : "nee") : (b ? "yes" : "no");
+        if (f.abnormal_load !== abnormalLoad) toggle("abnormal", abnormalLoad, f.abnormal_load, yes(abnormalLoad), yes(f.abnormal_load), setAbnormalLoad as (v: never) => void, { abnormal: f.abnormal_load });
+      }
+      // Cross-border as said: never overrides the countries the route knows.
+      if (typeof f.international === "boolean" || typeof f.border_post === "string") {
+        const prevI = nlInternational, prevB = nlBorderPost;
+        const nextI = typeof f.international === "boolean" ? f.international : prevI;
+        const nextB = typeof f.border_post === "string" && f.border_post ? f.border_post : prevB;
+        changes.push({ target: "pickup", filled: null, conflict: null,
+          summary: { international: nextI === true || undefined, borderPost: nextB ?? undefined },
+          apply: () => { setNlInternational(nextI); setNlBorderPost(nextB); },
+          revert: () => { setNlInternational(prevI); setNlBorderPost(prevB); } });
+      }
+
+      const now = changes.filter(c => !c.conflict);
+      const later = changes.filter(c => c.conflict);
+      applyNlChanges(now);
+      setNlUndo(now.length ? { reverts: now.map(c => c.revert), at: Date.now() } : null);
+      setNlConflict(later.length ? { lines: later.map(c => c.conflict!), changes: later } : null);
+      setFillInfo({
+        applied: now.reduce((a, c) => ({ ...a, ...c.summary }), {} as AppliedSummary), conf,
+        didntCatch: didntCatchLine(res?.not_understood, L),
+        // A truck was named but none in the fleet matches it.
+        vehicleHint: res?.vehicle_hint && !f.vehicle_type && !res?.pending_entity ? String(res.vehicle_hint) : null,
+        vehicleHintLabel: typeof res?.vehicle_hint_label === "string" ? res.vehicle_hint_label : null,
+        driverNights: Number(f.driver_nights) > 0 ? Math.trunc(Number(f.driver_nights)) : null,
+        fuelPrice: Number(f.fuel_price_override) > 0 ? Number(f.fuel_price_override) : null,
+      });
+      const reply = res?.reply || (L === "af" ? "Reg so. Die vorm is bygewerk." : "Got it. I updated the form.");
+      setNlLive(reply);
+      setChatMessages(prev => [...prev, { role: "assistant", text: reply, link: res?.link || undefined }]);
+      // Something to answer: a create-this-client/truck question, or nothing
+      // could be filled (the reply says what to try).
+      if (res?.pending_entity || changes.length === 0) setChatOpen(true);
       if (!textOverride) setNlText("");
     } catch {
+      setNlLive("");
+      setChatOpen(true);
       setChatMessages(prev => [...prev, { role: "assistant", text: "Sorry, I couldn't read that. Try rephrasing or use the fields directly." }]);
     }
     finally { setNlBusy(false); }
   };
 
-  const voice = useVoiceRecorder((text, lang) => { setNlText(text); submitNL(text, lang); });
+  const voiceNoticeRef = useRef<(() => void) | null>(null);
+  const voice = useVoiceRecorder((text, lang, alt, meta) => {
+    setNlText(text);
+    setHeard({ label: meta.languageLabel, confidence: meta.languageConfidence });
+    submitNL(text, lang, alt);
+  }, langMode === "auto" ? undefined : langMode, uiLang);
+  voiceNoticeRef.current = voice.clearNotice;
+  useEffect(() => {
+    if (voice.recording) setNlLive(`${vt(uiLang, "listening")} ${langMode === "auto" ? vt(uiLang, "lang_auto") : langModeText(langMode, uiLang)}`);
+    else if (voice.transcribing) setNlLive(vt(uiLang, "reading"));
+    else if (voice.stoppedAtLimit) setNlLive(vt(uiLang, "too_long"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voice.recording, voice.transcribing, voice.stoppedAtLimit]);
+
+  // §3.2: a field the last Fill set with low confidence, still as filled,
+  // gets a dotted underline and "Check this" (never red: it isn't an error).
+  const NL_CONF_FIELDS: Partial<Record<FieldTarget, string[]>> = {
+    pickup: ["pickup_location"], delivery: ["delivery_location"], weight: ["weight"], cargo: ["cargo_description"],
+    truck: ["vehicle_type"], client: ["customer_id", "customer_name"], pickup_date: ["pickup_date"],
+    delivery_date: ["delivery_date"], valid_until: ["valid_until"], trip: ["trip_type"], return: ["return_load_booked"], abnormal: ["abnormal_load"],
+  };
+  const nlCurrent: Record<FieldTarget, string> = {
+    pickup, delivery, weight, cargo, truck: vehicleType, client: customerId, pickup_date: pickupDate, delivery_date: deliveryDate,
+    valid_until: validUntil, trip: tripType, return: String(returnLoadBooked), abnormal: String(abnormalLoad), stops: "",
+  };
+  const nlCheck = (t: FieldTarget) => !!fillInfo && (NL_CONF_FIELDS[t] ?? []).some(k => isLow(fillInfo.conf, k))
+    && nlFilledRef.current[t] !== undefined && nlFilledRef.current[t] === nlCurrent[t];
+  const nlCheckHint = (t: FieldTarget) => nlCheck(t) ? <span className="qb-nl-checkhint">{vt(uiLang, "check_this")}</span> : null;
+  const nlFieldProps = (t: FieldTarget) => ({ "data-nl-field": t, className: nlCheck(t) ? "qb-nl-check" : undefined, title: nlCheck(t) ? vt(uiLang, "check_this") : undefined });
 
   // ---- edit mode: load existing quote ----
   useEffect(() => {
@@ -918,6 +1166,7 @@ export default function QuoteBuilder() {
       // The saved driver figure is the quote's own (kept, not re-prefilled).
       // A typed driver figure comes back as typed; otherwise nights × allowance again.
       if (q.driver_allowance != null && q.costing_inputs?.driver_cost_is_override === true) { setDriverAllowanceInput(String(Number(q.driver_allowance))); setDriverEdited(true); }
+      else if (Number(q.costing_inputs?.driver_nights) > 0) setDriverNightsSet(Math.trunc(Number(q.costing_inputs.driver_nights)));
       // Theirs (53856f8): the stored pricing decision describes this quote only
       // while its final price still equals the quote's total (to 50 cents,
       // QuoteDetail's rule) and the server hasn't marked it stale. Otherwise
@@ -1015,6 +1264,7 @@ export default function QuoteBuilder() {
     if (d.distanceConfirmed === true) setDistanceConfirmed(true);
     if (typeof d.border === "string" && d.border !== "") setBorderTyped(d.border);
     if (d.driver != null) { setDriverAllowanceInput(String(d.driver)); setDriverEdited(true); }
+    if (Number(d.driverNights) > 0) setDriverNightsSet(Math.trunc(Number(d.driverNights)));
     if (Number(d.price) > 0) setPriceSet(Number(d.price));
     if (typeof d.returnLoadBooked === "boolean") setReturnLoadBooked(d.returnLoadBooked);
     if (d.tollsNone) setTollsNone(true);
@@ -1037,7 +1287,7 @@ export default function QuoteBuilder() {
     setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
     setPickupDate(""); setDeliveryDate(""); setNlText("");
     setEditableTollCost(""); setTollManuallyEdited(false); setDriverAllowanceInput("");
-    setDriverEdited(false); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setAgentFee(null); setAbnormalLoad(false); setDistanceConfirmed(false); setUseOfficialDiesel(false);
+    setDriverEdited(false); setDriverNightsSet(null); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setAgentFee(null); setAbnormalLoad(false); setDistanceConfirmed(false); setUseOfficialDiesel(false);
     restoreRouteRef.current = null;
     savedFinalPriceRef.current = null; savedPricingRef.current = null; savedBorderRef.current = null; borderRestoreRef.current = null; setReopenNotice(null); setPriceSet(null); setSavedPriceShown(false);
     setRouteError(false);
@@ -1046,6 +1296,9 @@ export default function QuoteBuilder() {
     lastRouteKeyRef.current = null;
     setChatMessages([]); setChatOpen(false); setPendingEntity(null); setDeclinedEntities([]);
     setValidUntil("");
+    setNlSaid({});
+    setFillInfo(null); setNlConflict(null); setNlUndo(null); setHeard(null); setNlInternational(null); setNlBorderPost(null);
+    nlFilledRef.current = {}; nlTouchedRef.current = new Set();
     if (isEditing) navigate("/bookings/quotes/new", { replace: true });
     toast.success("Started a new quote");
   };
@@ -1066,7 +1319,7 @@ export default function QuoteBuilder() {
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
           customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType,
           pickupDate, deliveryDate, validUntil, stops: stops.filter(st => st.coords).map(st => ({ location: st.location, coords: st.coords })),
-          tolls: tollManuallyEdited ? editableTollCost : null, driver: driverEdited ? driverAllowanceInput : null,
+          tolls: tollManuallyEdited ? editableTollCost : null, driver: driverEdited ? driverAllowanceInput : null, driverNights: driverNightsSet,
           price: priceSet, returnLoadBooked, tollsNone,
           // Restored as they were (never "manual" unless typed).
           tollsSource: tollManuallyEdited ? "manual" : aiToll ? "market_check" : "route", aiToll, aiFuel,
@@ -1080,7 +1333,7 @@ export default function QuoteBuilder() {
     return () => { if (draftRef.current) clearTimeout(draftRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType,
-    pickupDate, deliveryDate, validUntil, stops, tollManuallyEdited, editableTollCost, driverEdited, driverAllowanceInput, priceSet, returnLoadBooked, tollsNone,
+    pickupDate, deliveryDate, validUntil, stops, tollManuallyEdited, editableTollCost, driverEdited, driverAllowanceInput, driverNightsSet, priceSet, returnLoadBooked, tollsNone,
     aiToll, aiFuel, useOfficialDiesel, distanceConfirmed, borderTyped]);
 
   // Runs its cleanup ONLY on true unmount (empty deps) — unlike the effect
@@ -1216,7 +1469,7 @@ export default function QuoteBuilder() {
     crossBorderCost, isInternational,
     pickupDate: pickupDate || null,
     // Only a figure the user typed (sent as an override); else the server prices the nights.
-    driverAllowance: driverEdited ? driverAllowance : null,
+    driverAllowance: driverEdited || driverNightsSet != null ? driverAllowance : null,
     includeReturn: legs === 1 ? emptyReturn.included : null,
     yourPrice: total > 0 ? total : null,
   } : null;
@@ -1447,6 +1700,9 @@ export default function QuoteBuilder() {
     border_cost_is_override: borderCostIsOverride,
     // The saved driver figure is the user's only when they typed it.
     driver_cost_is_override: driverEdited,
+    // Nights out set for this quote (not typed as a figure): the server
+    // prices the same nights (quote_costing reads driver_nights).
+    driver_nights: !driverEdited && driverNightsSet != null ? driverNightsSet : null,
   };
   // Valid until: as set, else today + the company's quote validity.
   const validUntilToSave = validUntil || (() => {
@@ -1696,7 +1952,7 @@ export default function QuoteBuilder() {
           "+ Add stop" trigger until the first stop exists, at which point
           the trigger is replaced by a collapsible header + the stop list. */}
       {pickupCoords && deliveryCoords && (
-        <div style={{ padding: "10px", borderTop: "1px solid var(--border-subtle)" }}>
+        <div style={{ padding: "10px", borderTop: "1px solid var(--border-subtle)" }} data-nl-field="stops">
           {stops.length === 0 ? (
             <button type="button" onClick={addStop} className="qb-textbtn">
               <Plus size={12} aria-hidden="true" /> Add stop
@@ -1854,50 +2110,70 @@ export default function QuoteBuilder() {
           analysis stacks under the cost breakdown. */}
       <div className="qb-layout">
       <div className="qb-main">
-      {/* NL input — typed or voice */}
-      <div className="qb-nl" style={{ ...cardS, border: "1px solid var(--border-control)", display: "flex", alignItems: "center", gap: 8, padding: "8px 8px 8px 14px", marginBottom: 16, minHeight: 44 }}>
-        {voice.recording ? (
-          <>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--status-danger)", flexShrink: 0, animation: "pulse-dot 1s infinite" }} />
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, height: 32 }}>
-              {voice.levels.map((h, i) => (
-                <div key={i} style={{ width: 3, height: h, borderRadius: 2, background: "var(--accent-primary)" }} />
-              ))}
+      {/* NL input — typed or voice. The mic stays the same button while it
+          records (Space / Enter toggles it, Esc cancels and discards). */}
+      <div className={`qb-nl${voice.recording ? " is-recording" : ""}`} style={{ ...cardS, border: "1px solid var(--border-control)", display: "flex", alignItems: "center", gap: 8, padding: "8px 8px 8px 14px", marginBottom: fillInfo || nlConflict || heard || voice.stoppedAtLimit ? 8 : 16, minHeight: 44 }}>
+        <div className="qb-nl__main">
+          {voice.recording ? (
+            <VoiceListening lang={uiLang} mode={langMode} levels={voice.levels} elapsed={voice.elapsed} remaining={voice.remaining} reducedMotion={reducedMotion} />
+          ) : voice.transcribing ? (
+            <div className="qb-nl__status">
+              <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" style={{ animation: reducedMotion ? undefined : "spin 1s linear infinite" }}>
+                <circle cx="8" cy="8" r="6" fill="none" stroke="var(--accent-primary)" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
+              </svg>
+              {vt(uiLang, "reading")}
             </div>
-            <button onClick={voice.stop} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "var(--status-danger)", color: "#fff", border: "none", borderRadius: "var(--radius-control, 8px)", padding: "9px 14px", cursor: "pointer" }}>
-              <Square size={12} fill="#fff" /> Stop
-            </button>
-          </>
-        ) : voice.transcribing ? (
-          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-tertiary)" }}>
-            <svg width="14" height="14" viewBox="0 0 16 16" style={{ animation: "spin 1s linear infinite" }}>
-              <circle cx="8" cy="8" r="6" fill="none" stroke="var(--accent-primary)" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
-            </svg>
-            Transcribing…
-          </div>
-        ) : (
-          <>
-            <MessageCircle size={16} color="var(--text-tertiary)" aria-hidden="true" className="qb-nl__icon" style={{ flexShrink: 0 }} />
-            <input value={nlText} onChange={e => setNlText(e.target.value)} onKeyDown={e => e.key === "Enter" && submitNL()}
-              placeholder={narrowNl ? "e.g. 28 t steel, Joburg to Durban" : "Describe the load, e.g. 28 t steel coils Joburg to Durban"} aria-label="Describe the load" style={{ ...inputS, border: "none", background: "transparent", paddingLeft: 4, minWidth: 0 }} />
-            <button type="button" onClick={voice.start} title="Record voice" aria-label="Record voice"
-              className="tw-btn qb-nl__mic">
-              <Mic size={16} />
-            </button>
-            <button type="button" onClick={() => submitNL()} disabled={nlBusy || !nlText.trim()} className="tw-btn qb-nl__fill">{nlBusy ? "Reading…" : "Fill"}</button>
-          </>
+          ) : (
+            <>
+              <MessageCircle size={16} color="var(--text-tertiary)" aria-hidden="true" className="qb-nl__icon" style={{ flexShrink: 0 }} />
+              <input ref={nlInputRef} value={nlText} onChange={e => { setNlText(e.target.value); if (heard) setHeard(null); }} onKeyDown={e => e.key === "Enter" && submitNL()}
+                placeholder={vt(uiLang, "placeholder")} aria-label="Describe the load" style={{ ...inputS, border: "none", background: "transparent", paddingLeft: 4, minWidth: 0 }} />
+            </>
+          )}
+        </div>
+        {!voice.transcribing && (
+          <button type="button" className="tw-btn qb-nl__lang" onClick={() => setLangMode(nextLangMode(langMode))} disabled={voice.recording}
+            aria-label={vt(uiLang, "mode_label", { mode: langModeText(langMode, uiLang) })} title={vt(uiLang, "mode_label", { mode: langModeText(langMode, uiLang) })}>
+            {langMode === "auto" ? vt(uiLang, "mode_auto") : langMode.toUpperCase()}
+          </button>
+        )}
+        <button type="button" onClick={voice.recording ? voice.stop : voice.start} disabled={voice.transcribing || nlBusy}
+          aria-pressed={voice.recording} aria-label={vt(uiLang, voice.recording ? "stop_label" : "mic_label")} title={vt(uiLang, voice.recording ? "stop_label" : "mic_label")}
+          className={`tw-btn qb-nl__mic${voice.recording ? " is-on" : ""}`}>
+          {voice.recording ? <><Square size={12} fill="currentColor" aria-hidden="true" /><span>{vt(uiLang, "stop")}</span></> : <Mic size={16} aria-hidden="true" />}
+        </button>
+        {!voice.recording && !voice.transcribing && (
+          <button type="button" onClick={() => submitNL()} disabled={nlBusy || !nlText.trim()} className="tw-btn qb-nl__fill">{nlBusy ? vt(uiLang, "reading") : vt(uiLang, "fill")}</button>
         )}
         {/* Assistant launcher slot (filled by AIChatPanel via a portal). */}
         {!showPriceBar && <span ref={nlChatSlotRef} className="qb-chatslot qb-chatslot--nl" />}
       </div>
+      {/* One polite live region: Listening… / Reading… / the reply, once. */}
+      <div className="qb-sr" role="status" aria-live="polite" aria-atomic="true">{nlLive}</div>
+      <DescribeFeedback
+        lang={uiLang}
+        heard={heard}
+        stoppedAtLimit={voice.stoppedAtLimit && !voice.recording}
+        info={fillInfo}
+        conflict={nlConflict ? nlConflict.lines : null}
+        replaceRef={nlReplaceRef}
+        onReplace={() => resolveNlConflict(true)}
+        onKeep={() => resolveNlConflict(false)}
+        undo={!!nlUndo}
+        onUndo={undoNl}
+        onChip={(t) => focusNlField(t)}
+        onPickTruck={() => focusNlField("truck", true)}
+        onApplyNights={(n) => { setDriverEdited(false); setDriverAllowanceInput(""); setDriverNightsSet(n); setFillInfo(prev => prev ? { ...prev, driverNights: null } : prev); }}
+        onUseFuel={(p) => { setAiFuel({ pricePerL: p, fuelType }); setFillInfo(prev => prev ? { ...prev, fuelPrice: null } : prev); }}
+      />
 
       {/* 1 — inputs */}
       {/* One 4-column grid for every field row (inputs, details, cargo/trip),
           same template and gap, so field edges line up row to row. */}
       <div className="qb-grid qb-grid--inputs" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16, marginBottom: 16 }}>
         <div>
-          <div style={fieldLabelS}><span>Client<Req /></span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New client (opens in a new tab)" onClick={() => window.open("/customers", "_blank", "noopener")}><Plus size={12} aria-hidden="true" />New</button>}</div>
-          <div className="qb-select">
+          <div style={fieldLabelS}><span>Client<Req />{nlCheckHint("client")}</span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New client (opens in a new tab)" onClick={() => window.open("/customers", "_blank", "noopener")}><Plus size={12} aria-hidden="true" />New</button>}</div>
+          <div className={`qb-select${nlCheck("client") ? " qb-nl-check" : ""}`} data-nl-field="client">
             <select value={customerId} onChange={e => setCustomerId(e.target.value)} style={inputS} data-empty={customerId ? undefined : ""} aria-label="Client">
               <option value="">Select client…</option>
               {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -1906,16 +2182,18 @@ export default function QuoteBuilder() {
           </div>
         </div>
         <div>
-          <div style={fieldLabelS}><span>Weight (t)<Req /></span></div>
-          <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} aria-label="Weight in tonnes" id="qb-weight-input" />
+          <div style={fieldLabelS}><span>Weight (t)<Req />{nlCheckHint("weight")}</span></div>
+          <div {...nlFieldProps("weight")}><input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} aria-label="Weight in tonnes" id="qb-weight-input" /></div>
         </div>
         <div className="qb-loc">
-          <div style={fieldLabelS}><span>Collection<Req /></span></div>
-          <LocationInput value={pickup} onChange={(v, c) => { setPickup(v); setPickupCoords(c || null); }} placeholder="City / address" style={inputS} />
+          <div style={fieldLabelS}><span>Collection<Req />{nlCheckHint("pickup")}</span></div>
+          <div {...nlFieldProps("pickup")}><LocationInput value={pickup} onChange={(v, c) => { setPickup(v); setPickupCoords(c || null); }} placeholder="City / address" style={inputS} /></div>
+          {nlSaid.pickup && nlFilledRef.current.pickup === pickup && <div className="qb-nl-said">{vt(uiLang, "said", { place: nlSaid.pickup })}</div>}
         </div>
         <div className="qb-loc">
-          <div style={fieldLabelS}><span>Delivery<Req /></span></div>
-          <LocationInput value={delivery} onChange={(v, c) => { setDelivery(v); setDeliveryCoords(c || null); }} placeholder="City / address" style={inputS} />
+          <div style={fieldLabelS}><span>Delivery<Req />{nlCheckHint("delivery")}</span></div>
+          <div {...nlFieldProps("delivery")}><LocationInput value={delivery} onChange={(v, c) => { setDelivery(v); setDeliveryCoords(c || null); }} placeholder="City / address" style={inputS} /></div>
+          {nlSaid.delivery && nlFilledRef.current.delivery === delivery && <div className="qb-nl-said">{vt(uiLang, "said", { place: nlSaid.delivery })}</div>}
         </div>
       </div>
 
@@ -1939,18 +2217,18 @@ export default function QuoteBuilder() {
           {/* The app's shared DatePicker: it hands back the same "yyyy-MM-dd"
               string the native date input did, straight to the same setter. */}
           {([
-            ["qb-date-pickup", "Pickup date", pickupDate, setPickupDate],
-            ["qb-date-delivery", "Delivery date", deliveryDate, setDeliveryDate],
-            ["qb-date-valid", "Valid until", validUntil, setValidUntil],
-          ] as const).map(([id, label, value, set]) => (
-            <div key={id} role="group" aria-labelledby={id} className="qb-date">
-              <div style={fieldLabelS}><span id={id}>{label}</span></div>
+            ["qb-date-pickup", "Pickup date", pickupDate, setPickupDate, "pickup_date"],
+            ["qb-date-delivery", "Delivery date", deliveryDate, setDeliveryDate, "delivery_date"],
+            ["qb-date-valid", "Valid until", validUntil, setValidUntil, "valid_until"],
+          ] as const).map(([id, label, value, set, nlKey]) => (
+            <div key={id} role="group" aria-labelledby={id} className={`qb-date${nlCheck(nlKey) ? " qb-nl-check" : ""}`} data-nl-field={nlKey}>
+              <div style={fieldLabelS}><span id={id}>{label}</span>{nlCheckHint(nlKey)}</div>
               <DatePicker value={value} onChange={set} style={{ minHeight: "var(--field-h, 40px)", boxSizing: "border-box" }} />
             </div>
           ))}
           <div className="qb-vehicle">
-            <div style={fieldLabelS}><span>Truck</span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New vehicle type (opens in a new tab)" onClick={() => window.open("/settings/vehicle-types", "_blank", "noopener")}><Plus size={12} aria-hidden="true" />New</button>}</div>
-            <div className="qb-select">
+            <div style={fieldLabelS}><span>Truck{nlCheckHint("truck")}</span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New vehicle type (opens in a new tab)" onClick={() => window.open("/settings/vehicle-types", "_blank", "noopener")}><Plus size={12} aria-hidden="true" />New</button>}</div>
+            <div className={`qb-select${nlCheck("truck") ? " qb-nl-check" : ""}`} data-nl-field="truck">
             {/* §3: always a real truck. "" = the suggested one for the load. */}
             <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS} aria-label="Truck" id="qb-truck-select">
               <option value="">{suggestedVT ? `${sentenceCaseLabel(suggestedVT.name)}${capacityTonnes(suggestedVT.capacity) ? ` (${capLabel(capacityTonnes(suggestedVT.capacity))})` : ""} · auto` : allVehicleTypes.length ? "Pick a truck" : "No trucks yet"}</option>
@@ -1962,11 +2240,11 @@ export default function QuoteBuilder() {
             <ChevronDown size={14} className="qb-select__chev" aria-hidden="true" />
             </div>
           </div>
-          <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span>Cargo</span></div><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} aria-label="Cargo" /></div>
-          <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span id="qb-trip-label">Trip</span></div>
+          <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span>Cargo{nlCheckHint("cargo")}</span></div><div {...nlFieldProps("cargo")}><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} aria-label="Cargo" /></div></div>
+          <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span id="qb-trip-label">Trip{nlCheckHint("trip")}</span></div>
             {/* The shared segmented control: neutral track, raised active option. */}
-            <div className="tw-seg tw-seg--block qb-trip" role="group" aria-labelledby="qb-trip-label">
-              {(["ONE_WAY", "ROUND_TRIP"] as const).map(t => <button key={t} type="button" onClick={() => setTripType(t)} aria-pressed={tripType === t} aria-label={t === "ONE_WAY" ? "One way" : "Round trip, loaded both ways"} className={`tw-seg__opt${tripType === t ? " is-active" : ""}`}>{t === "ONE_WAY" ? "One way" : <><span className="qb-trip-long">Round trip, loaded</span><span className="qb-trip-short">Round, loaded</span></>}</button>)}
+            <div className={`tw-seg tw-seg--block qb-trip${nlCheck("trip") ? " qb-nl-check" : ""}`} role="group" aria-labelledby="qb-trip-label" data-nl-field="trip">
+              {(["ONE_WAY", "ROUND_TRIP"] as const).map(t => <button key={t} type="button" onClick={() => { nlTouchedRef.current.add("trip"); setTripType(t); }} aria-pressed={tripType === t} aria-label={t === "ONE_WAY" ? "One way" : "Round trip, loaded both ways"} className={`tw-seg__opt${tripType === t ? " is-active" : ""}`}>{t === "ONE_WAY" ? "One way" : <><span className="qb-trip-long">Round trip, loaded</span><span className="qb-trip-short">Round, loaded</span></>}</button>)}
             </div>
           </div>
         </div>
@@ -2114,17 +2392,20 @@ export default function QuoteBuilder() {
                     <button type="button" className="qb-linkbtn" onClick={() => runWarningAction("update_allowance")}>Set allowance</button>
                   </>)}
                   {driverEdited && driverLineC?.suggested != null && Math.abs(driverAllowance - Number(driverLineC.suggested)) >= 0.5 && (
-                    <button type="button" className="qb-linkbtn" onClick={() => { setDriverEdited(false); setDriverAllowanceInput(""); }}>Reset</button>
+                    <button type="button" className="qb-linkbtn" onClick={() => { setDriverEdited(false); setDriverAllowanceInput(""); setDriverNightsSet(null); }}>Reset</button>
+                  )}
+                  {!driverEdited && driverNightsSet != null && (
+                    <button type="button" className="qb-linkbtn" onClick={() => setDriverNightsSet(null)}>Reset</button>
                   )}
                 </span>
                 {rIn(<NumberField id="qb-driver-input" decimals={0} value={driverEdited ? (driverAllowanceInput === "" ? null : Number(driverAllowanceInput) || 0) : driverLineC?.amount ?? null}
                   placeholder="Needed"
-                  onValue={(n) => { setDriverAllowanceInput(n == null ? "" : String(n)); setDriverEdited(true); }}
+                  onValue={(n) => { setDriverAllowanceInput(n == null ? "" : String(n)); setDriverEdited(true); setDriverNightsSet(null); }}
                   aria-label="Driver allowance (R)" className={`qb-mini qb-cost__input${driverLineC?.amount == null ? " is-missing" : ""}`} />)}
               </div>
               {(borderNotSet || borderTyped !== "") && (
                 <div className="qb-cost__row">
-                  <span className="qb-cost__label">Border fees{borderNotSet && <span className="qb-cost__tag">Not set</span>}
+                  <span className="qb-cost__label">Border fees{nlBorderPost && <span className="qb-cost__meta">{vt(uiLang, "via", { post: borderPostShort(nlBorderPost) })}</span>}{borderNotSet && <span className="qb-cost__tag">Not set</span>}
                     {/* Part of the route has no border figures on file: what is known, what is missing.
                         The figure entered here is the whole border cost (every crossing). */}
                     {borderUnknown && (
@@ -2147,7 +2428,7 @@ export default function QuoteBuilder() {
                 return (
                   <div className="qb-cost__row">
                     <span className="qb-cost__label">
-                      Border fees
+                      Border fees{nlBorderPost && <span className="qb-cost__meta">{vt(uiLang, "via", { post: borderPostShort(nlBorderPost) })}</span>}
                       <BorderPop title={routeB?.countries?.length ? routeB.countries.join(" → ") : "Border charges"}
                         agentFee={agentFee} onAgentFee={setAgentFee} assumptions={borderAssumptions}
                         legs={[
@@ -2156,8 +2437,8 @@ export default function QuoteBuilder() {
                         ]} />
                       {estimates && <span className="qb-cost__tag" title="Some charges are estimates: see the list">Includes estimates</span>}
                       {abnormalLoadRelevant(routeB?.countries) && (
-                        <label className="qb-cost__check" title="Tick only for an abnormal load (e.g. a low-bed carrying machinery). Legal interlinks up to 56 t pay the goods vehicle toll.">
-                          <input type="checkbox" checked={abnormalLoad} onChange={(e) => setAbnormalLoad(e.target.checked)} /> Abnormal load
+                        <label className={`qb-cost__check${nlCheck("abnormal") ? " qb-nl-check" : ""}`} data-nl-field="abnormal" title={nlCheck("abnormal") ? vt(uiLang, "check_this") : "Tick only for an abnormal load (e.g. a low-bed carrying machinery). Legal interlinks up to 56 t pay the goods vehicle toll."}>
+                          <input type="checkbox" checked={abnormalLoad} onChange={(e) => { nlTouchedRef.current.add("abnormal"); setAbnormalLoad(e.target.checked); }} /> Abnormal load
                         </label>)}
                     </span>
                     <span className="qb-cost__value">{money(crossBorderCost)}</span>
@@ -2168,9 +2449,9 @@ export default function QuoteBuilder() {
                 <div className="qb-cost__row">
                   <span className="qb-cost__label">
                     Truck comes back
-                    <span className="tw-seg tw-seg--sm qb-cost__seg" role="group" aria-label="Truck comes back">
+                    <span className={`tw-seg tw-seg--sm qb-cost__seg${nlCheck("return") ? " qb-nl-check" : ""}`} role="group" aria-label="Truck comes back" data-nl-field="return">
                       {([["Empty", false], ["Loaded", true]] as const).map(([lbl, booked]) => (
-                        <button key={lbl} type="button" aria-pressed={returnLoadBooked === booked} onClick={() => setReturnShape(booked)}
+                        <button key={lbl} type="button" aria-pressed={returnLoadBooked === booked} onClick={() => { nlTouchedRef.current.add("return"); setReturnShape(booked); }}
                           className={`tw-seg__opt${returnLoadBooked === booked ? " is-active" : ""}`}>{lbl}</button>
                       ))}
                     </span>
@@ -2353,7 +2634,7 @@ export default function QuoteBuilder() {
         );
       })()}
 
-      <AIChatPanel messages={chatMessages} busy={nlBusy} open={chatOpen} onOpenChange={setChatOpen} onSend={(t, lang) => submitNL(t, lang)} launcherSlot={chatSlot} />
+      <AIChatPanel messages={chatMessages} busy={nlBusy} open={chatOpen} onOpenChange={setChatOpen} onSend={(t, lang, alt) => submitNL(t, lang, alt)} launcherSlot={chatSlot} />
     </div>
   );
 }

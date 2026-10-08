@@ -1,0 +1,106 @@
+/* Quote follow-ups (FOLLOWUPS-CLIENT-SPEC.md). Calm: tokens only, no new colours. */
+
+/* Settings card */
+.fu-card { padding: 4px 0 0; }
+.fu-row { padding: 12px var(--card-pad, 20px); border-bottom: 1px solid var(--border-row); }
+.fu-row:last-of-type { border-bottom: none; }
+.fu-row__head { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 24px; }
+.fu-row__label { font: 400 14px/20px var(--font-sans); color: var(--text-primary); }
+.fu-row__line {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin-top: 10px;
+  font: 400 14px/20px var(--font-sans); color: var(--text-secondary);
+}
+.fu-row__help { margin: 6px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); max-width: 60ch; }
+.fu-num { display: inline-flex; align-items: center; gap: 6px; }
+.fu-num__input {
+  box-sizing: border-box; min-height: 36px; padding: 6px 10px; text-align: right;
+  background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: var(--radius-control);
+  font: 400 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.fu-num__input[aria-invalid='true'] { border-color: var(--status-danger-text); }
+.fu-num__input:disabled { opacity: 0.6; cursor: not-allowed; }
+.fu-num__suffix { color: var(--text-secondary); }
+.fu-confirm-list { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.fu-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--accent-primary); font: inherit; text-decoration: underline;
+}
+
+/* Notices on the quotes list (fuel clause prompt, pricing setup, fuel alert) */
+.fu-notice {
+  flex-shrink: 0; margin-bottom: 16px; padding: 16px 20px;
+  background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card, 12px);
+  font-family: var(--font-sans); min-width: 0;
+}
+.fu-notice--scroll { max-height: 45vh; overflow-y: auto; }
+.fu-notice__title { margin: 0; font: 600 14px/20px var(--font-sans); color: var(--text-primary); }
+.fu-notice__title small { font-weight: 400; color: var(--text-tertiary); font-size: 13px; }
+.fu-notice__text { margin: 4px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); max-width: 72ch; }
+.fu-notice__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.fu-notice__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.fu-close {
+  flex-shrink: 0; background: none; border: none; padding: 4px; margin: -4px -4px 0 0; cursor: pointer;
+  color: var(--text-tertiary); border-radius: var(--radius-control); line-height: 0;
+}
+.fu-close:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+
+/* Pricing setup rows */
+.fu-setup { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 0; }
+.fu-setup__row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: start;
+  padding: 10px 0; border-top: 1px solid var(--border-row);
+}
+.fu-setup__label { font: 500 14px/20px var(--font-sans); color: var(--text-primary); }
+.fu-setup__value { font: 400 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.fu-setup__default { grid-column: 1 / -1; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
+
+/* Fuel alert panel table */
+.fu-alert__table { width: 100%; border-collapse: collapse; margin-top: 12px; font: 400 13px/20px var(--font-sans); }
+.fu-alert__table th {
+  text-align: left; font-weight: 500; color: var(--text-tertiary); padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle); white-space: nowrap;
+}
+.fu-alert__table td { padding: 8px; border-bottom: 1px solid var(--border-row); color: var(--text-primary); vertical-align: top; }
+.fu-alert__table td.num, .fu-alert__table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fu-alert__table tr.is-closed td { color: var(--text-tertiary); }
+.fu-alert__table a { color: var(--accent-primary); text-decoration: none; }
+.fu-alert__table a:hover { text-decoration: underline; }
+.fu-tag {
+  display: inline-block; padding: 0 8px; border-radius: 6px; white-space: nowrap;
+  font: 500 12px/20px var(--font-sans); background: var(--status-warning-bg); color: var(--status-warning-text);
+}
+/* Phones: the table becomes stacked rows, never a horizontal scroll. */
+@media (max-width: 640px) {
+  .fu-notice { padding: 14px 16px; }
+  .fu-alert__table thead { display: none; }
+  .fu-alert__table, .fu-alert__table tbody, .fu-alert__table tr, .fu-alert__table td { display: block; width: 100%; box-sizing: border-box; }
+  .fu-alert__table tr { padding: 10px 0; border-bottom: 1px solid var(--border-row); }
+  .fu-alert__table td { border: none; padding: 1px 0; }
+  .fu-alert__table td.num { text-align: left; }
+  .fu-alert__table td[data-label]::before { content: attr(data-label) ' '; color: var(--text-tertiary); }
+}
+
+/* Quote detail: follow-up card and the fuel adjustment row */
+.fu-lines { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font: 400 14px/20px var(--font-sans); color: var(--text-primary); }
+.fu-lines .fu-muted { color: var(--text-tertiary); }
+.fu-adj { padding: 8px 0; border-top: 1px solid var(--border-row); font-family: var(--font-sans); }
+.fu-adj__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.fu-adj__title { font: 400 14px/20px var(--font-sans); color: var(--text-primary); min-width: 0; overflow-wrap: anywhere; }
+.fu-adj__amount { font: 500 14px/20px var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-primary); }
+.fu-adj__sub { margin: 2px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
+.fu-clause { margin: 8px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
+.fu-note {
+  width: 100%; box-sizing: border-box; min-height: 72px; resize: vertical; padding: 8px 10px;
+  background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: var(--radius-control);
+  font: 400 14px/20px var(--font-sans); color: var(--text-primary);
+}
+.fu-note__count { display: block; margin-top: 2px; font-size: 12px; color: var(--text-tertiary); text-align: right; }
+.fu-preview-text { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-secondary); }
+@media (max-width: 640px) { .fu-note { font-size: 16px; } }
+.fu-chip {
+  display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 6px; vertical-align: middle;
+  border: 1px solid var(--border-subtle); background: var(--bg-surface);
+  font: 500 12px/18px var(--font-sans); color: var(--text-tertiary); white-space: nowrap;
+}
+.fu-clause--builder { margin: -8px 0 16px; }
+.fu-report-note { margin: 8px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }

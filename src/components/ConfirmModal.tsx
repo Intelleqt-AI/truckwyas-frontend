@@ -4,7 +4,7 @@ import './confirm-dialog-brand.css';
 
 interface Props {
   title: string;
-  message: string;
+  message: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;

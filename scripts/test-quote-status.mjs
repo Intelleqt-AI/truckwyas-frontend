@@ -10,9 +10,10 @@ assert.equal(quoteIncomplete({ total_amount: "23400.00", customer_price: { total
 assert.equal(quoteIncomplete({ total_amount: 23400 }), false);
 assert.equal(quoteIncomplete({ total_amount: 24300, costing_inputs: { tolls_unknown: true } }), true, "priced, tolls unknown");
 assert.equal(quoteIncomplete({ total_amount: 24300, costing_inputs: { tolls_unknown: true, tolls_confirmed_none: true } }), false);
+assert.equal(quoteIncomplete({ total_amount: 24800, pricing_complete: false }), true, "border costs unknown");
 assert.equal(quoteTollsUnknown({ costing_inputs: { tolls_unknown: false, toll_cost_one_way: 0 } }), false, "a known R 0");
 assert.equal(ownDieselImpactText({ code: "diesel_own_off", impact_zar: -1333.4 }), "R 1 333 below official on this quote.");
 assert.equal(ownDieselImpactText({ code: "diesel_own_off", impact_zar: 257.5 }), "R 258 above official on this quote.");
 assert.equal(ownDieselImpactText({ code: "diesel_own_off", impact_zar: null }), null);
 assert.equal(ownDieselImpactText({ code: "diesel_stale", impact_zar: -10 }), null);
-console.log("quoteStatus: 12 cases passed");
+console.log("quoteStatus: 13 cases passed");

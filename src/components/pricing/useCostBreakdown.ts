@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { postData } from "@/lib/Api";
 
 export const COST_BREAKDOWN_URL = "api/v1/quotes/cost-breakdown/";
@@ -40,6 +40,9 @@ export function useCostBreakdown(payload: Record<string, unknown> | null): Serve
     enabled: !!debounced,
     staleTime: 5 * 60 * 1000,
     retry: false,
+    // A new request keeps the last answer on screen until it lands, so the
+    // suggested truck (and with it the route) never flips while it loads.
+    placeholderData: keepPreviousData,
   });
   if (!debounced || !data || (data as { success?: boolean }).success === false) return null;
   return data as ServerCosting;

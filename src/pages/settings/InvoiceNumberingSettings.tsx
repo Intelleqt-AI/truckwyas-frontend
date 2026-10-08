@@ -1,5 +1,6 @@
 import '@/pages/settings/settings-brand.css';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { patchData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
@@ -149,6 +150,7 @@ export function InvoiceNumberingSettings() {
               <div style={{ ...settingsInputStyle, display: 'flex', alignItems: 'center', background: 'transparent', border: 0, paddingLeft: 0 }}>
                 {settings.vat_registered ? 'VAT registered: invoices are tax invoices' : 'Not VAT registered'}
               </div>
+              <div style={settingsHelpStyle}>Change it in <Link to="/settings/company">Settings → Company</Link>.</div>
             </div>
           </div>
           {problems.length > 0 && canEdit && <div style={settingsErrorStyle} role="alert">{problems[0]}</div>}

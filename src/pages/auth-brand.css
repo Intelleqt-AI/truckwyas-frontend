@@ -97,3 +97,14 @@
 .mobile-auth-layout .tw-auth-proof li { font-size: 14px; line-height: 20px; white-space: normal; }
 .mobile-auth-layout .tw-auth-foot { margin-top: 20px; border-top: 0; padding-top: 0; }
 .tw-auth-split--tall { --auth-top: 80px; }
+
+/* Onboarding: "Are you registered for VAT?" two-choice radio cards. */
+.ob-vat-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ob-vat-choice__opt {
+  display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 12px; box-sizing: border-box;
+  border: 1px solid var(--border-control); border-radius: var(--radius-control);
+  font-size: 14px; line-height: 20px; color: var(--text-primary); cursor: pointer; background: var(--input-bg);
+}
+.ob-vat-choice__opt.is-on { border-color: var(--accent-primary); box-shadow: 0 0 0 1px var(--accent-primary) inset; }
+.ob-vat-choice__opt input { margin: 0; accent-color: var(--accent-primary); }
+@media (max-width: 480px) { .ob-vat-choice { grid-template-columns: 1fr; } }

@@ -2,6 +2,7 @@ import "./auth-brand.css";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchData, patchData, postData } from "@/lib/Api";
+import { vatNumberProblem } from "@/lib/finance/validation";
 import { toast } from "@/lib/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
@@ -11,6 +12,8 @@ interface CompanyProfile {
   company_name: string;
   industry: string;
   contact?: { phone?: string; email?: string };
+  vat_number?: string;
+  vat_registered?: boolean;
 }
 
 interface VehicleType {
@@ -35,6 +38,10 @@ export function Onboarding() {
   const [companyName, setCompanyName] = useState('');
   const [industry, setIndustry] = useState('');
   const [phone, setPhone] = useState('');
+  // Asked once, here, so a business that isn't a VAT vendor never issues
+  // tax invoices with VAT on them (Company.vat_registered defaults to on).
+  const [vatRegistered, setVatRegistered] = useState<'yes' | 'no' | ''>('');
+  const [vatNumber, setVatNumber] = useState('');
   const [loadingCompany, setLoadingCompany] = useState(true);
 
   // Steps 2 and 3 are imports; both are skippable, so all they track is how
@@ -51,6 +58,9 @@ export function Onboarding() {
         setCompanyName(data.company_name || '');
         setIndustry(data.industry || '');
         setPhone(data.contact?.phone || '');
+        setVatNumber(data.vat_number || '');
+        // Only a number already on file answers the question for them.
+        if ((data.vat_number || '').trim()) setVatRegistered('yes');
       })
       .catch(() => {
         toast.error('Failed to load company info');
@@ -73,12 +83,25 @@ export function Onboarding() {
       toast.error('Please enter company name');
       return;
     }
+    if (!vatRegistered) {
+      toast.error('Please say whether you are registered for VAT');
+      return;
+    }
+    const vatProblem = vatRegistered === 'yes' ? vatNumberProblem(vatNumber) : null;
+    if (vatProblem) {
+      toast.error(vatProblem);
+      return;
+    }
 
     setSubmitting(true);
     try {
       await patchData({
         url: 'api/v1/company/profile/',
-        data: { company_name: companyName, industry, contact: { phone } },
+        data: {
+          company_name: companyName, industry, contact: { phone },
+          vat_registered: vatRegistered === 'yes',
+          ...(vatRegistered === 'yes' ? { vat_number: vatNumber.replace(/[\s-]/g, '') } : {}),
+        },
       });
       toast.success('Company details saved');
       setStep(2);
@@ -306,6 +329,38 @@ export function Onboarding() {
                   }}
                   />
                 </div>
+
+                <fieldset style={{ border: 0, padding: 0, margin: '0 0 24px' }}>
+                  <legend style={{ ...lblSt, padding: 0 }}>Are you registered for VAT with SARS?</legend>
+                  <div className="ob-vat-choice">
+                    {([['yes', 'Yes, we charge VAT'], ['no', 'No, not VAT registered']] as const).map(([v, text]) => (
+                      <label key={v} className={`ob-vat-choice__opt${vatRegistered === v ? ' is-on' : ''}`}>
+                        <input type="radio" name="onboarding-vat" value={v} checked={vatRegistered === v}
+                          onChange={() => setVatRegistered(v)} />
+                        {text}
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 6 }}>
+                    {vatRegistered === 'no'
+                      ? 'Your invoices and quotes will show no VAT. You can change this later in Settings → Company.'
+                      : 'VAT vendors add 15% VAT to quotes and tax invoices. You can change this later in Settings → Company.'}
+                  </div>
+                  {vatRegistered === 'yes' && (
+                    <div style={{ marginTop: 16 }}>
+                      <label htmlFor="onboarding-vat-number" style={lblSt}>VAT number <span style={{ fontWeight: 400, color: 'var(--text-tertiary)' }}>(optional)</span></label>
+                      <input className="tw-auth-control" id="onboarding-vat-number" inputMode="numeric"
+                        value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} placeholder="4XXXXXXXXX"
+                        aria-invalid={!!vatNumberProblem(vatNumber)}
+                        style={{ width: '100%', padding: '8px 12px', minHeight: 40, boxSizing: 'border-box', background: 'var(--input-bg)',
+                          border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-control)', color: 'var(--text-primary)',
+                          fontSize: 14, lineHeight: '20px' }} />
+                      {vatNumberProblem(vatNumber) && (
+                        <div role="alert" style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)', marginTop: 4 }}>{vatNumberProblem(vatNumber)}</div>
+                      )}
+                    </div>
+                  )}
+                </fieldset>
 
                 <button
                   onClick={handleStep1Submit}

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { vt, uiLangFrom, nextLangMode, langModeText, listeningLangLine, loadLangMode, heardBadge, voiceErrorText,
   shortDate, tonnes, randPerL, borderPostShort, vehicleHintName, tripShapeText, buildFillChips, didntCatchLine,
-  sameText, samePlace, isConflict, replaceQuestion, FIELD_LABELS, isLow } from '../src/lib/voiceQuote.ts';
+  sameText, samePlace, isConflict, replaceQuestion, FIELD_LABELS, isLow, spokenPlace } from '../src/lib/voiceQuote.ts';
 
 // copy (spec §5, exact strings)
 assert.equal(vt('en', 'listening'), 'Listening…');
@@ -108,3 +108,11 @@ console.log('voice quote: ok');
 assert.equal(buildFillChips({ pickup: 'Bloemfontein', stops: ['Upington'] }, {}, 'en')[0].text, 'Bloemfontein via Upington');
 assert.equal(buildFillChips({ delivery: 'Durban' }, {}, 'af')[0].text, 'Durban');
 console.log('voice quote route chip: ok');
+
+// the field gets the geocodable name; the chip says it as the user did
+assert.equal(spokenPlace('Cape Town', 'staal van Joburg na Kaapstad môre'), 'Kaapstad');
+assert.equal(spokenPlace('Cape Town', 'steel from Joburg to Cape Town'), 'Cape Town');
+assert.equal(spokenPlace('Richards Bay', 'na richardsbaai'), 'Richardsbaai');
+assert.equal(spokenPlace('Durban', 'na Durban'), 'Durban');
+assert.equal(spokenPlace('Cape Town', 'x', 'Kaapstad'), 'Kaapstad', 'server spoken form wins');
+console.log('voice quote spoken places: ok');

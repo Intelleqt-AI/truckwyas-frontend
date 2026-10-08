@@ -158,6 +158,24 @@ export const randPerL = (p: number): string => `R ${p.toFixed(2).replace(".", ",
 /** "Oshoek / Ngwenya" → "Oshoek" (the SA side, as the border line shows it). */
 export const borderPostShort = (post: string): string => post.split(" / ")[0].trim();
 
+// The backend fills places with their geocodable (English/official) name;
+// the chip shows the place as the user said it when that was the Afrikaans
+// name (mirrors quote_nl._AF_PLACE).
+const AF_PLACES: Record<string, string> = {
+  "cape town": "Kaapstad", "east london": "Oos-Londen", "richards bay": "Richardsbaai", "mossel bay": "Mosselbaai",
+  "walvis bay": "Walvisbaai", "namibia": "Namibië", "zambia": "Zambië", "mozambique": "Mosambiek",
+};
+/**
+ * How the user said a place: an explicit spoken form from the server when it
+ * sends one, else the Afrikaans name when that is what the message used,
+ * else the filled name.
+ */
+export function spokenPlace(filled: string, message: string, spoken?: string | null): string {
+  if (spoken && spoken.trim()) return spoken.trim();
+  const af = AF_PLACES[filled.trim().toLowerCase()];
+  return af && message.toLowerCase().includes(af.toLowerCase()) ? af : filled;
+}
+
 const VEHICLE_HINT_NAMES: Record<string, string> = {
   interlink: "Superlink", tautliner: "Tautliner", reefer: "Reefer", tipper: "Tipper", flatbed: "Flatbed",
   tanker: "Tanker", lowbed: "Low-bed", ldv: "LDV", semi: "Semi-trailer", rigid: "Rigid",

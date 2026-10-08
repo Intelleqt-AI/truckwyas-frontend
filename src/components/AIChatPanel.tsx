@@ -28,7 +28,7 @@ interface AIChatPanelProps {
 }
 
 /**
- * Floating AI assistant — a persistent circular launcher (bottom-right) that
+ * Floating assistant — a persistent circular launcher (bottom-right) that
  * opens a conversation panel. Every message the user sends and every reply
  * the AI gives lands here, so a multi-turn "actually make it round trip"
  * follow-up has something to reply against instead of vanishing into a toast.
@@ -75,8 +75,8 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend, launch
     <button
       type="button"
       onClick={() => onOpenChange(!open)}
-      title="AI assistant"
-      aria-label="AI assistant"
+      title="Assistant"
+      aria-label="Assistant"
       aria-expanded={open}
       className={inlineLauncher ? "ai-launcher ai-launcher--inline" : "ai-launcher"}
     >
@@ -117,7 +117,7 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend, launch
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid var(--border-subtle)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <MessageCircle size={15} color="var(--accent-primary)" />
-              <span style={{ fontSize: 14, lineHeight: "20px", fontWeight: 600, color: "var(--text-primary)" }}>AI assistant</span>
+              <span style={{ fontSize: 14, lineHeight: "20px", fontWeight: 600, color: "var(--text-primary)" }}>Assistant</span>
             </div>
             <button onClick={() => onOpenChange(false)} title="Close" aria-label="Close" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, marginRight: -8, borderRadius: "var(--radius-control)", border: "none", background: "transparent", color: "var(--text-tertiary)", cursor: "pointer" }}>
               <X size={15} />
@@ -180,7 +180,7 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend, launch
                   value={text}
                   onChange={e => setText(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && submit()}
-                  placeholder="Message the AI…"
+                  placeholder="Message the assistant…"
                   disabled={busy}
                   style={{ flex: 1, background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-control)", padding: "8px 12px", minHeight: 40, boxSizing: "border-box", fontSize: 14, lineHeight: "20px", color: "var(--text-primary)", outline: "none" }}
                 />

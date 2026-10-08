@@ -28,7 +28,7 @@ import { Dialog, DialogTrigger, DialogContent, DialogClose } from "@/components/
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { DescribeFeedback, VoiceListening } from "@/components/pricing/DescribeFeedback";
 import { vt, uiLangFrom, loadLangMode, saveLangMode, nextLangMode, langModeText, isConflict, samePlace, sameText, saNum,
-  shortDate as nlDate, borderPostShort, FIELD_LABELS, didntCatchLine, isLow,
+  shortDate as nlDate, borderPostShort, spokenPlace, FIELD_LABELS, didntCatchLine, isLow,
   type UiLang, type VoiceLangMode, type FieldTarget, type ConflictLine, type AppliedSummary, type FillInfo } from "@/lib/voiceQuote";
 import { AIChatPanel, type ChatMessage } from "@/components/AIChatPanel";
 import { useAuth } from "@/lib/AuthContext";
@@ -386,6 +386,10 @@ export default function QuoteBuilder() {
   // True once the user typed a driver figure (or a saved quote had one).
   // Until then it is nights away × the company's allowance per night (§6).
   const [driverEdited, setDriverEdited] = useState(false);
+  // Nights out set for this quote (Describe the load "3 nights out — Apply"):
+  // the costing prices these nights at the allowance, and the line reads
+  // "3 nights". A typed driver figure still wins. Saved as driver_nights.
+  const [driverNightsSet, setDriverNightsSet] = useState<number | null>(null);
   // §5: a one-way trip ≥ the company's minimum km includes the empty return
   // unless a return load is booked.
   const [returnLoadBooked, setReturnLoadBooked] = useState(false);
@@ -705,7 +709,7 @@ export default function QuoteBuilder() {
     tolls: { one_way: tollsOneWay, lookup_failed: tollsOneWay == null && routeTollsUnknown, confirmed_none: tollsNone,
       empty_return: routeTollsInUse && tripType !== "ROUND_TRIP" ? returnTolls : null,
       return_leg: routeTollsInUse && tripType === "ROUND_TRIP" ? returnTolls : null },
-    driver: { allowance_per_night: allowancePerNight, nights: null, amount: driverEdited ? (driverAllowanceInput === "" ? null : Number(driverAllowanceInput) || 0) : null },
+    driver: { allowance_per_night: allowancePerNight, nights: driverEdited ? null : driverNightsSet, amount: driverEdited ? (driverAllowanceInput === "" ? null : Number(driverAllowanceInput) || 0) : null },
     hours_per_day: si?.hours_per_day ?? null,
     border_cost: borderLoaded,
     border_cost_empty_return: borderEmptyBack,
@@ -899,10 +903,13 @@ export default function QuoteBuilder() {
   // different entry points into the same conversation, so every message
   // (whichever surface it came from) is recorded in chatMessages with real
   // history/current_fields sent to the backend for follow-up context.
-  const geocodeNL = async (q: string): Promise<LocationCoords | null> => {
+  // The place a Fill names, geocoded the same way as a picked one: the field
+  // shows the geocoded label (Cape Town), the coords carry the country.
+  const geocodeNL = async (q: string): Promise<{ label: string; coords: LocationCoords } | null> => {
     const g = await fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(q)}`).catch(() => null);
     const s = g?.results?.[0] || g?.[0];
-    return s ? { lat: Number(s.lat), lon: Number(s.lon), ...(s.country_code ? { country_code: s.country_code } : {}) } : null;
+    return s ? { label: typeof s.label === "string" && s.label.trim() ? s.label.trim() : q,
+      coords: { lat: Number(s.lat), lon: Number(s.lon), ...(s.country_code ? { country_code: s.country_code } : {}) } } : null;
   };
 
   // Scrolls to a field and focuses it (the filled chips and the truck hint).
@@ -950,7 +957,8 @@ export default function QuoteBuilder() {
     if (!text) return;
     const history = chatMessages.map(m => ({ role: m.role, content: m.text }));
     setChatMessages(prev => [...prev, { role: "user", text }]);
-    setChatOpen(true);
+    // The panel isn't opened for a Fill: the chips say what happened. It
+    // opens only when the reply needs an answer (see below), or on request.
     setNlBusy(true);
     setNlLive(vt(uiLang, "reading"));
     setNlConflict(null);
@@ -989,6 +997,8 @@ export default function QuoteBuilder() {
       // Empty or Fill-set fields change now; the user's own values wait for
       // Replace / Keep mine. Same place written two ways is not a change.
       const labels = FIELD_LABELS[L];
+      // Optional: how each place was said, when the server sends it.
+      const spoken: Record<string, string | undefined> = res?.spoken_places && typeof res.spoken_places === "object" ? res.spoken_places : {};
       const filled = nlFilledRef.current;
       const changes: NlChange[] = [];
       const text_ = (target: FieldTarget, cur: string, next: string, from: string, to: string, set: (v: string) => void, summary: AppliedSummary) => {
@@ -1003,10 +1013,13 @@ export default function QuoteBuilder() {
         const setCoords = target === "pickup" ? setPickupCoords : setDeliveryCoords;
         if (sameText(cur, next)) return;
         const g = await geocodeNL(next);
-        if (cur.trim() && samePlace(curCoords, g)) return; // Kaapstad = Cape Town
-        changes.push({ target, filled: next, summary: { [target]: next },
-          apply: () => { setText(next); setCoords(g); }, revert: () => { setText(cur); setCoords(curCoords); },
-          conflict: isConflict(cur, next, filled[target]) ? { label: labels[target], from: cur, to: next } : null });
+        const shown = g?.label ?? next;
+        if (sameText(cur, shown)) return;
+        if (cur.trim() && samePlace(curCoords, g?.coords)) return; // Kaapstad = Cape Town
+        const said = spokenPlace(next, text, spoken[`${target}_location`]);
+        changes.push({ target, filled: shown, summary: { [target]: said },
+          apply: () => { setText(shown); setCoords(g?.coords ?? null); }, revert: () => { setText(cur); setCoords(curCoords); },
+          conflict: isConflict(cur, shown, filled[target]) ? { label: labels[target], from: cur, to: said } : null });
       };
       const toggle = (target: FieldTarget, cur: boolean | string, next: boolean | string, from: string, to: string, set: (v: never) => void, summary: AppliedSummary) => {
         if (cur === next) return;
@@ -1024,10 +1037,12 @@ export default function QuoteBuilder() {
       if (newStopNames.length) {
         const added = await Promise.all(newStopNames.map(async (name) => {
           stopIdRef.current += 1;
-          return { id: `stop-${stopIdRef.current}`, location: name, coords: await geocodeNL(name) };
+          const id = `stop-${stopIdRef.current}`;
+          const g = await geocodeNL(name);
+          return { id, location: g?.label ?? name, coords: g?.coords ?? null };
         }));
         const ids = added.map(a => a.id);
-        changes.push({ target: "stops", filled: null, summary: { stops: newStopNames }, conflict: null,
+        changes.push({ target: "stops", filled: null, summary: { stops: newStopNames.map(n => spokenPlace(n, text)) }, conflict: null,
           apply: () => { setStops(prev => [...prev, ...added]); setStopsExpanded(true); },
           revert: () => setStops(prev => prev.filter(s => !ids.includes(s.id))) });
       }
@@ -1091,9 +1106,13 @@ export default function QuoteBuilder() {
       const reply = res?.reply || (L === "af" ? "Reg so. Die vorm is bygewerk." : "Got it. I updated the form.");
       setNlLive(reply);
       setChatMessages(prev => [...prev, { role: "assistant", text: reply, link: res?.link || undefined }]);
+      // Something to answer: a create-this-client/truck question, or nothing
+      // could be filled (the reply says what to try).
+      if (res?.pending_entity || changes.length === 0) setChatOpen(true);
       if (!textOverride) setNlText("");
     } catch {
       setNlLive("");
+      setChatOpen(true);
       setChatMessages(prev => [...prev, { role: "assistant", text: "Sorry, I couldn't read that. Try rephrasing or use the fields directly." }]);
     }
     finally { setNlBusy(false); }
@@ -1151,6 +1170,7 @@ export default function QuoteBuilder() {
       // The saved driver figure is the quote's own (kept, not re-prefilled).
       // A typed driver figure comes back as typed; otherwise nights × allowance again.
       if (q.driver_allowance != null && q.costing_inputs?.driver_cost_is_override === true) { setDriverAllowanceInput(String(Number(q.driver_allowance))); setDriverEdited(true); }
+      else if (Number(q.costing_inputs?.driver_nights) > 0) setDriverNightsSet(Math.trunc(Number(q.costing_inputs.driver_nights)));
       // Theirs (53856f8): the stored pricing decision describes this quote only
       // while its final price still equals the quote's total (to 50 cents,
       // QuoteDetail's rule) and the server hasn't marked it stale. Otherwise
@@ -1248,6 +1268,7 @@ export default function QuoteBuilder() {
     if (d.distanceConfirmed === true) setDistanceConfirmed(true);
     if (typeof d.border === "string" && d.border !== "") setBorderTyped(d.border);
     if (d.driver != null) { setDriverAllowanceInput(String(d.driver)); setDriverEdited(true); }
+    if (Number(d.driverNights) > 0) setDriverNightsSet(Math.trunc(Number(d.driverNights)));
     if (Number(d.price) > 0) setPriceSet(Number(d.price));
     if (typeof d.returnLoadBooked === "boolean") setReturnLoadBooked(d.returnLoadBooked);
     if (d.tollsNone) setTollsNone(true);
@@ -1270,7 +1291,7 @@ export default function QuoteBuilder() {
     setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
     setPickupDate(""); setDeliveryDate(""); setNlText("");
     setEditableTollCost(""); setTollManuallyEdited(false); setDriverAllowanceInput("");
-    setDriverEdited(false); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setAgentFee(null); setAbnormalLoad(false); setDistanceConfirmed(false); setUseOfficialDiesel(false);
+    setDriverEdited(false); setDriverNightsSet(null); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setAgentFee(null); setAbnormalLoad(false); setDistanceConfirmed(false); setUseOfficialDiesel(false);
     restoreRouteRef.current = null;
     savedFinalPriceRef.current = null; savedPricingRef.current = null; savedBorderRef.current = null; borderRestoreRef.current = null; setReopenNotice(null); setPriceSet(null); setSavedPriceShown(false);
     setRouteError(false);
@@ -1301,7 +1322,7 @@ export default function QuoteBuilder() {
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
           customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType,
           pickupDate, deliveryDate, validUntil, stops: stops.filter(st => st.coords).map(st => ({ location: st.location, coords: st.coords })),
-          tolls: tollManuallyEdited ? editableTollCost : null, driver: driverEdited ? driverAllowanceInput : null,
+          tolls: tollManuallyEdited ? editableTollCost : null, driver: driverEdited ? driverAllowanceInput : null, driverNights: driverNightsSet,
           price: priceSet, returnLoadBooked, tollsNone,
           // Restored as they were (never "manual" unless typed).
           tollsSource: tollManuallyEdited ? "manual" : aiToll ? "market_check" : "route", aiToll, aiFuel,
@@ -1315,7 +1336,7 @@ export default function QuoteBuilder() {
     return () => { if (draftRef.current) clearTimeout(draftRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType,
-    pickupDate, deliveryDate, validUntil, stops, tollManuallyEdited, editableTollCost, driverEdited, driverAllowanceInput, priceSet, returnLoadBooked, tollsNone,
+    pickupDate, deliveryDate, validUntil, stops, tollManuallyEdited, editableTollCost, driverEdited, driverAllowanceInput, driverNightsSet, priceSet, returnLoadBooked, tollsNone,
     aiToll, aiFuel, useOfficialDiesel, distanceConfirmed, borderTyped]);
 
   // Runs its cleanup ONLY on true unmount (empty deps) — unlike the effect
@@ -1451,7 +1472,7 @@ export default function QuoteBuilder() {
     crossBorderCost, isInternational,
     pickupDate: pickupDate || null,
     // Only a figure the user typed (sent as an override); else the server prices the nights.
-    driverAllowance: driverEdited ? driverAllowance : null,
+    driverAllowance: driverEdited || driverNightsSet != null ? driverAllowance : null,
     includeReturn: legs === 1 ? emptyReturn.included : null,
     yourPrice: total > 0 ? total : null,
   } : null;
@@ -1682,6 +1703,9 @@ export default function QuoteBuilder() {
     border_cost_is_override: borderCostIsOverride,
     // The saved driver figure is the user's only when they typed it.
     driver_cost_is_override: driverEdited,
+    // Nights out set for this quote (not typed as a figure): the server
+    // prices the same nights (quote_costing reads driver_nights).
+    driver_nights: !driverEdited && driverNightsSet != null ? driverNightsSet : null,
   };
   // Valid until: as set, else today + the company's quote validity.
   const validUntilToSave = validUntil || (() => {
@@ -2142,8 +2166,7 @@ export default function QuoteBuilder() {
         onUndo={undoNl}
         onChip={(t) => focusNlField(t)}
         onPickTruck={() => focusNlField("truck", true)}
-        driverRate={allowancePerNight}
-        onApplyNights={(n) => { if (allowancePerNight != null) { setDriverAllowanceInput(String(Math.round(n * allowancePerNight * 100) / 100)); setDriverEdited(true); } setFillInfo(prev => prev ? { ...prev, driverNights: null } : prev); }}
+        onApplyNights={(n) => { setDriverEdited(false); setDriverAllowanceInput(""); setDriverNightsSet(n); setFillInfo(prev => prev ? { ...prev, driverNights: null } : prev); }}
         onUseFuel={(p) => { setAiFuel({ pricePerL: p, fuelType }); setFillInfo(prev => prev ? { ...prev, fuelPrice: null } : prev); }}
       />
 
@@ -2370,12 +2393,15 @@ export default function QuoteBuilder() {
                     <button type="button" className="qb-linkbtn" onClick={() => runWarningAction("update_allowance")}>Set allowance</button>
                   </>)}
                   {driverEdited && driverLineC?.suggested != null && Math.abs(driverAllowance - Number(driverLineC.suggested)) >= 0.5 && (
-                    <button type="button" className="qb-linkbtn" onClick={() => { setDriverEdited(false); setDriverAllowanceInput(""); }}>Reset</button>
+                    <button type="button" className="qb-linkbtn" onClick={() => { setDriverEdited(false); setDriverAllowanceInput(""); setDriverNightsSet(null); }}>Reset</button>
+                  )}
+                  {!driverEdited && driverNightsSet != null && (
+                    <button type="button" className="qb-linkbtn" onClick={() => setDriverNightsSet(null)}>Reset</button>
                   )}
                 </span>
                 {rIn(<NumberField id="qb-driver-input" decimals={0} value={driverEdited ? (driverAllowanceInput === "" ? null : Number(driverAllowanceInput) || 0) : driverLineC?.amount ?? null}
                   placeholder="Needed"
-                  onValue={(n) => { setDriverAllowanceInput(n == null ? "" : String(n)); setDriverEdited(true); }}
+                  onValue={(n) => { setDriverAllowanceInput(n == null ? "" : String(n)); setDriverEdited(true); setDriverNightsSet(null); }}
                   aria-label="Driver allowance (R)" className={`qb-mini qb-cost__input${driverLineC?.amount == null ? " is-missing" : ""}`} />)}
               </div>
               {(borderNotSet || borderTyped !== "") && (

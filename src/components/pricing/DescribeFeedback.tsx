@@ -50,7 +50,6 @@ export function DescribeFeedback(p: {
   onReplace: () => void; onKeep: () => void;
   undo: boolean; onUndo: () => void;
   onChip: (t: FieldTarget) => void; onPickTruck: () => void;
-  driverRate: number | null;
   onApplyNights: (n: number) => void; onUseFuel: (price: number) => void;
 }) {
   const { lang, info } = p;
@@ -85,12 +84,10 @@ export function DescribeFeedback(p: {
       {(nights || fuel) ? (
         <div className="qb-nlfb__row">
           {nights ? (
-            p.driverRate != null ? (
-              <span className="qb-nlfb__suggest">
-                {nights === 1 ? vt(lang, "night_apply") : vt(lang, "nights_apply", { n: nights })} —
-                <button type="button" className="qb-linkbtn" onClick={() => p.onApplyNights(nights)}>{vt(lang, "apply")}</button>
-              </span>
-            ) : <span className="qb-nlfb__suggest">{nights === 1 ? vt(lang, "night_apply") : vt(lang, "nights_apply", { n: nights })}</span>
+            <span className="qb-nlfb__suggest">
+              {nights === 1 ? vt(lang, "night_apply") : vt(lang, "nights_apply", { n: nights })} —
+              <button type="button" className="qb-linkbtn" onClick={() => p.onApplyNights(nights)}>{vt(lang, "apply")}</button>
+            </span>
           ) : null}
           {fuel ? (
             <span className="qb-nlfb__suggest">

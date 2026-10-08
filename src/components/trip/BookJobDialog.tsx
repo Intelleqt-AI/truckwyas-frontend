@@ -271,7 +271,7 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
               inFlight.current = true;
               book.mutate(undefined, { onSettled: () => { inFlight.current = false; } });
             }}>
-              {book.isPending ? 'Booking…' : choice.kind === 'return' || choice.kind === 'outbound' ? 'Book and link' : 'Book job'}
+              {book.isPending ? 'Booking…' : choice.kind === 'return' || choice.kind === 'outbound' ? 'Book and link' : callOff ? 'Book load' : 'Book job'}
             </button>
           )}
         </div>

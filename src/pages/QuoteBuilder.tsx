@@ -2,7 +2,7 @@ import "@/components/layout/section-header.css";
 import { isForeignCountry, tripIsInternational } from "@/lib/tripInternational";
 import { savedRouteMatches } from "@/lib/savedRoute";
 import { borderCostsUnknown } from "@/lib/borderUnknown";
-import { routeChipLabel, borderTotalWithAgentFee, tripBorderEstimate, abnormalLoadRelevant, type TollItem, type BorderItem } from "@/lib/routeTolls";
+import { routeChipLabel, borderTotalWithAgentFee, tripBorderEstimate, borderEstimate, abnormalLoadRelevant, type TollItem, type BorderItem } from "@/lib/routeTolls";
 import { TollPop, BorderPop } from "@/components/pricing/RouteCostPops";
 import SectionHeader from "@/components/layout/SectionHeader";
 import "./quote-invoice-roles.css";
@@ -596,6 +596,8 @@ export default function QuoteBuilder() {
   const borderEmptyBack: number | null = tripType !== "ROUND_TRIP" && borderTyped === "" ? routeBorderBack : null;
   const borderEstimated: number | null = borderTyped !== "" ? null
     : tripBorderEstimate(routeB?.cross_border_breakdown, returnLeg?.cross_border_breakdown, agentFee, tripType === "ROUND_TRIP");
+  // The empty run home's estimated part (its own exit-only lines).
+  const borderEstimatedBack: number | null = borderEmptyBack != null ? (borderEstimate(returnLeg?.cross_border_breakdown, agentFee) || null) : null;
   const weightKg = loadT * 1000;
 
   // ---- company figures the costing needs: the server's resolution
@@ -607,7 +609,9 @@ export default function QuoteBuilder() {
         cross_border_cost: Math.round(borderLoaded * 100) / 100,
         ...(borderEmptyBack != null ? { cross_border_cost_empty_return: borderEmptyBack } : {}),
         ...(borderEstimated ? { cross_border_estimate_zar: borderEstimated } : {}),
+        ...(borderEstimatedBack ? { cross_border_estimate_empty_return_zar: borderEstimatedBack } : {}),
         ...(pickupDate ? { pickup_date: pickupDate } : {}),
+        abnormal_load: abnormalLoad,
         ...(borderUnknown ? { border_costs_unknown: borderUnknown } : {}), border_cost_is_override: borderCostIsOverride } : null);
   const siRaw = serverBreakdown?.inputs ?? null;
   // The trip runs after the newest published toll schedule (route or server says so).
@@ -653,6 +657,7 @@ export default function QuoteBuilder() {
     border_cost: borderLoaded,
     border_cost_empty_return: borderEmptyBack,
     border_estimate: borderEstimated,
+    border_estimate_empty_return: borderEstimatedBack,
     border_costs_unknown: borderUnknown,
     border_cost_is_override: borderCostIsOverride,
     international: tripInternational,
@@ -762,7 +767,7 @@ export default function QuoteBuilder() {
         ...(wantReturnLeg ? { include_return: true } : {}),
         // The user's own clearing-agent fee replaces the agent estimate ("Your figure").
         ...(agentFee != null ? { clearing_agent_fee_zar: agentFee } : {}),
-        ...(abnormalLoad ? { abnormal_load: true } : {}),
+        abnormal_load: abnormalLoad,
       };
       const requestKey = routeRequestKey;
       // X-TW-Quote-Rules: the backend then says "unknown" (nulls + flags:
@@ -1194,6 +1199,8 @@ export default function QuoteBuilder() {
       ...(costingInputs.tolls?.empty_return != null ? { toll_cost_empty_return: costingInputs.tolls.empty_return } : {}),
       ...(borderEmptyBack != null ? { cross_border_cost_empty_return: borderEmptyBack } : {}),
       ...(borderEstimated ? { cross_border_estimate_zar: borderEstimated } : {}),
+      ...(borderEstimatedBack ? { cross_border_estimate_empty_return_zar: borderEstimatedBack } : {}),
+      abnormal_load: abnormalLoad,
     },
     tollCost, routePlazas: tollBreakdown.map(b => ({ plaza: b.plaza, route: b.route, tariff: Number(b.tariff) })),
     countryCodes: route?.country_codes ?? routeB?.countries ?? null,
@@ -1421,10 +1428,10 @@ export default function QuoteBuilder() {
     toll_cost_return: costingInputs.tolls?.return_leg ?? null,
     border_cost_empty_return: borderEmptyBack,
     border_estimate: borderEstimated,
+    border_estimate_empty_return: borderEstimatedBack,
     clearing_agent_fee: agentFee,
-    // Zimbabwe abnormal load (56 t+ GCM): saved so a reopened quote prices the
-    // same. Only when on: a server without the key refuses unknown keys.
-    ...(abnormalLoad ? { abnormal_load: true } : {}),
+    // Zimbabwe abnormal load (56 t+ GCM): saved so a reopened quote prices the same.
+    abnormal_load: abnormalLoad,
     // The border line (all legs): additional_charges can't be read back as it.
     border_cost: crossBorderCost > 0 ? round2(crossBorderCost) : null,
     border_costs_unknown: borderUnknown,

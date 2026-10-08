@@ -25,6 +25,7 @@ const zw = [
 assert.deepEqual(zw.map(borderKind), ['estimate', 'agent', 'published', 'unverified']);
 assert.equal(borderMeta(zw[0]), 'USD 375 at R16,6391 · as of 28 Apr 2026');
 assert.equal(rateText(0.25608), '0,25608', 'server precision, not rounded');
+assert.equal(borderMeta({ description: 'x', amount: 3677.24, currency: 'USD', amount_foreign: 221, fx: { zar_per_unit: 16.6391, zar_per_unit_text: '16.63910' } }), 'USD 221 at R16,63910');
 assert.equal(borderMeta({ description: 'x', amount: 460.94, currency: 'MZN', amount_foreign: 1800, fx: { zar_per_unit: 0.25608 } }), 'MZN 1 800 at R0,25608');
 assert.equal(tollNote(false, [{ plaza: 'Middelburg', tariff: 1, country: 'ZA' }]), 'Amounts excl. VAT.');
 assert.equal(tollNote(false, [{ plaza: 'Middelburg', tariff: 1, country: 'ZA' }, { plaza: 'Moamba', tariff: 1, country: 'MZ', currency: 'MZN' }]), 'SA tolls excl. VAT; foreign tolls have no SA VAT.');
@@ -41,4 +42,4 @@ assert.equal(borderTotalWithAgentFee(zw.slice(0, 2), 8244.66, 3500), 9739.66);
 assert.equal(borderTotalWithAgentFee([zw[0]], 6239.66, 3500), 6239.66, 'no agent line');
 assert.equal(borderEstimate(zw, null), 8894.66);
 assert.equal(borderEstimate(zw, 3500), 6889.66, 'your agent fee is not an estimate');
-console.log('routeTolls: 31 cases passed');
+console.log('routeTolls: 32 cases passed');

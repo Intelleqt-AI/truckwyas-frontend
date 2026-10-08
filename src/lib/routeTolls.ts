@@ -10,7 +10,7 @@ export interface TollItem {
   tariff_effective_from?: string | null; currency?: string | null;
   tariff_foreign?: number | null; fx?: Fx | null; class_mapping_verified?: boolean;
 }
-export interface Fx { currency?: string; zar_per_unit?: number; as_of?: string | null; source?: string | null; is_fallback?: boolean; label?: string | null }
+export interface Fx { currency?: string; zar_per_unit?: number; zar_per_unit_text?: string | null; as_of?: string | null; source?: string | null; is_fallback?: boolean; label?: string | null }
 export interface BorderItem {
   type?: string; code?: string; description: string; amount: number;
   currency?: string | null; amount_foreign?: number | null; fx?: Fx | null;
@@ -60,9 +60,10 @@ export function rateText(rate: number): string {
 }
 
 function foreignText(currency: string, amount: number, fx: Fx | null | undefined): string {
-  const rate = fx?.zar_per_unit;
+  // The server's exact rate text (zar_per_unit_text), else its number as sent.
+  const rate = fx?.zar_per_unit_text ? String(fx.zar_per_unit_text).replace(".", ",") : fx?.zar_per_unit ? rateText(fx.zar_per_unit) : null;
   const asOf = fx?.is_fallback ? dayLabel(fx.as_of) : null;
-  return `${currency} ${fmtNum(amount, amount % 1 ? 2 : 0)}${rate ? ` at R${rateText(rate)}` : ""}${asOf ? ` (rate as of ${asOf})` : ""}`;
+  return `${currency} ${fmtNum(amount, amount % 1 ? 2 : 0)}${rate ? ` at R${rate}` : ""}${asOf ? ` (rate as of ${asOf})` : ""}`;
 }
 
 /** Border estimate (for the costing's basis): a round trip counts the way out and the way back. */

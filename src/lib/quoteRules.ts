@@ -168,6 +168,8 @@ export interface CostingInputs {
   border_cost?: number | null;
   /** The empty return's own border charges (exit rules), when the route priced that leg. */
   border_cost_empty_return?: number | null;
+  /** The estimated part of border_cost_empty_return (said in its basis). */
+  border_estimate_empty_return?: number | null;
   /** The estimated part of border_cost (said in the line's basis). */
   border_estimate?: number | null;
   /** Cross-border trip: no border cost → incomplete floor (block). */
@@ -515,7 +517,10 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
       // itself (exit-only charges, the way back's own km); without it, the
       // loaded leg's figure is the stand-in.
       const back = num(i.border_cost_empty_return);
-      add("border_return", "empty_return", cents(back !== null ? back : border), "Border costs crossing back, empty");
+      const estBack = back !== null ? num(i.border_estimate_empty_return) : null;
+      add("border_return", "empty_return", cents(back !== null ? back : border),
+        "Border costs crossing back, empty" + (estBack ? ` (includes ${fmtRand(estBack, 2)} estimated)` : ""),
+        estBack ? { estimate: estBack } : {});
     }
   }
 

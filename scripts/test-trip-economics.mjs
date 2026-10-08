@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import {
   pctText, ptsText, marginText, costBasisLabel, emptyReturnNote, missingPrompts, combineLegs,
-  bookingPlan, isPending, previewMargin, linkWarnings, linkRefusal, invoiceWhenText, invoiceMismatchText, actualsText,
+  bookingRequest, isPending, previewMargin, linkWarnings, linkRefusal, invoiceWhenText, invoiceMismatchText, actualsText,
   returnHistoryText, candidateFit, candidateSummary,
 } from "../src/lib/tripEconomics.ts";
 
@@ -53,18 +53,14 @@ eq(c.marginPct, 43.97);
 eq(c.quotedMarginPct, -10.33);
 eq(combineLegs([{ revenue: 100, cost: null, quoted: { price: 100, cost_floor: 50 } }]).margin, null, "no cost, no margin");
 
-// The booking choice: one convert_to_load; only a job bringing the truck home links after.
+// The booking choice: always one convert_to_load, the link in either direction.
 const base = { vehicle_id: "3", driver_id: "", pickup_date: "2026-10-10", delivery_date: "2026-10-11" };
-let plan = bookingPlan({ kind: "none" }, 26, base);
-assert.deepEqual(plan.convert, { url: "api/v1/quotes/26/convert_to_load/", data: { vehicle_id: "3", pickup_date: "2026-10-10", delivery_date: "2026-10-11" } }); n++;
-eq(plan.after, null);
-plan = bookingPlan({ kind: "outbound", loadId: 7 }, 26, base);
-eq(plan.convert.data.return_of_load_id, 7); eq(plan.after, null);
-plan = bookingPlan({ kind: "expect" }, 26, base);
-eq(plan.convert.data.expect_return, true);
-plan = bookingPlan({ kind: "return", loadId: 29 }, 26, base);
-eq(plan.convert.data.return_of_load_id, undefined);
-assert.deepEqual(plan.after(40), { url: "api/v1/loads/40/link-return/", data: { return_load_id: 29 } }); n++;
+assert.deepEqual(bookingRequest({ kind: "none" }, 26, base), { url: "api/v1/quotes/26/convert_to_load/", data: { vehicle_id: "3", pickup_date: "2026-10-10", delivery_date: "2026-10-11" } }); n++;
+eq(bookingRequest({ kind: "outbound", loadId: 7 }, 26, base).data.return_of_load_id, 7);
+eq(bookingRequest({ kind: "return", loadId: 29 }, 26, base).data.return_load_id, 29);
+eq(bookingRequest({ kind: "return", loadId: 29 }, 26, base).data.return_of_load_id, undefined);
+eq(bookingRequest({ kind: "expect" }, 26, base).data.expect_return, true);
+eq(bookingRequest({ kind: "return", loadId: 5 }, 26, {}, { return_candidates: "brings_home_id" }).data.brings_home_id, 5, "server link_fields win");
 eq(isPending({ code: "tolls_pending", prompt: "Working out tolls…", pending: true }), true);
 eq(isPending({ code: "no_vehicle", prompt: "Add the truck to cost this job" }), false);
 eq(Math.round(previewMargin(32500, 29789.99).amount), 2710);

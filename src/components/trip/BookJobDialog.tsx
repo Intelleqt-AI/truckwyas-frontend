@@ -8,8 +8,8 @@ import { toast } from '@/lib/toast';
 import { sendBlockedMessage } from '@/lib/quoteWarnings';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import {
-  bookingPlan, invoiceWhenText, linkWarnings, marginText, previewMargin,
-  type Candidate, type InvoicePreview, type ReturnChoice,
+  bookingRequest, invoiceWhenText, linkRefusal, linkWarnings, marginText, previewMargin,
+  type Candidate, type InvoicePreview, type ReturnChoice, type DEFAULT_LINK_FIELDS,
 } from '@/lib/tripEconomics';
 import { CandidateOption, ChoiceOption } from './CandidateOption';
 import { invalidateTrip } from './invalidateTrip';
@@ -36,6 +36,7 @@ interface BookingBlock {
   outbound_candidates: Candidate[];
   invoice_preview: InvoicePreview;
   costing?: { cost_floor: number | null; empty_return_assumed: boolean | null };
+  link_fields?: Partial<typeof DEFAULT_LINK_FIELDS>;
 }
 interface Preview {
   preview: boolean;
@@ -59,7 +60,7 @@ const place = (s?: string) => (s || '').split(',')[0].trim();
  * (from GET booking-preview, nothing created) the invoice delivery will raise
  * and asks "Coming back loaded?" with the server's suggestions both ways.
  * Confirm is one idempotent convert_to_load (a second tap answers with the
- * same job); only "an existing job brings this truck home" links after it.
+ * same job), carrying the link in either direction or the expect flag.
  */
 export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClose: () => void }) {
   useFocusTrap(latestModal, true);
@@ -114,18 +115,16 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
 
   const book = useMutation({
     mutationFn: async () => {
-      const plan = bookingPlan(choice, quote.id, { vehicle_id: vehicleId, driver_id: driverId, pickup_date: pickup, delivery_date: delivery });
-      const job = await postData(plan.convert) as BookedJob;
-      let linkRes: unknown = job;
-      if (plan.after) linkRes = await postData(plan.after(job.id)).catch((e: Error) => ({ linkError: e?.message || "Couldn't link the return load" }));
-      return { job, linkRes };
+      const req = bookingRequest(choice, quote.id, { vehicle_id: vehicleId, driver_id: driverId, pickup_date: pickup, delivery_date: delivery }, b?.link_fields);
+      const job = await postData(req) as BookedJob;
+      return { job, linkRes: job as unknown };
     },
     onSuccess: ({ job, linkRes }) => {
       invalidateTrip(qc);
       qc.invalidateQueries({ queryKey: ['quote', String(quote.id)] });
       qc.invalidateQueries({ queryKey: ['quotes-column'] });
       qc.invalidateQueries({ queryKey: ['booking-preview'] });
-      const linkError = (linkRes as { linkError?: string } | null)?.linkError;
+      const linkError = linkRefusal(linkRes);
       const w = linkWarnings(linkRes);
       if (linkError) toast.error(`Booked ${job.load_number}. ${linkError}`);
       else toast.success(`Booked ${job.load_number}${choice.kind === 'return' || choice.kind === 'outbound' ? ', return load linked' : choice.kind === 'expect' ? ', expecting a return load' : ''}${w.length ? ` (${w.map(x => x.title.toLowerCase()).join(', ')})` : ''}`);

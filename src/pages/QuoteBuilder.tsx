@@ -1,6 +1,6 @@
 import "@/components/layout/section-header.css";
 import { isForeignCountry, tripIsInternational } from "@/lib/tripInternational";
-import { savedRouteMatches, savedBorderOverride } from "@/lib/savedRoute";
+import { savedRouteMatches, savedBorderOverride, reuseSavedRoute } from "@/lib/savedRoute";
 import { borderCostsUnknown } from "@/lib/borderUnknown";
 import { routeChipLabel, borderTotalWithAgentFee, tripBorderEstimate, borderEstimate, abnormalLoadRelevant, type TollItem, type BorderItem } from "@/lib/routeTolls";
 import { TollPop, BorderPop } from "@/components/pricing/RouteCostPops";
@@ -964,7 +964,13 @@ export default function QuoteBuilder() {
       if (q.delivery_date) setDeliveryDate(q.delivery_date);
       setSavedQuoteId(Number(editId));
       { const sr = snap.request, resp = snap.response;
+        // Reused unless its prices can have moved since: a cross-border trip
+        // (exchange rates) or a quote priced before the toll tariffs now in
+        // force; then the route is calculated again and the notice says so.
+        const crossBorder = !!resp?.cross_border || (Array.isArray(resp?.countries) && resp.countries.length > 1)
+          || (Array.isArray(resp?.routes) && resp.routes.some((r: { cross_border?: boolean }) => r?.cross_border));
         restoreRouteRef.current = sr && typeof sr === "object" && resp && typeof resp === "object" && (Array.isArray(resp.routes) ? resp.routes.length > 0 : true)
+          && reuseSavedRoute({ crossBorder, pricedAt: q.priced_at })
           ? { request: sr, response: resp as RouteData, index: Number(snap.selected_route_index) || 0 } : null; }
       if (q.distance) setRouteData({ distance_km: Number(q.distance), toll_cost_zar: Number(q.toll_charges) / (q.trip_type === "ROUND_TRIP" ? 2 : 1),
         duration_minutes: Number(q.estimated_duration_minutes) > 0 ? Number(q.estimated_duration_minutes) : undefined });
@@ -1287,7 +1293,7 @@ export default function QuoteBuilder() {
     // Wait for the company figures the server prices with (operating cost,
     // driver allowance for this trip): the profile's stand-ins would show a
     // false "Costs up" on a quote that has not changed.
-    if (breakdownPayload && selectedVT && !si) return;
+    if (breakdownPayload && selectedVT && (!si || serverBreakdown?.placeholder)) return;
     // Wait for a restored border figure, else the floor looks R x lower.
     if (savedBorderRef.current != null || (borderRestoreRef.current != null && borderTyped !== borderRestoreRef.current)) return;
     borderRestoreRef.current = null;
@@ -1296,7 +1302,7 @@ export default function QuoteBuilder() {
     if (!ch.changed || !ch.notice) return;
     setReopenNotice({ text: ch.notice, since: sp.pricedAt, reprice: ch.repriced_price_keep_margin });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeIsCurrent, floorNow, borderTyped, !!si]);
+  }, [routeIsCurrent, floorNow, borderTyped, !!si, !!serverBreakdown?.placeholder]);
 
   // Price bar height as a CSS variable (sticky aside, toasts sit above it).
   const priceBarRef = useRef<HTMLElement | null>(null);

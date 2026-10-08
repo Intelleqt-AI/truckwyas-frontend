@@ -42,6 +42,9 @@ export function usePricingAnalysis(inputs: PricingInputs | null, enabled: boolea
   const latestKeyRef = useRef<string | null>(null);
   latestKeyRef.current = key;
   const lastNonceRef = useRef(0);
+  // Automatic retries for the same inputs (reset on new inputs or an answer).
+  const attemptRef = useRef(0);
+  const attemptKeyRef = useRef<string | null>(null);
   const hasDataRef = useRef(false);
   hasDataRef.current = !!data;
 
@@ -51,10 +54,12 @@ export function usePricingAnalysis(inputs: PricingInputs | null, enabled: boolea
     abortRef.current?.abort();
     abortRef.current = null;
     if (!key) {
+      // The last result is kept (not shown: data is null without a key) so a
+      // route recalculation that then fails still has prices to show greyed.
       setStatus("idle");
-      setData(null); setDataKey(null);
       return;
     }
+    if (attemptKeyRef.current !== key) { attemptKeyRef.current = key; attemptRef.current = 0; }
     const forced = nonce !== lastNonceRef.current;
     lastNonceRef.current = nonce;
     if (key === dataKey && !forced) { setStatus("ready"); return; }
@@ -63,7 +68,9 @@ export function usePricingAnalysis(inputs: PricingInputs | null, enabled: boolea
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       try {
-        const res = await postData({ url: PRICING_URL, data: JSON.parse(key), config: { signal: ctrl.signal, timeout: 15000 } });
+        // 30 s: an international trip (border costs, market) can take a while;
+        // a timeout is retried below, never shown as "offline" for good.
+        const res = await postData({ url: PRICING_URL, data: JSON.parse(key), config: { signal: ctrl.signal, timeout: 30000 } });
         // Only an answer for exactly what is on screen now is shown.
         if (ctrl.signal.aborted || key !== latestKeyRef.current) return;
         const adapted = adaptAnalysis(res);
@@ -71,6 +78,7 @@ export function usePricingAnalysis(inputs: PricingInputs | null, enabled: boolea
         setData(adapted);
         setDataKey(key);
         setStatus("ready");
+        attemptRef.current = 0;
       } catch (e) {
         if (ctrl.signal.aborted || key !== latestKeyRef.current) return;
         const err = e as { status?: number; message?: string };
@@ -83,6 +91,18 @@ export function usePricingAnalysis(inputs: PricingInputs | null, enabled: boolea
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, nonce]);
+
+  // No answer (timeout, a gateway error without CORS headers, the server
+  // restarting) or a server error: try again on its own, backing off, while
+  // the inputs are the same. The last result stays on screen marked out of date.
+  useEffect(() => {
+    if ((status !== "offline" && status !== "error") || !key) return;
+    const delays = [2000, 5000, 10000, 20000, 30000];
+    const wait = delays[Math.min(attemptRef.current, delays.length - 1)];
+    attemptRef.current += 1;
+    const t = setTimeout(() => setNonce((n) => n + 1), wait);
+    return () => clearTimeout(t);
+  }, [status, key]);
 
   // Back online: try again on its own.
   useEffect(() => {

@@ -56,8 +56,10 @@ export function likelihoodAt(a: PricingAnalysis | null, price: number): LiveLike
   return { level: "rules", band, label: band ? BAND_LABEL[band] : NO_BAND, note: null };
 }
 
-export function readPrice(a: PricingAnalysis | null, price: number): LiveReading {
-  const floor = a?.costFloor?.total ?? null;
+/** `floorOverride`: the one floor on screen (the builder's costing); the
+ *  analysis' own floor is only used when none is given. */
+export function readPrice(a: PricingAnalysis | null, price: number, floorOverride?: number | null): LiveReading {
+  const floor = floorOverride !== undefined ? floorOverride : a?.costFloor?.total ?? null;
   const margin = floor != null ? price - floor : null;
   // A choice only when the price IS that choice's price, to the cent: R 27 999,99
   // is a custom price, never "Stretch".

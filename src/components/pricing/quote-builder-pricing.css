@@ -357,3 +357,8 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
   .qb-pricebar__notice > span:first-child { white-space: normal; overflow: visible; text-overflow: clip; flex-basis: 100%; }
   .qb-pricebar__notice .qb-linkbtn { font-size: 12px; line-height: 16px; }
 }
+/* Tolls as a figure with a quiet pencil (edit on purpose only). */
+.qb-cost__edit { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-right: 6px; padding: 0;
+  border: 0; border-radius: 4px; background: none; color: var(--text-tertiary); cursor: pointer; opacity: .6; vertical-align: -3px; }
+.qb-cost__row:hover .qb-cost__edit, .qb-cost__edit:focus-visible { opacity: 1; }
+.qb-cost__edit:hover { color: var(--text-primary); background: var(--bg-raised); }

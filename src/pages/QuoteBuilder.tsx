@@ -10,7 +10,7 @@ import { postData, patchData, fetchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatMoneyWhole, formatNumber, formatDateTime, sentenceCaseLabel } from "@/lib/formatters";
 import { DatePicker } from "@/components/ui/date-picker";
-import { fuelInputFor, fuelKind, dieselSourceNote, randPerLitre, currentPeriodStartIso, isoDay, type QuoteWarning } from "@/lib/dieselPrice";
+import { fuelInputFor, fuelKind, dieselSourceNote, randPerLitre, currentPeriodStartIso, isoDay, shortDate, type QuoteWarning } from "@/lib/dieselPrice";
 import { compute, changesSincePriced, fmtNum, suggestTruck, capacityTonnes, vehicleClass, CLASS_OPERATING_DEFAULTS, cents, type CostingInputs, type DieselInput } from "@/lib/quoteRules";
 import { useCostBreakdown } from "@/components/pricing/useCostBreakdown";
 import { sendBlockedMessage, SEND_CHECK_KEY } from "@/lib/quoteWarnings";
@@ -24,7 +24,7 @@ import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { AIChatPanel, type ChatMessage } from "@/components/AIChatPanel";
 import { useAuth } from "@/lib/AuthContext";
 import { isSubscriptionBlocked, subscriptionStatusDetail } from "@/lib/subscriptionStatus";
-import { MessageCircle, Map, Info, Maximize2, Mic, Square, X, Plus, GripVertical, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { MessageCircle, Map, Info, Maximize2, Mic, Square, X, Plus, GripVertical, ChevronDown, ChevronUp, AlertTriangle, Pencil } from "lucide-react";
 import { PricingPanel, lkTone, likelihoodShort, signedPct, wayOutChoice, type PricingPhase } from "@/components/pricing/PricingPanel";
 import { usePricingAnalysis } from "@/components/pricing/usePricingAnalysis";
 import { readPrice, pricingDecision, rowLikelihoods } from "@/components/pricing/evaluate";
@@ -343,6 +343,9 @@ export default function QuoteBuilder() {
   const [tollsNone, setTollsNone] = useState(false);
   // Border costs typed for this quote (all legs); "" = the route's.
   const [borderTyped, setBorderTyped] = useState("");
+  // Tolls are a figure, not a box: an explicit edit (pencil) opens the input.
+  const [tollEditing, setTollEditing] = useState(false);
+  const [fuelRefreshing, setFuelRefreshing] = useState(false);
   const [distanceConfirmed, setDistanceConfirmed] = useState(false);
   // diesel_own_off "Use official" for this quote only.
   const [useOfficialDiesel, setUseOfficialDiesel] = useState(false);
@@ -351,6 +354,8 @@ export default function QuoteBuilder() {
   const [priceSet, setPriceSet] = useState<number | null>(null);
   // The bar's chip says "Saved price" for a reopened quote's own price.
   const [savedPriceShown, setSavedPriceShown] = useState(false);
+  // The analysis' suggested choice price and the floor it was made for.
+  const [analysisSuggested, setAnalysisSuggested] = useState<{ price: number; floor: number | null } | null>(null);
   // Market fuel price applied from the AI price panel. Tied to the fuel type
   // it was verified for, so switching to a truck on another fuel falls back
   // to the company price instead of pricing petrol at a diesel rate.
@@ -603,7 +608,11 @@ export default function QuoteBuilder() {
   // whole rand. Unknown floor → no default price.
   // The costing's own default price (backend rule: ceil(max(rate price,
   // target price)); rate price = company default price per km × loaded km).
-  const defaultPrice: number | null = costing.default_price;
+  // The suggested price IS a choice: no market → Safe, a real market → the
+  // recommended choice (kept while the floor it was made for is unchanged).
+  // Until the analysis answers, the costing's own default (same rounding).
+  const defaultPrice: number | null = analysisSuggested && analysisSuggested.floor === costing.floor
+    ? analysisSuggested.price : costing.default_price;
   const total = cents(priceSet ?? defaultPrice ?? 0);
   // The same costing at the price in the bar: margin, below floor / minimum.
   const costingAtPrice = total > 0 ? compute({ ...costingInputs, price: total }) : costing;
@@ -1001,7 +1010,8 @@ export default function QuoteBuilder() {
   // call of its own; the request is debounced and stale ones are cancelled.
   // ---- warnings (§10): one list, block first ----
   // The margin line already says "Loss"; the weight is a required field.
-  const HIDDEN_WARNINGS = ["below_floor", "load_missing"];
+  // tolls_none_found: a known R 0 is just "no toll plazas" (said on the line).
+  const HIDDEN_WARNINGS = ["below_floor", "load_missing", "tolls_none_found"];
   const quoteWarnings: QuoteWarning[] = ready && !routeBlockedMessage && distance > 0 && !calculatingRoute
     ? costingAtPrice.warnings.filter(w => !HIDDEN_WARNINGS.includes(w.code)) : [];
   const blockWarnings = quoteWarnings.filter(w => w.severity === "block");
@@ -1052,16 +1062,33 @@ export default function QuoteBuilder() {
   } : null;
   const pricing = usePricingAnalysis(pricingInputs, pricingPhase === "ready");
   // The price in the bar, read live against the last analysis.
-  const liveReading = readPrice(pricing.data, total);
+  // ONE FLOOR: every margin on screen is the price less the costing's floor
+  // (the Costs card total). The analysis is used for choices and chance to
+  // win only while it answers exactly these inputs; a stale, offline or
+  // refreshing one is shown out of date and never read for margin or "Use …".
+  const analysisCurrent = pricing.isCurrent && pricing.status === "ready";
+  const currentData = analysisCurrent ? pricing.data : null;
+  const liveReading = readPrice(currentData, total, costing.floor);
   // The bar's one price story: the build-up until a price is applied, then the
   // applied price (a choice, or the user's own).
   const atBuildUp = priceSet == null;
-  const recChoice = pricing.data?.choices.find(c => c.recommended) ?? null;
-  const appliedChoice = liveReading.matchedChoice ? pricing.data?.choices.find(c => c.key === liveReading.matchedChoice) ?? null : null;
+  // No "Recommended" without evidence: the server's recommendation key decides.
+  const recChoice = currentData && currentData.recommendation?.key !== null
+    ? currentData.choices.find(c => c.recommended) ?? null : null;
+  const appliedChoice = liveReading.matchedChoice ? currentData?.choices.find(c => c.key === liveReading.matchedChoice) ?? null : null;
   // "Use Balanced R 25 100" sits in the bar until a price is applied.
-  const recLk = recChoice && pricing.data ? rowLikelihoods(pricing.data, pricing.data.choices).get(recChoice.key) ?? null : null;
+  const recLk = recChoice && currentData ? rowLikelihoods(currentData, currentData.choices).get(recChoice.key) ?? null : null;
   const recLessLikely = !!recLk && lkTone(recLk) === "less_likely";
   const useRec = atBuildUp && !!recChoice && !recLessLikely && liveReading.margin != null && Math.abs(recChoice.price - total) >= 0.005;
+  // Keep the suggested choice in step with the current analysis.
+  useEffect(() => {
+    if (!currentData || costing.floor == null) return;
+    const realMarket = !!currentData.market?.available && !currentData.market.isEstimate;
+    const pick = (realMarket ? recChoice : null) ?? currentData.choices.find(c => c.key === "safe") ?? null;
+    const next = pick ? { price: pick.price, floor: costing.floor } : null;
+    setAnalysisSuggested(prev => (prev?.price === next?.price && prev?.floor === next?.floor ? prev : next));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentData, costing.floor]);
 
   // Put a price in the bar (the cost lines never change with it).
   const costSum = defaultPrice ?? 0;
@@ -1192,8 +1219,8 @@ export default function QuoteBuilder() {
   const [priceTyping, setPriceTyping] = useState(false);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settlePrice = () => { if (typingTimerRef.current) clearTimeout(typingTimerRef.current); setPriceTyping(false); };
-  const serverAtPrice = pricing.data?.yourPrice && pricing.status === "ready" && Math.abs(pricing.data.yourPrice.price - total) <= 0.005
-    ? pricing.data.yourPrice : null;
+  const serverAtPrice = currentData?.yourPrice && Math.abs(currentData.yourPrice.price - total) <= 0.005
+    ? currentData.yourPrice : null;
   const barSettled = !priceTyping && (!!appliedChoice || !!serverAtPrice);
   const [settledTotal, setSettledTotal] = useState(total);
   useEffect(() => { if (barSettled || !pricing.data) setSettledTotal(total); }, [total, barSettled, pricing.data]);
@@ -1339,13 +1366,38 @@ export default function QuoteBuilder() {
     finally { setSaving(false); }
   };
 
+  // "Try again" on a stale official price: ask the server to re-check the
+  // official source now, then say what came back.
+  const refreshFuel = async () => {
+    if (fuelRefreshing) return;
+    setFuelRefreshing(true);
+    const before = costing.diesel.official_effective_from;
+    try {
+      await postData({ url: "api/v1/fuel-prices/refresh/", data: {} }).catch(async (e: unknown) => {
+        // Older backend: the forced GET does the same re-check.
+        if ((e as { status?: number } | null)?.status === 404) return fetchData("api/v1/fuel-prices/current/?force=true");
+        throw e;
+      });
+      await queryClient.invalidateQueries({ queryKey: ["fuel-price-current"] });
+      await queryClient.invalidateQueries({ queryKey: ["company-profile"] });
+      const fresh = queryClient.getQueryData<{ effective_from?: string | null; company_price?: { official?: { effective_from?: string | null; price?: unknown } } }>(["fuel-price-current"]);
+      const after = fresh?.company_price?.official?.effective_from ?? fresh?.effective_from ?? null;
+      if (after && after !== before && isoDay(after) !== isoDay(before)) toast.success(`New official price loaded, from ${shortDate(after)}.`);
+      else toast.info(`Still the latest official price${before ? ` (from ${shortDate(before)})` : ""}.`);
+    } catch (e: unknown) {
+      toast.error((e as { message?: string } | null)?.message || "Couldn't reach the official price source");
+    } finally {
+      setFuelRefreshing(false);
+    }
+  };
+
   // §10 warning actions (one handler for every surface).
   const runWarningAction = (id: string) => {
     switch (id) {
       case "use_official": setUseOfficialDiesel(true); break;
       case "update_own": navigate("/settings/company#fuel"); break;
-      case "update_allowance": navigate("/settings/company#pricing"); break;
-      case "retry_diesel": queryClient.invalidateQueries({ queryKey: ["fuel-price-current"] }); break;
+      case "update_allowance": window.open("/settings/company#pricing", "_blank", "noopener"); break;
+      case "retry_diesel": refreshFuel(); break;
       case "enter_tolls": document.getElementById("qb-tolls-input")?.focus(); break;
       case "enter_border_costs": document.getElementById("qb-border-input")?.focus(); break;
       case "confirm_no_tolls": setTollsNone(true); break;
@@ -1780,8 +1832,7 @@ export default function QuoteBuilder() {
               const paLine = (k: string) => (pricing.isCurrent ? pricing.data?.costFloor?.lines.find(l => l.key === k) : null) ?? null;
               // The costing's own codes: tolls_none_found, border_costs_missing
               // (border line needs_input); the server's operating_cost_overlap.
-              const tollsCheck = costing.warnings.some(w => w.code === "tolls_none_found");
-              const opCheck = !!pricing.data?.warnings.some(w => w.code === "operating_cost_overlap") || !!paLine("fixed_cost")?.check;
+              const opCheck = !!currentData?.warnings.some(w => w.code === "operating_cost_overlap") || !!paLine("fixed_cost")?.check;
               const borderLine = costing.lines.find(l => l.key === "border") ?? null;
               const borderNotSet = borderLine?.status === "needs_input";
               const opEstimate = opLine?.source === "vehicle_default";
@@ -1813,27 +1864,44 @@ export default function QuoteBuilder() {
                   {aiFuelActive && <button type="button" className="qb-linkbtn" onClick={() => setAiFuel(null)}>Reset</button>}
                   {/* Only when there is an own price for this truck's fuel to go back to. */}
                   {useOfficialDiesel && costing.diesel.own_price != null && costing.diesel.mode === "OWN" && <button type="button" className="qb-linkbtn" onClick={() => setUseOfficialDiesel(false)}>Use mine</button>}
+                  {/* The warning on the line it concerns (the bar keeps the count). */}
+                  {costing.warnings.some(w => w.code === "diesel_stale") && (<>
+                    <span className="qb-cost__tag" title="The official price on record may be out of date">Price from {shortDate(costing.diesel.official_effective_from) ?? "an earlier period"}</span>
+                    <button type="button" className="qb-linkbtn" onClick={refreshFuel} disabled={fuelRefreshing}>{fuelRefreshing ? "Checking…" : "Try again"}</button>
+                  </>)}
                 </span>
                 <span className="qb-cost__value">{lineAmt("fuel") != null ? money(fuelCost) : "—"}</span>
               </div>
               <div className="qb-cost__row">
                 <span className="qb-cost__label">
                   Tolls
-                  {tollsCheck && <span className="qb-cost__tag" title="No toll plazas found for this route: check">Check</span>}
                   <InfoPop label="Toll plazas" title="Toll plazas" rows={tollBreakdown.length
                     ? tollBreakdown.map(b => [b.plaza, formatCurrency(b.tariff)] as [string, string])
-                    : [[routeTollsUnknown ? "Lookup failed" : "None on this route", ""]]}
+                    : [[routeTollsUnknown ? "Lookup failed" : "No toll plazas on this route", ""]]}
                     total={tollBreakdown.length ? [legs === 2 ? "Both ways" : "One way", money(tollBreakdownOneWay * legs)] : undefined} />
                   {aiTollActive && !tollManuallyEdited && <button type="button" className="qb-linkbtn" onClick={() => setAiToll(null)}>Reset</button>}
+                  {tollManuallyEdited && <button type="button" className="qb-linkbtn" onClick={() => { setTollManuallyEdited(false); setEditableTollCost(""); setTollEditing(false); }}>Use route</button>}
                 </span>
-                {rIn(<NumberField id="qb-tolls-input" decimals={0} value={tollManuallyEdited ? (editableTollCost === "" ? null : Number(editableTollCost)) : lineAmt("tolls")}
-                  placeholder="Unknown"
-                  onValue={(n) => { setEditableTollCost(n == null ? "" : String(n)); setTollManuallyEdited(true); }}
-                  aria-label="Tolls (R)" aria-invalid={lineAmt("tolls") == null || undefined} className={`qb-mini qb-cost__input${lineAmt("tolls") == null ? " is-missing" : ""}`} />)}
+                {/* Known tolls (R 0 included) are a figure with a quiet pencil;
+                    the box shows only when they're unknown or being edited. */}
+                {lineAmt("tolls") == null || tollEditing || tollManuallyEdited
+                  ? rIn(<NumberField id="qb-tolls-input" decimals={0} autoFocus={tollEditing} value={tollManuallyEdited ? (editableTollCost === "" ? null : Number(editableTollCost)) : lineAmt("tolls")}
+                      placeholder="Unknown"
+                      onBlur={() => setTollEditing(false)}
+                      onValue={(n) => { setEditableTollCost(n == null ? "" : String(n)); setTollManuallyEdited(true); }}
+                      aria-label="Tolls (R)" aria-invalid={lineAmt("tolls") == null || undefined} className={`qb-mini qb-cost__input${lineAmt("tolls") == null ? " is-missing" : ""}`} />)
+                  : <span className="qb-cost__value">
+                      <button type="button" className="qb-cost__edit" aria-label="Edit tolls" title="Edit tolls" onClick={() => setTollEditing(true)}><Pencil size={12} aria-hidden="true" /></button>
+                      {money(lineAmt("tolls"))}
+                    </span>}
               </div>
               <div className="qb-cost__row">
                 <span className="qb-cost__label">
                   Driver allowance{driverNights != null && driverNights > 0 && <span className="qb-cost__meta">{driverNights} night{driverNights === 1 ? "" : "s"}</span>}
+                  {costing.warnings.some(w => w.code === "driver_allowance_missing") && (<>
+                    <span className="qb-cost__tag">No rate set</span>
+                    <button type="button" className="qb-linkbtn" onClick={() => runWarningAction("update_allowance")}>Set allowance</button>
+                  </>)}
                   {driverEdited && driverLineC?.suggested != null && Math.abs(driverAllowance - Number(driverLineC.suggested)) >= 0.5 && (
                     <button type="button" className="qb-linkbtn" onClick={() => { setDriverEdited(false); setDriverAllowanceInput(""); }}>Reset</button>
                   )}
@@ -1912,6 +1980,7 @@ export default function QuoteBuilder() {
           price={settledTotal}
           distanceKm={distance}
           buildUp={costSum}
+          costFloor={costing.floor}
           settingsHref="/settings/company#pricing"
           onApplyPrice={applyChoice}
           driver={{
@@ -1938,18 +2007,18 @@ export default function QuoteBuilder() {
       {/* One price, next to Send. Fixed to the window's foot on desktop
           (sticky on narrower screens) so Send stays in reach. */}
       {showPriceBar && (() => {
-        const data = pricing.data;
+        // Only an analysis of exactly these inputs; margins from the one floor.
+        const data = currentData;
         const floorKnown = costing.floor != null;
         const ready = floorKnown && liveReading.margin != null;
-        const waiting = floorKnown && !ready && (pricing.status === "loading" || pricing.status === "refreshing" || pricing.status === "idle" || pricingPhase === "route");
+        const waiting = !floorKnown && (pricing.status === "loading" || pricing.status === "refreshing" || pricing.status === "idle" || pricingPhase === "route");
         // The bar's figures: the choice's own at a choice price, the server's
         // at a settled custom price, else a neutral client reading.
         const rowLk = appliedChoice && data ? rowLikelihoods(data, data.choices).get(appliedChoice.key) ?? null : null;
-        const settled = barSettled && ready;
-        const margin = settled && appliedChoice ? appliedChoice.margin
-          : settled && serverAtPrice?.margin != null ? serverAtPrice.margin : liveReading.margin;
-        const marginPct = settled && appliedChoice ? appliedChoice.marginPct
-          : settled && serverAtPrice?.marginPct != null ? serverAtPrice.marginPct : liveReading.marginPct;
+        // Settled = not mid-typing (the margin itself never waits for the server).
+        const settled = !priceTyping && ready;
+        const margin = liveReading.margin;
+        const marginPct = liveReading.marginPct;
         const below = margin != null && margin < 0;
         const lk = !settled || below ? null : appliedChoice ? rowLk : serverAtPrice?.likelihood ?? null;
         const showLk = lk && !(lk.level === "rules" && lk.band == null);

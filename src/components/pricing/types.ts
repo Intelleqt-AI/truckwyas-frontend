@@ -110,6 +110,10 @@ export interface PricingAnalysis {
   yourPrice: { price: number; margin: number | null; marginPct: number | null; belowFloor: boolean; likelihood: Likelihood | null } | null;
   /** True when the server sends the round-5 display strings (headline …). */
   r5: boolean;
+  /** Progress to a real win model: won/lost closed quotes and what is needed. */
+  modelProgress: { won: number | null; lost: number | null; wonNeeded: number; lostNeeded: number } | null;
+  /** Where the target margin comes from (company setting / default). */
+  targetMarginSource: string | null;
   /** Floor including the empty return, when the floor itself excludes it. */
   floorWithReturn: number | null;
 }
@@ -290,7 +294,8 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
     price: num(c!.price) ?? 0,
     margin: num(c!.margin) ?? 0,
     marginPct: num(c!.margin_pct) ?? 0,
-    recommended: c!.recommended === true,
+    // No evidence → the server sends recommendation null: then nothing is "Recommended".
+    recommended: c!.recommended === true && !(obj(r.recommendation) === null && "recommendation" in r) && !(obj(r.recommendation) && obj(r.recommendation)!.key === null),
     summary: str(c!.summary),
     likelihood: adaptLikelihood(c!.likelihood),
     marginPctIfEmptyReturn: num(c!.margin_pct_if_empty_return),
@@ -371,6 +376,16 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
       return { price: num(y.price)!, margin: num(y.margin), marginPct: num(y.margin_pct), belowFloor: y.below_floor === true, likelihood: adaptLikelihood(y.likelihood) };
     })(),
     r5: !!str(lk?.headline),
+    modelProgress: (() => {
+      // Tolerant of the shapes the server may send (top level or under likelihood).
+      const mp = obj(r.model_progress) ?? obj(lk?.model_progress);
+      if (!mp) return null;
+      const tier = obj(mp.company) ?? obj(mp.user) ?? mp;
+      const won = num(tier.accepted ?? tier.won);
+      const lost = num(tier.rejected ?? tier.lost);
+      return { won, lost, wonNeeded: num(tier.accepted_needed ?? tier.won_needed ?? tier.needed) ?? 200, lostNeeded: num(tier.rejected_needed ?? tier.lost_needed ?? tier.needed) ?? 200 };
+    })(),
+    targetMarginSource: str(r.target_margin_source) ?? str(obj(r.target_margin)?.source),
     floorWithReturn: num(cf?.floor_with_return ?? r.floor_with_return),
     attention: arr(r.attention).map(obj).filter(Boolean).map((a) => ({ code: String(a!.code ?? ""), level: String(a!.level ?? "medium"), message: str(a!.message) || "" })).filter((a) => a.message),
     recommendation: obj(r.recommendation) ? { key: str(obj(r.recommendation)!.key), reason: str(obj(r.recommendation)!.reason), short: str(obj(r.recommendation)!.short) } : null,

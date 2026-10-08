@@ -1,7 +1,8 @@
 import '@/pages/settings/settings-brand.css';
 import { formatMoney, formatNumber } from '@/lib/formatters';
 import { shortDate, longDate } from '@/lib/dieselPrice';
-import { priceFieldError, priceFieldErrors, fieldChanged, ownPriceError } from '@/lib/settingsChecks';
+import { priceFieldError, priceFieldErrors, fieldChanged, ownPriceError, fuelChangeSummary } from '@/lib/settingsChecks';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData, postData } from "@/lib/Api";
@@ -392,7 +393,21 @@ export function CompanySettings() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSave = async () => {
+  // §1 settings alert: what quotes will use after this save, confirmed first.
+  const [fuelConfirm, setFuelConfirm] = useState<ReturnType<typeof fuelChangeSummary>>(null);
+  const officialsNow = () => {
+    const coastal = form.fuel_zone === 'COASTAL';
+    const okSrc = (src: unknown) => !['FALLBACK', 'FALLBACK_LATEST'].includes(String(src || '').toUpperCase());
+    const diesel = livePrice && livePrice.success !== false && okSrc(livePrice.source)
+      ? Number(coastal ? livePrice.coastal_price : livePrice.inland_price) || null : null;
+    const grade = !coastal && form.fuel_price_petrol_grade === '93' ? '93' : '95';
+    const rec = livePrice?.petrol?.[`${coastal ? 'coastal' : 'inland'}_${grade}`]
+      ?? (petrolInUse && petrolInUse.zone === form.fuel_zone && String(petrolInUse.grade) === grade ? petrolInUse.official : null);
+    const petrol = rec && okSrc(rec.source) ? Number(rec.price) || null : null;
+    return { diesel, petrol };
+  };
+
+  const handleSave = async (fuelConfirmed = false) => {
     // Own fuel prices: present and R 5 to R 100 per litre (the server's rule), inline.
     if (form.fuel_price_mode === 'OWN') {
       const err = ownPriceError(form.fuel_price_own);
@@ -415,6 +430,9 @@ export function CompanySettings() {
       return;
     }
     setFieldErrors({});
+    // A change to the fuel price quotes use is confirmed before it is saved.
+    const fuelChange = fuelChangeSummary(loadedForm, form, officialsNow(), hasPetrolModeField);
+    if (fuelChange && !fuelConfirmed) { setFuelConfirm(fuelChange); return; }
     const validityDays = parseInt(form.default_quote_validity_days, 10);
     if (isNaN(validityDays) || validityDays < 1 || validityDays > 365) {
       toast.error('Default quote validity must be between 1 and 365 days');
@@ -558,7 +576,7 @@ export function CompanySettings() {
       await queryClient.invalidateQueries({ queryKey: ['company-profile'] });
       queryClient.invalidateQueries({ queryKey: ['fuel-price-current'] });
       setSaved(true);
-      toast.success('Company details saved');
+      toast.success(fuelChange ? fuelChange.toast : 'Company details saved');
       setTimeout(() => setSaved(false), 2000);
     } catch (e: unknown) {
       // A 400 with field errors ({field: [msg]}): each shows under its field.
@@ -1186,12 +1204,17 @@ export function CompanySettings() {
         </div>
       </div>
 
+      {fuelConfirm && (
+        <ConfirmModal title={fuelConfirm.title} message={fuelConfirm.message} confirmLabel={fuelConfirm.confirmLabel}
+          onCancel={() => setFuelConfirm(null)}
+          onConfirm={() => { setFuelConfirm(null); handleSave(true); }} />
+      )}
       {/* Sticky save bar: Save is in view on every part of this long form. */}
       <div className="cs-savebar">
         <span className="cs-savebar__note">{saved ? 'Saved. New quotes use these settings.' : 'Changes apply to new quotes and invoices.'}</span>
         <button
           className="btn-action settings-control"
-          onClick={handleSave}
+          onClick={() => handleSave()}
           disabled={saving || isDemo}
           // Invalid pricing field: Save reads as disabled, and a click puts
           // focus on the first invalid field instead of saving.

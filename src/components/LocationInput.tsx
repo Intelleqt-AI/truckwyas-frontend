@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { fetchData, postData } from '@/lib/Api';
 import { History, LocateFixed } from 'lucide-react';
+import { countryNear } from '@/lib/locationCountry';
 
 interface Suggestion {
   label: string;
@@ -16,9 +17,10 @@ interface Suggestion {
 // history (core/views.py's LocationRecentView) so it surfaces first next
 // time anyone on the team searches or focuses an empty field. Never blocks
 // or fails the actual selection — errors are swallowed on purpose.
-function recordLocationPick(label: string, lat: number, lon: number) {
-  postData({ url: 'api/v1/location/recent/', data: { location_text: label, lat, lon } }).catch(() => {});
+function recordLocationPick(label: string, lat: number, lon: number, countryCode?: string) {
+  postData({ url: 'api/v1/location/recent/', data: { location_text: label, lat, lon, ...(countryCode ? { country_code: countryCode } : {}) } }).catch(() => {});
 }
+
 
 // Merge recent-history matches ahead of live geocoding results, deduped by
 // label (case-insensitive) so nothing shows twice.
@@ -50,6 +52,10 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Each search and each pick bumps this: an answer for an older search
+  // (arriving after a pick) never reopens the list.
+  const seqRef = useRef(0);
+  const pickedRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Presentation only (R11): the list may be wider than a narrow field so a
@@ -91,6 +97,7 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
   }, []);
 
   const fetchSuggestions = useCallback((q: string) => {
+    const seq = ++seqRef.current;
     if (q.length < 2) { setSuggestions([]); setOpen(false); return; }
     setLoading(true);
     // Recent-history matches and live geocoding results are independent
@@ -101,20 +108,23 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
       fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(q)}`).catch(() => []),
     ])
       .then(([recent, live]: [Suggestion[], Suggestion[]]) => {
+        if (seq !== seqRef.current) return;
         const results = mergeSuggestions(recent || [], live || []);
         setSuggestions(results);
         setOpen(results.length > 0);
       })
       .catch(() => setSuggestions([]))
-      .finally(() => setLoading(false));
+      .finally(() => { if (seq === seqRef.current) setLoading(false); });
   }, []);
 
   // Empty field + focus: show the company's recent/frequent locations —
   // today's LocationSuggestView never fires for a query this short, so
   // without this an empty field's focus does nothing.
   const fetchRecentOnFocus = useCallback(() => {
+    const seq = ++seqRef.current;
     fetchData('api/v1/location/recent/')
       .then((data: Suggestion[]) => {
+        if (seq !== seqRef.current) return;
         const results = data || [];
         setSuggestions(results);
         setOpen(results.length > 0);
@@ -123,16 +133,31 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
   }, []);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    pickedRef.current = null;
     onChange(e.target.value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchSuggestions(e.target.value), 300);
   };
 
   const handleSelect = (s: Suggestion) => {
-    onChange(s.label, { lat: s.lat, lon: s.lon, country_code: s.country_code });
-    recordLocationPick(s.label, s.lat, s.lon);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    seqRef.current += 1;
+    setLoading(false);
+    const lat = Number(s.lat), lon = Number(s.lon);
+    pickedRef.current = s.label;
+    onChange(s.label, { lat, lon, country_code: s.country_code });
     setSuggestions([]);
     setOpen(false);
+    if (s.country_code) { recordLocationPick(s.label, lat, lon, s.country_code); return; }
+    // A recent pick: find its country, then set it if this is still the pick.
+    fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(s.label)}`)
+      .then((g: Suggestion[] | { results?: Suggestion[] }) => {
+        const list = Array.isArray(g) ? g : g?.results ?? [];
+        const cc = countryNear(list, lat, lon);
+        if (cc && pickedRef.current === s.label) onChange(s.label, { lat, lon, country_code: cc });
+        recordLocationPick(s.label, lat, lon, cc);
+      })
+      .catch(() => recordLocationPick(s.label, lat, lon));
   };
 
   const handleGpsChange = (newLat: string, newLng: string) => {

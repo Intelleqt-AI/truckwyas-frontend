@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { formatDate, formatMoneyWhole, formatNumber } from "@/lib/formatters";
 import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
 import { InfoTip } from "@/components/ui/InfoTip";
@@ -44,6 +45,9 @@ export interface PricingPanelProps {
   paused?: boolean;
   /** The builder's first block warning (the price bar's), so both lead with the same blocker. */
   firstBlockCode?: string | null;
+  /** ONE FLOOR: the builder's costing floor (the Costs card total). Every
+   *  margin in the panel is a price less this, never an older analysis floor. */
+  costFloor?: number | null;
 }
 
 const OUTCOME: Record<string, { tone: StatusTone; label: string }> = {
@@ -130,7 +134,7 @@ export function PricingPanel(p: PricingPanelProps) {
     const msg = rec ? `Pricing analysis updated. Recommended ${formatMoneyWhole(rec.price)}.` : "Pricing analysis updated.";
     if (msg !== lastAnnounced.current) { lastAnnounced.current = msg; setAnnounce(msg); }
   }, [state.status, data]);
-  const floor = data?.costFloor?.total ?? null;
+  const floor = p.costFloor !== undefined ? p.costFloor : data?.costFloor?.total ?? null;
   const belowFloor = floor != null && p.price > 0 && p.price < floor - 0.005;
   const wasBelow = useRef(false);
   useEffect(() => {
@@ -178,12 +182,12 @@ function Body(p: BodyProps) {
       return <div className="pa__body"><p className="pa-msg"><b>Not available on this account.</b></p></div>;
     }
     if (state.status === "offline") {
-      return <div className="pa__body"><p className="pa-msg"><b>You're offline.</b></p>
-        <button type="button" className="tw-btn tw-btn--sm pa-retry" onClick={state.retry}>Try again</button></div>;
+      return <div className="pa__body"><p className="pa-msg"><b>No connection — retrying.</b></p>
+        <button type="button" className="tw-btn tw-btn--sm pa-retry" onClick={state.retry}>Try now</button></div>;
     }
     if (state.status === "error") {
-      return <div className="pa__body"><p className="pa-msg"><b>Unavailable right now.</b></p>
-        <button type="button" className="tw-btn tw-btn--sm pa-retry" onClick={state.retry}>Try again</button></div>;
+      return <div className="pa__body"><p className="pa-msg"><b>Unavailable right now — retrying.</b></p>
+        <button type="button" className="tw-btn tw-btn--sm pa-retry" onClick={state.retry}>Try now</button></div>;
     }
     return <Analysing start={1} facts={stepFacts(p)} />;
   }
@@ -257,15 +261,28 @@ function stepFacts(p: PricingPanelProps): (string | null)[] {
 function Result(p: BodyProps & { data: PricingAnalysis }) {
   const { data, state } = p;
   const failedRefresh = state.status === "error" || state.status === "offline" || state.status === "unavailable";
+  // ONE FLOOR: a result for other inputs (stale, offline, still refreshing)
+  // is visibly out of date and its prices can't be applied.
+  const outOfDate = !state.isCurrent || state.status !== "ready";
+  const realMarket = !!data.market?.available && !data.market.isEstimate;
+  const noModel = data.likelihood?.level !== "model";
+  const mp = data.modelProgress;
   // Said elsewhere already: the alerts, the floor row, the market section or
   // the header. Each fact is shown once.
   const includeReturn = p.includeReturn ?? data.costFloor?.includeReturn ?? false;
   return (
-    <div className={`pa__result${state.status === "refreshing" || p.paused ? " is-refreshing" : ""}`}>
+    <div className={`pa__result${outOfDate || p.paused ? " is-refreshing" : ""}`}>
       {failedRefresh && (
         <div className="pa-notice" role="status">
-          {state.status === "offline" ? "Offline. " : "Couldn't refresh. "}Showing the last result.
-          <button type="button" className="pa-link" onClick={state.retry}>Try again</button>
+          Prices out of date — retrying.
+          <button type="button" className="pa-link" onClick={state.retry}>Try now</button>
+        </div>
+      )}
+      {/* No evidence, said plainly at the top (not under "Why these prices"). */}
+      {(!realMarket || noModel) && (
+        <div className="pa-sec pa-evidence">
+          {!realMarket && <p className="pa-quiet">No market data for this lane yet. Prices are your costs plus your margin.</p>}
+          {noModel && <p className="pa-quiet">Win chance appears after {mp?.wonNeeded ?? 200} won and {mp?.lostNeeded ?? 200} lost quotes{mp && mp.won != null && mp.lost != null ? ` (you have ${mp.won} and ${mp.lost})` : ""}.</p>}
         </div>
       )}
       <Alerts data={data} customerName={p.customerName} onOneWay={p.returnApplicable ? () => p.onIncludeReturn(false) : null} includeReturn={includeReturn} />
@@ -277,7 +294,8 @@ function Result(p: BodyProps & { data: PricingAnalysis }) {
             : `No prices until ${firstGate(data.missing)} ${firstGate(data.missing) === "tolls" ? "are" : "is"} known.`}</p>
         </div>
       )}
-      {data.choices.length > 0 && <ChoicesSection data={data} price={p.price} onApply={p.onApplyPrice} includeReturn={includeReturn}
+      {data.choices.length > 0 && <ChoicesSection data={data} price={p.price} onApply={outOfDate ? () => {} : p.onApplyPrice} includeReturn={includeReturn} disabled={outOfDate} floor={p.costFloor}
+        settingsHref={p.settingsHref}
         returnApplicable={p.returnApplicable} onIncludeReturn={p.onIncludeReturn} />}
       <MarketSection data={data} price={p.price} />
       <WhySection data={data} price={p.price} />
@@ -387,13 +405,12 @@ function Section({ title, aside, children, delay, label, className }: { title: s
 const ORDER: ChoiceKey[] = ["safe", "balanced", "stretch"];
 const sortChoices = (cs: Choice[]) => [...cs].sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key));
 
-function ChoicesSection({ data, price, onApply, includeReturn, returnApplicable, onIncludeReturn }: {
+function ChoicesSection({ data, price, onApply, includeReturn, returnApplicable, onIncludeReturn, disabled, settingsHref, floor }: {
   data: PricingAnalysis; price: number; onApply: PricingPanelProps["onApplyPrice"]; includeReturn: boolean; returnApplicable: boolean; onIncludeReturn: (v: boolean) => void;
+  disabled?: boolean; settingsHref?: string; floor?: number | null;
 }) {
-  const applied = readPrice(data, price).matchedChoice;
+  const applied = readPrice(data, price, floor).matchedChoice;
   const choices = sortChoices(data.choices);
-  const m = data.market;
-  const realMarket = !!m && m.available && !m.isEstimate;
   // One format per row: all % or all bands.
   const lks = rowLikelihoods(data, choices);
   const bands = choices.map((c) => { const l = lks.get(c.key); return l && l.level === "rules" ? l.band : undefined; });
@@ -402,10 +419,7 @@ function ChoicesSection({ data, price, onApply, includeReturn, returnApplicable,
   const target = data.targetMarginPct != null ? Math.round(data.targetMarginPct) : null;
   return (
     <Section title="Choose a price" delay={1} className="pa-choose"
-      aside={target != null ? <span className="pa-sec__hint">Margin · target {target}%</span> : null}>
-      {!realMarket && (
-        <p className="pa-choices__lead">No market data: floor{target != null ? ` + ${target}%` : ""}.</p>
-      )}
+      aside={target != null ? <span className="pa-sec__hint">Target margin {target}% · <Link to={settingsHref || "/settings/company#pricing"} className="pa-link pa-link--inline">Settings</Link></span> : null}>
       {sameBand && (
         <p className="pa-choices__band">All three: <span className={`pa-lk pa-lk--${sameBand}`}>{BAND_LABEL[sameBand]}</span></p>
       )}
@@ -414,26 +428,29 @@ function ChoicesSection({ data, price, onApply, includeReturn, returnApplicable,
           const l = lks.get(c.key) ?? null;
           const shown = sameBand || !l || (l.level === "rules" && l.band == null) ? null : l;
           return <ChoiceRow key={c.key} c={c} lk={shown} ariaLk={l && !(l.level === "rules" && l.band == null) ? l : null}
-            applied={applied === c.key} onApply={() => onApply(c.price, c.key)} />;
+            applied={applied === c.key} onApply={() => onApply(c.price, c.key)} disabled={disabled} floor={floor} />;
         })}
       </div>
     </Section>
   );
 }
 
-function ChoiceRow({ c, lk, ariaLk, applied, onApply }: { c: Choice; lk: Likelihood | null; ariaLk: Likelihood | null; applied: boolean; onApply: () => void }) {
+function ChoiceRow({ c, lk, ariaLk, applied, onApply, disabled, floor }: { c: Choice; lk: Likelihood | null; ariaLk: Likelihood | null; applied: boolean; onApply: () => void; disabled?: boolean; floor?: number | null }) {
+  // Margin against the current costing floor (the analysis's own when none is given).
+  const margin = floor != null ? c.price - floor : c.margin;
+  const marginPct = floor != null ? (c.price > 0 ? (margin / c.price) * 100 : 0) : c.marginPct;
   const chance = ariaLk ? (ariaLk.level === "model" ? `${Math.round(ariaLk.pct)}% chance to win` : `${ariaLk.label} to win`) : null;
   return (
     <button type="button" className={`pa-choice${c.recommended ? " is-rec" : ""}${applied ? " is-applied" : ""}`}
-      aria-pressed={applied} onClick={onApply}
-      aria-label={`${c.label}${c.recommended ? ", recommended" : ""}: ${formatMoneyWhole(c.price)}, margin ${formatMoneyWhole(c.margin)} or ${signedPct(c.marginPct)}${chance ? `, ${chance}` : ""}. ${applied ? "In your quote." : "Use this price."}`}>
+      aria-pressed={applied} onClick={onApply} disabled={disabled} title={disabled ? "Prices out of date" : undefined}
+      aria-label={`${c.label}${c.recommended ? ", recommended" : ""}: ${formatMoneyWhole(c.price)}, margin ${formatMoneyWhole(margin)} or ${signedPct(marginPct)}${chance ? `, ${chance}` : ""}. ${applied ? "In your quote." : "Use this price."}`}>
       <span className="pa-choice__label">
         {applied && <Check size={12} strokeWidth={2.75} className="pa-choice__check" aria-hidden="true" />}
         {/* Never "Recommended" on a price that is less likely to win. */}
         {c.label}{c.recommended && !(ariaLk && lkTone(ariaLk) === "less_likely") && <span className="pa-choice__rec">Recommended</span>}
       </span>
       <span className="pa-choice__price">{formatMoneyWhole(c.price)}</span>
-      <span className="pa-choice__margin">{formatMoneyWhole(c.margin)} · {signedPct(c.marginPct)}</span>
+      <span className="pa-choice__margin">{formatMoneyWhole(margin)} · {signedPct(marginPct)}</span>
       {lk ? <span className={`pa-lk pa-lk--${lkTone(lk)}`}>{likelihoodShort(lk)}</span> : <span aria-hidden="true" />}
     </button>
   );

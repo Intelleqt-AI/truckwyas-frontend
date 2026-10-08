@@ -122,6 +122,14 @@ export function fmtNum(v: number, dp = 0): string {
   return (v < 0 && /[1-9]/.test(txt) ? "−" : "") + txt;
 }
 /** "R 32,80" / "R 1 050" (whole rand half-up when dp = 0). */
+/** Offered prices in whole amounts: UP to the next R 50 below R 20 000, else
+ *  the next R 100 (never below the price it was built from). */
+export function roundPriceUp(price: number): number {
+  const p = Number(price) || 0;
+  const unit = p < 20000 ? 50 : 100;
+  return Math.ceil(p / unit - 1e-9) * unit;
+}
+
 export function fmtRand(v: number, dp = 0): string {
   const shown = halfUp(v, dp);
   const sign = v < 0 && shown !== 0 ? "−" : "";
@@ -159,6 +167,12 @@ export interface CostingInputs {
   border_cost?: number | null;
   /** Cross-border trip: no border cost → incomplete floor (block). */
   international?: boolean;
+  /** Parts of the route with no border figures on file (the route's
+   *  border_costs_unknown, countries as names): unless the border figure is
+   *  the user's own, the border lines are null and the quote blocks. */
+  border_costs_unknown?: { countries?: (string | null)[] | null; crossings?: (string | null)[] | null; known?: { label?: string | null; amount?: number | string | null }[] | null } | null;
+  /** The border figure is the user's own (covers every crossing). */
+  border_cost_is_override?: boolean;
   include_empty_return?: boolean | null;
   settings?: { include_empty_return_default?: boolean | null; empty_return_min_km?: number | null } | null;
   minimum_charge?: number | null;
@@ -385,14 +399,11 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
     warnings.push(warning("tolls_unknown", "block", "Tolls could not be worked out",
       "Enter the tolls, or confirm there are none on this route.", null, ["enter_tolls", "confirm_no_tolls"]));
   }
-  if (tollOneWay === 0 && !tolls.confirmed_none) {
-    // R 0 from the route means no plazas were FOUND, not that the road has none.
-    warnings.push(warning("tolls_none_found", "warn", "No tolls found on this route",
-      "Check it if the trip uses toll roads.", null, ["enter_tolls", "confirm_no_tolls"]));
-  }
+  // R 0 from a toll lookup that worked is a known R 0: the route has no
+  // plazas (owner rule: we know every toll; no "check / add your own").
   const tollAmt = tollOneWay !== null ? cents(tollOneWay * legsLoaded) : null;
   add("tolls", "loaded", tollAmt,
-    tollAmt === null ? "Unknown" : roundTrip ? `${fmtRand(tollOneWay as number, 2)} × 2 legs` : `${fmtRand(tollOneWay as number, 2)} one way`,
+    tollAmt === null ? "Unknown" : tollOneWay === 0 ? "No toll plazas on this route" : roundTrip ? `${fmtRand(tollOneWay as number, 2)} × 2 legs` : `${fmtRand(tollOneWay as number, 2)} one way`,
     { one_way: tollOneWay, legs: legsLoaded });
 
   // --- driver nights (§6) ---
@@ -429,7 +440,22 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
 
   // --- border ---
   const border = num(i.border_cost);
-  if (border !== null && border > 0) add("border", "loaded", cents(border), "Border, permit and non-SA toll costs");
+  const bu = i.border_costs_unknown || {};
+  const unknownNames = (bu.countries || []).filter((c) => c).map(String);
+  const unknownCrossings = (bu.crossings || []).filter((c) => c).map(String);
+  const borderUnknown = (unknownNames.length > 0 || unknownCrossings.length > 0) && !i.border_cost_is_override;
+  if (borderUnknown) {
+    // Part of the route has no border figures on file (e.g. Namibia -> Angola):
+    // the floor is incomplete until the user enters the border costs.
+    const names = unknownNames.length ? unknownNames : unknownCrossings.map((c) => c.split("→").pop() as string);
+    const known = (bu.known || []).filter((k) => k && typeof k === "object" && num(k.amount) !== null);
+    const missing = (unknownCrossings.length ? unknownCrossings : names).join(", ");
+    const detail = known.length
+      ? "Known: " + known.map((k) => `${k.label} ${fmtRand(Number(k.amount), 2)}`).join(" + ") + `; missing: ${missing}`
+      : `Missing: ${missing}`;
+    add("border", "loaded", null, `Not known for ${names.join(" and ")}`, { status: "needs_input" });
+    warnings.push(warning("border_costs_missing", "block", `Border costs for ${names.join(" and ")} not known`, detail, null, ["enter_border_costs"]));
+  } else if (border !== null && border > 0) add("border", "loaded", cents(border), "Border, permit and non-SA toll costs");
   else if (i.international) {
     // An international trip always has border costs: without them the floor is incomplete.
     add("border", "loaded", null, "Not worked out yet", { status: "needs_input" });
@@ -466,7 +492,9 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
       warnings.push(warning("driver_nights_unknown", "block", "Driving time is unknown",
         "Enter the driver cost, or recalculate the route.", null, ["enter_driver_cost", "recalculate_route"]));
     }
-    if (i.international && border !== null && border > 0) {
+    if (i.international && borderUnknown) {
+      add("border_return", "empty_return", null, "Not known crossing back", { status: "needs_input" });
+    } else if (i.international && border !== null && border > 0) {
       // The empty truck crosses the border(s) back: the same costs per crossing.
       add("border_return", "empty_return", cents(border), "Border costs crossing back, empty");
     }
@@ -506,7 +534,9 @@ export function compute(inputs: CostingInputs | null | undefined): Costing {
   // per km > 0 is set, on the billable (loaded) km. No floor → none.
   const ratePerKm = pos(i.default_price_per_km);
   const ratePrice = ratePerKm !== null && kmLoaded !== null ? cents(ratePerKm * kmLoaded) : null;
-  const defaultPrice = targetPrice !== null ? Math.ceil(Math.max(ratePrice ?? 0, targetPrice) - 1e-9) : null;
+  // The same rounding as the pricing analysis' choices: with no market the
+  // suggested price IS the Safe choice.
+  const defaultPrice = targetPrice !== null ? roundPriceUp(Math.max(ratePrice ?? 0, targetPrice)) : null;
   // The same quote with a return load booked (one-way, empty return included).
   let alternative: { floor: number | null; target_price: number | null; default_price: number | null } | null = null;
   if (emptyReturn && requested !== false) {

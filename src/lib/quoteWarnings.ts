@@ -48,4 +48,4 @@ export function sendBlockedMessage(e: unknown): string | null {
   return w ? w.title : (typeof body.error === "string" ? body.error : "This quote can't be sent yet");
 }
 
-export { quoteIncomplete } from "./quoteStatus";
+export { quoteIncomplete, quoteTollsUnknown } from "./quoteStatus";

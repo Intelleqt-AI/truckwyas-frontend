@@ -3,6 +3,7 @@
 // (scripts/test-quote-golden.mjs covers compute()).
 import assert from "node:assert/strict";
 import { suggestTruck, capacityTonnes, nightsAway, vehicleClass, cents, compute } from "../src/lib/quoteRules.ts";
+import { tripIsInternational } from "../src/lib/tripInternational.ts";
 
 const cases = [];
 const t = (name, fn) => { fn(); cases.push(name); };
@@ -45,6 +46,28 @@ t("one cost model: the cost lines add up to the floor; the price never feeds the
   assert.ok(c.floor < a.floor && c.lines.every((l) => l.leg === "loaded"));
   assert.equal(a.alternative_with_return_load.default_price, c.default_price);
   assert.equal(compute({ ...base, default_price_per_km: 60 }).default_price, Math.ceil(Math.max(60 * 400, a.target_price)));
+});
+
+t("international trip (Lesotho): flagged for the cost-breakdown call; nights at the cross-border rate", () => {
+  // The owner's Lesotho -> Durban quote: picked points carry LS before any route.
+  assert.equal(tripIsInternational(null, ["LS", "ZA"]), true);
+  assert.equal(tripIsInternational({ cross_border: false, countries: ["ZA", "LS"] }, []), true);
+  assert.equal(tripIsInternational({ cross_border: true }, []), true);
+  assert.equal(tripIsInternational(null, ["ZA", "ZA", undefined]), false);
+  assert.equal(tripIsInternational({ countries: ["ZA"] }, [null]), false);
+  // The gap the builder showed: nights (one loaded + one coming home empty)
+  // at the SA minimum R 243,63 instead of the cross-border R 487,05 the
+  // server uses: the floor is R 243,42 per night short.
+  const trip = { trip_type: "ONE_WAY", distance_km: 520, duration_minutes: 600, load_kg: 15000,
+    vehicle: { id: 1, name: "Tri-axle", capacity: 30, rated_burn_l_per_100km: 38 },
+    diesel: { zone: "INLAND", mode: "LIVE", official_price: 32.8 }, operating_cost_per_km: 14,
+    tolls: { one_way: 312.17 }, border_cost: 1027, international: true, target_margin_pct: 10 };
+  const sa = compute({ ...trip, driver: { allowance_per_night: 243.63 } });
+  const xb = compute({ ...trip, driver: { allowance_per_night: 487.05 } });
+  const drv = (c) => c.lines.filter((l) => l.key === "driver" || l.key === "driver_return").map((l) => l.amount);
+  assert.deepEqual(drv(sa), [243.63, 243.63], "a loaded night and an empty-return night");
+  assert.deepEqual(drv(xb), [487.05, 487.05]);
+  assert.equal(cents(xb.floor - sa.floor), 486.84);
 });
 
 console.log(`quoteRules helpers: ${cases.length} cases passed`);

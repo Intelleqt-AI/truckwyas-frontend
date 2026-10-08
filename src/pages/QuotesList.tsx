@@ -268,6 +268,8 @@ interface QuotePage {
   next: string | null;
   total_amount?: string | number;
   total_incl_vat?: string | number;
+  /** Quotes with a cost still unknown: left out of the totals. */
+  incomplete_count?: number;
 }
 
 // One pipeline column's data, fetched independently from the backend —
@@ -307,6 +309,7 @@ function flattenColumn(q: ReturnType<typeof useQuoteColumn>) {
     count: q.data?.pages[0]?.count ?? 0,
     // Column total incl. VAT, as the cards show (server-summed over every page).
     totalAmount: Number(q.data?.pages[0]?.total_incl_vat ?? q.data?.pages[0]?.total_amount ?? 0),
+    incompleteCount: Number(q.data?.pages[0]?.incomplete_count ?? 0),
     hasNextPage: !!q.hasNextPage,
     isLoading: q.isLoading,
     isFetchingNextPage: q.isFetchingNextPage,
@@ -468,6 +471,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       return {
         items: expiredRows, count: expiredRows.length,
         totalAmount: expiredRows.reduce((n: number, q: any) => n + amountOf(q), 0),
+        incompleteCount: expiredRows.filter((q: any) => quoteIncomplete(q)).length,
         hasNextPage: false, isLoading: (expiryPending || (!allRows && (draftQ.isLoading || sentQ.isLoading))) && !failed,
         isFetchingNextPage: false, fetchNextPage: () => undefined,
       };
@@ -764,7 +768,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
             <div className="bk-kanban" ref={kanbanRef}>
               {BOARD_COLUMNS.map(col => {
-                const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading: colLoading, isFetchingNextPage, fetchNextPage } = boardColumn(col);
+                const { items: colItems, count: colCount, totalAmount: colTotal, incompleteCount: colIncomplete, hasNextPage, isLoading: colLoading, isFetchingNextPage, fetchNextPage } = boardColumn(col);
                 const isExpiredCol = col === 'EXPIRED';
                 const colFailed = isExpiredCol ? failedColumns.includes('DRAFT') && failedColumns.includes('SENT') : failedColumns.includes(col);
                 const isLoading = colLoading && !colFailed;
@@ -777,7 +781,11 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       {COLUMN_LABELS[col]}
                       {!colFailed && <span className="bk-col__count">{colCount}</span>}
                     </span>
-                    {colTotal > 0 && <span className="bk-col__total" title={`${formatCurrency(colTotal)} incl. VAT`} aria-label={`${formatMoneyWhole(colTotal)} incl. VAT`}>{formatMoneyWhole(colTotal)}</span>}
+                    {colTotal > 0 && (() => {
+                      // Incomplete quotes (a cost still unknown) are not in the total: said on hover.
+                      const left = colIncomplete > 0 ? `; ${colIncomplete} incomplete quote${colIncomplete === 1 ? "" : "s"} not counted` : "";
+                      return <span className="bk-col__total" title={`${formatCurrency(colTotal)} incl. VAT${left}`} aria-label={`${formatMoneyWhole(colTotal)} incl. VAT${left}`}>{formatMoneyWhole(colTotal)}</span>;
+                    })()}
                   </div>
                   <div className="kanban-col-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
                     {colFailed ? (

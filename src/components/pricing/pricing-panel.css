@@ -330,3 +330,6 @@
 }
 /* A block warning in the builder: the status slot says so (out of flow). */
 .pa__status.is-paused { color: var(--status-danger-text); }
+/* No-evidence notes at the top of the result. */
+.pa-evidence .pa-quiet + .pa-quiet { margin-top: 4px; }
+.pa-choice:disabled { cursor: default; }

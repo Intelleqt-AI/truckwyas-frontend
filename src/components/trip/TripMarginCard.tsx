@@ -64,7 +64,7 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
 
   const legRow = (leg: EconomicsLeg) => (
     <tr key={leg.load_id}>
-      <td>
+      <td className="tm-jobcell">
         <span className="tm-legname">
           {econ.pair ? roleLabel(leg.role) : 'This job'}
           {econ.pair && leg.load_id !== load.id && (
@@ -73,20 +73,20 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
         </span>
         {leg.lane && <span className="tm-sub">{leg.lane}</span>}
       </td>
-      <td>{money(leg.revenue) ?? <span className="tm-muted">—</span>}<span className="tm-sub">{revenueBasisLabel(leg.revenue_basis)}</span></td>
-      <td>
+      <td data-label="Revenue">{money(leg.revenue) ?? <span className="tm-muted">—</span>}<span className="tm-sub">{revenueBasisLabel(leg.revenue_basis)}</span></td>
+      <td data-label="Cost">
         {leg.cost !== null ? money(leg.cost) : <span className="tm-muted">{(leg.missing || []).some(isPending) ? 'Working out' : 'Unknown'}</span>}
         <span className="tm-sub" title={leg.cost_basis === 'estimate' ? leg.estimate_label : undefined}>{costBasisLabel(leg)}</span>
       </td>
-      <td className={tone(leg.margin)}>
+      <td data-label="Margin" className={tone(leg.margin)}>
         {leg.margin !== null ? money(leg.margin) : <span className="tm-muted">—</span>}
         {leg.margin_pct !== null && <span className="tm-sub">{pctText(leg.margin_pct)}</span>}
       </td>
-      <td>
+      <td data-label="Quoted margin">
         {leg.quoted?.margin_pct !== null && leg.quoted?.margin_pct !== undefined ? pctText(leg.quoted.margin_pct) : <span className="tm-muted">Not quoted</span>}
         {leg.quoted?.price !== null && leg.quoted?.price !== undefined && <span className="tm-sub">on {formatMoneyWhole(leg.quoted.price)}</span>}
       </td>
-      <td className={leg.margin_vs_quoted_pts === null ? 'tm-muted' : tone(leg.margin_vs_quoted_pts)}>{ptsText(leg.margin_vs_quoted_pts)}</td>
+      <td data-label="Vs quote" className={leg.margin_vs_quoted_pts === null ? 'tm-muted' : tone(leg.margin_vs_quoted_pts)}>{ptsText(leg.margin_vs_quoted_pts)}</td>
     </tr>
   );
 
@@ -136,12 +136,12 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
             {econ.legs.map(legRow)}
             {econ.pair && (
               <tr className="tm-total">
-                <td>Both legs</td>
-                <td>{money(c.revenue) ?? '—'}</td>
-                <td>{c.cost !== null ? money(c.cost) : <span className="tm-muted">Unknown</span>}<span className="tm-sub">{combinedBasisLabel(c.cost_basis)}</span></td>
-                <td className={tone(c.margin)}>{c.margin !== null ? money(c.margin) : '—'}{c.margin_pct !== null && <span className="tm-sub">{pctText(c.margin_pct)}</span>}</td>
-                <td>{c.quoted?.margin_pct !== null && c.quoted?.margin_pct !== undefined ? pctText(c.quoted.margin_pct) : <span className="tm-muted">—</span>}</td>
-                <td className={c.margin_vs_quoted_pts === null ? 'tm-muted' : tone(c.margin_vs_quoted_pts)}>{ptsText(c.margin_vs_quoted_pts)}</td>
+                <td className="tm-jobcell">Both legs</td>
+                <td data-label="Revenue">{money(c.revenue) ?? '—'}<span className="tm-sub">{revenueBasisLabel(c.revenue_basis)}</span></td>
+                <td data-label="Cost">{c.cost !== null ? money(c.cost) : <span className="tm-muted">Unknown</span>}<span className="tm-sub">{combinedBasisLabel(c.cost_basis)}</span></td>
+                <td data-label="Margin" className={tone(c.margin)}>{c.margin !== null ? money(c.margin) : '—'}{c.margin_pct !== null && <span className="tm-sub">{pctText(c.margin_pct)}</span>}</td>
+                <td data-label="Quoted margin">{c.quoted?.margin_pct !== null && c.quoted?.margin_pct !== undefined ? pctText(c.quoted.margin_pct) : <span className="tm-muted">—</span>}</td>
+                <td data-label="Vs quote" className={c.margin_vs_quoted_pts === null ? 'tm-muted' : tone(c.margin_vs_quoted_pts)}>{ptsText(c.margin_vs_quoted_pts)}</td>
               </tr>
             )}
           </tbody>

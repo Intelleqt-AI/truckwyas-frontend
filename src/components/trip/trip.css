@@ -85,3 +85,22 @@
 .tm-pulse { animation: tm-pulse 1.6s ease-in-out infinite; }
 @keyframes tm-pulse { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .tm-pulse { animation: none; } }
+
+/* Phones: each leg is a block of label / value rows, no sideways scroll. */
+@media (max-width: 640px) {
+  .tm-table-wrap { overflow: visible; margin: 0; padding: 0; }
+  .tm-table { min-width: 0; }
+  .tm-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .tm-table, .tm-table tbody, .tm-table tr, .tm-table td { display: block; width: 100%; }
+  .tm-table tr { padding: 12px 0; border-bottom: 1px solid var(--border-row); }
+  .tm-table tr:last-child { border-bottom: none; }
+  .tm-table td { display: flex; justify-content: flex-end; flex-wrap: wrap; align-items: baseline; column-gap: 8px; padding: 4px 0; border-bottom: none; text-align: right; }
+  .tm-table td::before { content: attr(data-label); flex-shrink: 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); text-align: left; margin-right: auto; }
+  .tm-table td.tm-jobcell { display: block; text-align: left; padding-bottom: 8px; font-weight: 500; }
+  .tm-table td.tm-jobcell::before { content: none; }
+  .tm-table td > .tm-sub { display: inline; white-space: normal; }
+  .tm-table td.tm-jobcell > .tm-sub { display: block; margin-left: 0; }
+  .tm-table .tm-total td { padding-top: 4px; }
+  .tm-sub--wrap { max-width: none; }
+}
+.bj-group { margin: 8px 0 0; font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }

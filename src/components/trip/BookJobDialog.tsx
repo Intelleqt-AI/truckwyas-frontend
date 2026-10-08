@@ -8,7 +8,7 @@ import { toast } from '@/lib/toast';
 import { sendBlockedMessage } from '@/lib/quoteWarnings';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import {
-  bookingRequest, invoiceWhenText, linkRefusal, linkWarnings, marginText, previewMargin,
+  bookingRequest, candidateFit, candidateSummary, invoiceWhenText, linkRefusal, linkWarnings, marginText, previewMargin,
   type Candidate, type InvoicePreview, type ReturnChoice, type DEFAULT_LINK_FIELDS,
 } from '@/lib/tripEconomics';
 import { CandidateOption, ChoiceOption } from './CandidateOption';
@@ -197,20 +197,24 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
             <h3 className="bj-section__title" id="bj-back-title">Coming back loaded?</h3>
             <fieldset className="tm-options">
               <legend className="sr-only">Return load</legend>
-              <ChoiceOption name="bj-back" checked={choice.kind === 'none'} onChange={() => setChoice({ kind: 'none' })}
+              <ChoiceOption name="bj-back" ariaLabel={emptyAssumed ? 'No, back empty' : 'No'} checked={choice.kind === 'none'} onChange={() => setChoice({ kind: 'none' })}
                 title={emptyAssumed ? 'No, back empty' : 'No'}
                 meta={margin ? `Margin ${marginText(margin.amount, margin.pct)}${emptyAssumed ? ' with the empty return, as quoted' : ''}` : undefined} />
               {returns.map(c => (
                 <CandidateOption key={`r${c.load_id}`} name="bj-back" candidate={c} direction="return"
                   checked={same({ kind: 'return', loadId: c.load_id })} onChange={() => setChoice({ kind: 'return', loadId: c.load_id })} />
               ))}
+              <ChoiceOption name="bj-back" ariaLabel="Expecting a return load" checked={choice.kind === 'expect'} onChange={() => setChoice({ kind: 'expect' })} title="Expecting a return load" meta="Link it from the job once it's booked" />
+              {outbounds.length > 0 && <p className="bj-group" id="bj-outbound-head">This job is the return of…</p>}
               {outbounds.map(c => (
                 <ChoiceOption key={`o${c.load_id}`} name="bj-back" checked={same({ kind: 'outbound', loadId: c.load_id })}
                   onChange={() => setChoice({ kind: 'outbound', loadId: c.load_id })}
-                  title={<>Return of {c.load_number}</>} meta={[c.customer_name, [c.pickup, c.delivery].filter(Boolean).join(' → ')].filter(Boolean).join(' · ')}
+                  ariaLabel={`This job is the return of ${c.load_number}${c.customer_name ? `, ${c.customer_name}` : ''}`}
+                  title={<>{c.load_number}{c.customer_name ? <span className="tm-muted">{c.customer_name}</span> : null}</>}
+                  meta={candidateSummary(c, 'outbound')}
+                  fit={candidateFit(c)}
                   warnings={(c.warnings || []).map(w => w.title)} />
               ))}
-              <ChoiceOption name="bj-back" checked={choice.kind === 'expect'} onChange={() => setChoice({ kind: 'expect' })} title="Expecting a return load" meta="Link it from the job once it's booked" />
             </fieldset>
           </section>
 

@@ -3,7 +3,7 @@
 // docs/QUOTE-RULES.md "Trip economics"). Pure: no "@/" imports, node tests it.
 import { formatMoneyWhole, formatDateShort } from "./formatters.ts";
 
-export type Basis = "actual" | "estimate" | "mixed" | null;
+export type Basis = "actual" | "estimate" | "mixed" | "part_actual" | null;
 
 export interface Missing { code: string; prompt: string; pending?: boolean }
 
@@ -100,17 +100,20 @@ const ESTIMATE_SHORT: Record<string, string> = {
 /** What the cost figure is: actual expenses, or which estimate. */
 export function costBasisLabel(leg: Pick<EconomicsLeg, "cost_basis" | "estimate_label" | "estimate_basis">): string {
   if (leg.cost_basis === "actual") return "Actual costs";
+  // Actual where recorded, the estimate for the rest.
+  if (leg.cost_basis === "part_actual" || leg.cost_basis === "mixed") return "Part actual · estimate for the rest";
   if (leg.cost_basis === "estimate") return `Estimate · ${ESTIMATE_SHORT[leg.estimate_basis] ?? leg.estimate_label ?? "quote costing"}`;
   return "No estimate";
 }
 
 export function revenueBasisLabel(basis: Basis): string {
-  return basis === "actual" ? "Invoiced" : basis === "mixed" ? "Part invoiced" : "Job price";
+  const what = basis === "actual" ? "Invoiced" : basis === "mixed" || basis === "part_actual" ? "Part invoiced" : "Job price";
+  return `${what}, excl. VAT`;
 }
 
 /** Combined cost basis in a word ("Actual", "Estimate", "Actual and estimate"). */
 export function combinedBasisLabel(basis: Basis): string {
-  return basis === "actual" ? "Actual" : basis === "estimate" ? "Estimate" : basis === "mixed" ? "Actual and estimate" : "Incomplete";
+  return basis === "actual" ? "Actual" : basis === "estimate" ? "Estimate" : basis === "mixed" || basis === "part_actual" ? "Part actual" : "Incomplete";
 }
 
 /** The line shown when the pair's empty return came out of the estimates. */
@@ -291,7 +294,8 @@ export function actualsText(a: QuoteActuals | null | undefined): { line: string;
   const cost = num(a.actual_cost);
   if (rev === null || cost === null) return null;
   const line = `Actual margin ${formatMoneyWhole(rev - cost)} · ${pctText(a.actual_margin_pct ?? (rev ? ((rev - cost) / rev) * 100 : null))}`;
-  const costWord = a.actual_cost_basis === "actual" ? "Actual costs" : a.actual_cost_basis === "mixed" ? "Part actual costs" : "Estimated costs";
+  const costWord = a.actual_cost_basis === "actual" ? "Actual costs"
+    : a.actual_cost_basis === "mixed" || a.actual_cost_basis === "part_actual" ? "Part actual costs" : "Estimated costs";
   const back = a.backhaul_found === true ? "came back loaded" : a.backhaul_found === false ? "came back empty" : null;
   return { line, basis: [costWord, back].filter(Boolean).join(" · ") };
 }

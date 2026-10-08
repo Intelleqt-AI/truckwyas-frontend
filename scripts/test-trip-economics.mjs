@@ -2,7 +2,7 @@
 // Trip economics display rules: margins, pair sums, booking choice, banners.
 import assert from "node:assert/strict";
 import {
-  pctText, ptsText, marginText, costBasisLabel, emptyReturnNote, missingPrompts, combineLegs,
+  pctText, ptsText, marginText, costBasisLabel, revenueBasisLabel, combinedBasisLabel, emptyReturnNote, missingPrompts, combineLegs,
   bookingRequest, isPending, previewMargin, linkWarnings, linkRefusal, invoiceWhenText, invoiceMismatchText, actualsText,
   returnHistoryText, candidateFit, candidateSummary,
 } from "../src/lib/tripEconomics.ts";
@@ -24,6 +24,11 @@ eq(costBasisLabel({ cost_basis: "estimate", estimate_label: "Quote costing, no e
   "Estimate · no empty return");
 eq(costBasisLabel({ cost_basis: "estimate", estimate_label: "Quote costing", estimate_basis: "snapshot" }), "Estimate · quote costing");
 eq(costBasisLabel({ cost_basis: "estimate", estimate_label: "Odd", estimate_basis: "new_kind" }), "Estimate · Odd");
+eq(costBasisLabel({ cost_basis: "part_actual", estimate_label: "Quote costing", estimate_basis: "snapshot" }), "Part actual · estimate for the rest");
+eq(revenueBasisLabel("estimate"), "Job price, excl. VAT");
+eq(revenueBasisLabel("actual"), "Invoiced, excl. VAT");
+eq(combinedBasisLabel("part_actual"), "Part actual");
+eq(actualsText({ actual_margin_pct: 10, actual_revenue: 100, actual_cost: 90, actual_cost_basis: "part_actual", backhaul_found: null }).basis, "Part actual costs");
 eq(costBasisLabel({ cost_basis: null, estimate_label: "No estimate", estimate_basis: "unknown" }), "No estimate");
 
 // The empty-return note only for a pair that removed something.

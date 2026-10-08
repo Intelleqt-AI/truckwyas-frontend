@@ -163,6 +163,10 @@ export default function Bookings() {
     qc.invalidateQueries({ queryKey: ['load', id] });
     qc.invalidateQueries({ queryKey: ['loads-list'] });
     qc.invalidateQueries({ queryKey: ['loads'] });
+    // Assigning a truck re-costs the job on the server: its margin and
+    // return-load suggestions change with it.
+    qc.invalidateQueries({ queryKey: ['load-economics'] });
+    qc.invalidateQueries({ queryKey: ['return-candidates'] });
   };
 
   const updateStatus = async (newStatus: string) => {

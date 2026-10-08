@@ -118,6 +118,16 @@ export default function QuoteDetail() {
   // The board's quote -> load lookup (same cached GET), so a converted quote
   // offers "View booking" here exactly as its board card does (R11).
   const loadsQ = useQuery(loadsQuery);
+  // Delivered: the actual margin is compared with the margin the job was
+  // booked at (its quoted_margin_pct), never today's cost floor.
+  const bookedLoadId = quote?.actuals
+    ? (quote?.booked_load?.id ?? (mapLoadsByQuoteId(loadsQ.data).get(String(quote?.id)) as { id?: number | string } | undefined)?.id)
+    : undefined;
+  const bookedLoadQ = useQuery({
+    queryKey: ['load', String(bookedLoadId)],
+    queryFn: () => fetchData(`api/v1/loads/${bookedLoadId}/`),
+    enabled: bookedLoadId != null,
+  });
   // The route map grows to end level with the rail when the rail is the
   // longer column, but never drops below a readable floor (R10): 320px on
   // desktop, 240px on phones. When the Job card is long, the main column
@@ -768,7 +778,7 @@ export default function QuoteDetail() {
               const neg = Number(quote.actuals.actual_revenue) - Number(quote.actuals.actual_cost) < 0;
               return (
                 <div className="qd-agreed">
-                  <span className={`qd-agreed__line${neg ? ' qd-decision__neg' : ''}`}>{a.line}{marginNow?.pct != null ? <span className="qd-agreed__quoted"> (quoted {formatPct(marginNow.pct)})</span> : null}</span>
+                  <span className={`qd-agreed__line${neg ? ' qd-decision__neg' : ''}`}>{a.line}{bookedLoadQ.data?.quoted_margin_pct != null && bookedLoadQ.data.quoted_margin_pct !== '' ? <span className="qd-agreed__quoted"> (quoted {formatPct(Number(bookedLoadQ.data.quoted_margin_pct))})</span> : null}</span>
                   <span className="qd-agreed__margin">{a.basis}</span>
                 </div>
               );

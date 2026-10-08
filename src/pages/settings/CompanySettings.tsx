@@ -433,9 +433,6 @@ export function CompanySettings() {
       return;
     }
     setFieldErrors({});
-    // A change to the fuel price quotes use is confirmed before it is saved.
-    const fuelChange = fuelChangeSummary(loadedForm, form, officialsNow(), hasPetrolModeField);
-    if (fuelChange && !fuelConfirmed) { setFuelConfirm(fuelChange); return; }
     const validityDays = parseInt(form.default_quote_validity_days, 10);
     if (isNaN(validityDays) || validityDays < 1 || validityDays > 365) {
       toast.error('Default quote validity must be between 1 and 365 days');
@@ -501,6 +498,10 @@ export function CompanySettings() {
       toast.error('Enter both a bank name and an account number, or leave both blank');
       return;
     }
+    // A change to the fuel price quotes use is confirmed before it is saved,
+    // once every other check has passed (a confirmed save then can't fail on one).
+    const fuelChange = fuelChangeSummary(loadedForm, form, officialsNow(), hasPetrolModeField);
+    if (fuelChange && !fuelConfirmed) { setFuelConfirm(fuelChange); return; }
     setSaving(true);
     try {
       const saved = await patchData({ url: '/api/v1/company/profile/', data: {

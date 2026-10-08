@@ -8,6 +8,7 @@ import { BoardScrollbar } from "@/components/BoardScrollbar";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { fetchData, patchData, postData } from "@/lib/Api";
+import { useLiveEvent, eventPrefix } from '@/hooks/useLiveEvent';
 import { formatCurrency, formatDate, formatDateShort, formatMoneyWhole } from "@/lib/formatters";
 import { Loader } from "@/components/Loader";
 import { toast } from "@/lib/toast";
@@ -498,18 +499,12 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
 
   // Live update: refetch every column when the backend pushes any quote
   // event over WebSocket — prefix match invalidates all of them (and the
-  // "All" list query) regardless of their search term.
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { detail } = (e as CustomEvent);
-      if (typeof detail?.event === 'string' && detail.event.startsWith('quote.')) {
-        queryClient.invalidateQueries({ queryKey: ['quotes-column'] });
-        queryClient.invalidateQueries({ queryKey: ['insights-source', 'quotes'] });
-      }
-    };
-    window.addEventListener('tw:live-event', handler);
-    return () => window.removeEventListener('tw:live-event', handler);
-  }, [queryClient]);
+  // "All" list query) regardless of their search term. Coalesced: a burst of
+  // quote events is one refetch per column, not one per event.
+  useLiveEvent(eventPrefix('quote.'), () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['quotes-column'] }),
+    queryClient.invalidateQueries({ queryKey: ['insights-source', 'quotes'] }),
+  ]));
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status, extra }: { id: string; status: string; extra?: Record<string, unknown> }) =>

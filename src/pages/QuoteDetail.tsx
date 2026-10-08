@@ -6,6 +6,7 @@ import { useMapFill } from './useMapFill';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchData, patchData, deleteData, postData, downloadBlob } from '@/lib/Api';
+import { useLiveEvent, eventPrefix } from '@/hooks/useLiveEvent';
 import { formatCurrency, formatDate, formatDistance, formatMoney, formatMoneyWhole, formatNumber, normaliseFigures, sentenceCaseLabel } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -154,20 +155,15 @@ export default function QuoteDetail() {
   const quoteFailed = loadFailed(quoteQuery);
   const quoteError = (quoteQuery.error ?? quoteQuery.failureReason) as { status?: number } | null;
 
-  // Live update: refetch when backend pushes a quote status event over WebSocket
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { detail } = e as CustomEvent;
-      if (typeof detail?.event === 'string' && detail.event.startsWith('quote.')) {
-        if (!detail?.data?.id || String(detail.data.id) === String(id)) {
-          queryClient.invalidateQueries({ queryKey: ['quote', id] });
-          queryClient.invalidateQueries({ queryKey: ['quotes'] });
-        }
-      }
-    };
-    window.addEventListener('tw:live-event', handler);
-    return () => window.removeEventListener('tw:live-event', handler);
-  }, [id, queryClient]);
+  // Live update: refetch when backend pushes a quote status event over
+  // WebSocket. Coalesced: a burst of quote events is one refetch.
+  useLiveEvent(
+    (detail) => eventPrefix('quote.')(detail) && (!detail?.data?.id || String(detail.data.id) === String(id)),
+    () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['quote', id] }),
+      queryClient.invalidateQueries({ queryKey: ['quotes'] }),
+    ]),
+  );
 
   // Fetch fuel alert for sent/pending quotes
   useEffect(() => {

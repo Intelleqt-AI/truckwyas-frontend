@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { fetchData } from './Api';
+import { useLiveEvent, eventPrefix } from '@/hooks/useLiveEvent';
 
 export interface AuthUser {
   id: number;
@@ -99,25 +100,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // (e.g. the check_pending_cancellations sweep finalising a cancellation,
   // or the monthly-fee cron recharging/suspending): focus/visibility alone
   // can't catch that since the tab never lost focus for those to fire.
-  useEffect(() => {
-    const onLiveEvent = (e: Event) => {
-      const { detail } = e as CustomEvent;
-      if (typeof detail?.event === 'string' && detail.event.startsWith('subscription.')) {
-        refreshUser();
-      }
-    };
-    window.addEventListener('tw:live-event', onLiveEvent);
-    return () => window.removeEventListener('tw:live-event', onLiveEvent);
-  }, [refreshUser]);
-
+  //
   // Also re-sync once, right after the WebSocket reconnects post-drop (see
   // components/LiveEvents.tsx) — catches anything pushed while the socket
-  // was down, without polling on a fixed schedule. Fires only on an actual
-  // reconnect event, never on a timer.
-  useEffect(() => {
-    window.addEventListener('tw:live-reconnected', refreshUser);
-    return () => window.removeEventListener('tw:live-reconnected', refreshUser);
-  }, [refreshUser]);
+  // was down, without polling on a fixed schedule. Both are coalesced
+  // (useLiveEvent): a burst is one /auth/me/ call, errors back off.
+  useLiveEvent(eventPrefix('subscription.'), refreshUser, { onReconnect: true });
 
   return (
     <AuthContext.Provider value={{ user, setUser, refreshUser }}>

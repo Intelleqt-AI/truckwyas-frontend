@@ -4,6 +4,7 @@ import { shortDate, longDate } from '@/lib/dieselPrice';
 import { priceFieldError, priceFieldErrors, fieldChanged, ownPriceError, fuelChangeSummary } from '@/lib/settingsChecks';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { vatNumberProblem } from '@/lib/finance/validation';
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData, postData } from "@/lib/Api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -195,6 +196,7 @@ export function CompanySettings() {
     default_quote_validity_days: '7',
     allow_cross_border: 'yes',
     auto_email_invoices: 'no',
+    vat_registered: 'yes',
     default_base_rate_per_km: '', default_toll_rate_per_km: '', default_sla_hours: '',
     cross_border_crossings_per_year: '',
     fuel_zone: 'INLAND',
@@ -294,6 +296,7 @@ export function CompanySettings() {
             d.default_quote_validity_days != null ? String(d.default_quote_validity_days) : '7',
           allow_cross_border: d.allow_cross_border === false ? 'no' : 'yes',
           auto_email_invoices: d.auto_email_invoices === true ? 'yes' : 'no',
+          vat_registered: d.vat_registered === false ? 'no' : 'yes',
           default_base_rate_per_km:
             Number(d.default_base_rate_per_km) > 0 ? String(d.default_base_rate_per_km) : '',
           default_toll_rate_per_km:
@@ -485,6 +488,11 @@ export function CompanySettings() {
       return;
     }
     const branchDigits = form.bank_branch_code.replace(/[\s-]/g, '');
+    const vatProblem = vatNumberProblem(form.vat_number);
+    if (vatProblem) {
+      toast.error(vatProblem);
+      return;
+    }
     if (branchDigits && !/^\d{4,10}$/.test(branchDigits)) {
       toast.error('Branch code must be 4–10 digits');
       return;
@@ -507,6 +515,7 @@ export function CompanySettings() {
         default_quote_validity_days: validityDays,
         allow_cross_border: form.allow_cross_border === 'yes',
         auto_email_invoices: form.auto_email_invoices === 'yes',
+        vat_registered: form.vat_registered === 'yes',
         // Optional price (not a cost): empty = none (0).
         // These four are sent only when changed: a stored out-of-range value
         // never fails an unrelated save.
@@ -575,6 +584,8 @@ export function CompanySettings() {
       if (savedPetrol && 'petrol_price_in_use' in savedPetrol) setPetrolInUse((savedPetrol.petrol_price_in_use as typeof petrolInUse) ?? null);
       await queryClient.invalidateQueries({ queryKey: ['company-profile'] });
       queryClient.invalidateQueries({ queryKey: ['fuel-price-current'] });
+      // VAT registration also shows on Invoice numbering and decides VAT on quotes.
+      queryClient.invalidateQueries({ queryKey: ['finance', 'settings'] });
       setSaved(true);
       toast.success(fuelChange ? fuelChange.toast : 'Company details saved');
       setTimeout(() => setSaved(false), 2000);
@@ -680,7 +691,31 @@ export function CompanySettings() {
             </div>
             <div>
               <label htmlFor="company-vat-number" style={labelStyle}>VAT number</label>
-              <input id="company-vat-number" className="settings-control" style={inputStyle} value={form.vat_number} onChange={e => set('vat_number', e.target.value)} placeholder="4XXXXXXXXX" />
+              <input id="company-vat-number" className="settings-control" style={inputStyle} value={form.vat_number} onChange={e => set('vat_number', e.target.value)} placeholder="4XXXXXXXXX"
+                aria-invalid={!!vatNumberProblem(form.vat_number)} />
+              {vatNumberProblem(form.vat_number) && <div style={{ ...helpTextStyle, color: 'var(--status-danger-text)' }} role="alert">{vatNumberProblem(form.vat_number)}</div>}
+            </div>
+          </div>
+          <div className="cs-grid cs-grid--2" style={{ marginBottom: 16 }}>
+            <div>
+              <label htmlFor="company-vat-registered" style={labelTipStyle}>
+                Registered for VAT
+                <InfoTip label="About VAT registration">Only a business registered with SARS as a VAT vendor may charge VAT. With Yes, quotes show 15% VAT (0% for international trips) and invoices are tax invoices. With No, quotes and new invoices show no VAT and invoices are titled INVOICE. Invoices already issued never change.</InfoTip>
+              </label>
+              <Select value={form.vat_registered} onValueChange={val => set('vat_registered', val)}>
+                <SelectTrigger style={inputStyle} className="cs-select" id="company-vat-registered">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes, we charge VAT</SelectItem>
+                  <SelectItem value="no">No, not VAT registered</SelectItem>
+                </SelectContent>
+              </Select>
+              <div style={helpTextStyle}>
+                {form.vat_registered === 'yes' && !form.vat_number.trim()
+                  ? 'Add your VAT number above: tax invoices must show it.'
+                  : form.vat_registered === 'yes' ? 'Quotes and tax invoices include 15% VAT.' : 'Quotes and new invoices show no VAT.'}
+              </div>
             </div>
           </div>
           <div style={{ marginBottom: 16 }}>

@@ -11,7 +11,9 @@ assert.equal(plazaMeta({ plaza: 'Moamba', tariff: 458.64, plaza_type: 'mainline'
   'Class 4 (mapped) · TRAC · mainline · MZN 1 800 at R0,2548 (rate as of 8 Oct 2026)');
 assert.equal(routeChipLabel({ toll_summary: 'Fastest · via N17/N3 (Gosforth Ramp (W), Wilge, Tugela, Mooi) · tolls R 887' }, 0), 'Fastest · via N17/N3 · tolls R 887');
 assert.equal(routeChipLabel({ toll_cost_zar: 1020 }, 0), 'Fastest · tolls R 1 020');
+assert.equal(routeChipLabel({ toll_summary: 'Alternative 2 · via N1 (Grasmere, Vaal) · tolls R\u00a0636,53 excl. VAT', toll_cost_zar: 636.53 }, 2), 'Alternative 2 · via N1 · tolls R 637');
 assert.equal(routeChipLabel({ tolls_unknown: true }, 2), 'Alternative 2 · tolls unknown');
+assert.equal(routeChipLabel({ toll_summary: 'Fastest · no toll plazas · tolls R 0,00 excl. VAT', toll_cost_zar: 0, countries: ['SA', 'BW', 'NA'] }, 0), 'Fastest · no toll plazas · tolls R 0 · through Botswana');
 
 const zw = [
   { code: 'zw_border_access_toll', description: 'Zimbabwe border access toll, Beitbridge (estimate)', amount: 6239.66, currency: 'USD', amount_foreign: 375,
@@ -28,4 +30,4 @@ assert.equal(borderTotalWithAgentFee(zw.slice(0, 2), 8244.66, 3500), 9739.66);
 assert.equal(borderTotalWithAgentFee([zw[0]], 6239.66, 3500), 6239.66, 'no agent line');
 assert.equal(borderEstimate(zw, null), 8894.66);
 assert.equal(borderEstimate(zw, 3500), 6889.66, 'your agent fee is not an estimate');
-console.log('routeTolls: 18 cases passed');
+console.log('routeTolls: 20 cases passed');

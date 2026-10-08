@@ -65,8 +65,10 @@ export interface BorderLeg { title: string; items: BorderItem[]; total: number }
 /** Each border, permit and foreign-road charge with how sure it is
  *  (published / estimate / unverified / agent estimate), its source and date,
  *  and the exchange rate used. The clearing agent's fee is the user's to set. */
-export function BorderPop({ title, legs, agentFee, onAgentFee, note }: {
+export function BorderPop({ title, legs, agentFee, onAgentFee, note, assumptions = [] }: {
   title: string; legs: BorderLeg[]; agentFee: number | null; onAgentFee: (v: number | null) => void;
+  /** What was assumed about the truck, each with a way to set it. */
+  assumptions?: string[];
   /** e.g. what is not on file (the quote is blocked until a figure is entered). */
   note?: string | null;
 }) {
@@ -76,6 +78,13 @@ export function BorderPop({ title, legs, agentFee, onAgentFee, note }: {
       <PopoverContent align="start" collisionPadding={16} className="qb-pop qb-pop--wide">
         <div className="qb-pop__title">{title}</div>
         {note && <div className="qb-pop__note qb-pop__note--warn" style={{ margin: "0 0 6px" }}>{note}</div>}
+        {assumptions.map((a) => (
+          <div key={a} className="qb-pop__note">
+            {a.replace(/\s+—\s+set your truck's .*$/, "")}.{" "}
+            <a href="/settings/vehicle-types" target="_blank" rel="noopener noreferrer" className="qb-pop__src">
+              {/gross/.test(a) ? "Set gross mass" : "Set axles"}</a>
+          </div>
+        ))}
         {legs.map((leg) => (
           <div key={leg.title} className="qb-pop__leg">
             {legs.length > 1 && <div className="qb-pop__leg-title">{leg.title}</div>}

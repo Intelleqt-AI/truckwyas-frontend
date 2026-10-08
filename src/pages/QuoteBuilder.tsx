@@ -209,7 +209,16 @@ interface RouteOption {
   fuel_usage_litres?: number; country_codes?: string[]; tolls_unavailable?: boolean; tolls_unknown?: boolean;
   /** "Fastest · via N17/N3 (plazas) · tolls R 887" (the server's). */
   toll_summary?: string | null; toll_plazas?: string[]; tolls_unavailable_reason?: string | null;
+  // Each option's own border data and way back (newer servers).
+  cross_border?: boolean; countries?: string[];
+  additional_costs?: { border_fees?: number; weighbridge_fees?: number; non_sa_tolls?: number };
+  cross_border_breakdown?: BorderItem[];
+  border_costs_unknown?: { countries?: string[]; crossings?: string[] } | null;
+  border_vehicle_profile?: BorderVehicleProfile | null;
+  return_leg?: ReturnLeg | null;
 }
+/** What the border charges assumed about the truck (gross mass, axles). */
+interface BorderVehicleProfile { gross_assumed?: boolean; assumptions?: { field: string; message: string }[] }
 /** The way home, priced on its own TomTom route (include_return). */
 interface ReturnLeg {
   available?: boolean; distance_km?: number; toll_cost_zar?: number | null; tolls_unknown?: boolean;
@@ -247,6 +256,7 @@ interface RouteData {
   /** The trip date is after the newest published toll schedule. */
   toll_schedule_warning?: { message?: string } | string | null;
   return_leg?: ReturnLeg | null;
+  border_vehicle_profile?: BorderVehicleProfile | null;
 }
 
 // ---- display-only formatting (render strings only; never read back into
@@ -490,11 +500,16 @@ export default function QuoteBuilder() {
   const preDistance = preRoute?.distance_km ?? routeData?.distance_km ?? 0;
   const preDuration = preRoute?.duration_minutes ?? preRoute?.duration_min ?? routeData?.duration_minutes ?? null;
   // A cross-border trip (route or any point outside SA): no border cost blocks.
-  const tripInternational = tripIsInternational(routeData, [pickupCoords?.country_code, deliveryCoords?.country_code, ...stops.map(st => st.coords?.country_code)]);
+  // The chosen route option's own border lines, countries and way back (a
+  // direct SA→Namibia option has no Botswana charges); older servers send
+  // them for the fastest route only, at the top level.
+  const optB = routeData?.routes?.[selectedRouteIndex];
+  const routeB: RouteOption | RouteData | null = optB && "cross_border" in optB ? optB : routeData;
+  const tripInternational = tripIsInternational(routeB, [pickupCoords?.country_code, deliveryCoords?.country_code, ...stops.map(st => st.coords?.country_code)]);
   // Parts of the route with no border figures on file (e.g. Angola): the
   // costing blocks until the user enters the border costs (their own figure
   // then covers every crossing). Sent on every costing call and saved.
-  const borderUnknown = borderCostsUnknown(routeData?.border_costs_unknown, routeData?.cross_border_breakdown);
+  const borderUnknown = borderCostsUnknown(routeB?.border_costs_unknown, routeB?.cross_border_breakdown);
   const borderCostIsOverride = borderTyped !== "";
   // The server prices driver nights at the cross-border allowance on an
   // international trip, so it must be told (every cost-breakdown call).
@@ -561,13 +576,16 @@ export default function QuoteBuilder() {
     : routeTollsUnknown || routeToll == null ? null : Number(routeToll);
   // The way home on its own route (asked for with include_return): its own
   // plazas and the exit-only border charges.
-  const returnLeg = routeData?.return_leg?.available ? routeData.return_leg : null;
+  const returnLegRaw = routeB?.return_leg ?? routeData?.return_leg ?? null;
+  // What the border charges assumed about the truck ("Assumed 56 t gross — set your truck's gross mass").
+  const borderAssumptions = (routeB?.border_vehicle_profile?.assumptions ?? []).map(a => a.message).filter(Boolean);
+  const returnLeg = returnLegRaw?.available ? returnLegRaw : null;
   const returnTolls: number | null = returnLeg && !returnLeg.tolls_unknown && returnLeg.toll_cost_zar != null ? Number(returnLeg.toll_cost_zar) : null;
   // The route's own toll figure (not a typed or market one) can use the return leg's.
   const routeTollsInUse = !tollManuallyEdited && !aiTollActive;
   const borderSum = (ac?: { border_fees?: number; weighbridge_fees?: number; non_sa_tolls?: number }) =>
     (ac?.border_fees || 0) + (ac?.weighbridge_fees || 0) + (ac?.non_sa_tolls || 0);
-  const routeBorderOut = borderTotalWithAgentFee(routeData?.cross_border_breakdown, borderSum(routeData?.additional_costs), agentFee);
+  const routeBorderOut = borderTotalWithAgentFee(routeB?.cross_border_breakdown, borderSum(routeB?.additional_costs), agentFee);
   const routeBorderBack: number | null = returnLeg?.additional_costs
     ? borderTotalWithAgentFee(returnLeg.cross_border_breakdown, borderSum(returnLeg.additional_costs), agentFee) : null;
   // Loaded leg(s): a round trip's way back on its own charges when priced.
@@ -575,7 +593,7 @@ export default function QuoteBuilder() {
   const borderLoaded = borderTyped !== "" ? (Number(borderTyped) || 0) : routeBorderLoaded;
   const borderEmptyBack: number | null = tripType !== "ROUND_TRIP" && borderTyped === "" ? routeBorderBack : null;
   const borderEstimated: number | null = borderTyped !== "" ? null
-    : (borderEstimate(routeData?.cross_border_breakdown, agentFee) + (tripType === "ROUND_TRIP" ? borderEstimate(returnLeg?.cross_border_breakdown ?? routeData?.cross_border_breakdown, agentFee) : 0)) || null;
+    : (borderEstimate(routeB?.cross_border_breakdown, agentFee) + (tripType === "ROUND_TRIP" ? borderEstimate(returnLeg?.cross_border_breakdown ?? routeB?.cross_border_breakdown, agentFee) : 0)) || null;
   const weightKg = loadT * 1000;
 
   // ---- company figures the costing needs: the server's resolution
@@ -740,6 +758,8 @@ export default function QuoteBuilder() {
         ...(pickupDate ? { trip_date: pickupDate } : {}),
         // The way home on its own route: a round trip's back leg, or the empty return.
         ...(wantReturnLeg ? { include_return: true } : {}),
+        // The user's own clearing-agent fee replaces the agent estimate ("Your figure").
+        ...(agentFee != null ? { clearing_agent_fee_zar: agentFee } : {}),
       };
       const requestKey = routeRequestKey;
       // X-TW-Quote-Rules: the backend then says "unknown" (nulls + flags:
@@ -907,6 +927,7 @@ export default function QuoteBuilder() {
           ? { price, floor, pricedAt: isoDay(q.priced_at), pricedAtRaw: q.priced_at ?? null, fuelPrice: Number(q.fuel_price_used) || null }
           : null;
         savedBorderRef.current = Number(ci.border_cost) > 0 ? Number(ci.border_cost) : null;
+        setAgentFee(ci.clearing_agent_fee != null && Number.isFinite(Number(ci.clearing_agent_fee)) ? Number(ci.clearing_agent_fee) : null);
         setReturnLoadBooked(ci.include_empty_return === false);
         setTollsNone(ci.tolls_confirmed_none === true);
         setDistanceConfirmed(ci.distance_confirmed === true);
@@ -1062,8 +1083,8 @@ export default function QuoteBuilder() {
   // is in hand; until then the saved quote keeps whatever it had.
   const pointCountries = [pickupCoords?.country_code, deliveryCoords?.country_code, ...stops.map(st => st.coords?.country_code)];
   const internationalKnown = !!routeData || pointCountries.some(Boolean);
-  const isInternational = !!routeData?.cross_border
-    || (routeData?.countries || []).some(c => isForeignCountry(c))
+  const isInternational = !!routeB?.cross_border
+    || (routeB?.countries || []).some(c => isForeignCountry(c))
     || pointCountries.some(c => isForeignCountry(c));
   // The send preview's VAT for this unsaved quote: the backend rule
   // (core/services/quote_vat.py) on the figures on screen, so the preview
@@ -1171,7 +1192,7 @@ export default function QuoteBuilder() {
       ...(borderEstimated ? { cross_border_estimate_zar: borderEstimated } : {}),
     },
     tollCost, routePlazas: tollBreakdown.map(b => ({ plaza: b.plaza, route: b.route, tariff: Number(b.tariff) })),
-    countryCodes: route?.country_codes ?? routeData?.countries ?? null,
+    countryCodes: route?.country_codes ?? routeB?.countries ?? null,
     crossBorderCost, isInternational,
     pickupDate: pickupDate || null,
     // Only a figure the user typed (sent as an override); else the server prices the nights.
@@ -1391,6 +1412,12 @@ export default function QuoteBuilder() {
     toll_cost_one_way: tollsOneWay != null ? round2(tollsOneWay) : null,
     // The empty return's own tolls (its route home), when that leg was priced.
     tolls_empty_return: costingInputs.tolls?.empty_return ?? null,
+    // Both legs as shown: the way back's own tolls and border, the estimated
+    // part of the border and the user's clearing-agent fee.
+    toll_cost_return: costingInputs.tolls?.return_leg ?? null,
+    border_cost_empty_return: borderEmptyBack,
+    border_estimate: borderEstimated,
+    clearing_agent_fee: agentFee,
     // The border line (all legs): additional_charges can't be read back as it.
     border_cost: crossBorderCost > 0 ? round2(crossBorderCost) : null,
     border_costs_unknown: borderUnknown,
@@ -2078,11 +2105,11 @@ export default function QuoteBuilder() {
                     {/* Part of the route has no border figures on file: what is known, what is missing.
                         The figure entered here is the whole border cost (every crossing). */}
                     {borderUnknown && (
-                      <BorderPop title={routeData?.countries?.length ? routeData.countries.join(" → ") : "Border charges"}
-                        agentFee={agentFee} onAgentFee={setAgentFee}
+                      <BorderPop title={routeB?.countries?.length ? routeB.countries.join(" → ") : "Border charges"}
+                        agentFee={agentFee} onAgentFee={setAgentFee} assumptions={borderAssumptions}
                         note={`Not on file: ${(borderUnknown.crossings.length ? borderUnknown.crossings : borderUnknown.countries).join(", ")}. Enter the total for every crossing.`}
-                        legs={(routeData?.cross_border_breakdown || []).length
-                          ? [{ title: "On file", items: (routeData?.cross_border_breakdown || []).filter(it => Number(it.amount) > 0), total: routeBorderOut }] : []} />)}
+                        legs={(routeB?.cross_border_breakdown || []).length
+                          ? [{ title: "On file", items: (routeB?.cross_border_breakdown || []).filter(it => Number(it.amount) > 0), total: routeBorderOut }] : []} />)}
                     {borderTyped !== "" && <button type="button" className="qb-linkbtn" onClick={() => setBorderTyped("")}>Reset</button>}</span>
                   {rIn(<NumberField id="qb-border-input" decimals={0} value={borderTyped === "" ? null : Number(borderTyped)} placeholder="Needed"
                     onValue={(n) => setBorderTyped(n == null ? "" : String(n))}
@@ -2090,7 +2117,7 @@ export default function QuoteBuilder() {
                 </div>
               )}
               {crossBorderCost > 0 && borderTyped === "" && !borderNotSet && (() => {
-                const outItems = (routeData?.cross_border_breakdown || []).filter(it => Number(it.amount) > 0);
+                const outItems = (routeB?.cross_border_breakdown || []).filter(it => Number(it.amount) > 0);
                 const backItems = (returnLeg?.cross_border_breakdown || []).filter(it => Number(it.amount) > 0);
                 const showBack = !!returnLeg && routeBorderBack != null && (tripType === "ROUND_TRIP" || emptyReturn.included);
                 const estimates = [...outItems, ...(showBack ? backItems : [])].some(it => !it.verified);
@@ -2098,8 +2125,8 @@ export default function QuoteBuilder() {
                   <div className="qb-cost__row">
                     <span className="qb-cost__label">
                       Border fees
-                      <BorderPop title={routeData?.countries?.length ? routeData.countries.join(" → ") : "Border charges"}
-                        agentFee={agentFee} onAgentFee={setAgentFee}
+                      <BorderPop title={routeB?.countries?.length ? routeB.countries.join(" → ") : "Border charges"}
+                        agentFee={agentFee} onAgentFee={setAgentFee} assumptions={borderAssumptions}
                         legs={[
                           { title: showBack ? "Out" : "Border fees", items: outItems, total: routeBorderOut },
                           ...(showBack ? [{ title: tripType === "ROUND_TRIP" ? "Back" : "Back, empty", items: backItems, total: routeBorderBack! }] : []),

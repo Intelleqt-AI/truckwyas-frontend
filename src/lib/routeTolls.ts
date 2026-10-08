@@ -1,6 +1,7 @@
 // Tolls and border charges from /route/calculate/, as the builder shows them.
 // Display only: the amounts the costing uses are the route's own totals.
 import { fmtNum, fmtRand } from "./quoteRules.ts";
+import { COUNTRY_NAMES } from "./borderUnknown.ts";
 
 export interface TollItem {
   plaza: string; route?: string; location_km?: number; tariff: number;
@@ -48,11 +49,21 @@ function foreignText(currency: string, amount: number, fx: Fx | null | undefined
 }
 
 /** Route option chip: "Fastest · via N17/N3 · tolls R 887" (plazas on hover). */
-export function routeChipLabel(r: { toll_summary?: string | null; toll_cost_zar?: number | null; tolls_unknown?: boolean; tolls_unavailable?: boolean; distance_km?: number }, index: number): string {
+export function routeChipLabel(r: { toll_summary?: string | null; toll_cost_zar?: number | null; tolls_unknown?: boolean; tolls_unavailable?: boolean; distance_km?: number; countries?: string[] | null }, index: number): string {
+  // A cross-border option says which countries it passes through ("through Botswana").
+  const mid = (r.countries || []).slice(1, -1).map((c) => COUNTRY_NAMES[c] ?? c);
+  const label = routeChipBase(r, index);
+  return mid.length ? `${label} · through ${mid.join(", ")}` : label;
+}
+
+function routeChipBase(r: { toll_summary?: string | null; toll_cost_zar?: number | null; tolls_unknown?: boolean; tolls_unavailable?: boolean }, index: number): string {
   if (r.toll_summary) {
     // "Fastest · via N17/N3 (Gosforth Ramp (W), Wilge, …) · tolls R 887": the plaza list goes to the hover.
+    // The money part is the option's own figure in whole rand (VAT basis is said in the toll popover).
+    const money = r.tolls_unknown || r.tolls_unavailable ? "tolls unknown" : r.toll_cost_zar != null ? `tolls ${fmtRand(r.toll_cost_zar)}` : null;
     return r.toll_summary.replace(/\u00a0/g, " ").split(" · ")
-      .map((part) => (part.startsWith("via ") && part.includes(" (") ? part.slice(0, part.indexOf(" (")) : part)).join(" · ");
+      .map((part) => (part.startsWith("via ") && part.includes(" (") ? part.slice(0, part.indexOf(" (")) : part))
+      .map((part) => (money && part.startsWith("tolls ") ? money : part)).join(" · ");
   }
   const name = index === 0 ? "Fastest" : `Alternative ${index}`;
   const tolls = r.tolls_unknown || r.tolls_unavailable || r.toll_cost_zar == null ? "tolls unknown" : `tolls ${fmtRand(r.toll_cost_zar)}`;

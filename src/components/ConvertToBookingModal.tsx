@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import { fmtTonnes } from '@/lib/tonnage';
 
 interface Props {
   quoteNumber?: string;
@@ -12,8 +13,12 @@ interface Props {
   deliveryDate?: string | null;
   /** The quote's distance (km), so a suggested delivery date fits the run. */
   distanceKm?: number | null;
-  /** dates: only when the quote lacks them and the suggested dates are shown. */
-  onConfirm: (driverId: string, vehicleId: string, dates?: { pickup_date: string; delivery_date: string }) => void;
+  /** Volume contract call-off: tonnes left and the planned load size (the
+   *  modal asks the tonnes and the dates of this load). */
+  callOff?: { remaining: number; size: number | null } | null;
+  /** dates: only when the quote lacks them and the suggested dates are shown
+   *  (always for a call-off). tonnes: a call-off's planned tonnes. */
+  onConfirm: (driverId: string, vehicleId: string, dates?: { pickup_date: string; delivery_date: string }, tonnes?: number) => void;
   onCancel: () => void;
 }
 
@@ -100,14 +105,18 @@ const addDays = (iso: string, n: number) => {
 // delivered the same day and Johannesburg to Cape Town in two.
 const roadDays = (km?: number | null) => (km && km > 0 ? Math.floor(km / 700) : 2);
 
-export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, pickupDate, deliveryDate, distanceKm, onConfirm, onCancel }: Props) {
+export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, pickupDate, deliveryDate, distanceKm, callOff, onConfirm, onCancel }: Props) {
   useFocusTrap(latestModal, true);
   // A booking needs dates. When the quote has none, the suggested ones are
   // shown and editable here, never filled in silently.
-  const needsDates = !pickupDate || !deliveryDate;
-  const [pickup, setPickup] = useState(pickupDate || isoInDays(2));
-  const [delivery, setDelivery] = useState(deliveryDate || addDays(pickupDate || isoInDays(2), roadDays(distanceKm)));
+  // A contract call-off is its own load: always its own dates and tonnes.
+  const needsDates = !!callOff || !pickupDate || !deliveryDate;
+  const [pickup, setPickup] = useState((!callOff && pickupDate) || isoInDays(2));
+  const [delivery, setDelivery] = useState((!callOff && deliveryDate) || addDays((!callOff && pickupDate) || isoInDays(2), roadDays(distanceKm)));
   const datesBad = needsDates && (!pickup || !delivery || delivery < pickup);
+  const [tonnesText, setTonnesText] = useState(callOff ? String(Math.min(callOff.size ?? callOff.remaining, callOff.remaining)).replace('.', ',') : '');
+  const tonnes = Number(tonnesText.replace(/\s/g, '').replace(',', '.'));
+  const tonnesBad = !!callOff && !(tonnes > 0 && tonnes <= callOff.remaining + 1e-9);
   const [showAssign, setShowAssign] = useState(false);
   const [driverId, setDriverId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
@@ -137,27 +146,37 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, pickupDa
   // a vehicle is ambiguous (a driver needs a truck) — same rule the backend
   // enforces on convert_to_load.
   const driverWithoutVehicle = !!driverId && !vehicleId;
-  const canProceed = !driverWithoutVehicle && !datesBad && !busy;
+  const canProceed = !driverWithoutVehicle && !datesBad && !tonnesBad && !busy;
 
   return (
     <div style={overlayStyle} onClick={onCancel}>
       <div style={boxStyle} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="convert-booking-title">
-        <h2 id="convert-booking-title" style={titleStyle}>Convert to booking</h2>
+        <h2 id="convert-booking-title" style={titleStyle}>{callOff ? 'Book a load' : 'Convert to booking'}</h2>
         <div style={messageStyle}>
-          Convert {quoteNumber ? <b>{quoteNumber}</b> : 'this quote'} to an active booking?
+          {callOff
+            ? <>A load on contract {quoteNumber ? <b>{quoteNumber}</b> : ''}. {fmtTonnes(callOff.remaining)} left.</>
+            : <>Convert {quoteNumber ? <b>{quoteNumber}</b> : 'this quote'} to an active booking?</>}
         </div>
+
+        {callOff && (
+          <div style={{ marginBottom: 12 }}>
+            <label htmlFor="convert-tonnes" style={fieldLabelStyle}>Tonnes on this load</label>
+            <input id="convert-tonnes" inputMode="decimal" value={tonnesText} onChange={e => setTonnesText(e.target.value)} style={selectStyle} />
+            {tonnesBad && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning-text, var(--status-warning))', marginTop: 6 }}>Enter up to {fmtTonnes(callOff.remaining)}.</div>}
+          </div>
+        )}
 
         {needsDates && (
           <div style={{ marginBottom: 12 }}>
-            <p style={{ ...messageStyle, marginBottom: 10 }}>The quote has no {!pickupDate && !deliveryDate ? 'collection or delivery date' : !pickupDate ? 'collection date' : 'delivery date'}. A booking needs both: check these suggested dates.</p>
+            {!callOff && <p style={{ ...messageStyle, marginBottom: 10 }}>The quote has no {!pickupDate && !deliveryDate ? 'collection or delivery date' : !pickupDate ? 'collection date' : 'delivery date'}. A booking needs both: check these suggested dates.</p>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label htmlFor="convert-pickup" style={fieldLabelStyle}>Collection{pickupDate ? '' : ' (suggested)'}</label>
-                <input id="convert-pickup" type="date" value={pickup} onChange={e => setPickup(e.target.value)} style={selectStyle} disabled={!!pickupDate} />
+                <label htmlFor="convert-pickup" style={fieldLabelStyle}>Collection{pickupDate || callOff ? '' : ' (suggested)'}</label>
+                <input id="convert-pickup" type="date" value={pickup} onChange={e => setPickup(e.target.value)} style={selectStyle} disabled={!!pickupDate && !callOff} />
               </div>
               <div>
-                <label htmlFor="convert-delivery" style={fieldLabelStyle}>Delivery{deliveryDate ? '' : ' (suggested)'}</label>
-                <input id="convert-delivery" type="date" value={delivery} min={pickup || undefined} onChange={e => setDelivery(e.target.value)} style={selectStyle} disabled={!!deliveryDate} />
+                <label htmlFor="convert-delivery" style={fieldLabelStyle}>Delivery{deliveryDate || callOff ? '' : ' (suggested)'}</label>
+                <input id="convert-delivery" type="date" value={delivery} min={pickup || undefined} onChange={e => setDelivery(e.target.value)} style={selectStyle} disabled={!!deliveryDate && !callOff} />
               </div>
             </div>
             {datesBad && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning-text, var(--status-warning))', marginTop: 6 }}>Delivery can't be before collection.</div>}
@@ -221,7 +240,7 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, pickupDa
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
           <button onClick={onCancel} style={cancelBtnStyle}>Cancel</button>
           <button
-            onClick={() => canProceed && onConfirm(driverId, vehicleId, needsDates ? { pickup_date: pickup, delivery_date: delivery } : undefined)}
+            onClick={() => canProceed && onConfirm(driverId, vehicleId, needsDates ? { pickup_date: pickup, delivery_date: delivery } : undefined, callOff ? tonnes : undefined)}
             disabled={!canProceed}
             style={{
               padding: '8px 16px',
@@ -239,7 +258,7 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, pickupDa
               opacity: canProceed ? 1 : 0.5,
             }}
           >
-            {busy ? 'Converting…' : vehicleId ? 'Assign and confirm' : 'Confirm, assign later'}
+            {busy ? (callOff ? 'Booking…' : 'Converting…') : vehicleId ? 'Assign and confirm' : callOff ? 'Book, assign later' : 'Confirm, assign later'}
           </button>
         </div>
       </div>

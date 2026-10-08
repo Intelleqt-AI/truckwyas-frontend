@@ -529,11 +529,11 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   });
 
   const convertToLoadMutation = useMutation({
-    mutationFn: ({ quote, driverId, vehicleId, dates }: { quote: any; driverId: string; vehicleId: string; dates?: { pickup_date: string; delivery_date: string } }) =>
+    mutationFn: ({ quote, driverId, vehicleId, dates, tonnes }: { quote: any; driverId: string; vehicleId: string; dates?: { pickup_date: string; delivery_date: string }; tonnes?: number }) =>
       postData({
         url: `api/v1/quotes/${quote.id}/convert_to_load/`,
         // dates: only when the quote had none and the modal showed suggested ones.
-        data: { driver_id: driverId, vehicle_id: vehicleId, ...(dates || {}) },
+        data: { driver_id: driverId, vehicle_id: vehicleId, ...(dates || {}), ...(tonnes != null ? { tonnes } : {}) },
       }).then(data => ({ data, quote })),
     onSuccess: ({ quote }) => {
       // Invalidate both keys — QuotesList uses 'loads', LoadsList uses 'loads-list'
@@ -1067,7 +1067,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           pickupDate={pendingConvertQuote?.pickup_date}
           deliveryDate={pendingConvertQuote?.delivery_date}
           distanceKm={pendingConvertQuote?.distance ? parseFloat(pendingConvertQuote.distance) : null}
-          onConfirm={(driverId, vehicleId, dates) => convertToLoadMutation.mutate({ quote: pendingConvertQuote, driverId, vehicleId, dates })}
+          callOff={pendingConvertQuote?.volume_contract ? { remaining: pendingConvertQuote.volume_contract.remaining_tonnes, size: pendingConvertQuote.volume_contract.tonnes_per_load } : null}
+          onConfirm={(driverId, vehicleId, dates, tonnes) => convertToLoadMutation.mutate({ quote: pendingConvertQuote, driverId, vehicleId, dates, tonnes })}
           onCancel={() => setPendingConvertQuote(null)}
         />
       )}

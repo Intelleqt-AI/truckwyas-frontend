@@ -16,6 +16,8 @@ export interface ServerCosting {
   } | null;
   floor: number | null;
   warnings: unknown[];
+  /** The previous answer kept on screen while the one for these inputs loads. */
+  placeholder?: boolean;
   resolution?: { vehicle_type_id?: number | null; suggested_vehicle_type_id?: number | null;
     /** Where an approved allowance rate comes from, e.g. 'NBCRFLI minimum R 243,63/night (from 1 Mar 2026)'. */
     driver_rate_detail?: string | null } | null;
@@ -34,7 +36,7 @@ export function useCostBreakdown(payload: Record<string, unknown> | null): Serve
     const t = setTimeout(() => setDebounced(key), 400);
     return () => clearTimeout(t);
   }, [key]);
-  const { data } = useQuery({
+  const { data, isPlaceholderData } = useQuery({
     queryKey: ["cost-breakdown", debounced],
     queryFn: () => postData({ url: COST_BREAKDOWN_URL, data: JSON.parse(debounced as string) }).catch(() => null),
     enabled: !!debounced,
@@ -45,5 +47,5 @@ export function useCostBreakdown(payload: Record<string, unknown> | null): Serve
     placeholderData: keepPreviousData,
   });
   if (!debounced || !data || (data as { success?: boolean }).success === false) return null;
-  return data as ServerCosting;
+  return { ...(data as ServerCosting), placeholder: isPlaceholderData || debounced !== key };
 }

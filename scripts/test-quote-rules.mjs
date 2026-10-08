@@ -70,4 +70,20 @@ t("international trip (Lesotho): flagged for the cost-breakdown call; nights at 
   assert.equal(cents(xb.floor - sa.floor), 486.84);
 });
 
+t("return leg priced on its own route: round-trip tolls out + back; empty return's own border charges", () => {
+  const base = { distance_km: 600, duration_minutes: 480, load_kg: 30000,
+    vehicle: { id: 1, name: "Interlink", capacity: 34, rated_burn_l_per_100km: 46.3 },
+    diesel: { zone: "INLAND", mode: "LIVE", official_price: 29.56 }, operating_cost_per_km: 14,
+    driver: { allowance_per_night: 650 }, target_margin_pct: 10 };
+  const rt = compute({ ...base, trip_type: "ROUND_TRIP", tolls: { one_way: 886.96, return_leg: 907.83 } });
+  const tl = rt.lines.find((l) => l.key === "tolls");
+  assert.equal(tl.amount, 1794.79); assert.equal(tl.basis, "R 886,96 out + R 907,83 back");
+  assert.equal(compute({ ...base, trip_type: "ROUND_TRIP", tolls: { one_way: 886.96 } }).lines.find((l) => l.key === "tolls").amount, 1773.92);
+  // One way to Harare, empty home: exit-only border charges on the way back.
+  const ow = compute({ ...base, trip_type: "ONE_WAY", distance_km: 1123, tolls: { one_way: 1171.32, empty_return: 1171.32 },
+    international: true, border_cost: 10950.85, border_cost_empty_return: 4711.19, border_estimate: 10950.85 });
+  assert.equal(ow.lines.find((l) => l.key === "border").basis, "Border, permit and non-SA toll costs (includes R 10 950,85 estimated)");
+  assert.equal(ow.lines.find((l) => l.key === "border_return").amount, 4711.19);
+});
+
 console.log(`quoteRules helpers: ${cases.length} cases passed`);

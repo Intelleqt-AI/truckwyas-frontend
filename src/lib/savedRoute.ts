@@ -19,3 +19,29 @@ export function savedRouteMatches(request: Record<string, unknown> | null | unde
   if (savedStops.length !== now.stops.length) return false;
   return savedStops.every((st, i) => same(st?.lat, now.stops[i].lat) && same(st?.lon, now.stops[i].lon));
 }
+
+/** A reopened quote's border figure to restore as typed: only the user's own
+ *  (costing_inputs.border_cost_is_override); else null, so the fresh route's
+ *  border lines stand. */
+export function savedBorderOverride(ci: Record<string, unknown> | null | undefined): number | null {
+  if (!ci || ci.border_cost_is_override !== true) return null;
+  const v = Number(ci.border_cost);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+
+/** The start of the SA toll year in force on `today` (SANRAL tariffs change on 1 March). */
+export function tollYearStart(today: Date): string {
+  const y = today.getUTCFullYear();
+  const m = today.getUTCMonth() + 1;
+  return `${m >= 3 ? y : y - 1}-03-01`;
+}
+
+/** Reuse a reopened quote's saved route (stable figures) unless prices on it
+ *  can have moved: a cross-border trip (exchange rates move daily), or a
+ *  quote priced before the toll tariffs now in force took effect. */
+export function reuseSavedRoute(o: { crossBorder: boolean; pricedAt: string | null | undefined; today?: Date }): boolean {
+  if (o.crossBorder) return false;
+  const priced = String(o.pricedAt ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(priced)) return true;
+  return priced >= tollYearStart(o.today ?? new Date());
+}

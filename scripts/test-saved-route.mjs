@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { savedRouteMatches } from '../src/lib/savedRoute.ts';
+import { savedRouteMatches, savedBorderOverride, reuseSavedRoute, tollYearStart } from '../src/lib/savedRoute.ts';
 
 const req = { origin_lat: -28.758133, origin_lon: 28.53757, dest_lat: -29.85, dest_lon: 31.03, vehicle_type: 'Tri-axle', vehicle_type_id: 7, stops: [] };
 const now = { pickup: { lat: -28.758133, lon: 28.53757 }, delivery: { lat: -29.85, lon: 31.03 }, truckId: 7, truckName: 'Tri-axle', stops: [] };
@@ -11,4 +11,15 @@ assert.equal(savedRouteMatches(req, { ...now, stops: [{ lat: -29.1, lon: 30 }] }
 assert.equal(savedRouteMatches({ ...req, stops: [{ lat: -29.1, lon: 30 }] }, { ...now, stops: [{ lat: -29.1, lon: 30 }] }), true, 'same stop');
 assert.equal(savedRouteMatches(req, { ...now, pickup: null }), false, 'collection not resolved yet');
 assert.equal(savedRouteMatches(null, now), false);
-console.log('savedRoute: 8 cases passed');
+assert.equal(savedBorderOverride({ border_cost: 9800, border_cost_is_override: true }), 9800, "the user's own figure comes back");
+assert.equal(savedBorderOverride({ border_cost: 14652.04, border_cost_is_override: false }), null, 'route figure: fresh lines stand');
+assert.equal(savedBorderOverride({ border_cost: 14652.04 }), null, 'older quote without the flag');
+assert.equal(savedBorderOverride({ border_cost: 0, border_cost_is_override: true }), null);
+assert.equal(savedBorderOverride(null), null);
+const oct = new Date('2026-10-08T12:00:00Z');
+assert.equal(tollYearStart(oct), '2026-03-01'); assert.equal(tollYearStart(new Date('2027-02-10T12:00:00Z')), '2026-03-01');
+assert.equal(reuseSavedRoute({ crossBorder: false, pricedAt: '2026-10-08T10:31:58Z', today: oct }), true, 'domestic, same tariff year');
+assert.equal(reuseSavedRoute({ crossBorder: true, pricedAt: '2026-10-08T10:31:58Z', today: oct }), false, 'cross-border: exchange rates move');
+assert.equal(reuseSavedRoute({ crossBorder: false, pricedAt: '2026-02-20T09:00:00Z', today: oct }), false, 'priced before 1 Mar 2026');
+assert.equal(reuseSavedRoute({ crossBorder: false, pricedAt: null, today: oct }), true);
+console.log('savedRoute: 19 cases passed');

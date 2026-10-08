@@ -1,4 +1,5 @@
 import { likelihoodLabel } from "@/lib/pricing";
+import { returnHistoryText } from "@/lib/tripEconomics";
 
 /**
  * Pricing analysis: the typed contract for POST /api/v1/quotes/pricing-analysis/
@@ -116,6 +117,8 @@ export interface PricingAnalysis {
   targetMarginSource: string | null;
   /** Floor including the empty return, when the floor itself excludes it. */
   floorWithReturn: number | null;
+  /** "On this lane 60% of your trips found a return load (3 of 5)." Context only. */
+  returnLoadHistory: string | null;
 }
 
 /** What the builder sends. Field names follow the brief; the backend's
@@ -384,6 +387,7 @@ export function adaptAnalysis(raw: unknown): PricingAnalysis | null {
     })(),
     targetMarginSource: str(obj(r.target_margin)?.source),
     floorWithReturn: num(cf?.floor_with_return ?? r.floor_with_return),
+    returnLoadHistory: returnHistoryText(r.return_load_history ?? obj(r.alternative_with_return_load)?.return_load_history),
     attention: arr(r.attention).map(obj).filter(Boolean).map((a) => ({ code: String(a!.code ?? ""), level: String(a!.level ?? "medium"), message: str(a!.message) || "" })).filter((a) => a.message),
     recommendation: obj(r.recommendation) ? { key: str(obj(r.recommendation)!.key), reason: str(obj(r.recommendation)!.reason), short: str(obj(r.recommendation)!.short) } : null,
     warnings: arr(r.warnings).map(obj).filter(Boolean).map((w) => ({ code: String(w!.code ?? ""), message: str(w!.message) || "" })).filter((w) => w.message),

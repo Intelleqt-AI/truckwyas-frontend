@@ -23,8 +23,10 @@ const sourceLine = (s: string) => sourceParts(s).map((p, i, all) => (
  * shows them, this block shows only how they were reached.
  * Money is whole rand here.
  */
-export default function PricingDecisionRows({ decision, marginInHeader = false, likelihoodInHeader = false }: {
+export default function PricingDecisionRows({ decision, marginInHeader = false, likelihoodInHeader = false, tollsUnknown = false }: {
   decision: DecisionView;
+  /** The tolls are unknown now: the stored R 0 / old figure is not shown, and the floor is incomplete. */
+  tollsUnknown?: boolean;
   /** The card's header already shows the margin / chance to win: each figure once per card. */
   marginInHeader?: boolean;
   likelihoodInHeader?: boolean;
@@ -54,22 +56,25 @@ export default function PricingDecisionRows({ decision, marginInHeader = false, 
         <>
           <div className="bk-kv">
             <span className="bk-kv__label">Cost floor <InfoTip label="About the cost floor">The full cost of the trip when it was priced: fuel, tolls, driver allowance, border fees and operating costs per km.{d.floorLinesDerived ? ' Operating costs here are the floor less the other lines.' : ''}</InfoTip></span>
-            <span className="bk-kv__value">{money(d.floor)}</span>
+            <span className="bk-kv__value">{tollsUnknown ? <span className="bk-muted">Incomplete</span> : money(d.floor)}</span>
           </div>
           {d.floorLines && (
             <ul className="qd-decision__parts" aria-label="Cost floor parts">
-              {d.floorLines.map((l) => (
-                <li key={l.label} className={l.missing ? 'is-missing' : undefined}>
+              {d.floorLines.map((l) => {
+                const unknown = tollsUnknown && /^tolls?$/i.test(l.label.trim());
+                return (
+                <li key={l.label} className={l.missing || unknown ? 'is-missing' : undefined}>
                   <span>{l.label}{l.source && /estimate/i.test(l.source) && <span className="qd-decision__kind">Estimate</span>}</span>
                   {/* A cost with no figure on record reads "Not set" (the floor leaves it out), never "R 0". */}
-                  <span>{l.missing ? 'Not set' : l.note || money(l.amount)}</span>
+                  <span>{unknown ? '—' : l.missing ? 'Not set' : l.note || money(l.amount)}</span>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </>
       )}
-      {d.margin && !marginInHeader && (
+      {d.margin && !marginInHeader && !tollsUnknown && (
         <>
           <div className="bk-kv">
             <span className="bk-kv__label">{d.stale ? `Margin at ${money(d.finalPrice)}` : 'Margin'}</span>

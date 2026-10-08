@@ -1,4 +1,6 @@
 import "@/components/layout/section-header.css";
+import { isForeignCountry, tripIsInternational } from "@/lib/tripInternational";
+import { savedRouteMatches } from "@/lib/savedRoute";
 import SectionHeader from "@/components/layout/SectionHeader";
 import "./quote-invoice-roles.css";
 import { localDateISO } from '@/lib/dates';
@@ -58,9 +60,6 @@ const extractCode = (s: string) => {
   for (const key in m) if (k.includes(key)) return m[key];
   return (s || "").slice(0, 3).toUpperCase();
 };
-// Mirrors the backend's country detection (core/services/cross_border.py):
-// anything that isn't South Africa itself counts as a foreign location.
-const isForeignCountry = (code?: string) => !!code && !["ZA", "ZAF"].includes(code.toUpperCase());
 
 interface TollBreakdownItem { plaza: string; route: string; location_km: number; tariff: number; }
 interface QuoteStop { id: string; location: string; coords: LocationCoords | null; }
@@ -467,7 +466,12 @@ export default function QuoteBuilder() {
   const preRoute = routeData?.routes?.[selectedRouteIndex] || null;
   const preDistance = preRoute?.distance_km ?? routeData?.distance_km ?? 0;
   const preDuration = preRoute?.duration_minutes ?? preRoute?.duration_min ?? routeData?.duration_minutes ?? null;
+  // A cross-border trip (route or any point outside SA): no border cost blocks.
+  const tripInternational = tripIsInternational(routeData, [pickupCoords?.country_code, deliveryCoords?.country_code, ...stops.map(st => st.coords?.country_code)]);
+  // The server prices driver nights at the cross-border allowance on an
+  // international trip, so it must be told (every cost-breakdown call).
   const breakdownPayload = customerId && pickupCoords && deliveryCoords && loadT > 0 && preDistance > 0 ? {
+    is_international: tripInternational,
     trip_type: tripType, one_way_distance_km: Math.round(preDistance * 100) / 100, legs: tripType === "ROUND_TRIP" ? 2 : 1,
     duration_minutes: preDuration != null ? Math.round(Number(preDuration)) : null,
     weight: loadT * 1000, vehicle_type_id: chosenVT?.id ?? null, vehicle_type: vehicleType || null,
@@ -530,9 +534,6 @@ export default function QuoteBuilder() {
   const tollBreakdownOneWay = tollBreakdown.reduce((s, b) => s + Number(b.tariff), 0);
   const routeBorderOneWay = (routeData?.additional_costs?.border_fees || 0) + (routeData?.additional_costs?.weighbridge_fees || 0) + (routeData?.additional_costs?.non_sa_tolls || 0);
   const borderOneWay = borderTyped !== "" ? (Number(borderTyped) || 0) / legs : routeBorderOneWay;
-  // A cross-border trip (route or any point outside SA): no border cost blocks.
-  const tripInternational = !!routeData?.cross_border || (routeData?.countries || []).some(c => isForeignCountry(c))
-    || [pickupCoords?.country_code, deliveryCoords?.country_code, ...stops.map(st => st.coords?.country_code)].some(c => isForeignCountry(c));
   const weightKg = loadT * 1000;
 
   // ---- company figures the costing needs: the server's resolution
@@ -652,6 +653,11 @@ export default function QuoteBuilder() {
   // routeIsCurrent) — so the AI panel never auto-runs on a previous route.
   const lastRouteKeyRef = useRef<string | null>(null);
   const routeReqIdRef = useRef(0);
+  // A reopened quote's saved route (route_snapshot request + response): used
+  // instead of a fresh calculation while collection, delivery, stops and
+  // truck are what it was calculated for, so a just-saved quote reopens on
+  // the same distance and tolls (a new lookup can differ: 410 vs 406 km).
+  const restoreRouteRef = useRef<{ request: Record<string, unknown>; response: RouteData; index: number } | null>(null);
   const calculateRoute = async () => {
     if (!pickupCoords || !deliveryCoords) return;
     const reqId = ++routeReqIdRef.current;
@@ -720,6 +726,21 @@ export default function QuoteBuilder() {
   useEffect(() => {
     if (!ready || billingBlocked) return;
     if (calcRef.current) clearTimeout(calcRef.current);
+    const saved = restoreRouteRef.current;
+    if (saved && savedRouteMatches(saved.request, {
+      pickup: pickupCoords, delivery: deliveryCoords, truckId: selectedVT?.id ?? null, truckName: truckName || "Flatbed",
+      stops: stops.filter(st => st.coords).map(st => ({ lat: st.coords!.lat, lon: st.coords!.lon })),
+    })) {
+      restoreRouteRef.current = null;
+      routeReqIdRef.current += 1; // a calculation already on its way is dropped
+      setCalculatingRoute(false);
+      lastRouteRequestRef.current = saved.request;
+      lastRouteKeyRef.current = routeRequestKey;
+      setRouteData(saved.response);
+      setSelectedRouteIndex(saved.index);
+      setRouteError(false);
+      return;
+    }
     calcRef.current = setTimeout(() => { calculateRoute(); }, 500);
     return () => { if (calcRef.current) clearTimeout(calcRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -842,6 +863,9 @@ export default function QuoteBuilder() {
       if (q.pickup_date) setPickupDate(q.pickup_date);
       if (q.delivery_date) setDeliveryDate(q.delivery_date);
       setSavedQuoteId(Number(editId));
+      { const sr = snap.request, resp = snap.response;
+        restoreRouteRef.current = sr && typeof sr === "object" && resp && typeof resp === "object" && (Array.isArray(resp.routes) ? resp.routes.length > 0 : true)
+          ? { request: sr, response: resp as RouteData, index: Number(snap.selected_route_index) || 0 } : null; }
       if (q.distance) setRouteData({ distance_km: Number(q.distance), toll_cost_zar: Number(q.toll_charges) / (q.trip_type === "ROUND_TRIP" ? 2 : 1),
         duration_minutes: Number(q.estimated_duration_minutes) > 0 ? Number(q.estimated_duration_minutes) : undefined });
     }).catch(() => toast.error("Couldn't load that quote"));
@@ -908,6 +932,7 @@ export default function QuoteBuilder() {
     setPickupDate(""); setDeliveryDate(""); setNlText("");
     setEditableTollCost(""); setTollManuallyEdited(false); setDriverAllowanceInput("");
     setDriverEdited(false); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setDistanceConfirmed(false); setUseOfficialDiesel(false);
+    restoreRouteRef.current = null;
     savedFinalPriceRef.current = null; savedPricingRef.current = null; savedBorderRef.current = null; borderRestoreRef.current = null; setReopenNotice(null); setPriceSet(null); setSavedPriceShown(false);
     setRouteError(false);
     setRouteData(null); setSelectedRouteIndex(0); setRouteBlockedMessage(null);
@@ -1148,6 +1173,10 @@ export default function QuoteBuilder() {
   useEffect(() => {
     const sp = savedPricingRef.current;
     if (!sp || !routeIsCurrent || floorNow == null) return;
+    // Wait for the company figures the server prices with (operating cost,
+    // driver allowance for this trip): the profile's stand-ins would show a
+    // false "Costs up" on a quote that has not changed.
+    if (breakdownPayload && selectedVT && !si) return;
     // Wait for a restored border figure, else the floor looks R x lower.
     if (savedBorderRef.current != null || (borderRestoreRef.current != null && borderTyped !== borderRestoreRef.current)) return;
     borderRestoreRef.current = null;
@@ -1156,7 +1185,7 @@ export default function QuoteBuilder() {
     if (!ch.changed || !ch.notice) return;
     setReopenNotice({ text: ch.notice, since: sp.pricedAt, reprice: ch.repriced_price_keep_margin });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeIsCurrent, floorNow, borderTyped]);
+  }, [routeIsCurrent, floorNow, borderTyped, !!si]);
 
   // Price bar height as a CSS variable (sticky aside, toasts sit above it).
   const priceBarRef = useRef<HTMLElement | null>(null);

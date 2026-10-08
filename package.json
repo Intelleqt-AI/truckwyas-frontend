@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types scripts/test-quote-golden.mjs && node --experimental-strip-types scripts/test-quote-rules.mjs && node --experimental-strip-types scripts/test-diesel-price.mjs && node --experimental-strip-types scripts/test-diesel-short.mjs && node --experimental-strip-types scripts/test-blob-error.mjs && node --experimental-strip-types scripts/test-quote-status.mjs && node --experimental-strip-types scripts/test-settings-checks.mjs && node --experimental-strip-types scripts/test-location-country.mjs && TZ=America/New_York node --experimental-strip-types scripts/test-sast-dates.mjs"
+    "test": "node --experimental-strip-types scripts/test-quote-golden.mjs && node --experimental-strip-types scripts/test-quote-rules.mjs && node --experimental-strip-types scripts/test-diesel-price.mjs && node --experimental-strip-types scripts/test-diesel-short.mjs && node --experimental-strip-types scripts/test-blob-error.mjs && node --experimental-strip-types scripts/test-quote-status.mjs && node --experimental-strip-types scripts/test-settings-checks.mjs && node --experimental-strip-types scripts/test-location-country.mjs && node --experimental-strip-types scripts/test-saved-route.mjs && TZ=America/New_York node --experimental-strip-types scripts/test-sast-dates.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

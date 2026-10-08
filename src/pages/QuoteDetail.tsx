@@ -16,8 +16,8 @@ import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
 import { Download, FileSearch } from 'lucide-react';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
-import { useSendCheck, sendBlockedMessage, quoteIncomplete } from '@/lib/quoteWarnings';
-import { randPerLitre, longDate } from '@/lib/dieselPrice';
+import { useSendCheck, sendBlockedMessage, quoteIncomplete as quoteIncompleteBase, quoteTollsUnknown } from '@/lib/quoteWarnings';
+import { randPerLitre, shortDate } from '@/lib/dieselPrice';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import SectionHeader from '@/components/layout/SectionHeader';
 import { StatusChip, statusMeta } from '@/components/ui/StatusChip';
@@ -148,6 +148,10 @@ export default function QuoteDetail() {
   // Fetched up front for an open quote, so a block shows on Send itself.
   const sendWarnings = useSendCheck(quote && ['DRAFT', 'SENT', 'ACCEPTED'].includes(quote.status) ? id : null, quote);
   const sendBlock = sendWarnings.find((w) => w.severity === 'block') ?? null;
+  // Tolls unknown now (saved so, or the send check says so): the old figure
+  // is not shown (never "Tolls R 0") and the quote reads as incomplete.
+  const tollsUnknownNow = quoteTollsUnknown(quote) || sendWarnings.some((w) => w.code === 'tolls_unknown');
+  const quoteIncomplete = (q: typeof quote) => quoteIncompleteBase(q) || tollsUnknownNow;
   // Copy link / WhatsApp are sends too: blocked like Send on an open quote.
   const shareBlocked = !!sendBlock && !!quote && (quote.status === 'DRAFT' || quote.status === 'SENT');
 
@@ -460,12 +464,18 @@ export default function QuoteDetail() {
       ? `${fuelWord.charAt(0).toUpperCase()}${fuelWord.slice(1)} ${fuelDelta > 0 ? 'up' : 'down'} ${formatMoney(Math.abs(fuelDelta))}/L since quoted: about ${formatMoneyWhole(Math.abs(fuelImpact))} ${fuelDelta > 0 ? 'more' : 'less'}.`
       : normaliseFigures(fuelAlert.message))
     : null;
-  // §11 / PDF: "Priced on diesel R 32,80/L (official inland, 7 Oct 2026)."
+  // Two dates, each named (the PDF's date is the fuel price's): "Priced on
+  // 8 Oct · diesel R 32,80/L official inland from 7 Oct".
   const pricedOn = Number(quote.fuel_price_used) > 0
-    ? `Priced on ${fuelWord} ${randPerLitre(Number(quote.fuel_price_used))}/${fuelWord === 'electric' ? 'kWh' : 'L'} (${[
-        quote.fuel_price_source === 'own' ? 'your price' : quote.fuel_price_source === 'override' ? 'set on quote' : 'official',
-        quote.fuel_price_source === 'official' || !quote.fuel_price_source ? (quote.fuel_zone === 'COASTAL' ? 'coastal' : 'inland') : null,
-      ].filter(Boolean).join(' ')}${quote.priced_at ? `, ${longDate(quote.priced_at)}` : ''}).`
+    ? (() => {
+        const official = quote.fuel_price_source === 'official' || !quote.fuel_price_source;
+        const source = quote.fuel_price_source === 'own' ? 'your price' : quote.fuel_price_source === 'override' ? 'set on quote'
+          : `official ${quote.fuel_zone === 'COASTAL' ? 'coastal' : 'inland'}`;
+        const from = official && quote.fuel_effective_from ? ` from ${shortDate(quote.fuel_effective_from)}` : '';
+        const unit = fuelWord === 'electric' ? 'kWh' : 'L';
+        const when = quote.priced_at ? `Priced on ${shortDate(quote.priced_at)} · ` : 'Priced on ';
+        return `${when}${fuelWord} ${randPerLitre(Number(quote.fuel_price_used))}/${unit} ${source}${from}.`;
+      })()
     : null;
   // An expired quote, or a draft priced before the diesel rise, is edited
   // before it goes out (R8): Edit quote is the primary, Send the secondary.
@@ -518,7 +528,7 @@ export default function QuoteDetail() {
     { label: 'Base rate', value: parseFloat(quote.base_rate || '0') },
     // The builder's line names (Fuel, Tolls), not the stored field names.
     { label: 'Fuel', value: parseFloat(quote.fuel_surcharge || '0') },
-    { label: 'Tolls', value: parseFloat(quote.toll_charges || '0') },
+    { label: 'Tolls', value: tollsUnknownNow ? NaN : parseFloat(quote.toll_charges || '0') },
     { label: 'Driver allowance', value: parseFloat(quote.driver_allowance || '0') },
     ...(parseFloat(quote.additional_charges || '0') > 0 ? [{ label: 'Cross-border and other charges', value: parseFloat(quote.additional_charges) }] : []),
     ...(isRound && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0
@@ -540,7 +550,7 @@ export default function QuoteDetail() {
     amount: total - serverFloor,
     pct: quote.margin_percentage != null && quote.margin_percentage !== '' ? Math.round(Number(quote.margin_percentage)) : Math.round((total - serverFloor) / total * 100),
   } : null;
-  const marginNow = decision && !decision.stale ? decision.margin : serverMargin;
+  const marginNow = quoteIncomplete(quote) ? null : decision && !decision.stale ? decision.margin : serverMargin;
   // No chance to win on a dead offer (R9), nor once decided: then it shows
   // once, as "when priced", under How it was priced.
   const showChance = !!decision?.likelihood && openStatus && !lapsed && undecided;
@@ -790,7 +800,7 @@ export default function QuoteDetail() {
             {showBuildUp && <div className="qd-price-rows">
               {/* Lines in whole rand. */}
               {priceRows.map(r => (
-                <div key={r.label} className="bk-kv"><span className="bk-kv__label">{r.label}</span><span className="bk-kv__value">{formatMoneyWhole(r.value)}</span></div>
+                <div key={r.label} className="bk-kv"><span className="bk-kv__label">{r.label}</span><span className="bk-kv__value">{Number.isFinite(r.value) ? formatMoneyWhole(r.value) : '—'}</span></div>
               ))}
               {/* Normal weight: when it is a large share of the total it is the
                   line a reader most needs to see (as on Booking detail). */}
@@ -813,7 +823,7 @@ export default function QuoteDetail() {
                 )}
               </div>
             )}
-            {decision && <PricingDecisionRows decision={decision} marginInHeader={!!marginNow} likelihoodInHeader={showChance} />}
+            {decision && <PricingDecisionRows decision={decision} marginInHeader={!!marginNow} likelihoodInHeader={showChance} tollsUnknown={tollsUnknownNow} />}
             {(!decision || decision.stale) && serverFloor != null && !quoteIncomplete(quote) && (
               <div className="qd-price-rows">
                 <div className="bk-kv"><span className="bk-kv__label">Cost floor now</span><span className="bk-kv__value">{formatMoneyWhole(serverFloor)}</span></div>

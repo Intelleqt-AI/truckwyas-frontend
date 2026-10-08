@@ -35,6 +35,9 @@ assert.notEqual(costLabel("actual", true), costLabel("actual", false)); n++;
   eq(g.line, "Actual: fuel · Estimated: running cost");
   eq(sp(g.recordedNote), "Maintenance and overheads recorded R 1 200,00: inside the running cost, not added again");
   eq(costGroupsText([{ group: "operating", estimated: 1, actual: null, used: 1, basis: "estimate" }]).line, null);
+  // After Close costs the slips count as actual: a name, never the raw key.
+  eq(costGroupsText([{ group: "fuel", estimated: null, actual: 10, used: 10, basis: "actual" },
+    { group: "operating_recorded", estimated: null, actual: 5, used: 5, basis: "actual" }]).line, "Actual: fuel, maintenance & overheads");
 }
 eq(costBasisLabel({ cost_basis: "estimate", estimate_label: "Quote costing, no empty return (return load linked)", estimate_basis: "snapshot_return_linked" }),
   "Estimate · no empty return");

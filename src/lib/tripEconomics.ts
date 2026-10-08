@@ -143,7 +143,7 @@ export function costBasisLabel(leg: Pick<EconomicsLeg, "cost_basis" | "estimate_
 
 const GROUP_NAMES: Record<string, string> = {
   fuel: "fuel", tolls: "tolls", driver: "driver", operating: "running cost", border: "border",
-  other: "other", subcontractor: "subcontractor",
+  other: "other", subcontractor: "subcontractor", operating_recorded: "maintenance & overheads",
 };
 
 /** Which cost groups are actual and which are estimated, plus slips already

@@ -1,5 +1,5 @@
 import './trip.css';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData } from '@/lib/Api';
@@ -49,6 +49,13 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
   });
   const econ = econQ.data;
 
+  // One close / reopen in flight, even on a double click before re-render.
+  const closing = useRef(false);
+  const setClosed = (closed: boolean) => {
+    if (closing.current) return;
+    closing.current = true;
+    closeCosts.mutate(closed, { onSettled: () => { closing.current = false; } });
+  };
   const closeCosts = useMutation({
     mutationFn: (closed: boolean) => postData({ url: `api/v1/loads/${load.id}/close-costs/`, data: { closed } }),
     onSuccess: (_r, closed) => { invalidateTrip(qc); toast.success(closed ? 'Costs closed' : 'Costs reopened'); },
@@ -130,11 +137,11 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
             </button>
           )}
           {thisLeg && (thisLeg.costs_closed ? (
-            <button type="button" className="bk-btn bk-btn--secondary bk-btn--sm" onClick={() => closeCosts.mutate(false)} disabled={closeCosts.isPending}>
+            <button type="button" className="bk-btn bk-btn--secondary bk-btn--sm" onClick={() => setClosed(false)} disabled={closeCosts.isPending}>
               {closeCosts.isPending ? 'Reopening…' : 'Reopen costs'}
             </button>
           ) : (thisLeg.actual_cost ?? 0) > 0 && (
-            <button type="button" className="bk-btn bk-btn--secondary bk-btn--sm" onClick={() => closeCosts.mutate(true)} disabled={closeCosts.isPending}
+            <button type="button" className="bk-btn bk-btn--secondary bk-btn--sm" onClick={() => setClosed(true)} disabled={closeCosts.isPending}
               title="Every cost of this job is recorded: use the expenses as the whole cost">
               {closeCosts.isPending ? 'Closing…' : 'Close costs'}
             </button>

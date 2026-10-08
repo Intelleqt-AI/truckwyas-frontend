@@ -1,0 +1,87 @@
+/* Fleet actuals: measured fuel use (Cartrack). Calm: one strip, one cell,
+   one drawer section. Tokens only (both themes). */
+
+.ff-strip {
+  padding: 12px var(--card-pad, 20px);
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.ff-strip__main { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.ff-strip__line { color: var(--text-tertiary); }
+
+.ff-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--link, var(--accent-primary));
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-align: left;
+}
+.ff-link:disabled { color: var(--text-tertiary); cursor: default; text-decoration: none; }
+
+.ff-cell { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.ff-cell__top { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ff-value { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ff-value--btn { background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
+.ff-tag {
+  font-size: 12px;
+  line-height: 16px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.ff-tag--measured { border-color: var(--status-success); color: var(--status-success-text); }
+.ff-sub, .ff-muted { font-size: 13px; line-height: 20px; color: var(--text-tertiary); }
+
+.ff-detail { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-subtle); font-family: var(--font-sans); }
+.ff-detail__title { margin: 0 0 8px; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--text-primary); }
+.ff-detail__sub { margin: 16px 0 4px; font-size: 13px; line-height: 20px; font-weight: 600; color: var(--text-secondary); }
+.ff-detail__chips { margin-bottom: 8px; }
+.ff-detail__how { margin: 8px 0 0; }
+.ff-lines { margin: 0; padding: 0; list-style: none; font-size: 13px; line-height: 22px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.ff-lines--muted { color: var(--text-tertiary); }
+.ff-warn { margin: 8px 0; font-size: 13px; line-height: 20px; color: var(--status-warning-text); }
+
+.ff-seg { display: flex; margin-top: 16px; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); overflow: hidden; }
+.ff-seg__opt {
+  flex: 1;
+  min-height: 40px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.ff-seg__opt + .ff-seg__opt { border-left: 1px solid var(--border-subtle); }
+.ff-seg__opt.is-on { background: var(--bg-raised); color: var(--text-primary); font-weight: 500; }
+.ff-seg__opt:disabled { cursor: not-allowed; opacity: 0.6; }
+
+.ff-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--card-pad, 20px);
+  min-width: 0;
+}
+.ff-card__title { margin: 0 0 8px; font-size: 16px; line-height: 24px; font-weight: 600; color: var(--text-primary); }
+.ff-card__top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.ff-card__value { font-size: 20px; line-height: 28px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .ff-link { min-height: 44px; display: inline-flex; align-items: center; }
+  .ff-seg__opt { min-height: 48px; }
+}

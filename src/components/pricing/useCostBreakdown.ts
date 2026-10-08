@@ -20,7 +20,9 @@ export interface ServerCosting {
   placeholder?: boolean;
   resolution?: { vehicle_type_id?: number | null; suggested_vehicle_type_id?: number | null;
     /** Where an approved allowance rate comes from, e.g. 'NBCRFLI minimum R 243,63/night (from 1 Mar 2026)'. */
-    driver_rate_detail?: string | null } | null;
+    driver_rate_detail?: string | null;
+    /** The truck fuel figure priced on (fleet actuals): measured by Cartrack, your figure or the standard estimate. */
+    rated_burn?: import("@/lib/fleetFuel").RatedBurn | null } | null;
 }
 
 /**

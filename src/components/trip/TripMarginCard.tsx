@@ -9,7 +9,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import {
-  combinedBasisLabel, costBasisLabel, costGroupsText, emptyReturnNote, linkWarnings, missingPrompts, money as moneyText, pctText,
+  combinedBasisLabel, costBasisLabel, costGroupsText, emptyReturnNote, fuelBurnNote, linkWarnings, missingPrompts, money as moneyText, pctText,
   ptsText, revenueBasisLabel, roleLabel, isPending, type Candidate, type Economics, type EconomicsLeg, type LinkWarning,
 } from '@/lib/tripEconomics';
 import { CandidateOption } from './CandidateOption';
@@ -104,6 +104,7 @@ export function TripMarginCard({ load, onAddTruck }: { load: LoadLike; onAddTruc
         <span className="tm-sub" title={leg.cost_basis === 'estimate' ? leg.estimate_label : undefined}>{costBasisLabel(leg)}</span>
         {costGroupsText(leg.cost_groups).line && <span className="tm-sub">{costGroupsText(leg.cost_groups).line}</span>}
         {costGroupsText(leg.cost_groups).recordedNote && <span className="tm-sub">{costGroupsText(leg.cost_groups).recordedNote}</span>}
+        {fuelBurnNote(leg.cost_groups) && <span className="tm-sub">{fuelBurnNote(leg.cost_groups)}</span>}
       </td>
       <td data-label="Margin" className={tone(leg.margin)}>
         {leg.margin !== null ? money(leg.margin) : <span className="tm-muted">—</span>}

@@ -1,6 +1,7 @@
 import './fleet-detail.css';
 import { useCallback, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { TruckFuelCard } from '@/components/fleet/FleetFuel';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, patchData } from '@/lib/Api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -398,6 +399,7 @@ export default function VehicleFinancialProfile() {
           {driverCard}
           {!bal.inMain('facts') && factsCard}
           {conditionCard}
+          {id && <TruckFuelCard vehicleId={id} />}
         </aside>
       </div>
 

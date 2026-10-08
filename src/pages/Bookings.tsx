@@ -28,6 +28,7 @@ import { parseTonnes, saveWeighbridge } from '@/components/pricing/weighbridge';
 import { fmtRatePerTonne, fmtTonnes } from '@/lib/tonnage';
 import { TripMarginCard } from '@/components/trip/TripMarginCard';
 import { invoiceMismatchText } from '@/lib/tripEconomics';
+import { FuelAdjustmentRow } from '@/components/followups/QuoteFollowUp';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   PENDING: 'neutral',
@@ -172,6 +173,8 @@ export default function Bookings() {
     // Assigning a truck re-costs the job on the server: its margin and
     // return-load suggestions change with it.
     qc.invalidateQueries({ queryKey: ['load-economics'] });
+    // Weighbridge tonnes change a per-tonne load's fuel price adjustment.
+    qc.invalidateQueries({ queryKey: ['fuel-adjustment', 'loads'] });
     qc.invalidateQueries({ queryKey: ['return-candidates'] });
   };
 
@@ -714,6 +717,10 @@ export default function Bookings() {
                 </>
               );
             })()}
+            {/* Fuel price clause on the quote: the adjustment this load's invoice carries. */}
+            {load.quote != null && (
+              <FuelAdjustmentRow kind="loads" id={load.id} onOpenInvoice={(invoiceId) => navigate(`/finance/invoices/${invoiceId}`)} />
+            )}
             {/* What fuel was expected to cost vs what was spent (expenses on
                 this order's trips). Hidden when there's neither figure. */}
             {(() => {

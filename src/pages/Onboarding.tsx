@@ -1,3 +1,4 @@
+import { PricingSetupNotice } from '@/components/followups/QuoteListNotices';
 import "./auth-brand.css";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -420,6 +421,10 @@ export function Onboarding() {
                 </>
               )}
             </div>
+
+            {/* Pricing basics (admins, while any is not set): what quotes use
+                until the company sets its own. */}
+            <div style={{ textAlign: 'left' }}><PricingSetupNotice variant="step" /></div>
 
             <button
               onClick={handleComplete}

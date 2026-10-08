@@ -10,6 +10,7 @@ import { localDateISO } from '@/lib/dates';
 import "./quote-builder-controls.css";
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { QuoteClauseNote } from "@/components/followups/QuoteFollowUp";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, patchData, fetchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
@@ -20,7 +21,7 @@ import { burnInUse, burnDetail, localRatedBurn, noticeWithBurn, pricedOnText, qu
 import { compute, computeTonnage, changesSincePriced, fmtNum, suggestTruck, capacityTonnes, vehicleClass, CLASS_OPERATING_DEFAULTS, cents, type CostingInputs, type DieselInput, type Tonnage, type TonnageCosting } from "@/lib/quoteRules";
 import { TonnagePanel, type TonnageChoice, type TonnageMarket } from "@/components/pricing/TonnagePanel";
 import { useTonnageAnalysis } from "@/components/pricing/useTonnageAnalysis";
-import { fmtRatePerTonne, fmtTonnes, loadsText } from "@/lib/tonnage";
+import { fmtRatePerTonne, fmtTonnes, loadsText, nextAutoBasis, AUTO_BASIS_START, type AutoBasis } from "@/lib/tonnage";
 import { useCostBreakdown } from "@/components/pricing/useCostBreakdown";
 import { sendBlockedMessage, SEND_CHECK_KEY } from "@/lib/quoteWarnings";
 import { ownDieselImpactText } from "@/lib/quoteStatus";
@@ -360,8 +361,8 @@ export default function QuoteBuilder() {
   const [contractEnd, setContractEnd] = useState("");
   const [ratePerTonne, setRatePerTonne] = useState<number | null>(null);
   // Truck unknown: the cost card follows the safest truck (the tonnage basis).
-  const [autoBasisName, setAutoBasisName] = useState<string | null>(null);
-  const basisHistoryRef = useRef<string[]>([]);
+  const [autoBasis, setAutoBasis] = useState<AutoBasis>(AUTO_BASIS_START);
+  const autoBasisName = autoBasis.name;
   const [cargo, setCargo] = useState("");
   const [pickupDate, setPickupDate] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
@@ -822,6 +823,12 @@ export default function QuoteBuilder() {
     const est = Number(opInUse?.estimates?.[cls]) > 0 ? Number(opInUse.estimates[cls]) : CLASS_OPERATING_DEFAULTS[cls];
     return { value: est, source: "vehicle_default" };
   };
+  // The truck the tonnage is priced on by id: the one chosen, or the auto truck
+  // the builder holds (nextAutoBasis), else none (safest).
+  const pricedOnId: number | null = chosenVT?.id != null ? Number(chosenVT.id)
+    : autoBasis.held && autoBasisVT?.id != null ? Number(autoBasisVT.id) : null;
+  const tonnageInputKey = JSON.stringify([loadT, isContract ? totalTonnes : null, minTonnes, pickupCoords?.lat, pickupCoords?.lon,
+    deliveryCoords?.lat, deliveryCoords?.lon, stops.filter(st => st.coords).map(st => `${st.coords!.lat},${st.coords!.lon}`).join("|"), tripType, returnLoadBooked, cargo]);
   const localTonnage: TonnageCosting | null = useMemo(() => {
     if (!perTonne || !(loadT > 0) || !(distance > 0)) return null;
     const { vehicle: _v, load_kg: _l, price: _p, operating_cost_per_km: _o, operating_cost_source: _s, ...lane } = costingInputs;
@@ -831,16 +838,16 @@ export default function QuoteBuilder() {
         operating_cost_per_km: op?.value ?? null, operating_cost_source: op?.source ?? null };
     });
     return computeTonnage({ lane, trucks, tonnes_per_load: loadT, total_tonnes: isContract ? totalTonnes : null,
-      min_tonnes_per_load: minTonnes, vehicle_type_id: chosenVT?.id != null ? Number(chosenVT.id) : null, rate_per_tonne: ratePerTonne });
+      min_tonnes_per_load: minTonnes, vehicle_type_id: pricedOnId, rate_per_tonne: ratePerTonne });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [perTonne, loadT, distance, JSON.stringify(costingInputs), vehicleTypesRaw, companyProfile, isContract, totalTonnes, minTonnes, chosenVT?.id, ratePerTonne, useConfiguredBurn]);
+  }, [perTonne, loadT, distance, JSON.stringify(costingInputs), vehicleTypesRaw, companyProfile, isContract, totalTonnes, minTonnes, pricedOnId, ratePerTonne, useConfiguredBurn]);
   const tonnagePayload = perTonne && customerId && pickupCoords && deliveryCoords && loadT > 0 && distance > 0 ? {
     pricing_basis: "per_tonne", customer_id: Number(customerId),
     origin: extractCode(pickup), destination: extractCode(delivery), cargo_description: cargo || null,
     trip_type: tripType, one_way_distance_km: Math.round(distance * 100) / 100, legs,
     duration_minutes: durationMin != null ? Math.round(Number(durationMin)) : null, is_international: tripInternational,
     tonnes_per_load: loadT, total_tonnes: isContract ? totalTonnes : null, min_tonnes_per_load: minTonnes,
-    vehicle_type_id: chosenVT?.id ?? null, rate_per_tonne: ratePerTonne,
+    vehicle_type_id: pricedOnId, rate_per_tonne: ratePerTonne,
     toll_cost_one_way: tollsOneWay != null ? Math.round(tollsOneWay * 100) / 100 : null, tolls_unknown: tollsOneWay == null && !tollsNone,
     tolls_confirmed_none: tollsNone, toll_cost_empty_return: costingInputs.tolls?.empty_return ?? null,
     include_empty_return: returnLoadBooked ? false : null,
@@ -891,13 +898,9 @@ export default function QuoteBuilder() {
     if (!perTonne || vehicleType) return;
     const id = tonnage?.basis_vehicle_type_id;
     const name: string | null = id != null ? allVehicleTypes.find((v: VTLite) => String(v.id) === String(id))?.name ?? null : null;
-    if (!name || name === autoBasisName) return;
-    const h = basisHistoryRef.current;
-    if (h.length >= 2 && h[h.length - 2] === name) return;   // never flip back and forth
-    basisHistoryRef.current = [...h.slice(-3), name];
-    setAutoBasisName(name);
+    setAutoBasis((st) => nextAutoBasis(st, tonnageInputKey, name, tonnage?.basis_reason));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [perTonne, vehicleType, tonnage?.basis_vehicle_type_id]);
+  }, [perTonne, vehicleType, tonnage?.basis_vehicle_type_id, tonnage?.basis_reason, tonnageInputKey]);
 
   // ---- route calculation (debounced auto-run) ----
   const calcRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1428,7 +1431,7 @@ export default function QuoteBuilder() {
     setStops([]); setPickMode("pickup"); setStopsExpanded(false);
     setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
     setPricingBasis("per_load"); setIsContract(false); setTotalTonnes(null); setMinTonnes(null); setRatePerTonne(null);
-    setContractStart(""); setContractEnd(""); setAutoBasisName(null); basisHistoryRef.current = [];
+    setContractStart(""); setContractEnd(""); setAutoBasis(AUTO_BASIS_START);
     setPickupDate(""); setDeliveryDate(""); setNlText("");
     setEditableTollCost(""); setTollManuallyEdited(false); setDriverAllowanceInput("");
     setDriverEdited(false); setDriverNightsSet(null); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setAgentFee(null); setAbnormalLoad(false); setDistanceConfirmed(false); setUseOfficialDiesel(false); setUseConfiguredBurn(false); setSavedBurn(null);
@@ -1940,6 +1943,7 @@ export default function QuoteBuilder() {
     if (pickupCoords && deliveryCoords && !routeIsCurrent && !routeError) return "The route is still updating: try again in a moment";
     if (weightBlockedMessage) return weightBlockedMessage;
     if (perTonne && isContract && !(Number(totalTonnes) > 0)) return "Enter the contract's total tonnes";
+    if (perTonne && isContract && contractStart && contractEnd && contractEnd < contractStart) return "The contract ends before it starts";
     if (perTonne && rateToSave == null) return "The rate per tonne is still being worked out";
     if (isDemoQuotaExceeded) return "This demo session's quote is used. Log in again for a new one.";
     return null;
@@ -2673,6 +2677,7 @@ export default function QuoteBuilder() {
             periodStart={contractStart} periodEnd={contractEnd}
             onPeriod={(a, b) => { setContractStart(a); setContractEnd(b); }}
             chosenId={chosenVT?.id != null ? Number(chosenVT.id) : null}
+            held={!chosenVT && autoBasis.held}
             onChooseTruck={(id) => {
               if (id == null) { setVehicleType(""); return; }
               const vt = allVehicleTypes.find((v: VTLite) => Number(v.id) === id);
@@ -2716,6 +2721,9 @@ export default function QuoteBuilder() {
       <div className="qb-after">
       {/* notes: above the price bar so they are filled in before sending */}
       {ready && <div style={{ marginBottom: 16 }}><div style={fieldLabelS}><label htmlFor="qb-notes">Notes</label></div><textarea id="qb-notes" value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Optional" style={{ ...inputS, resize: "vertical" }} /></div>}
+      {/* Fuel price clause: what the PDF will say (company setting; a saved
+          draft shows its own clause). Nothing when the clause is off. */}
+      {ready && <QuoteClauseNote quoteId={savedQuoteId ?? (editId ? Number(editId) : null)} />}
       </div>
       </div>
 

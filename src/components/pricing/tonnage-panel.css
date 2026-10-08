@@ -70,6 +70,12 @@
 .ct-sub { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
 .ct-progress { margin: 0; min-width: 120px; }
 .ct-table td { vertical-align: middle; }
+.ct-table .ct-col-status { white-space: nowrap; width: 1%; }
+.ct-table .ct-col-lane { max-width: 24ch; }
+.ct-table .ct-col-client { max-width: 22ch; }
+.ct-table .ct-progress { min-width: 100px; }
+.ct-table .ct-col-period { max-width: 14ch; }
+@media (max-width: 1180px) { .ct-col-period, .ct-col-min { display: none; } }
 @media (max-width: 768px) {
   .ct-col-lane, .ct-col-min, .ct-col-period, .ct-col-status { display: none; }
   .ct-table { min-width: 0; width: 100%; }

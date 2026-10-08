@@ -3,7 +3,7 @@ import './quote-invoice-roles.css';
 import './bookings-section.css';
 import { useState, useEffect, useCallback } from 'react';
 import { useMapFill } from './useMapFill';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchData, patchData, deleteData, postData, downloadBlob } from '@/lib/Api';
 import { formatCurrency, formatDate, formatDistance, formatMoney, formatMoneyWhole, formatNumber, normaliseFigures, sentenceCaseLabel } from '@/lib/formatters';
@@ -34,6 +34,7 @@ import { LOSS_REASONS, formatPct, formatRand, lossReasonPayload, type LossReason
 import { agreedMarginOf, agreedPriceOf, pricingDecisionOf } from '@/lib/pricingDecision';
 import { cargoText } from '@/lib/cargo';
 import { TonnageTerms } from '@/components/pricing/TonnageTerms';
+import { DraftClauseLine, FollowUpCard, FuelAdjustmentRow } from '@/components/followups/QuoteFollowUp';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   DRAFT: 'neutral',
@@ -104,6 +105,9 @@ function lossReasonText(quote: { loss_reason?: { reason?: string; note?: string 
 
 export default function QuoteDetail() {
   const { id } = useParams();
+  // ?follow_up=1 (an expiry / no-answer nudge) opens the follow-up card.
+  const [searchParams] = useSearchParams();
+  const focusFollowUp = searchParams.get('follow_up') === '1';
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user: authUser } = useAuth();
@@ -804,6 +808,10 @@ export default function QuoteDetail() {
               {fuelNote && <span className="bk-dot bk-dot--warning" aria-hidden="true" />}
               <span>{pricedOn}{fuelNote && Number.isFinite(fuelDelta) && Math.abs(fuelDelta) >= 0.005 ? ` Now ${fuelDelta > 0 ? 'up' : 'down'} ${formatMoney(Math.abs(fuelDelta))}/L.` : ''}</span>
             </p>}
+            {/* Fuel price clause: what a draft's PDF will say; once sent, the adjustment it carries. */}
+            {quote.status === 'DRAFT'
+              ? <DraftClauseLine quoteId={id} />
+              : <FuelAdjustmentRow kind="quotes" id={id} />}
             {perTonne && <div className="qd-price-rows"><TonnageTerms quote={quote} /></div>}
             {sendBlock && openStatus && <p className="qd-block" role="alert">{sendBlock.title}</p>}
             {!sendBlock && demoteReason && <p className="qd-demote" role="status">{demoteReason}</p>}
@@ -857,6 +865,10 @@ export default function QuoteDetail() {
                   carried no signal. The stored pricing decision is the one signal. */}
             </div>
           </section>
+
+          {!booked && !declined && quote.status === 'SENT' && (
+            <FollowUpCard quoteId={id!} status={quote.status} customerName={quote.customer_company || quote.customer_name} focus={focusFollowUp} />
+          )}
 
           {!booked && !declined && !neverSent && (effectiveShareUrl || (quote.status === 'SENT' && undecided)) && (
             <section className="bk-card" aria-labelledby="qd-customer-title">

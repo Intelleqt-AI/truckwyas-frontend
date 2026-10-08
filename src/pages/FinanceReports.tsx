@@ -13,6 +13,7 @@ import CustomerStatement from '@/components/reports/CustomerStatement';
 import { RevenueByCustomer, RevenueByLane, SalesByMonth } from '@/components/reports/RevenueReports';
 import { ExpenseReport, VatReport } from '@/components/reports/CostAndTax';
 import LaneMargin from '@/components/reports/LaneMargin';
+import WeeklyMargin from '@/components/reports/WeeklyMargin';
 
 /* Finance > Reports: a library of accountant-grade statements built from the
    records TruckWys holds (invoices, payments, expenses, loads). Reports say
@@ -83,6 +84,7 @@ function Report({ id }: { id: ReportId }) {
       {id === 'customers' && <RevenueByCustomer d={data} companyName={name} />}
       {id === 'lanes' && <RevenueByLane d={data} companyName={name} />}
       {id === 'margin' && <LaneMargin companyName={name} />}
+      {id === 'weekly' && <WeeklyMargin companyName={name} />}
       {id === 'expenses' && <ExpenseReport d={data} companyName={name} />}
       {id === 'vat' && <VatReport d={data} companyName={name} vatNumber={company.data?.vat_number} />}
     </>

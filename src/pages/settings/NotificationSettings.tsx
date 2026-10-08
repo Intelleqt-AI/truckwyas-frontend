@@ -14,8 +14,8 @@ const ToggleRow = SettingsToggleRow;
 
 // Canonical schema — mirrors backend core/services/notification_prefs.py.
 const DEFAULTS = {
-  email: { quotes: true, invoices: true, payments: true, fleet_alerts: true, weekly_reports: false },
-  push: { new_bookings: true, payment_received: true, maintenance_due: true, driver_updates: false },
+  email: { quotes: true, invoices: true, payments: true, fleet_alerts: true, weekly_reports: false, fuel_alerts: true, margin_report: true },
+  push: { new_bookings: true, payment_received: true, maintenance_due: true, driver_updates: false, quote_reminders: true },
   sms: { critical_alerts: false, payment_confirmations: false },
 };
 
@@ -34,6 +34,7 @@ function mergeSettings(server: any): Settings {
 export function NotificationSettings() {
   const { user: authUser } = useAuth();
   const isDemo = !!authUser?.is_demo;
+  const isAdmin = String(authUser?.role || '').toUpperCase() === 'ADMIN';
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
   const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -126,6 +127,8 @@ export function NotificationSettings() {
           <ToggleRow label="Payment received" description="Confirmation when payments clear" checked={settings.email.payments} onChange={v => setChannel('email', 'payments', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           <ToggleRow label="Fleet alerts" description="Maintenance due and vehicle issues" checked={settings.email.fleet_alerts} onChange={v => setChannel('email', 'fleet_alerts', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           <ToggleRow label="Weekly summary" description="Performance digest every Monday" checked={settings.email.weekly_reports} onChange={v => setChannel('email', 'weekly_reports', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
+          <ToggleRow label="Fuel price alerts" description="When the official fuel price changes and open quotes are affected." checked={settings.email.fuel_alerts} onChange={v => setChannel('email', 'fuel_alerts', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
+          {isAdmin && <ToggleRow label="Weekly margin email" description="Mondays at 07:00. Admins only." checked={settings.email.margin_report} onChange={v => setChannel('email', 'margin_report', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />}
         </div>
       </div>
 
@@ -139,6 +142,7 @@ export function NotificationSettings() {
           <ToggleRow label="Payment received" checked={settings.push.payment_received} onChange={v => setChannel('push', 'payment_received', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           <ToggleRow label="Maintenance due" checked={settings.push.maintenance_due} onChange={v => setChannel('push', 'maintenance_due', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           <ToggleRow label="Driver status updates" checked={settings.push.driver_updates} onChange={v => setChannel('push', 'driver_updates', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
+          <ToggleRow label="Quote reminders" description="Quotes about to expire, quotes with no answer, fuel price alerts." checked={settings.push.quote_reminders} onChange={v => setChannel('push', 'quote_reminders', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           {pushHint && (
             <div style={{ padding: '12px var(--card-pad, 20px)', borderTop: '1px solid var(--border-row)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{pushHint}</div>
           )}

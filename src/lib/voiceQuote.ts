@@ -28,7 +28,6 @@ const COPY = {
     too_long: "Stopped at 1 minute",
     mic_denied: "Microphone permission is needed to record",
     placeholder: "Describe the load, e.g. 28 t steel coils Joburg to Durban",
-    placeholder_short: "e.g. 28 t steel, Joburg to Durban",
     mic_label: "Record voice description",
     stop_label: "Stop recording",
     stop: "Stop",
@@ -45,6 +44,7 @@ const COPY = {
     seconds_left: "{s} s left",
     filled_aria: "filled",
     chip_go: "go to the field",
+    said: "said “{place}”",
   },
   af: {
     listening: "Luister…",
@@ -67,12 +67,11 @@ const COPY = {
     too_long: "Gestop by 1 minuut",
     mic_denied: "Mikrofoontoestemming is nodig om op te neem",
     placeholder: "Beskryf die vrag, bv. 28 ton staalrolle Joburg na Durban",
-    placeholder_short: "bv. 28 ton staal, Joburg na Durban",
     mic_label: "Neem stembeskrywing op",
     stop_label: "Stop opname",
     stop: "Stop",
     fill: "Vul in",
-    mode_auto: "Outo",
+    mode_auto: "Auto",
     mode_label: "Taal vir stem: {mode}. Verander",
     pick_truck: "{hint}? Kies ’n trok",
     nights_apply: "{n} nagte weg",
@@ -84,6 +83,7 @@ const COPY = {
     seconds_left: "{s} s oor",
     filled_aria: "ingevul",
     chip_go: "gaan na die veld",
+    said: "gesê “{place}”",
   },
 } as const;
 

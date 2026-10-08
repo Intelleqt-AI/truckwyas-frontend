@@ -267,18 +267,6 @@ interface RouteData {
 // state or any calculation) ----
 /** Vehicle capacity at render: "20 t", "7,5 t" (house style, not "20.00t"). */
 const capLabel = (c: unknown) => `${formatNumber(Number(c), { maximumFractionDigits: 1 })}\u00a0t`;
-/** True below a width (presentation only: picks a shorter placeholder). */
-function useNarrow(maxPx: number) {
-  const q = `(max-width: ${maxPx}px)`;
-  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia(q).matches);
-  useEffect(() => {
-    const mq = window.matchMedia(q);
-    const on = () => setNarrow(mq.matches);
-    on(); mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, [q]);
-  return narrow;
-}
 /** prefers-reduced-motion: the recording bars become a static level dot. */
 function useReducedMotion() {
   const q = "(prefers-reduced-motion: reduce)";
@@ -475,6 +463,9 @@ export default function QuoteBuilder() {
   // border post shows in the border line's hint.
   const [nlInternational, setNlInternational] = useState<boolean | null>(null);
   const [nlBorderPost, setNlBorderPost] = useState<string | null>(null);
+  // How a filled place was said, when it differs from the geocoded name
+  // ("Kaapstad" for Cape Town): a small hint under the field.
+  const [nlSaid, setNlSaid] = useState<{ pickup?: string; delivery?: string }>({});
   const nlInputRef = useRef<HTMLInputElement | null>(null);
   const nlReplaceRef = useRef<HTMLButtonElement | null>(null);
   const reducedMotion = useReducedMotion();
@@ -502,7 +493,6 @@ export default function QuoteBuilder() {
     const r = requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
     return () => cancelAnimationFrame(r);
   }, [inlineMapH]);
-  const narrowNl = useNarrow(1280);
   // In-progress "create this client/vehicle type" mini-conversation (see
   // backend/core/services/quote_entity_chat.py) — round-tripped every turn
   // since the endpoint is otherwise stateless. declinedEntities remembers
@@ -955,7 +945,9 @@ export default function QuoteBuilder() {
   const submitNL = async (textOverride?: string, detectedLanguage?: string | null, alternateText?: string | null) => {
     const text = (textOverride ?? nlText).trim();
     if (!text) return;
-    const history = chatMessages.map(m => ({ role: m.role, content: m.text }));
+    // Only the user's own turns go back as history: the assistant's replies
+    // can name clients, and current_fields already carries the form.
+    const history = chatMessages.filter(m => m.role === "user").map(m => ({ role: m.role, content: m.text }));
     setChatMessages(prev => [...prev, { role: "user", text }]);
     // The panel isn't opened for a Fill: the chips say what happened. It
     // opens only when the reply needs an answer (see below), or on request.
@@ -1016,9 +1008,12 @@ export default function QuoteBuilder() {
         const shown = g?.label ?? next;
         if (sameText(cur, shown)) return;
         if (cur.trim() && samePlace(curCoords, g?.coords)) return; // Kaapstad = Cape Town
-        const said = spokenPlace(next, text, spoken[`${target}_location`]);
+        // spoken_places is keyed { pickup, delivery } (older: pickup_location).
+        const said = spokenPlace(next, text, spoken[target] ?? spoken[`${target}_location`]);
+        const prevSaid = nlSaid[target];
         changes.push({ target, filled: shown, summary: { [target]: said },
-          apply: () => { setText(shown); setCoords(g?.coords ?? null); }, revert: () => { setText(cur); setCoords(curCoords); },
+          apply: () => { setText(shown); setCoords(g?.coords ?? null); setNlSaid(p => ({ ...p, [target]: sameText(said, shown) ? undefined : said })); },
+          revert: () => { setText(cur); setCoords(curCoords); setNlSaid(p => ({ ...p, [target]: prevSaid })); },
           conflict: isConflict(cur, shown, filled[target]) ? { label: labels[target], from: cur, to: said } : null });
       };
       const toggle = (target: FieldTarget, cur: boolean | string, next: boolean | string, from: string, to: string, set: (v: never) => void, summary: AppliedSummary) => {
@@ -1300,6 +1295,7 @@ export default function QuoteBuilder() {
     lastRouteKeyRef.current = null;
     setChatMessages([]); setChatOpen(false); setPendingEntity(null); setDeclinedEntities([]);
     setValidUntil("");
+    setNlSaid({});
     setFillInfo(null); setNlConflict(null); setNlUndo(null); setHeard(null); setNlInternational(null); setNlBorderPost(null);
     nlFilledRef.current = {}; nlTouchedRef.current = new Set();
     if (isEditing) navigate("/bookings/quotes/new", { replace: true });
@@ -2130,7 +2126,7 @@ export default function QuoteBuilder() {
             <>
               <MessageCircle size={16} color="var(--text-tertiary)" aria-hidden="true" className="qb-nl__icon" style={{ flexShrink: 0 }} />
               <input ref={nlInputRef} value={nlText} onChange={e => { setNlText(e.target.value); if (heard) setHeard(null); }} onKeyDown={e => e.key === "Enter" && submitNL()}
-                placeholder={vt(uiLang, narrowNl ? "placeholder_short" : "placeholder")} aria-label="Describe the load" style={{ ...inputS, border: "none", background: "transparent", paddingLeft: 4, minWidth: 0 }} />
+                placeholder={vt(uiLang, "placeholder")} aria-label="Describe the load" style={{ ...inputS, border: "none", background: "transparent", paddingLeft: 4, minWidth: 0 }} />
             </>
           )}
         </div>
@@ -2191,10 +2187,12 @@ export default function QuoteBuilder() {
         <div className="qb-loc">
           <div style={fieldLabelS}><span>Collection<Req />{nlCheckHint("pickup")}</span></div>
           <div {...nlFieldProps("pickup")}><LocationInput value={pickup} onChange={(v, c) => { setPickup(v); setPickupCoords(c || null); }} placeholder="City / address" style={inputS} /></div>
+          {nlSaid.pickup && nlFilledRef.current.pickup === pickup && <div className="qb-nl-said">{vt(uiLang, "said", { place: nlSaid.pickup })}</div>}
         </div>
         <div className="qb-loc">
           <div style={fieldLabelS}><span>Delivery<Req />{nlCheckHint("delivery")}</span></div>
           <div {...nlFieldProps("delivery")}><LocationInput value={delivery} onChange={(v, c) => { setDelivery(v); setDeliveryCoords(c || null); }} placeholder="City / address" style={inputS} /></div>
+          {nlSaid.delivery && nlFilledRef.current.delivery === delivery && <div className="qb-nl-said">{vt(uiLang, "said", { place: nlSaid.delivery })}</div>}
         </div>
       </div>
 

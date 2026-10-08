@@ -381,3 +381,5 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
 .qb-pop__fee { display: inline-flex; align-items: center; gap: 4px; }
 .qb-pop__input { width: 84px; }
 .qb-routeopt__sub { color: var(--text-tertiary); }
+.qb-cost__check { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; line-height: 18px; color: var(--text-secondary); cursor: pointer; }
+.qb-cost__check input { margin: 0; accent-color: var(--text-primary); }

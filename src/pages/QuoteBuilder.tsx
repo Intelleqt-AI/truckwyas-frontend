@@ -2,7 +2,7 @@ import "@/components/layout/section-header.css";
 import { isForeignCountry, tripIsInternational } from "@/lib/tripInternational";
 import { savedRouteMatches } from "@/lib/savedRoute";
 import { borderCostsUnknown } from "@/lib/borderUnknown";
-import { routeChipLabel, borderTotalWithAgentFee, borderEstimate, type TollItem, type BorderItem } from "@/lib/routeTolls";
+import { routeChipLabel, borderTotalWithAgentFee, tripBorderEstimate, abnormalLoadRelevant, type TollItem, type BorderItem } from "@/lib/routeTolls";
 import { TollPop, BorderPop } from "@/components/pricing/RouteCostPops";
 import SectionHeader from "@/components/layout/SectionHeader";
 import "./quote-invoice-roles.css";
@@ -375,6 +375,8 @@ export default function QuoteBuilder() {
   const [borderTyped, setBorderTyped] = useState("");
   // The user's own clearing-agent fee (per crossing), in place of the route's agent estimate.
   const [agentFee, setAgentFee] = useState<number | null>(null);
+  // Zimbabwe: an abnormal load (56 t+ GCM) pays the higher border access toll.
+  const [abnormalLoad, setAbnormalLoad] = useState(false);
   // Tolls are a figure, not a box: an explicit edit (pencil) opens the input.
   const [tollEditing, setTollEditing] = useState(false);
   const [fuelRefreshing, setFuelRefreshing] = useState(false);
@@ -593,7 +595,7 @@ export default function QuoteBuilder() {
   const borderLoaded = borderTyped !== "" ? (Number(borderTyped) || 0) : routeBorderLoaded;
   const borderEmptyBack: number | null = tripType !== "ROUND_TRIP" && borderTyped === "" ? routeBorderBack : null;
   const borderEstimated: number | null = borderTyped !== "" ? null
-    : (borderEstimate(routeB?.cross_border_breakdown, agentFee) + (tripType === "ROUND_TRIP" ? borderEstimate(returnLeg?.cross_border_breakdown ?? routeB?.cross_border_breakdown, agentFee) : 0)) || null;
+    : tripBorderEstimate(routeB?.cross_border_breakdown, returnLeg?.cross_border_breakdown, agentFee, tripType === "ROUND_TRIP");
   const weightKg = loadT * 1000;
 
   // ---- company figures the costing needs: the server's resolution
@@ -760,6 +762,7 @@ export default function QuoteBuilder() {
         ...(wantReturnLeg ? { include_return: true } : {}),
         // The user's own clearing-agent fee replaces the agent estimate ("Your figure").
         ...(agentFee != null ? { clearing_agent_fee_zar: agentFee } : {}),
+        ...(abnormalLoad ? { abnormal_load: true } : {}),
       };
       const requestKey = routeRequestKey;
       // X-TW-Quote-Rules: the backend then says "unknown" (nulls + flags:
@@ -807,7 +810,7 @@ export default function QuoteBuilder() {
   // A round trip, or a company whose one-way quotes include the empty return.
   const wantReturnLeg = tripType === "ROUND_TRIP" || companyProfile?.include_empty_return_default !== false;
   const routeRequestKey = JSON.stringify([pickupCoords?.lat, pickupCoords?.lon, deliveryCoords?.lat, deliveryCoords?.lon,
-    truckName || "Flatbed", selectedVT?.id ?? null, stopsRouteKey, pickupDate || null, wantReturnLeg]);
+    truckName || "Flatbed", selectedVT?.id ?? null, stopsRouteKey, pickupDate || null, wantReturnLeg, abnormalLoad]);
   const routeIsCurrent = !!route && !calculatingRoute && lastRouteKeyRef.current === routeRequestKey;
 
   useEffect(() => {
@@ -831,7 +834,7 @@ export default function QuoteBuilder() {
     calcRef.current = setTimeout(() => { calculateRoute(); }, 500);
     return () => { if (calcRef.current) clearTimeout(calcRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, pickupCoords, deliveryCoords, truckName, selectedVT?.id, billingBlocked, stopsRouteKey, pickupDate, wantReturnLeg]);
+  }, [ready, pickupCoords, deliveryCoords, truckName, selectedVT?.id, billingBlocked, stopsRouteKey, pickupDate, wantReturnLeg, abnormalLoad]);
 
   // ---- natural-language input (typed or transcribed from voice) ----
   // Shared by the top quick-fill bar and the AI chat panel — both are just
@@ -1019,7 +1022,7 @@ export default function QuoteBuilder() {
     setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
     setPickupDate(""); setDeliveryDate(""); setNlText("");
     setEditableTollCost(""); setTollManuallyEdited(false); setDriverAllowanceInput("");
-    setDriverEdited(false); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setAgentFee(null); setDistanceConfirmed(false); setUseOfficialDiesel(false);
+    setDriverEdited(false); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setAgentFee(null); setAbnormalLoad(false); setDistanceConfirmed(false); setUseOfficialDiesel(false);
     restoreRouteRef.current = null;
     savedFinalPriceRef.current = null; savedPricingRef.current = null; savedBorderRef.current = null; borderRestoreRef.current = null; setReopenNotice(null); setPriceSet(null); setSavedPriceShown(false);
     setRouteError(false);
@@ -2132,6 +2135,10 @@ export default function QuoteBuilder() {
                           ...(showBack ? [{ title: tripType === "ROUND_TRIP" ? "Back" : "Back, empty", items: backItems, total: routeBorderBack! }] : []),
                         ]} />
                       {estimates && <span className="qb-cost__tag" title="Some charges are estimates: see the list">Includes estimates</span>}
+                      {abnormalLoadRelevant(routeB?.countries) && (
+                        <label className="qb-cost__check" title="56 t or more gross combination mass: Zimbabwe charges the abnormal border access toll">
+                          <input type="checkbox" checked={abnormalLoad} onChange={(e) => setAbnormalLoad(e.target.checked)} /> Abnormal load
+                        </label>)}
                     </span>
                     <span className="qb-cost__value">{money(crossBorderCost)}</span>
                   </div>

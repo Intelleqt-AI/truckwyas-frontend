@@ -39,14 +39,40 @@ export function plazaMeta(t: TollItem, sanralClass: number | null | undefined): 
   const from = dayLabel(t.tariff_effective_from);
   if (from) parts.push(`from ${from}`);
   if (t.currency && t.currency !== "ZAR" && t.tariff_foreign != null) parts.push(foreignText(t.currency, t.tariff_foreign, t.fx));
+  // A foreign plaza's tariff is never reduced by SA VAT.
+  if (isForeignPlaza(t)) parts.push("no SA VAT");
   return parts.join(" · ");
+}
+
+export const isForeignPlaza = (t: TollItem) => (!!t.country && t.country.toUpperCase() !== "ZA") || (!!t.currency && t.currency !== "ZAR");
+
+/** The tolls note: SA tolls on the company's VAT basis; foreign plazas carry no SA VAT. */
+export function tollNote(includesVat: boolean | null | undefined, items: TollItem[]): string {
+  const anyForeign = items.some(isForeignPlaza);
+  const anySa = items.some((t) => !isForeignPlaza(t));
+  if (anyForeign && !anySa) return "No SA VAT on these tolls.";
+  return anyForeign ? `SA tolls ${tollVatBasis(includesVat)}; foreign tolls have no SA VAT.` : `Amounts ${tollVatBasis(includesVat)}.`;
+}
+
+/** The rate exactly as the server used it (e.g. 0,25608), so the rand amount can be reproduced. */
+export function rateText(rate: number): string {
+  return String(rate).replace(".", ",");
 }
 
 function foreignText(currency: string, amount: number, fx: Fx | null | undefined): string {
   const rate = fx?.zar_per_unit;
   const asOf = fx?.is_fallback ? dayLabel(fx.as_of) : null;
-  return `${currency} ${fmtNum(amount, amount % 1 ? 2 : 0)}${rate ? ` at R${fmtNum(rate, 4)}` : ""}${asOf ? ` (rate as of ${asOf})` : ""}`;
+  return `${currency} ${fmtNum(amount, amount % 1 ? 2 : 0)}${rate ? ` at R${rateText(rate)}` : ""}${asOf ? ` (rate as of ${asOf})` : ""}`;
 }
+
+/** Border estimate (for the costing's basis): a round trip counts the way out and the way back. */
+export function tripBorderEstimate(out: BorderItem[] | null | undefined, back: BorderItem[] | null | undefined, agentFee: number | null, roundTrip: boolean): number | null {
+  const est = borderEstimate(out, agentFee) + (roundTrip ? borderEstimate(back ?? out, agentFee) : 0);
+  return est ? Math.round(est * 100) / 100 : null;
+}
+
+/** Zimbabwe charges an abnormal (56 t+ GCM) access toll: the toggle shows only there. */
+export const abnormalLoadRelevant = (countries: string[] | null | undefined) => (countries || []).some((c) => ["ZW", "ZWE"].includes(String(c).toUpperCase()));
 
 /** Route option chip: "Fastest · via N17/N3 · tolls R 887" (plazas on hover). */
 export function routeChipLabel(r: { toll_summary?: string | null; toll_cost_zar?: number | null; tolls_unknown?: boolean; tolls_unavailable?: boolean; distance_km?: number; countries?: string[] | null }, index: number): string {

@@ -3,7 +3,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { NumberField } from "@/components/pricing/NumberField";
 import { fmtRand } from "@/lib/quoteRules";
 import {
-  plazaMeta, tollVatBasis, borderKind, borderMeta, borderName, BORDER_KIND_LABEL,
+  plazaMeta, tollNote, borderKind, borderMeta, borderName, BORDER_KIND_LABEL,
   type TollItem, type BorderItem,
 } from "@/lib/routeTolls";
 
@@ -34,7 +34,7 @@ export function TollPop({ legs, sanralClass, includesVat, scheduleWarning }: {
       <Trigger label="Toll plazas" />
       <PopoverContent align="start" collisionPadding={16} className="qb-pop qb-pop--wide">
         <div className="qb-pop__title">Toll plazas{sanralClass ? ` · Class ${sanralClass}` : ""}</div>
-        <div className="qb-pop__note">Amounts {tollVatBasis(includesVat)}.</div>
+        <div className="qb-pop__note">{tollNote(includesVat, shown.flatMap((l) => l.items))}</div>
         {shown.length === 0 && <div className="qb-pop__row"><span>No toll plazas on this route</span><span /></div>}
         {shown.map((leg) => (
           <div key={leg.title} className="qb-pop__leg">

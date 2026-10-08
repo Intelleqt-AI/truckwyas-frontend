@@ -148,6 +148,8 @@ export default function QuoteDetail() {
   // Fetched up front for an open quote, so a block shows on Send itself.
   const sendWarnings = useSendCheck(quote && ['DRAFT', 'SENT', 'ACCEPTED'].includes(quote.status) ? id : null, quote);
   const sendBlock = sendWarnings.find((w) => w.severity === 'block') ?? null;
+  // Copy link / WhatsApp are sends too: blocked like Send on an open quote.
+  const shareBlocked = !!sendBlock && !!quote && (quote.status === 'DRAFT' || quote.status === 'SENT');
 
   const quoteFailed = loadFailed(quoteQuery);
   const quoteError = (quoteQuery.error ?? quoteQuery.failureReason) as { status?: number } | null;
@@ -865,26 +867,37 @@ export default function QuoteDetail() {
                           : 'No email on file for this customer. Share the link instead.'}
                     </p>
                   )}
+                  {/* Sharing the link is sending it (QUOTE-RULES §11): the same
+                      block as Send, so a quote that fails the send check
+                      can't go out by link or WhatsApp either. */}
                   <div className="qd-btn-row">
                     <button
                       type="button"
                       onClick={() => { navigator.clipboard.writeText(effectiveShareUrl); toast.success('Link copied to clipboard'); }}
                       className="bk-btn bk-btn--secondary"
+                      disabled={shareBlocked}
+                      title={shareBlocked ? sendBlock!.title : undefined}
                     >
                       Copy link
                     </button>
-                    <a
-                      href={buildWhatsAppShareUrl(
-                        quote.customer_phone,
-                        whatsAppQuoteMessage(quote, effectiveShareUrl)
-                      )}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bk-btn bk-btn--secondary"
-                      style={{ boxSizing: 'border-box' }}
-                    >
-                      WhatsApp
-                    </a>
+                    {shareBlocked ? (
+                      <button type="button" className="bk-btn bk-btn--secondary" disabled title={sendBlock!.title}>
+                        WhatsApp
+                      </button>
+                    ) : (
+                      <a
+                        href={buildWhatsAppShareUrl(
+                          quote.customer_phone,
+                          whatsAppQuoteMessage(quote, effectiveShareUrl)
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bk-btn bk-btn--secondary"
+                        style={{ boxSizing: 'border-box' }}
+                      >
+                        WhatsApp
+                      </a>
+                    )}
                   </div>
                 </div>
               )}

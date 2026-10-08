@@ -363,6 +363,12 @@ export default function QuoteBuilder() {
   // A saved quote priced with the pricing analysis reopens at the price that
   // was decided (pricing_decision.final_price), applied once its route is in.
   const savedFinalPriceRef = useRef<number | null>(null);
+  // A reopened quote's saved border line (all legs), restored as typed once
+  // the route is in when the route's own figure differs: a figure the user
+  // typed must survive a reopen (it is saved in costing_inputs.border_cost).
+  const savedBorderRef = useRef<number | null>(null);
+  // The border figure the reopen notice must wait for (it compares floors).
+  const borderRestoreRef = useRef<string | null>(null);
   // §11: what a reopened quote was priced on (its floor and when), so a cost
   // change since then is said once, with Keep price / Re-price.
   const savedPricingRef = useRef<{ price: number; floor: number; pricedAt: string | null; pricedAtRaw: string | null; fuelPrice: number | null } | null>(null);
@@ -613,6 +619,18 @@ export default function QuoteBuilder() {
   const altReturnPrice: number | null = !costing.trip.empty_return_default ? null
     : costing.trip.empty_return_included ? costing.alternative_with_return_load?.default_price ?? null
     : compute({ ...costingInputs, include_empty_return: true }).default_price;
+  // Empty ↔ Loaded back. The switch changes what the trip costs, so a price
+  // already set (applied, typed, or a reopened quote's) moves to the other
+  // shape's price too, the figure the "Loaded back R x" button shows. With no
+  // price set the bar follows the new default on its own.
+  const setReturnShape = (booked: boolean) => {
+    if (booked === returnLoadBooked) return;
+    setReturnLoadBooked(booked);
+    if (priceSet == null) return;
+    if (altReturnPrice != null && altReturnPrice > 0) setPriceSet(Math.round(altReturnPrice * 100) / 100);
+    else setPriceSet(null);
+    setSavedPriceShown(false);
+  };
 
   // ---- route calculation (debounced auto-run) ----
   const calcRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -791,6 +809,7 @@ export default function QuoteBuilder() {
         savedPricingRef.current = floor > 0 && price > 0
           ? { price, floor, pricedAt: isoDay(q.priced_at), pricedAtRaw: q.priced_at ?? null, fuelPrice: Number(q.fuel_price_used) || null }
           : null;
+        savedBorderRef.current = Number(ci.border_cost) > 0 ? Number(ci.border_cost) : null;
         setReturnLoadBooked(ci.include_empty_return === false);
         setTollsNone(ci.tolls_confirmed_none === true);
         setDistanceConfirmed(ci.distance_confirmed === true);
@@ -880,7 +899,7 @@ export default function QuoteBuilder() {
     setPickupDate(""); setDeliveryDate(""); setNlText("");
     setEditableTollCost(""); setTollManuallyEdited(false); setDriverAllowanceInput("");
     setDriverEdited(false); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setDistanceConfirmed(false); setUseOfficialDiesel(false);
-    savedFinalPriceRef.current = null; savedPricingRef.current = null; setReopenNotice(null); setPriceSet(null); setSavedPriceShown(false);
+    savedFinalPriceRef.current = null; savedPricingRef.current = null; savedBorderRef.current = null; borderRestoreRef.current = null; setReopenNotice(null); setPriceSet(null); setSavedPriceShown(false);
     setRouteError(false);
     setRouteData(null); setSelectedRouteIndex(0); setRouteBlockedMessage(null);
     setAiFuel(null); setAiToll(null);
@@ -1084,6 +1103,18 @@ export default function QuoteBuilder() {
     setSavedPriceShown(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeIsCurrent]);
+  // A reopened quote's typed border fees: once the route is in, keep the saved
+  // figure when the route's own one differs (else the route figure is it).
+  useEffect(() => {
+    const saved = savedBorderRef.current;
+    if (saved == null || !routeIsCurrent) return;
+    savedBorderRef.current = null;
+    if (Math.abs(routeBorderOneWay * legs - saved) < 0.5) return;
+    const typed = String(round2(saved));
+    borderRestoreRef.current = typed;
+    setBorderTyped(typed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeIsCurrent]);
   // §11: costs changed since the quote was priced → one compact notice. The
   // floor is the one the panel shows (the server's), else the local costing.
   // One floor everywhere: the costing (the panel's floor is the same compute()).
@@ -1091,12 +1122,15 @@ export default function QuoteBuilder() {
   useEffect(() => {
     const sp = savedPricingRef.current;
     if (!sp || !routeIsCurrent || floorNow == null) return;
+    // Wait for a restored border figure, else the floor looks R x lower.
+    if (savedBorderRef.current != null || (borderRestoreRef.current != null && borderTyped !== borderRestoreRef.current)) return;
+    borderRestoreRef.current = null;
     savedPricingRef.current = null;
     const ch = changesSincePriced(sp.price, sp.floor, floorNow, sp.pricedAtRaw);
     if (!ch.changed || !ch.notice) return;
     setReopenNotice({ text: ch.notice, since: sp.pricedAt, reprice: ch.repriced_price_keep_margin });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeIsCurrent, floorNow]);
+  }, [routeIsCurrent, floorNow, borderTyped]);
 
   // Price bar height as a CSS variable (sticky aside, toasts sit above it).
   const priceBarRef = useRef<HTMLElement | null>(null);
@@ -1875,7 +1909,7 @@ export default function QuoteBuilder() {
                     Truck comes back
                     <span className="tw-seg tw-seg--sm qb-cost__seg" role="group" aria-label="Truck comes back">
                       {([["Empty", false], ["Loaded", true]] as const).map(([lbl, booked]) => (
-                        <button key={lbl} type="button" aria-pressed={returnLoadBooked === booked} onClick={() => setReturnLoadBooked(booked)}
+                        <button key={lbl} type="button" aria-pressed={returnLoadBooked === booked} onClick={() => setReturnShape(booked)}
                           className={`tw-seg__opt${returnLoadBooked === booked ? " is-active" : ""}`}>{lbl}</button>
                       ))}
                     </span>
@@ -1922,7 +1956,7 @@ export default function QuoteBuilder() {
           }}
           buildUpDriver={driverAllowance}
           includeReturn={emptyReturn.included}
-          onIncludeReturn={(v) => setReturnLoadBooked(!v)}
+          onIncludeReturn={(v) => setReturnShape(!v)}
           returnApplicable={emptyReturn.applicable}
           revealKey={`${pickup}|${delivery}|${selectedVT?.id ?? truckName}|${tripType}|${customerId}`}
           atBuildUp={atBuildUp}
@@ -1991,7 +2025,7 @@ export default function QuoteBuilder() {
               <span className="qb-pricebar__chip">{chipLabel}</span>
               {!(atBuildUp && !priceTyping) && <button type="button" className="qb-linkbtn" onClick={resetPrice}>Reset</button>}
               {altReturnPrice != null && (
-                <button type="button" className="qb-linkbtn qb-pricebar__alt" onClick={() => setReturnLoadBooked(v => !v)}
+                <button type="button" className="qb-linkbtn qb-pricebar__alt" onClick={() => setReturnShape(!returnLoadBooked)}
                   title={emptyReturn.included ? "Price if a load comes back" : "Price if the truck comes back empty"}>
                   {emptyReturn.included ? "Loaded back" : "Empty back"} {formatMoneyWhole(altReturnPrice)}
                 </button>

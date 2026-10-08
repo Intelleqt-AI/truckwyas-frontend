@@ -18,7 +18,7 @@ interface AIChatPanelProps {
   busy: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSend: (text: string, detectedLanguage?: string | null) => void;
+  onSend: (text: string, detectedLanguage?: string | null, alternateText?: string | null) => void;
   /**
    * Position only. When passed (even as null while the host's slot mounts),
    * the launcher renders inside that element as an ordinary icon button
@@ -58,7 +58,7 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend, launch
     return () => clearTimeout(t);
   }, [open]);
 
-  const voice = useVoiceRecorder((transcribed, lang) => { onSend(transcribed, lang); });
+  const voice = useVoiceRecorder((transcribed, lang, alt) => { onSend(transcribed, lang, alt); });
 
   useEffect(() => {
     if (open) listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });

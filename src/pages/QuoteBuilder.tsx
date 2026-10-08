@@ -1095,6 +1095,7 @@ export default function QuoteBuilder() {
         didntCatch: didntCatchLine(res?.not_understood, L),
         // A truck was named but none in the fleet matches it.
         vehicleHint: res?.vehicle_hint && !f.vehicle_type && !res?.pending_entity ? String(res.vehicle_hint) : null,
+        vehicleHintLabel: typeof res?.vehicle_hint_label === "string" ? res.vehicle_hint_label : null,
         driverNights: Number(f.driver_nights) > 0 ? Math.trunc(Number(f.driver_nights)) : null,
         fuelPrice: Number(f.fuel_price_override) > 0 ? Number(f.fuel_price_override) : null,
       });

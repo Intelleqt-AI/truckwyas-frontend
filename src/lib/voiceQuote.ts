@@ -180,7 +180,14 @@ const VEHICLE_HINT_NAMES: Record<string, string> = {
   interlink: "Superlink", tautliner: "Tautliner", reefer: "Reefer", tipper: "Tipper", flatbed: "Flatbed",
   tanker: "Tanker", lowbed: "Low-bed", ldv: "LDV", semi: "Semi-trailer", rigid: "Rigid",
 };
-export const vehicleHintName = (hint: string): string => VEHICLE_HINT_NAMES[hint] ?? hint.charAt(0).toUpperCase() + hint.slice(1);
+/** The truck word for the chip: the server's own label for "other" ("Lowbed"), else the hint's name. */
+export const vehicleHintName = (hint: string, label?: string | null): string => {
+  if (label && label.trim() && (hint === "other" || !VEHICLE_HINT_NAMES[hint])) {
+    const l = label.trim();
+    return l.charAt(0).toUpperCase() + l.slice(1);
+  }
+  return VEHICLE_HINT_NAMES[hint] ?? hint.charAt(0).toUpperCase() + hint.slice(1);
+};
 
 export function tripShapeText(tripType: string | undefined, returnLoadBooked: boolean | undefined, lang: UiLang): string | null {
   const af = lang === "af";
@@ -208,7 +215,7 @@ export interface AppliedSummary {
 /** What the last Fill set and said, for the feedback under the bar. */
 export interface FillInfo {
   applied: AppliedSummary; conf: Record<string, number>; didntCatch: string | null;
-  vehicleHint: string | null; driverNights: number | null; fuelPrice: number | null;
+  vehicleHint: string | null; vehicleHintLabel?: string | null; driverNights: number | null; fuelPrice: number | null;
 }
 
 export interface FillChip { key: string; text: string; target: FieldTarget; check: boolean; aria: string }

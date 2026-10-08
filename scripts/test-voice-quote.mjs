@@ -117,3 +117,8 @@ assert.equal(spokenPlace('Richards Bay', 'na richardsbaai'), 'Richardsbaai');
 assert.equal(spokenPlace('Durban', 'na Durban'), 'Durban');
 assert.equal(spokenPlace('Cape Town', 'x', 'Kaapstad'), 'Kaapstad', 'server spoken form wins');
 console.log('voice quote spoken places: ok');
+assert.equal(vehicleHintName('other', 'lowbed'), 'Lowbed');
+assert.equal(vehicleHintName('other', null), 'Other');
+assert.equal(vehicleHintName('interlink', 'superlink'), 'Superlink');
+assert.equal(vt('en', 'pick_truck', { hint: vehicleHintName('other', 'Lowbed') }), 'Lowbed? Pick a truck');
+console.log('voice quote other hint: ok');

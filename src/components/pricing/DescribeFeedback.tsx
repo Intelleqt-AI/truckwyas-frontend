@@ -74,7 +74,7 @@ export function DescribeFeedback(p: {
           ))}
           {info?.vehicleHint && (
             <button type="button" className="qb-nlfb__chip qb-nlfb__chip--ask" onClick={p.onPickTruck}>
-              {vt(lang, "pick_truck", { hint: vehicleHintName(info.vehicleHint) })}
+              {vt(lang, "pick_truck", { hint: vehicleHintName(info.vehicleHint, info.vehicleHintLabel) })}
             </button>
           )}
           {p.undo && <button type="button" className="qb-linkbtn qb-nlfb__undo" onClick={p.onUndo}>{vt(lang, "undo")}</button>}

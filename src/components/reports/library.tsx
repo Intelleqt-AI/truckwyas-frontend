@@ -8,7 +8,7 @@ import {
   type Ledger, type SourceName,
 } from './data';
 
-export type ReportId = 'pl' | 'sales' | 'cash' | 'debtors' | 'statement' | 'customers' | 'lanes' | 'margin' | 'expenses' | 'vat';
+export type ReportId = 'pl' | 'sales' | 'cash' | 'debtors' | 'statement' | 'customers' | 'lanes' | 'margin' | 'weekly' | 'expenses' | 'vat';
 
 export interface ReportDef {
   id: ReportId; group: string; title: string; purpose: string; basis: string; icon: LucideIcon;
@@ -31,6 +31,7 @@ export const REPORTS: ReportDef[] = [
   { id: 'customers', group: 'Customers and debtors', title: 'Revenue by customer', purpose: 'Which customers bring in the revenue?', basis: 'Excl. VAT · accrual or cash', icon: Users, needs: ['invoices', 'payments', 'creditNotes'], latest: latestInvoice },
   { id: 'lanes', group: 'Customers and debtors', title: 'Revenue by lane', purpose: 'Which routes earn the most, and per km?', basis: 'Load prices · excl. VAT', icon: Route, needs: ['loads'], latest: d => maxDate(d.loads.map(l => l.delivery_date)) },
   { id: 'margin', group: 'Customers and debtors', title: 'Lane margin', purpose: 'What each route really earns after its costs.', basis: 'Excl. VAT · actual vs estimate', icon: Percent, needs: [], latest: () => undefined },
+  { id: 'weekly', group: 'Customers and debtors', title: 'Weekly margin', purpose: 'Last week: quoted against actual margin, by lane and customer.', basis: 'Excl. VAT · as in the Monday email', icon: CalendarRange, needs: [], latest: () => undefined },
   { id: 'expenses', group: 'Costs', title: 'Expense report', purpose: 'Where the money goes, by category and truck.', basis: 'Expense date · excl. VAT', icon: Receipt, needs: ['expenses', 'vehicles'], latest: d => maxDate(d.expenses.map(e => e.expense_date)) },
   { id: 'vat', group: 'Tax and accountant', title: 'VAT report', purpose: 'Output VAT charged, input VAT paid, and the net.', basis: 'Invoice or payments basis', icon: Landmark, needs: ['invoices', 'payments', 'creditNotes', 'expenses'], latest: d => maxDate([latestInvoice(d), latestPayment(d)]) },
 ];

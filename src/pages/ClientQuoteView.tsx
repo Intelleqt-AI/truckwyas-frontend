@@ -222,6 +222,16 @@ export default function ClientQuoteView() {
           </div>
         </section>
 
+        {/* Fuel price terms (quote follow-ups): the price the quote was priced
+            on and, when the sender uses it, the fuel price clause. Small print. */}
+        {(quote.fuel_reference || quote.fuel_clause) && (
+          <section className="pd-section">
+            <p className="pd-sub" style={{ margin: 0, fontSize: 13 }}>
+              {[quote.fuel_reference, quote.fuel_clause].filter(Boolean).join(' ')}
+            </p>
+          </section>
+        )}
+
         {/* Respond */}
         <section className="pd-section">
           {alreadyActioned ? (

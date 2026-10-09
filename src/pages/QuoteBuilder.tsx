@@ -10,6 +10,7 @@ import { localDateISO } from '@/lib/dates';
 import "./quote-builder-controls.css";
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { QuoteClauseNote } from "@/components/followups/QuoteFollowUp";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, patchData, fetchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
@@ -2658,6 +2659,9 @@ export default function QuoteBuilder() {
       <div className="qb-after">
       {/* notes: above the price bar so they are filled in before sending */}
       {ready && <div style={{ marginBottom: 16 }}><div style={fieldLabelS}><label htmlFor="qb-notes">Notes</label></div><textarea id="qb-notes" value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Optional" style={{ ...inputS, resize: "vertical" }} /></div>}
+      {/* Fuel price clause: what the PDF will say (company setting; a saved
+          draft shows its own clause). Nothing when the clause is off. */}
+      {ready && <QuoteClauseNote quoteId={savedQuoteId ?? (editId ? Number(editId) : null)} />}
       </div>
       </div>
 

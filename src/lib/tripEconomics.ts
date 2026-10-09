@@ -1,6 +1,7 @@
 // Trip economics display rules: job / return-pair margins, booking choices,
 // invoice mismatch and quote actuals (backend core.services.trip_economics,
 // docs/QUOTE-RULES.md "Trip economics"). Pure: no "@/" imports, node tests it.
+import { l100 } from "./fleetFuel.ts";
 import { formatMoney, formatMoneyWhole, formatDateShort } from "./formatters.ts";
 
 export type Basis = "actual" | "estimate" | "mixed" | "part_actual" | null;
@@ -14,6 +15,8 @@ export interface QuotedFigures { price: number | null; cost_floor: number | null
  *  overhead slips, shown but already inside the running-cost estimate. */
 export interface CostGroup {
   group: string;
+  /** fuel group only: the truck fuel figure the estimate was costed on. */
+  rated_burn?: { value: number | null; source?: string | null } | null;
   estimated: number | null;
   actual: number | null;
   used: number | null;
@@ -159,6 +162,19 @@ export function costGroupsText(groups: CostGroup[] | null | undefined): { line: 
     line: actual.length ? parts.join(" · ") : null,
     recordedNote: recAmt ? `Maintenance and overheads recorded ${formatMoney(recAmt)}: inside the running cost, not added again` : null,
   };
+}
+
+/** Under the cost, while fuel is still an estimate: the figure it used
+ *  ("Fuel estimated on 40,2 L/100 km measured by Cartrack"). */
+export function fuelBurnNote(groups: CostGroup[] | null | undefined): string | null {
+  const f = (groups ?? []).find((x) => x.group === "fuel");
+  const rb = f?.rated_burn;
+  if (!f || f.basis !== "estimate" || !rb) return null;
+  const v = l100(rb.value);
+  if (!v) return null;
+  if (rb.source === "measured") return `Fuel estimated on ${v} measured by Cartrack`;
+  if (rb.source === "standard") return `Fuel estimated on the standard ${v}`;
+  return `Fuel estimated on your figure, ${v}`;
 }
 
 export function revenueBasisLabel(basis: Basis): string {

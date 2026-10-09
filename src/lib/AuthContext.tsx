@@ -28,6 +28,8 @@ export interface AuthUser {
   // user's company-scoped `role` (e.g. 'ADMIN'). Gates the cross-tenant
   // admin dashboard only.
   is_superuser?: boolean;
+  // A team / developer test company (set by a superuser): testing tools show.
+  is_test_company?: boolean;
   [key: string]: any;
 }
 

@@ -49,7 +49,8 @@
 /* ---- Price bar: editable price, live margin and likelihood ------------- */
 .qb-pricebar__field {
   display: inline-flex; align-items: baseline; gap: 6px; width: 220px; max-width: 100%;
-  border-bottom: 1px dashed var(--border-strong); transition: border-color 120ms ease;
+  /* No line at rest (it read as clutter); it shows on hover and, accent, while typing. */
+  border-bottom: 1px solid transparent; transition: border-color 120ms ease;
 }
 @media (hover: hover) { .qb-pricebar__field:hover { border-bottom-color: var(--border-control-hover); } }
 .qb-pricebar__field:focus-within { border-bottom: 1px solid var(--accent-primary); }
@@ -173,10 +174,7 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
    is, with a quiet way back to the build-up. */
 .qb-pricebar__src { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; }
 .qb-pricebar__src .qb-linkbtn { margin-left: 0; }
-.qb-pricebar__chip {
-  display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--radius-chip, 6px);
-  font: 500 11px/16px var(--font-sans); color: var(--text-primary); background: var(--bg-raised);
-}
+.qb-pricebar__chip { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
 .qb-pricebar__next { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; margin-top: 2px; }
 .qb-pricebar__next .qb-pricebar__muted { font-size: 12px; line-height: 16px; }
 .qb-pricebar .qb-pricebar__use { height: 28px; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -218,7 +216,7 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
   .qb-has-pricebar .qb-pricebar__field {
     grid-column: 1; grid-row: 2;
     width: 100%; height: 32px; margin: 0; box-sizing: border-box; align-items: center;
-    border-bottom: 1px dashed var(--border-strong);
+    border-bottom: 1px solid transparent;
   }
   .qb-has-pricebar .qb-pricebar__field:focus-within { margin: 0; border-bottom: 1px solid var(--accent-primary); box-shadow: 0 1px 0 0 var(--accent-primary); }
   .qb-has-pricebar .qb-pricebar__cur { font: 600 28px/31px var(--font-sans); }
@@ -289,11 +287,12 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
 .qb-warn__icon { flex: none; color: var(--status-warning); }
 .qb-warn--block .qb-warn__icon { color: var(--status-danger); }
 .qb-warn__title { padding: 0; border: 0; background: none; cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-  font: 500 13px/20px var(--font-sans); color: var(--text-primary); }
+  font: 400 12px/18px var(--font-sans); color: var(--text-secondary); }
 .qb-warn--block .qb-warn__title { color: var(--status-danger-text); }
 .qb-warn__title:hover { text-decoration: underline; text-underline-offset: 2px; }
 .qb-warn__more { font-weight: 400; color: var(--text-tertiary); }
-.qb-warn .qb-linkbtn { margin-left: 4px; font-size: 13px; line-height: 20px; }
+.qb-warn .qb-linkbtn { margin-left: 4px; font-size: 12px; line-height: 18px; }
+.qb-warn--block .qb-warn__title { font-weight: 500; }
 .qb-pricebar__notice { gap: 10px; color: var(--text-secondary); }
 .qb-pricebar__notice .qb-linkbtn { margin-left: 0; font-size: 13px; line-height: 20px; }
 /* One line, always: the notice text truncates before its actions wrap. */
@@ -328,8 +327,20 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
 .qb-pricebar__usechip:hover { border-color: var(--border-strong); }
 .qb-pricebar__usechip:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; }
 .qb-pricebar__alt { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.qb-resume-inline { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.qb-resume-inline .qb-linkbtn { margin-left: 0; font-size: 13px; line-height: 20px; }
+/* "Use Balanced R x": a quiet link after the margin, not a boxed chip. */
+.qb-pricebar__line .qb-pricebar__uselink { margin-left: 0; font-size: 13px; line-height: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Unsaved draft from earlier: a full-width row under the page head, the
+   route on the left (one line, truncated), Resume / Discard on the right. */
+.qb-resume-bar {
+  display: flex; align-items: center; gap: 16px; width: 100%; box-sizing: border-box;
+  margin: 0 0 16px; padding: 10px 16px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-card, 12px);
+  background: var(--bg-surface); font-size: 13px; line-height: 20px; color: var(--text-secondary);
+}
+.qb-resume-bar__text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qb-resume-bar__text b { font-weight: 500; color: var(--text-primary); }
+.qb-resume-bar__actions { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 16px; }
+.qb-resume-bar__actions .qb-linkbtn { margin-left: 0; font-size: 13px; line-height: 20px; }
 @media (min-width: 1024px) {
   .qb-has-pricebar .qb-pricebar.is-buildup .qb-pricebar__src { grid-column: 1; }
   .qb-has-pricebar .qb-pricebar .qb-pricebar__read,

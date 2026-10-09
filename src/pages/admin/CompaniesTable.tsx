@@ -34,6 +34,8 @@ interface Company {
   /** VAT vendor: quotes and invoices carry VAT. Off = no VAT, invoices titled INVOICE. */
   vat_registered: boolean;
   has_vat_number: boolean;
+  /** Team / developer test company: never suspended when a grace period ends. */
+  is_test_company?: boolean;
   created_at: string;
   next_billing_date: string | null;
   grace_period_expires_at: string | null;
@@ -53,12 +55,13 @@ interface BillingChargeRow {
   created_at: string;
 }
 
-type CompanyActionType = 'suspend' | 'reactivate' | 'delete' | 'vat_on' | 'vat_off';
+type CompanyActionType = 'suspend' | 'reactivate' | 'delete' | 'vat_on' | 'vat_off' | 'test_on' | 'test_off';
+type ConfirmedAction = Exclude<CompanyActionType, 'reactivate'>;
 
 const formatCurrency = (n: number) => formatMoney(n || 0);
 
 // Row actions that ask first.
-const CONFIRM_COPY: Record<'suspend' | 'delete' | 'vat_on' | 'vat_off', { title: string; label: string; message: (name: string) => string }> = {
+const CONFIRM_COPY: Record<ConfirmedAction, { title: string; label: string; message: (name: string) => string }> = {
   delete: { title: 'Delete company', label: 'Delete',
     message: n => `Mark ${n} as deleted? Its users immediately lose access. This can't be undone from here.` },
   suspend: { title: 'Suspend company', label: 'Suspend',
@@ -67,6 +70,10 @@ const CONFIRM_COPY: Record<'suspend' | 'delete' | 'vat_on' | 'vat_off', { title:
     message: n => `${n} will charge 15% VAT (0% on international trips) on quotes, and new invoices will be tax invoices. Invoices already issued don't change.` },
   vat_off: { title: 'Mark as not VAT registered', label: 'Mark not VAT registered',
     message: n => `${n} will show no VAT on quotes, and new invoices will be titled INVOICE without VAT. Invoices already issued don't change. Only do this for a business that isn't a SARS VAT vendor.` },
+  test_on: { title: 'Mark as test company', label: 'Mark as test company',
+    message: n => `${n} is made active now and is never suspended when a grace period ends. Use this only for the team's own companies used for testing and review.` },
+  test_off: { title: 'Make an ordinary company', label: 'Make ordinary',
+    message: n => `${n} will be billed and suspended like any other company again. Its current status stays as it is.` },
 };
 
 const fmtDateTime = (dateStr?: string | null) => (dateStr ? formatDateTime(dateStr) : 'Not recorded');
@@ -185,7 +192,7 @@ export function CompaniesTable() {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [confirmAction, setConfirmAction] = useState<{ company: Company; action: 'suspend' | 'delete' | 'vat_on' | 'vat_off' } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ company: Company; action: ConfirmedAction } | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -223,6 +230,7 @@ export function CompaniesTable() {
       const done: Record<CompanyActionType, string> = {
         suspend: 'Company suspended', reactivate: 'Company reactivated', delete: 'Company deleted',
         vat_on: 'Marked as VAT registered', vat_off: 'Marked as not VAT registered',
+        test_on: 'Marked as test company', test_off: 'Now an ordinary company',
       };
       toast.success(done[variables.action]);
       qc.invalidateQueries({ queryKey: ['admin-companies-full'] });
@@ -278,6 +286,7 @@ export function CompaniesTable() {
                         <div>
                           {c.company_name}
                           {c.is_demo && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)' }}>Demo</span>}
+                          {c.is_test_company && <span title="Team test company: never suspended when a grace period ends" style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)' }}>Test</span>}
                           {c.is_deleted && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-danger-text)' }}>Deleted</span>}
                         </div>
                         {/* company_name alone is rarely unique — self-service signup
@@ -322,6 +331,9 @@ export function CompaniesTable() {
                             ...(!c.is_deleted ? [c.vat_registered
                               ? { label: 'Mark not VAT registered', onSelect: () => setConfirmAction({ company: c, action: 'vat_off' }), disabled: actionMutation.isPending }
                               : { label: 'Mark VAT registered', onSelect: () => setConfirmAction({ company: c, action: 'vat_on' }), disabled: actionMutation.isPending }] : []),
+                            ...(!c.is_deleted ? [c.is_test_company
+                              ? { label: 'Make ordinary company', onSelect: () => setConfirmAction({ company: c, action: 'test_off' }), disabled: actionMutation.isPending }
+                              : { label: 'Mark as test company', onSelect: () => setConfirmAction({ company: c, action: 'test_on' }), disabled: actionMutation.isPending }] : []),
                             ...(!c.is_deleted ? [{ label: 'Delete', danger: true, onSelect: () => setConfirmAction({ company: c, action: 'delete' }), disabled: actionMutation.isPending }] : []),
                           ]}
                         />

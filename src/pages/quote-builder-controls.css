@@ -308,8 +308,14 @@
 .qb-controls .qb-suggest { justify-content: flex-end; }
 @media (max-width: 640px) {
   .qb-controls .qb-suggest { justify-content: flex-start; }
-  /* Vehicle type now follows Valid until (one column): 8px more room so the
-     label-row "New" target (grows 20px upward) clears the calendar button
-     with room to spare. */
+  /* The date after the Truck (one column): 8px more room so the Truck's
+     label-row "New" target (grows 20px upward) clears what sits above. */
   .qb-controls .qb-vehicle { margin-top: 8px; }
 }
+
+/* Suggested trucks under the Truck picker (smallest that carry the load). */
+.qb-truck-suggest {
+  grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px;
+  margin-top: -4px; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary);
+}
+.qb-truck-suggest .qb-textbtn--pick.is-picked { text-decoration: underline; text-underline-offset: 2px; }

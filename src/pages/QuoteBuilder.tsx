@@ -10,6 +10,8 @@ import { localDateISO } from '@/lib/dates';
 import "./quote-builder-controls.css";
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { ConfirmModal } from "@/components/ConfirmModal";
+import { openQuoteExport } from "@/lib/quoteExport";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, patchData, fetchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
@@ -173,13 +175,17 @@ function WarnLine({ list, onAction }: { list: QuoteWarning[]; onAction: (id: str
   const sorted = [...list].sort((a, b) => (a.severity === "block" ? 0 : 1) - (b.severity === "block" ? 0 : 1));
   const w = sorted[0];
   if (!w) return null;
-  const act = w.actions[0];
+  const blocked = w.severity === "block";
+  // A block says what stops Send, with its fix. Warnings only: one quiet
+  // summary ("3 things to check"); titles and fixes are one click away.
+  const act = blocked ? w.actions[0] : undefined;
+  const summary = blocked || sorted.length === 1 ? w.title : `${sorted.length} things to check`;
   return (
-    <span className={`qb-pricebar__next qb-warn qb-warn--${w.severity}`} role={w.severity === "block" ? "alert" : "status"}>
+    <span className={`qb-pricebar__next qb-warn qb-warn--${w.severity}`} role={blocked ? "alert" : "status"}>
       <AlertTriangle size={13} aria-hidden="true" className="qb-warn__icon" />
       <Popover>
         <PopoverTrigger asChild>
-          <button type="button" className="qb-warn__title">{w.title}{impactText(w) ? <span className="qb-warn__more"> · {impactText(w)!.replace(" on this quote.", "")}</span> : null}{sorted.length > 1 ? <span className="qb-warn__more"> +{sorted.length - 1} more</span> : null}</button>
+          <button type="button" className="qb-warn__title">{summary}{blocked && sorted.length > 1 ? <span className="qb-warn__more"> +{sorted.length - 1} more</span> : null}</button>
         </PopoverTrigger>
         {/* Above the whole bar, never over its margin line. */}
         <PopoverContent align="start" side="top" sideOffset={48} className="qb-pop qb-pop--warn">
@@ -288,6 +294,8 @@ export default function QuoteBuilder() {
   // invoices), so gating the AI calls and the send/save actions on it here
   // never disagrees with what the backend would actually allow.
   const { user: authUser } = useAuth();
+  // The team's own test companies get the Clear and Export testing tools.
+  const isTestCompany = !!authUser?.is_test_company;
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
   // Every demo visitor logs into the same shared demo@truckwys.com account,
   // but each login gets its own session-scoped quote allowance server-side
@@ -529,6 +537,19 @@ export default function QuoteBuilder() {
   const localSuggestedVT = useMemo(() => (loadT > 0 ? suggestTruck(allVehicleTypes, loadT) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [vehicleTypesRaw, loadT]);
+  // Up to three trucks that carry the load, smallest first (then lowest burn):
+  // shown under the Truck picker so the user can pick one in a click.
+  const truckSuggestions = useMemo(() => {
+    type SuggestVT = { id?: number | string | null; name: string; capacity?: unknown; fuel_consumption_l_per_100km?: unknown };
+    if (!(loadT > 0)) return [] as SuggestVT[];
+    return (allVehicleTypes as SuggestVT[])
+      .map((v) => ({ v, cap: capacityTonnes(v.capacity), burn: Number(v.fuel_consumption_l_per_100km) || Infinity }))
+      .filter(x => x.cap !== null && (x.cap as number) >= loadT)
+      .sort((a, b) => (a.cap as number) - (b.cap as number) || a.burn - b.burn || (Number(a.v.id) || 0) - (Number(b.v.id) || 0))
+      .slice(0, 3)
+      .map(x => x.v);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleTypesRaw, loadT]);
   const suggestedVT = (serverSuggestedId != null ? allVehicleTypes.find((v: any) => String(v.id) === String(serverSuggestedId)) : null) ?? localSuggestedVT;
   const selectedVT = useMemo(() => (vehicleType
     ? allVehicleTypes.find((v: any) => v.name === vehicleType) ?? vehicleTypes.find((v: any) => v.name === vehicleType)
@@ -1028,7 +1049,7 @@ export default function QuoteBuilder() {
   // & New Quote" button's handler on a not-yet-saved quote — an explicit
   // clear, so dropping the local draft here (like the Resume banner's
   // Discard) is the intended behavior, not data loss.
-  const startNew = () => {
+  const startNew = (message = "Started a new quote") => {
     localStorage.removeItem(DRAFT_KEY);
     setSavedQuoteId(null); setLastSavedAt(null); setResumable(null);
     setCustomerId(""); setVehicleType(""); setPickup(""); setDelivery("");
@@ -1047,8 +1068,11 @@ export default function QuoteBuilder() {
     setChatMessages([]); setChatOpen(false); setPendingEntity(null); setDeclinedEntities([]);
     setValidUntil("");
     if (isEditing) navigate("/bookings/quotes/new", { replace: true });
-    toast.success("Started a new quote");
+    toast.success(message);
   };
+  // Clear (price bar): empties the form after a confirm. A saved quote is
+  // never deleted: the builder just starts a fresh one.
+  const [clearConfirm, setClearConfirm] = useState(false);
 
   const draftRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Holds a closure over "what would be saved right now" — read by the
@@ -1832,23 +1856,32 @@ export default function QuoteBuilder() {
         back={isEditing ? { to: `/bookings/quotes/${editId}`, label: "Quote" } : { to: "/bookings/quotes", label: "Quotes" }}
         description={
           <span className="qb-savestate" aria-live="polite">
-            {/* An unsaved draft from earlier is offered here, inline: the form never moves. */}
-            {resumable && !isEditing ? (
-              <span className="qb-resume-inline">
-                Unsaved draft{resumable.pickup ? `: ${resumable.pickup}${resumable.delivery ? ` → ${resumable.delivery}` : ""}` : ""}
-                <button type="button" className="qb-linkbtn qb-linkbtn--strong" onClick={applyResumable}>Resume</button>
-                <button type="button" className="qb-linkbtn" onClick={discardResumable}>Discard</button>
-              </span>
-            ) : saving ? "Saving…" : isEditing || savedQuoteId ? "Saved" : lastSavedAt ? `Draft on this device · ${formatDateTime(lastSavedAt).split(", ")[1]}` : "Not saved"}
+            {resumable && !isEditing ? "Unsaved draft from earlier" : saving ? "Saving…" : isEditing || savedQuoteId ? "Saved" : lastSavedAt ? `Draft on this device · ${formatDateTime(lastSavedAt).split(", ")[1]}` : "Not saved"}
           </span>
         }
         // On a new quote the page itself is the new quote: no second "New quote".
         actions={isEditing || savedQuoteId ? (
-          <button type="button" className="tw-btn" onClick={startNew} title="Start a fresh quote">
+          <button type="button" className="tw-btn" onClick={() => startNew()} title="Start a fresh quote">
             New quote
           </button>
         ) : undefined}
       />
+      {/* An unsaved draft from earlier: one full-width row, the route on the
+          left (one line, the full addresses on hover), the actions on the right. */}
+      {resumable && !isEditing && (() => {
+        const route = resumable.pickup ? `${resumable.pickup}${resumable.delivery ? ` → ${resumable.delivery}` : ""}` : "";
+        return (
+          <div className="qb-resume-bar" role="status">
+            <span className="qb-resume-bar__text" title={route || undefined}>
+              <b>Unsaved draft</b>{route ? `: ${route}` : ""}
+            </span>
+            <span className="qb-resume-bar__actions">
+              <button type="button" className="qb-linkbtn qb-linkbtn--strong" onClick={applyResumable}>Resume</button>
+              <button type="button" className="qb-linkbtn" onClick={discardResumable}>Discard</button>
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Form left, pricing analysis right (≥1024px); on narrower screens the
           analysis stacks under the cost breakdown. */}
@@ -1910,12 +1943,12 @@ export default function QuoteBuilder() {
           <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} aria-label="Weight in tonnes" id="qb-weight-input" />
         </div>
         <div className="qb-loc">
-          <div style={fieldLabelS}><span>Collection<Req /></span></div>
-          <LocationInput value={pickup} onChange={(v, c) => { setPickup(v); setPickupCoords(c || null); }} placeholder="City / address" style={inputS} />
+          <LocationInput label={<span>Collection<Req /></span>} labelStyle={fieldLabelS}
+            value={pickup} onChange={(v, c) => { setPickup(v); setPickupCoords(c || null); }} placeholder="City / address" style={inputS} />
         </div>
         <div className="qb-loc">
-          <div style={fieldLabelS}><span>Delivery<Req /></span></div>
-          <LocationInput value={delivery} onChange={(v, c) => { setDelivery(v); setDeliveryCoords(c || null); }} placeholder="City / address" style={inputS} />
+          <LocationInput label={<span>Delivery<Req /></span>} labelStyle={fieldLabelS}
+            value={delivery} onChange={(v, c) => { setDelivery(v); setDeliveryCoords(c || null); }} placeholder="City / address" style={inputS} />
         </div>
       </div>
 
@@ -1936,6 +1969,21 @@ export default function QuoteBuilder() {
       {/* details */}
       <div style={{ marginBottom: 24 }}>
         <div className="qb-grid qb-grid--details" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16 }}>
+          {/* Truck first: it decides fuel use, operating cost and tolls (required). */}
+          <div className="qb-vehicle">
+            <div style={fieldLabelS}><span>Truck type<Req /></span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New vehicle type (opens in a new tab)" onClick={() => window.open("/settings/vehicle-types", "_blank", "noopener")}><Plus size={12} aria-hidden="true" />New</button>}</div>
+            <div className="qb-select">
+            {/* §3: always a real truck. "" = the suggested one for the load. */}
+            <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS} aria-label="Truck type" id="qb-truck-select">
+              <option value="">{suggestedVT ? `${sentenceCaseLabel(suggestedVT.name)}${capacityTonnes(suggestedVT.capacity) ? ` (${capLabel(capacityTonnes(suggestedVT.capacity))})` : ""} · auto` : allVehicleTypes.length ? "Pick a truck" : "No trucks yet"}</option>
+              {allVehicleTypes.map((v: any) => (
+                <option key={v.id || v.name} value={v.name}>{sentenceCaseLabel(v.name)}{capacityTonnes(v.capacity) ? ` (${capLabel(capacityTonnes(v.capacity))})` : ""}</option>
+              ))}
+              {vehicleType && !allVehicleTypes.some((v: any) => v.name === vehicleType) && <option value={vehicleType}>{sentenceCaseLabel(vehicleType)}</option>}
+            </select>
+            <ChevronDown size={14} className="qb-select__chev" aria-hidden="true" />
+            </div>
+          </div>
           {/* The app's shared DatePicker: it hands back the same "yyyy-MM-dd"
               string the native date input did, straight to the same setter. */}
           {([
@@ -1948,20 +1996,21 @@ export default function QuoteBuilder() {
               <DatePicker value={value} onChange={set} style={{ minHeight: "var(--field-h, 40px)", boxSizing: "border-box" }} />
             </div>
           ))}
-          <div className="qb-vehicle">
-            <div style={fieldLabelS}><span>Truck</span>{!authUser?.is_demo && <button type="button" className="qb-textbtn qb-textbtn--label" aria-label="New vehicle type (opens in a new tab)" onClick={() => window.open("/settings/vehicle-types", "_blank", "noopener")}><Plus size={12} aria-hidden="true" />New</button>}</div>
-            <div className="qb-select">
-            {/* §3: always a real truck. "" = the suggested one for the load. */}
-            <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS} aria-label="Truck" id="qb-truck-select">
-              <option value="">{suggestedVT ? `${sentenceCaseLabel(suggestedVT.name)}${capacityTonnes(suggestedVT.capacity) ? ` (${capLabel(capacityTonnes(suggestedVT.capacity))})` : ""} · auto` : allVehicleTypes.length ? "Pick a truck" : "No trucks yet"}</option>
-              {allVehicleTypes.map((v: any) => (
-                <option key={v.id || v.name} value={v.name}>{sentenceCaseLabel(v.name)}{capacityTonnes(v.capacity) ? ` (${capLabel(capacityTonnes(v.capacity))})` : ""}</option>
-              ))}
-              {vehicleType && !allVehicleTypes.some((v: any) => v.name === vehicleType) && <option value={vehicleType}>{sentenceCaseLabel(vehicleType)}</option>}
-            </select>
-            <ChevronDown size={14} className="qb-select__chev" aria-hidden="true" />
+          {truckSuggestions.length > 0 && (
+            <div className="qb-truck-suggest" role="group" aria-label={`Suggested trucks for this ${capLabel(loadT)} load`}>
+              <span className="qb-truck-suggest__lbl">Suggested for this {capLabel(loadT)} load:</span>
+              {truckSuggestions.map((v) => {
+                const picked = selectedVT?.name === v.name;
+                return (
+                  <button key={v.id || v.name} type="button" className={`qb-textbtn qb-textbtn--pick${picked ? " is-picked" : ""}`}
+                    aria-pressed={picked} onClick={() => applyVehicleType(v.name)}
+                    title={`Carries up to ${capLabel(capacityTonnes(v.capacity))}${Number(v.fuel_consumption_l_per_100km) > 0 ? `, about ${fmtNum(Number(v.fuel_consumption_l_per_100km), 1)} L/100 km` : ""}`}>
+                    {sentenceCaseLabel(v.name)} ({capLabel(capacityTonnes(v.capacity))})
+                  </button>
+                );
+              })}
             </div>
-          </div>
+          )}
           <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span>Cargo</span></div><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} aria-label="Cargo" /></div>
           <div style={{ gridColumn: "span 2" }}><div style={fieldLabelS}><span id="qb-trip-label">Trip</span></div>
             {/* The shared segmented control: neutral track, raised active option. */}
@@ -2253,7 +2302,18 @@ export default function QuoteBuilder() {
         const wayOut = loss ? wayOutChoice(data?.choices ?? [], liveReading.floor) : null;
         const blocked = blockWarnings.length > 0;
         const sendPrimary = !blocked && !waiting;
-        const chipLabel = priceTyping ? "Your price" : atBuildUp ? "Target" : savedPriceShown ? "Saved price" : appliedChoice ? appliedChoice.label : "Your price";
+        // The suggested price, one plain word under it (the margin line beside
+        // already says the margin); how it was worked out is on hover: the
+        // target margin on the cost floor, or the company's own rate per km or
+        // minimum charge when either is higher.
+        const suggestedFrom = (() => {
+          const tp = costing.target_price, rp = costing.rate_price, min = costing.minimum_charge;
+          if (rp != null && tp != null && rp > tp) return `Your rate of R ${formatNumber(costing.default_price_per_km ?? 0)} per km.`;
+          if (min != null && tp != null && Math.abs(tp - min) < 0.005) return "Your minimum charge.";
+          return costing.floor != null && costing.target_margin_pct != null
+            ? `Your costs of ${formatMoneyWhole(costing.floor)}, priced to keep your ${formatNumber(costing.target_margin_pct)}% margin.` : null;
+        })();
+        const chipLabel = priceTyping ? "Your price" : atBuildUp ? "Suggested price" : savedPriceShown ? "Saved price" : appliedChoice ? appliedChoice.label : "Your price";
         // Line 1: margin and chance to win, and the next price as a chip.
         // Line 2 (always reserved, so nothing moves): block > reopen > warn.
         const chip = !ready || priceTyping ? null
@@ -2284,14 +2344,8 @@ export default function QuoteBuilder() {
                 onValue={(n) => onPriceInput(n)} />
             </span>
             <span className="qb-pricebar__sub qb-pricebar__src">
-              <span className="qb-pricebar__chip">{chipLabel}</span>
+              <span className="qb-pricebar__chip" title={atBuildUp && !priceTyping && suggestedFrom ? suggestedFrom : undefined}>{chipLabel}</span>
               {!(atBuildUp && !priceTyping) && <button type="button" className="qb-linkbtn" onClick={resetPrice}>Reset</button>}
-              {altReturnPrice != null && (
-                <button type="button" className="qb-linkbtn qb-pricebar__alt" onClick={() => setReturnShape(!returnLoadBooked)}
-                  title={emptyReturn.included ? "Price if a load comes back" : "Price if the truck comes back empty"}>
-                  {emptyReturn.included ? "Loaded back" : "Empty back"} {formatMoneyWhole(altReturnPrice)}
-                </button>
-              )}
             </span>
           </div>
           <div className="qb-pricebar__read" id="qb-price-read" aria-live="off">
@@ -2307,12 +2361,37 @@ export default function QuoteBuilder() {
                 <span className={`qb-pricebar__lk qb-pricebar__lk--${lkTone(lk!)}`}>{likelihoodShort(lk!)}</span>
               )}
               {chip && (
-                <button type="button" className="qb-pricebar__usechip" onClick={() => applyPrice(chip.price)}>{chip.label}</button>
+                <button type="button" className="qb-linkbtn qb-pricebar__uselink" onClick={() => applyPrice(chip.price)}>{chip.label}</button>
               )}
             </span>
             <span className="qb-pricebar__warnline">{line2}</span>
           </div>
           <div className="qb-pricebar__actions">
+            {/* Clear and Export are testing tools: team test companies only. */}
+            {isTestCompany && <>
+            <button type="button" className="tw-btn tw-btn--ghost qb-pricebar__clear" onClick={() => setClearConfirm(true)} disabled={saving}>Clear</button>
+            {/* Everything this quote was priced on, to check by hand (print → Save as PDF). */}
+            <button type="button" className="tw-btn tw-btn--ghost qb-pricebar__export" title="Export the full quote working as a PDF"
+              onClick={() => {
+                const client = customers.find((c: any) => String(c.id) === String(customerId));
+                const opened = openQuoteExport({
+                  quoteRef: savedQuoteId ? `Quote ${savedQuoteId}` : isEditing ? `Quote ${editId}` : null,
+                  company: companyProfile?.company_name ?? null,
+                  customer: client ? (client.company_name || client.name || null) : null,
+                  pickup, delivery, stops: stops.map(st => st.location).filter(Boolean),
+                  tripType: tripType === "ROUND_TRIP" ? "Round trip" : "One way", legs,
+                  distanceKm: distance || null, durationMin: durationMin != null ? Number(durationMin) : null,
+                  truck: truckName || null, weightKg: weightKg || null, cargo: cargo || null,
+                  pickupDate: pickupDate || null, deliveryDate: deliveryDate || null, validUntil: validUntilToSave,
+                  routeLabel: optB ? routeChipLabel(optB, selectedRouteIndex) : null,
+                  tolls: tollBreakdown, borderOut: routeB?.cross_border_breakdown || [], borderBack: returnLeg?.cross_border_breakdown || [],
+                  costing, costingAtPrice, costingInputs,
+                  price: total, priceSource: chipLabel,
+                  vat: previewVat, analysis: pricing.data ?? null,
+                });
+                if (!opened) toast.error("Your browser blocked the export window. Allow pop-ups for this site and try again.");
+              }}>Export</button>
+            </>}
             <button type="button" className="tw-btn qb-pricebar__save" onClick={() => save(false)} disabled={saving}>
               <span className="qb-lbl-long">Save draft</span><span className="qb-lbl-short">Save</span>
             </button>
@@ -2349,6 +2428,19 @@ export default function QuoteBuilder() {
           />
         );
       })()}
+
+      {clearConfirm && (
+        <ConfirmModal
+          title="Clear this quote?"
+          message={isEditing || savedQuoteId
+            ? "This empties the form and starts a new quote. The saved quote is kept."
+            : "Everything you've entered on this quote will be removed."}
+          confirmLabel="Clear"
+          danger
+          onConfirm={() => startNew("Quote cleared")}
+          onCancel={() => setClearConfirm(false)}
+        />
+      )}
 
       <AIChatPanel messages={chatMessages} busy={nlBusy} open={chatOpen} onOpenChange={setChatOpen} onSend={(t, lang) => submitNL(t, lang)} launcherSlot={chatSlot} />
     </div>

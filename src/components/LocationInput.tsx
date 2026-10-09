@@ -42,9 +42,13 @@ interface LocationInputProps {
   style?: React.CSSProperties;
   onFocus?: () => void;
   resolvedText?: string;
+  /** Field label. When given, it is drawn here with the GPS / address toggle
+   *  just to its right, instead of the toggle sitting under the field. */
+  label?: React.ReactNode;
+  labelStyle?: React.CSSProperties;
 }
 
-export function LocationInput({ value, onChange, placeholder, style, onFocus, resolvedText }: LocationInputProps) {
+export function LocationInput({ value, onChange, placeholder, style, onFocus, resolvedText, label, labelStyle }: LocationInputProps) {
   const [mode, setMode] = useState<'search' | 'gps'>('search');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -222,6 +226,12 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
   if (mode === 'gps') {
     return (
       <div ref={containerRef}>
+        {label != null && (
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%' }}>
+            {label}
+            <button type="button" style={{ ...toggleLink, marginTop: 0 }} onClick={switchToSearch}>Search by address</button>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8 }}>
           <div style={{ flex: 1 }}>
             <input
@@ -244,15 +254,29 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
             />
           </div>
         </div>
-        <button type="button" style={toggleLink} onClick={switchToSearch}>
-          ← Search by address
-        </button>
+        {label == null && (
+          <button type="button" style={toggleLink} onClick={switchToSearch}>
+            ← Search by address
+          </button>
+        )}
       </div>
     );
   }
 
+  const gpsButton = (
+    <button type="button" style={{ ...toggleLink, marginTop: label != null ? 0 : 4, display: 'inline-flex', alignItems: 'center' }} onClick={switchToGps}
+      title="Enter GPS coordinates" aria-label="Enter GPS coordinates">
+      <LocateFixed size={12} aria-hidden="true" />
+    </button>
+  );
   return (
     <div ref={containerRef}>
+      {label != null && (
+        <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%' }}>
+          {label}
+          {gpsButton}
+        </div>
+      )}
       {/* The list anchors to the input's own box, not to the wrapper that
           also holds the GPS link, so it opens directly under the field. */}
       <div style={{ position: 'relative' }}>
@@ -334,13 +358,12 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
         </div>
       )}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button type="button" style={{ ...toggleLink, marginTop: 4, display: 'inline-flex', alignItems: 'center' }} onClick={switchToGps}
-          title="Enter GPS coordinates" aria-label="Enter GPS coordinates">
-          <LocateFixed size={12} aria-hidden="true" />
-        </button>
-        {resolvedText && <ResolvedInfo text={resolvedText} />}
-      </div>
+      {(label == null || resolvedText) && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {label == null ? gpsButton : <span />}
+          {resolvedText && <ResolvedInfo text={resolvedText} />}
+        </div>
+      )}
     </div>
   );
 }

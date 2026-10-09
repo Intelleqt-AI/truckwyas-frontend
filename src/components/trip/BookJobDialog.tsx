@@ -50,6 +50,8 @@ interface Preview {
   blocked?: { error?: string; title?: string; warnings?: { severity?: string; title?: string }[] } | null;
   load_id: number | null;
   booking: BookingBlock;
+  /** One per-tonne consignment too heavy for one truck: the tonnes of each load booking creates. */
+  loads_planned?: number[];
 }
 interface BookedJob { id: number; load_number: string; booking?: { return_link?: unknown } }
 
@@ -180,6 +182,13 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
         {bookedId ? (
           <p className="bj-done"><span className="bk-dot bk-dot--success" aria-hidden="true" />Already booked. Open the job to see its margin and return load.</p>
         ) : (<>
+        {!callOff && (pv?.loads_planned?.length ?? 0) > 1 && (
+          // Quoted (and accepted) as several loads: booking creates every one.
+          <p className="bk-help" role="status" style={{ marginBottom: 12 }}>
+            This creates {pv!.loads_planned!.length} loads: {pv!.loads_planned!.map(t => fmtTonnes(t)).join(' + ')}.
+            {' '}The truck below goes on the first load; assign the others from Orders.
+          </p>
+        )}
         {callOff && (
           <div className="bk-field" style={{ marginBottom: 12 }}>
             <label className="bk-field__label" htmlFor="bj-tonnes">Tonnes on this load</label>

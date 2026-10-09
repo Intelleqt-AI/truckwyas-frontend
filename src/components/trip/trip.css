@@ -1,0 +1,106 @@
+/* Trip economics: the job's margin card, the return-load picker and the
+   Book job dialog. Tokens only (theme.css); sizes on the 4px grid. */
+
+/* ---- Trip margin card ---- */
+.tm-card { margin-top: var(--section-gap, 24px); }
+.tm-pair { margin: -4px 0 12px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.tm-table-wrap { overflow-x: auto; margin: 0 calc(-1 * var(--card-pad, 20px)); padding: 0 var(--card-pad, 20px); }
+.tm-table { width: 100%; min-width: 640px; border-collapse: collapse; font-family: var(--font-sans); }
+.tm-table th {
+  text-align: right; font: 500 12px/16px var(--font-sans); color: var(--text-secondary);
+  padding: 0 0 8px 16px; border-bottom: 1px solid var(--border-row); white-space: nowrap;
+}
+.tm-table th:first-child, .tm-table td:first-child { text-align: left; padding-left: 0; }
+.tm-table td {
+  text-align: right; vertical-align: top; padding: 12px 0 12px 16px;
+  border-bottom: 1px solid var(--border-row);
+  font: 400 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.tm-table tr:last-child td { border-bottom: none; }
+.tm-table .tm-total td { font-weight: 600; padding-top: 14px; }
+.tm-table .tm-total td:first-child { font-weight: 500; }
+.tm-sub { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; }
+.tm-sub--wrap { white-space: normal; max-width: 26ch; margin-left: auto; }
+.tm-table td:first-child .tm-sub--wrap { margin-left: 0; }
+.tm-neg { color: var(--status-danger-text); }
+.tm-pos { color: var(--status-success-text); }
+.tm-muted { color: var(--text-tertiary); }
+.tm-legname { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.tm-note { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.tm-note--warning { color: var(--status-warning-text); }
+.tm-missing { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; padding: 12px 16px; border-radius: var(--radius-nested, 8px); background: var(--status-warning-bg); }
+.tm-missing p { margin: 0; font: 500 14px/20px var(--font-sans); color: var(--status-warning-text); }
+.tm-warns { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.tm-warns li { display: flex; align-items: baseline; gap: 8px; font: 400 13px/20px var(--font-sans); color: var(--status-warning-text); }
+.tm-warns li .bk-dot { transform: translateY(-1px); }
+.tm-head-actions { display: inline-flex; gap: 8px; margin: -6px 0; }
+
+/* ---- Candidate list (link dialog and Book job) ---- */
+.tm-options { display: grid; gap: 8px; margin: 0; padding: 0; border: none; }
+.tm-option {
+  display: grid; grid-template-columns: 20px 1fr; gap: 4px 10px; align-items: start;
+  padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-nested, 8px);
+  cursor: pointer; background: var(--bg-surface);
+}
+.tm-option:hover { background: var(--surface-tint-hover, var(--bg-surface-hover)); }
+.tm-option.is-selected { border-color: var(--accent-primary); }
+.tm-option input { margin: 3px 0 0; accent-color: var(--accent-primary); }
+.tm-option__title { font: 500 14px/20px var(--font-sans); color: var(--text-primary); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.tm-option__meta { grid-column: 2; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.tm-option__fit { font: 400 12px/16px var(--font-sans); color: var(--status-success-text); }
+.tm-option__warn { grid-column: 2; font: 400 12px/16px var(--font-sans); color: var(--status-warning-text); }
+.tm-empty { margin: 0; padding: 12px; border: 1px dashed var(--border-subtle); border-radius: var(--radius-nested, 8px); font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.tm-picker-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+
+/* ---- Book job dialog ---- */
+.bj-dialog { max-width: 520px; width: 100%; max-height: calc(100vh - 48px); overflow-y: auto; }
+.bj-summary { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 12px 0; margin-bottom: 16px; border-top: 1px solid var(--border-row); border-bottom: 1px solid var(--border-row); }
+.bj-summary__lane { font: 500 14px/20px var(--font-sans); color: var(--text-primary); }
+.bj-summary__sub { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.bj-summary__price { text-align: right; flex-shrink: 0; }
+.bj-summary__total { font: 600 16px/24px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-bottom: 4px; }
+.bj-grid .bk-field { margin-bottom: 12px; }
+.bj-input {
+  width: 100%; min-height: 40px; padding: 8px 12px; box-sizing: border-box;
+  background: var(--input-bg, var(--bg-surface)); color: var(--text-primary);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-control);
+  font: 400 14px/20px var(--font-sans); outline: none;
+}
+.bj-input:focus-visible { border-color: var(--accent-primary); }
+.bj-section { margin-top: 20px; }
+.bj-section__title { margin: 0 0 8px; font: 600 14px/20px var(--font-sans); color: var(--text-primary); }
+.bj-section__sub { margin: -4px 0 8px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.bj-error { margin: 12px 0 0; font: 400 13px/20px var(--font-sans); color: var(--status-danger-text); }
+.bj-done { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+
+@media (max-width: 640px) {
+  .bj-grid { grid-template-columns: 1fr; gap: 0; }
+  .bj-summary { flex-direction: column; gap: 4px; }
+  .bj-summary__price { text-align: left; display: flex; align-items: baseline; gap: 8px; }
+}
+.bj-dialog .bk-kv__value { white-space: nowrap; flex-shrink: 0; }
+.bj-dialog .bk-kv__label { flex-shrink: 1; min-width: 0; }
+/* Tolls being worked out: a calm, slow pulse (none with reduced motion). */
+.tm-pulse { animation: tm-pulse 1.6s ease-in-out infinite; }
+@keyframes tm-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .tm-pulse { animation: none; } }
+
+/* Phones: each leg is a block of label / value rows, no sideways scroll. */
+@media (max-width: 640px) {
+  .tm-table-wrap { overflow: visible; margin: 0; padding: 0; }
+  .tm-table { min-width: 0; }
+  .tm-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .tm-table, .tm-table tbody, .tm-table tr, .tm-table td { display: block; width: 100%; }
+  .tm-table tr { padding: 12px 0; border-bottom: 1px solid var(--border-row); }
+  .tm-table tr:last-child { border-bottom: none; }
+  .tm-table td { display: flex; justify-content: flex-end; flex-wrap: wrap; align-items: baseline; column-gap: 8px; padding: 4px 0; border-bottom: none; text-align: right; }
+  .tm-table td::before { content: attr(data-label); flex-shrink: 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); text-align: left; margin-right: auto; }
+  .tm-table td.tm-jobcell { display: block; text-align: left; padding-bottom: 8px; font-weight: 500; }
+  .tm-table td.tm-jobcell::before { content: none; }
+  .tm-table td > .tm-sub { display: inline; white-space: normal; }
+  .tm-table td.tm-jobcell > .tm-sub { display: block; margin-left: 0; }
+  .tm-table .tm-total td { padding-top: 4px; }
+  .tm-sub--wrap { max-width: none; }
+}
+.bj-group { margin: 8px 0 0; font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }

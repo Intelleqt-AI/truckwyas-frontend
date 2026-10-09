@@ -54,6 +54,7 @@ function PublicOnly({ children }: { children: React.ReactNode }) {
 // Lazy load all other pages for code splitting
 const QuoteBuilder = lazy(() => import('./pages/QuoteBuilder'));
 const QuoteDetail = lazy(() => import('./pages/QuoteDetail'));
+const Contracts = lazy(() => import('./pages/Contracts'));
 const Bookings = lazy(() => import('./pages/Bookings'));
 const LoadsList = lazy(() => import('./pages/LoadsList'));
 const Vehicles = lazy(() => import('./pages/Vehicles'));
@@ -282,6 +283,7 @@ const App = () => (
                 <Route path="/bookings/quotes/new" element={<QuoteBuilder />} />
                 <Route path="/bookings/quotes/:id/edit" element={<QuoteBuilder />} />
                 <Route path="/bookings/quotes/:id" element={<QuoteDetail />} />
+                <Route path="/bookings/contracts" element={<Contracts />} />
                 <Route path="/bookings/:id" element={<Bookings />} />
 
                 {/* Fleet */}

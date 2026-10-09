@@ -394,3 +394,10 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
 .qb-routeopt__sub { color: var(--text-tertiary); }
 .qb-cost__check { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; line-height: 18px; color: var(--text-secondary); cursor: pointer; }
 .qb-cost__check input { margin: 0; accent-color: var(--text-primary); }
+
+/* Price by: per load / per tonne (above the analysis or per-tonne panel). */
+.qb-basis { margin-bottom: 12px; }
+
+/* Per tonne: the rate sits next to its unit ("R 5 551 per tonne"). */
+.qb-pricebar__field--rate .qb-pricebar__input { flex: 0 0 auto !important; }
+.qb-pricebar__unit { font: 500 14px/20px var(--font-sans); color: var(--text-secondary); white-space: nowrap; }

@@ -10,7 +10,8 @@ import { useLiveEvent, eventPrefix } from '@/hooks/useLiveEvent';
 import { formatCurrency, formatDate, formatDistance, formatMoney, formatMoneyWhole, formatNumber, normaliseFigures, sentenceCaseLabel } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { ConvertToBookingModal } from '@/components/ConvertToBookingModal';
+import { BookJobDialog } from '@/components/trip/BookJobDialog';
+import { actualsText } from '@/lib/tripEconomics';
 import { useAuth } from '@/lib/AuthContext';
 import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
 import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
@@ -33,6 +34,7 @@ import PricingDecisionRows from '@/components/PricingDecisionRows';
 import { LOSS_REASONS, formatPct, formatRand, lossReasonPayload, type LossReason } from '@/lib/pricing';
 import { agreedMarginOf, agreedPriceOf, pricingDecisionOf } from '@/lib/pricingDecision';
 import { cargoText } from '@/lib/cargo';
+import { TonnageTerms } from '@/components/pricing/TonnageTerms';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   DRAFT: 'neutral',
@@ -118,6 +120,16 @@ export default function QuoteDetail() {
   // The board's quote -> load lookup (same cached GET), so a converted quote
   // offers "View booking" here exactly as its board card does (R11).
   const loadsQ = useQuery(loadsQuery);
+  // Delivered: the actual margin is compared with the margin the job was
+  // booked at (its quoted_margin_pct), never today's cost floor.
+  const bookedLoadId = quote?.actuals
+    ? (quote?.booked_load?.id ?? (mapLoadsByQuoteId(loadsQ.data).get(String(quote?.id)) as { id?: number | string } | undefined)?.id)
+    : undefined;
+  const bookedLoadQ = useQuery({
+    queryKey: ['load', String(bookedLoadId)],
+    queryFn: () => fetchData(`api/v1/loads/${bookedLoadId}/`),
+    enabled: bookedLoadId != null,
+  });
   // The route map grows to end level with the rail when the rail is the
   // longer column, but never drops below a readable floor (R10): 320px on
   // desktop, 240px on phones. When the Job card is long, the main column
@@ -244,26 +256,6 @@ export default function QuoteDetail() {
     mutationFn: () => deleteData({ url: `api/v1/quotes/${id}/` }),
     onSuccess: () => {
       navigate('/bookings/quotes');
-    },
-  });
-
-  const convertToLoadMutation = useMutation({
-    mutationFn: ({ driverId, vehicleId, dates }: { driverId: string; vehicleId: string; dates?: { pickup_date: string; delivery_date: string } }) =>
-      postData({
-        url: `api/v1/quotes/${id}/convert_to_load/`,
-        // dates: only when the quote had none and the modal showed suggested ones.
-        data: { driver_id: driverId, vehicle_id: vehicleId, ...(dates || {}) },
-      }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['loads'] });
-      setShowConvertModal(false);
-      toast.success('Quote converted to booking');
-      if (data?.id) {
-        navigate(`/bookings/${data.id}`);
-      }
-    },
-    onError: (error: any) => {
-      toast.error(error?.message || 'Failed to convert quote to booking');
     },
   });
 
@@ -482,7 +474,11 @@ export default function QuoteDetail() {
   // load status (In transit, Completed) with no load found offer no Send
   // either: the chip says where the job stands.
   const booking = (quote.booked_load ?? mapLoadsByQuoteId(loadsQ.data).get(String(quote.id))) as { id: number | string; load_number?: string; status?: string } | undefined;
-  const booked = !!booking;
+  // A volume contract books call-off loads until its tonnes are used up.
+  const perTonne = quote.pricing_basis === 'per_tonne';
+  const contract = perTonne ? quote.volume_contract ?? null : null;
+  const contractOpen = !!contract && contract.remaining_tonnes > 0;
+  const booked = !!booking && !contractOpen;
   const loadStateOnly = !booked && (quote.status === 'IT' || quote.status === 'COMPLETED');
   // Only an alert about this quote's own fuel can demote Send (fuelNote is fuel-aware).
   const fuelDemotes = quote.status === 'DRAFT' && !!fuelNote;
@@ -559,7 +555,8 @@ export default function QuoteDetail() {
   // floor into its parts, "How it was priced" carries fuel, tolls and the rest,
   // so the build-up lines (Base rate, Fuel, …) are not listed a second time.
   // An incomplete quote (no price) has no build-up to show (it would read as R 0 and a negative line).
-  const showBuildUp = !quoteIncomplete(quote) && !(decision && decision.floorLines && !decision.stale);
+  // A tonnage quote is a rate per tonne: no per-load build-up.
+  const showBuildUp = quote.pricing_basis !== 'per_tonne' && !quoteIncomplete(quote) && !(decision && decision.floorLines && !decision.stale);
   const statusOptions: StatusOption[] = [
     { value: 'DRAFT', label: 'Draft', hint: 'Not offered to the customer yet' },
     // An expired quote can still be marked Sent (the preview warns), but the
@@ -569,7 +566,7 @@ export default function QuoteDetail() {
       : sendBlock
         ? [{ value: 'SENT', label: 'Sent', hint: sendBlock.title, disabledReason: sendBlock.title }]
         : [{ value: 'SENT', label: 'Sent', hint: lapsed ? 'Quote has expired, edit first' : 'Emails the quote to the customer' }]),
-    { value: 'ACCEPTED', label: 'Accepted', hint: booked ? 'Won and booked' : 'Ready to convert to a booking' },
+    { value: 'ACCEPTED', label: 'Accepted', hint: booked ? 'Won and booked' : 'Ready to book' },
     { value: 'DECLINED', label: 'Declined' },
     // In transit and Completed live on the order created by "Convert to
     // booking"; the backend rejects a direct write. Listed only so a legacy
@@ -629,9 +626,9 @@ export default function QuoteDetail() {
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate(`/bookings/${booking!.id}`)} aria-label="View booking">
               <span className="qd-label-long" data-short="Booking">View booking</span>
             </button>
-          ) : quote.status === 'ACCEPTED' ? (
-            <button type="button" className="bk-btn bk-btn--primary" onClick={handleConvertToLoad} disabled={convertToLoadMutation.isPending} aria-label={convertToLoadMutation.isPending ? undefined : 'Convert to booking'}>
-              {convertToLoadMutation.isPending ? 'Converting…' : <span className="qd-label-long" data-short="Convert">Convert to booking</span>}
+          ) : quote.status === 'ACCEPTED' || (contractOpen && !!booking) ? (
+            <button type="button" className="bk-btn bk-btn--primary" onClick={handleConvertToLoad} aria-label={contract ? 'Book a load' : 'Book job'}>
+              {contract ? <span className="qd-label-long" data-short="Book">Book a load</span> : <span className="qd-label-long" data-short="Book">Book job</span>}
             </button>
           ) : (
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending || !!sendBlock} title={sendBlock ? sendBlock.title : undefined} aria-label={sendToCustomerMutation.isPending ? undefined : (quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer')}>
@@ -739,7 +736,7 @@ export default function QuoteDetail() {
         {/* RIGHT: the price (the only place the total appears), then tools. */}
         <div ref={railRef} className="quote-detail-rail">
           <section className="bk-card" aria-labelledby="qd-price-title">
-            <h2 className="bk-fact__label" id="qd-price-title" style={{ margin: 0 }}>{isRound ? 'Total, both legs' : 'Total'}{vat?.vat_registered ? ' excl. VAT' : ''}</h2>
+            <h2 className="bk-fact__label" id="qd-price-title" style={{ margin: 0 }}>{perTonne ? (contract ? 'Contract, estimated' : 'Estimated total') : isRound ? 'Total, both legs' : 'Total'}{vat?.vat_registered ? ' excl. VAT' : ''}</h2>
             {/* Whole rand when the cents are zero, as in the builder's price bar. */}
             {/* No price yet (costs incomplete): never "R 0". */}
             <div className="qd-total">{quoteIncomplete(quote) ? <span className="bk-muted">Incomplete</span> : formatRand(total)}</div>
@@ -776,6 +773,18 @@ export default function QuoteDetail() {
                 {booking!.status && <> · {statusMeta(booking!.status).label}</>}
               </p>
             )}
+            {/* Once delivered: what the job really made (server actuals). */}
+            {(() => {
+              const a = actualsText(quote.actuals);
+              if (!a) return null;
+              const neg = a.negative;
+              return (
+                <div className="qd-agreed">
+                  <span className={`qd-agreed__line${neg ? ' qd-decision__neg' : ''}`}>{a.line}{bookedLoadQ.data?.quoted_margin_pct != null && bookedLoadQ.data.quoted_margin_pct !== '' ? <span className="qd-agreed__quoted"> (quoted {formatPct(Number(bookedLoadQ.data.quoted_margin_pct))})</span> : null}</span>
+                  <span className="qd-agreed__margin">{a.basis}</span>
+                </div>
+              );
+            })()}
             {loadStateOnly && (
               <p className="qd-booked">
                 Marked {STATUS_LABEL[quote.status].toLowerCase()} on an older record. No booking is linked to this quote.
@@ -791,6 +800,7 @@ export default function QuoteDetail() {
               {fuelNote && <span className="bk-dot bk-dot--warning" aria-hidden="true" />}
               <span>{pricedOn}{fuelNote && Number.isFinite(fuelDelta) && Math.abs(fuelDelta) >= 0.005 ? ` Now ${fuelDelta > 0 ? 'up' : 'down'} ${formatMoney(Math.abs(fuelDelta))}/L.` : ''}</span>
             </p>}
+            {perTonne && <div className="qd-price-rows"><TonnageTerms quote={quote} /></div>}
             {sendBlock && openStatus && <p className="qd-block" role="alert">{sendBlock.title}</p>}
             {!sendBlock && demoteReason && <p className="qd-demote" role="status">{demoteReason}</p>}
             {showBuildUp && <div className="qd-price-rows">
@@ -1093,17 +1103,8 @@ export default function QuoteDetail() {
         />
       )}
 
-      {showConvertModal && (
-        <ConvertToBookingModal
-          quoteNumber={quote?.quote_number}
-          vehicleType={quote?.vehicle_type}
-          busy={convertToLoadMutation.isPending}
-          pickupDate={quote?.pickup_date}
-          deliveryDate={quote?.delivery_date}
-          distanceKm={quote?.distance ? parseFloat(quote.distance) : null}
-          onConfirm={(driverId, vehicleId, dates) => convertToLoadMutation.mutate({ driverId, vehicleId, dates })}
-          onCancel={() => setShowConvertModal(false)}
-        />
+      {showConvertModal && quote && (
+        <BookJobDialog quote={quote} onClose={() => setShowConvertModal(false)} />
       )}
     </div>
   );

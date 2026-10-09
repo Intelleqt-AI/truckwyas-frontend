@@ -14,6 +14,7 @@ const ROUTES: Array<[prefix: string, load: Loader]> = [
   ['/bookings/quotes', () => import('@/pages/LoadsList')],
   ['/bookings/orders', () => import('@/pages/LoadsList')],
   ['/bookings/history', () => import('@/pages/LoadsList')],
+  ['/bookings/contracts', () => import('@/pages/Contracts')],
   ['/finance/invoices/new', () => import('@/pages/CreateInvoice')],
   ['/finance/credit-notes/', () => import('@/pages/CreditNoteDetail')],
   ['/finance/credit-notes', () => import('@/pages/CreditNotes')],

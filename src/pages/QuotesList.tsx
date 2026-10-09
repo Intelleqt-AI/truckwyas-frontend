@@ -17,7 +17,7 @@ import { boardStage } from "@/components/overview/today";
 import { useAllQuotes } from "@/components/overview/ledger";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { ConfirmModal } from "@/components/ConfirmModal";
-import { ConvertToBookingModal } from "@/components/ConvertToBookingModal";
+import { BookJobDialog } from "@/components/trip/BookJobDialog";
 import { useAuth } from "@/lib/AuthContext";
 import { isSubscriptionBlocked, subscriptionStatusDetail } from "@/lib/subscriptionStatus";
 import {
@@ -80,7 +80,7 @@ const sentenceCase = (s?: string) =>
 const COLUMNS = ['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED'];
 // Booked: quotes converted into a load (server filter status=BOOKED, the
 // load is the source of truth). Fetched like a status column but nothing is
-// dropped on it or dragged out: only "Convert to booking" puts a quote there.
+// dropped on it or dragged out: only "Book job" puts a quote there.
 const QUERY_COLUMNS = ['DRAFT', 'SENT', 'ACCEPTED', 'BOOKED', 'DECLINED'];
 // The board shows one more column, Expired: derived from the date rule, not
 // a status, so nothing can be dropped on it either.
@@ -187,7 +187,7 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
           onClick={(e) => onConvertToLoad(e, quote)}
           style={{ pointerEvents: 'auto' }}
         >
-          Convert to booking
+          Book job
         </button>
       )}
     </div>
@@ -250,7 +250,7 @@ export const loadsQuery = {
 };
 
 // A quote converts to at most one load (convert_to_load blocks a second
-// conversion) — map quote id -> its load so the "Convert to booking"
+// conversion) — map quote id -> its load so the "Book job"
 // button can be swapped for a "View booking" link once that's happened.
 export function mapLoadsByQuoteId(loadsData: any): Map<string, any> {
   const loads: any[] = loadsData?.results || loadsData || [];
@@ -520,26 +520,6 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
         : patchData({ url: `api/v1/quotes/${id}/`, data: { status } }),
     onError: (err: unknown) => {
       toast.error(sendBlockedMessage(err) || 'Failed to update quote status.');
-    },
-  });
-
-  const convertToLoadMutation = useMutation({
-    mutationFn: ({ quote, driverId, vehicleId, dates }: { quote: any; driverId: string; vehicleId: string; dates?: { pickup_date: string; delivery_date: string } }) =>
-      postData({
-        url: `api/v1/quotes/${quote.id}/convert_to_load/`,
-        // dates: only when the quote had none and the modal showed suggested ones.
-        data: { driver_id: driverId, vehicle_id: vehicleId, ...(dates || {}) },
-      }).then(data => ({ data, quote })),
-    onSuccess: ({ quote }) => {
-      // Invalidate both keys — QuotesList uses 'loads', LoadsList uses 'loads-list'
-      queryClient.invalidateQueries({ queryKey: ['loads'] });
-      queryClient.invalidateQueries({ queryKey: ['loads-list'] });
-      queryClient.invalidateQueries({ queryKey: ['quotes-column'] });
-      setPendingConvertQuote(null);
-      toast.success(`Quote ${quote.quote_number} converted to load`);
-    },
-    onError: (err: any) => {
-      toast.error(err?.message || 'Failed to convert quote to load');
     },
   });
 
@@ -982,11 +962,11 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                           type="button"
                           className="bk-btn bk-btn--secondary bk-btn--sm"
                           onClick={(e) => handleConvertToLoad(e, quote)}
-                          aria-label="Convert to booking"
-                          title="Convert to booking"
+                          aria-label="Book job"
+                          title="Book job"
                         >
                           {/* Short in the table so the column keeps its width (R5). */}
-                          Convert
+                          Book
                         </button>
                       )}
                     </td>}
@@ -1055,16 +1035,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       )}
 
       {pendingConvertQuote && (
-        <ConvertToBookingModal
-          quoteNumber={pendingConvertQuote.quote_number}
-          vehicleType={pendingConvertQuote.vehicle_type}
-          busy={convertToLoadMutation.isPending}
-          pickupDate={pendingConvertQuote?.pickup_date}
-          deliveryDate={pendingConvertQuote?.delivery_date}
-          distanceKm={pendingConvertQuote?.distance ? parseFloat(pendingConvertQuote.distance) : null}
-          onConfirm={(driverId, vehicleId, dates) => convertToLoadMutation.mutate({ quote: pendingConvertQuote, driverId, vehicleId, dates })}
-          onCancel={() => setPendingConvertQuote(null)}
-        />
+        <BookJobDialog quote={pendingConvertQuote} onClose={() => setPendingConvertQuote(null)} />
       )}
     </div>
   );

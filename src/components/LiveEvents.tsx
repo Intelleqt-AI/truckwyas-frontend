@@ -55,6 +55,10 @@ const EVENT_TITLES: Record<string, string> = {
   'quote.declined':  'Quote declined',
   'quote.completed': 'Quote completed',
   'quote.expired':   'Quote expired',
+  // Quote follow-ups (the backend message is the toast; these are the burst label)
+  'quote.fuel_alert': 'Fuel price alert',
+  'quote.expiring':   'Quote expiring soon',
+  'quote.no_answer':  'No answer yet',
   // Invoices
   'invoice.auto_created': 'Invoice raised',
   'invoice.paid':         'Invoice paid',

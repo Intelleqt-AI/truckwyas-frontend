@@ -3,6 +3,8 @@ import { formatMoney, formatNumber } from '@/lib/formatters';
 import { shortDate, longDate } from '@/lib/dieselPrice';
 import { priceFieldError, priceFieldErrors, fieldChanged, ownPriceError, fuelChangeSummary } from '@/lib/settingsChecks';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { QuoteFollowUpsCard } from '@/components/followups/QuoteFollowUpsCard';
+import { NotSetChip } from '@/components/followups/QuoteListNotices';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { vatNumberProblem } from '@/lib/finance/validation';
 import { useState, useEffect, useRef } from "react";
@@ -365,8 +367,10 @@ export function CompanySettings() {
   // /settings/company#pricing (the quote builder's "Set yours" link) lands on
   // the Pricing card once the form has its values (so the layout is final).
   useEffect(() => {
-    if (!loaded || location.hash !== '#pricing') return;
-    const el = document.getElementById('pricing');
+    // Also #fuel and #quote-follow-ups (the pricing setup step's Change links).
+    const target = ['#pricing', '#fuel', '#quote-follow-ups'].includes(location.hash) ? location.hash.slice(1) : null;
+    if (!loaded || !target) return;
+    const el = document.getElementById(target);
     if (!el) return;
     const raf = requestAnimationFrame(() => el.scrollIntoView({ block: 'start' }));
     return () => cancelAnimationFrame(raf);
@@ -585,6 +589,8 @@ export function CompanySettings() {
       if (savedPetrol && 'petrol_price_in_use' in savedPetrol) setPetrolInUse((savedPetrol.petrol_price_in_use as typeof petrolInUse) ?? null);
       await queryClient.invalidateQueries({ queryKey: ['company-profile'] });
       queryClient.invalidateQueries({ queryKey: ['fuel-price-current'] });
+      // A changed pricing basic is marked set on the server (pricing setup step).
+      queryClient.invalidateQueries({ queryKey: ['pricing-setup'] });
       // VAT registration also shows on Invoice numbering and decides VAT on quotes.
       queryClient.invalidateQueries({ queryKey: ['finance', 'settings'] });
       setSaved(true);
@@ -973,7 +979,7 @@ export function CompanySettings() {
             {hasTargetField && (
               <div>
                 <label htmlFor="company-margin-target" style={labelTipStyle}>
-                  Target margin (%)
+                  Target margin (%)<NotSetChip item="target_margin" />
                   <InfoTip label="About the target margin">Price less the cost floor, as a share of the price. Suggested prices never go below it.</InfoTip>
                 </label>
                 <PricingInput id="company-margin-target" inputMode="decimal" decimals={/\.\d/.test(form.margin_target_pct) ? 2 : 0} suffix="%" value={form.margin_target_pct}
@@ -989,7 +995,7 @@ export function CompanySettings() {
             )}
             <div>
               <label htmlFor="company-operating-cost-per-km" style={labelTipStyle}>
-                Operating cost per km
+                Operating cost per km<NotSetChip item="operating_cost" />
                 <InfoTip label="About the operating cost per km">Wages, finance, insurance, licences, tyres, maintenance and overheads. Empty: your last 12 months, else a typical figure per truck class.</InfoTip>
               </label>
               <PricingInput id="company-operating-cost-per-km" inputMode="decimal" decimals={2} prefix="R" suffix="/km" placeholder="Automatic"
@@ -1005,7 +1011,7 @@ export function CompanySettings() {
             {hasDriverField && (
               <div>
                 <label htmlFor="company-driver-allowance" style={labelTipStyle}>
-                  Driver allowance per night (R)
+                  Driver allowance per night (R)<NotSetChip item="driver_allowance" />
                   <InfoTip label="About the driver allowance">Paid per night away. Each quote can change it.</InfoTip>
                 </label>
                 <PricingInput id="company-driver-allowance" inputMode="numeric" decimals={0} prefix="R" placeholder="Not set" value={form.driver_allowance_per_night}
@@ -1072,11 +1078,15 @@ export function CompanySettings() {
         </div>
       </div>
 
+      {/* Quote follow-ups: fuel price clause, alerts, reminders, weekly email.
+          Its own save (confirmed first); not part of the save bar below. */}
+      <QuoteFollowUpsCard />
+
       {/* Fuel (QUOTE-RULES.md §1): the official zone price by default, or the
           fleet's own. Nothing here ever copies the official price into "own". */}
       <div style={{ ...sectionStyle, scrollMarginTop: 16 }} id="fuel">
         <div style={{ ...sectionHeaderStyle, justifyContent: 'space-between' }}>
-          <h2 style={sectionTitleStyle}>Fuel</h2>
+          <h2 style={sectionTitleStyle}>Fuel<NotSetChip item="fuel_mode" /></h2>
           <button
             type="button"
             onClick={() => loadLivePrice(true)}

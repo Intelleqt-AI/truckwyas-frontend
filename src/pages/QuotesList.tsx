@@ -18,6 +18,7 @@ import { useAllQuotes } from "@/components/overview/ledger";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { BookJobDialog } from "@/components/trip/BookJobDialog";
+import { QuoteListNotices } from '@/components/followups/QuoteListNotices';
 import { useAuth } from "@/lib/AuthContext";
 import { isSubscriptionBlocked, subscriptionStatusDetail } from "@/lib/subscriptionStatus";
 import {
@@ -722,6 +723,10 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           </button>
         </div>
       )}
+
+      {/* Quote follow-ups: a fuel price alert (?fuel_alert=), the one-time fuel
+          clause question and the pricing setup step (admins). */}
+      <QuoteListNotices />
 
       {/* Tabs */}
       {view === 'board' && failedColumns.length === QUERY_COLUMNS.length ? (

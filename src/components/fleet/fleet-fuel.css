@@ -85,3 +85,23 @@
   .ff-link { min-height: 44px; display: inline-flex; align-items: center; }
   .ff-seg__opt { min-height: 48px; }
 }
+
+/* Vehicle types table: Description is the column to drop when space is short
+   (it stays in the edit drawer), so Fuel use, Base rate and Status never sit
+   under the sticky actions column. */
+@media (max-width: 1439px) {
+  .vt-col-desc { display: none; }
+}
+
+.ff-drawer { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; }
+.ff-drawer__backdrop { position: absolute; inset: 0; background: var(--modal-backdrop); }
+.ff-drawer__panel {
+  position: relative; width: 420px; max-width: 100%; box-sizing: border-box; overflow-y: auto;
+  background: var(--bg-deep); border-left: 1px solid var(--border-subtle); padding: var(--card-pad, 20px);
+}
+.ff-drawer__head { display: flex; justify-content: space-between; align-items: center; }
+.ff-drawer__title { margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: var(--text-primary); }
+.ff-drawer__close {
+  background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 18px;
+  min-width: 44px; min-height: 44px; border-radius: var(--radius-control);
+}

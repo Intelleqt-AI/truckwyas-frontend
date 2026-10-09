@@ -1,7 +1,8 @@
 // Fleet actuals UI (FLEET-ACTUALS-CLIENT-SPEC.md): measured fuel use from
 // Cartrack on Settings > Vehicle types and on a truck's page. Display rules
 // live in src/lib/fleetFuel.ts (shared with the app).
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useFleetFuel } from './useFleetFuel';
 import { Link } from 'react-router-dom';
 import { postData } from '@/lib/Api';
@@ -20,17 +21,32 @@ const errText = (e: unknown, fallback: string): string => {
   return d?.error || d?.detail || fallback;
 };
 
-export function FleetFuelStrip({ data, isAdmin, onQueued }: { data: FuelActuals; isAdmin: boolean; onQueued: () => void }) {
+export function FleetFuelStrip({ data, isAdmin, onQueued }: {
+  data: FuelActuals; isAdmin: boolean;
+  /** A refresh was queued (or refused by the cooldown): what the server said. */
+  onQueued: (r: { queued: boolean; next_at: string | null }) => void;
+}) {
   const s = headerStrip(data);
   const [busy, setBusy] = useState(false);
+  // Re-render when the cooldown ends, so "Refresh now" comes back by itself.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const ms = data.refresh_next_at ? Date.parse(data.refresh_next_at) - Date.now() : 0;
+    if (!(ms > 0)) return;
+    const t = window.setTimeout(() => setTick(x => x + 1), ms + 500);
+    return () => window.clearTimeout(t);
+  }, [data.refresh_next_at]);
   const queued = !!data.refresh_queued || busy;
   const refresh = async () => {
     setBusy(true);
     try {
-      await postData({ url: 'api/v1/fleet/fuel-actuals/refresh/', data: {} });
-      onQueued();
+      const r = await postData({ url: 'api/v1/fleet/fuel-actuals/refresh/', data: {} }) as { next_at?: string | null };
+      onQueued({ queued: true, next_at: r?.next_at ?? null });
     } catch (e) {
-      toast.error(errText(e, "Couldn't start a refresh."));
+      const d = (e as { response?: { status?: number; data?: { next_at?: string | null; queued?: boolean } } })?.response;
+      // 429: one refresh per 15 minutes; the strip then says when.
+      if (d?.status === 429) onQueued({ queued: !!d.data?.queued, next_at: d.data?.next_at ?? null });
+      else toast.error(errText(e, "Couldn't start a refresh."));
     } finally {
       setBusy(false);
     }
@@ -42,11 +58,12 @@ export function FleetFuelStrip({ data, isAdmin, onQueued }: { data: FuelActuals;
         {s.link && (
           <Link className="ff-link" to={s.link.to === 'fleet' ? '/fleet/vehicles' : '/settings/integrations'}>{s.link.text}</Link>
         )}
-        {s.canRefresh && isAdmin && (
+        {s.canRefresh && isAdmin && !s.cooldown && (
           <button type="button" className="ff-link" onClick={refresh} disabled={queued}>
             {queued ? 'Refreshing...' : 'Refresh now'}
           </button>
         )}
+        {s.canRefresh && isAdmin && s.cooldown && <span className="ff-muted">{s.cooldown}</span>}
       </div>
       {s.lines.map((l) => <div key={l} className="ff-strip__line">{l}</div>)}
     </div>
@@ -169,5 +186,30 @@ export function TruckFuelCard({ vehicleId }: { vehicleId: number | string }) {
       </ul>
       {card.amber && <p className="ff-warn">{card.amber}</p>}
     </section>
+  );
+}
+
+/** Side drawer for one vehicle type's measured fuel use: a modal dialog
+ *  (aria-modal, focus kept inside, Escape and the backdrop close it, focus
+ *  returns to the row that opened it). */
+export function FuelDrawer({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const panel = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(panel, true);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="ff-drawer">
+      <div className="ff-drawer__backdrop" onClick={onClose} />
+      <div ref={panel} role="dialog" aria-modal="true" aria-labelledby="ff-drawer-title" className="ff-drawer__panel">
+        <div className="ff-drawer__head">
+          <h2 id="ff-drawer-title" className="ff-drawer__title">{title}</h2>
+          <button type="button" className="ff-drawer__close settings-control" aria-label="Close" onClick={onClose}>✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
   );
 }

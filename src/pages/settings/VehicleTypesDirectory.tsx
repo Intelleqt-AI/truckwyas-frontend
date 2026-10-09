@@ -2,7 +2,7 @@ import '@/pages/table-heading-roles.css';
 import { formatMoney } from '@/lib/formatters';
 import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import '@/pages/settings/settings-brand.css';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmModal } from "@/components/ConfirmModal";
@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { settingsCardStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsBadgeStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
 import RowActions from '@/components/ui/RowActions';
 import { StatusChip } from '@/components/ui/StatusChip';
-import { FleetFuelStrip, FuelDetail, FuelUseCell } from '@/components/fleet/FleetFuel';
+import { FleetFuelStrip, FuelDetail, FuelDrawer, FuelUseCell } from '@/components/fleet/FleetFuel';
 import { useFleetFuel } from '@/components/fleet/useFleetFuel';
 import type { VehicleTypeFuel } from '@/lib/fleetFuel';
 import { toast } from '@/lib/toast';
@@ -72,6 +72,7 @@ export function VehicleTypesDirectory() {
   // Measured fuel use per type (Cartrack), FLEET-ACTUALS-CLIENT-SPEC.md.
   const fuel = useFleetFuel();
   const [fuelTypeId, setFuelTypeId] = useState<number | null>(null);
+  const closeFuel = useCallback(() => setFuelTypeId(null), []);
   const fuelRow = (t: VehicleType): VehicleTypeFuel | undefined => {
     const r = fuel.data?.vehicle_types.find(x => x.id === t.id);
     if (r) return r;
@@ -266,7 +267,7 @@ export function VehicleTypesDirectory() {
           </div>
         </div>
 
-        {fuel.data && <FleetFuelStrip data={fuel.data} isAdmin={isAdmin} onQueued={() => fuel.setData(d => d ? { ...d, refresh_queued: true } : d)} />}
+        {fuel.data && <FleetFuelStrip data={fuel.data} isAdmin={isAdmin} onQueued={r => fuel.setData(d => d ? { ...d, refresh_queued: r.queued, refresh_next_at: r.next_at } : d)} />}
 
         {loading ? (
           <TableSkeleton rows={6} cols={4} label="Loading truck types" />
@@ -279,7 +280,7 @@ export function VehicleTypesDirectory() {
                   <input type="checkbox" aria-label="Select all vehicle types" checked={allSelected} onChange={toggleAll} style={{ cursor: 'pointer' }} />
                 </th>
                 {['Name', 'Description', 'Payload (t)', 'Fuel use', 'Base rate', 'Status', ''].map(h => (
-                  <th key={h || 'actions'} scope="col" style={{ textAlign: (h === 'Payload (t)' || h === 'Base rate' || h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
+                  <th key={h || 'actions'} scope="col" className={h === 'Description' ? 'vt-col-desc' : undefined} style={{ textAlign: (h === 'Payload (t)' || h === 'Base rate' || h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
@@ -319,13 +320,13 @@ export function VehicleTypesDirectory() {
                       <span style={{ ...settingsBadgeStyle, marginLeft: 8, fontWeight: 400 }} title={badgeTitle}>{isShared ? 'Platform default' : 'Customised'}</span>
                     )}
                   </td>
-                  <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', minWidth: 200 }}>
+                  <td className="vt-col-desc" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', minWidth: 200 }}>
                     {t.description || '—'}
                   </td>
                   <td className="num" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                     {t.capacity ? `${t.capacity}t` : '—'}
                   </td>
-                  <td style={{ minWidth: 180 }}>
+                  <td style={{ minWidth: 150 }}>
                     <FuelUseCell
                       row={fuelRow(t)}
                       isAdmin={isAdmin}
@@ -476,21 +477,9 @@ export function VehicleTypesDirectory() {
 
       {/* Measured fuel use (Cartrack) for one type */}
       {fuelDetailRow && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setFuelTypeId(null)} />
-          <div role="dialog" aria-label={`${fuelDetailRow.name} fuel use`} style={{ position: 'relative', width: 420, maxWidth: '100%', background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 'var(--card-pad, 20px)', overflowY: 'auto', boxSizing: 'border-box' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{fuelDetailRow.name}</h2>
-              <button
-                className="settings-control"
-                aria-label="Close"
-                onClick={() => setFuelTypeId(null)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, minWidth: 44, minHeight: 44, borderRadius: 'var(--radius-control)' }}
-              >✕</button>
-            </div>
-            <FuelDetail row={fuelDetailRow} isAdmin={isAdmin} minKm={fuel.data?.rules?.min_distance_km ?? 2000} onChanged={replaceFuelRow} />
-          </div>
-        </div>
+        <FuelDrawer title={fuelDetailRow.name} onClose={closeFuel}>
+          <FuelDetail row={fuelDetailRow} isAdmin={isAdmin} minKm={fuel.data?.rules?.min_distance_km ?? 2000} onChanged={replaceFuelRow} />
+        </FuelDrawer>
       )}
 
       {/* Edit slide-out */}

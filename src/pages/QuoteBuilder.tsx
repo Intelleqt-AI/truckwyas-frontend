@@ -17,7 +17,7 @@ import { toast } from "@/lib/toast";
 import { formatCurrency, formatMoneyWhole, formatNumber, formatDateTime, sentenceCaseLabel } from "@/lib/formatters";
 import { DatePicker } from "@/components/ui/date-picker";
 import { fuelInputFor, fuelKind, dieselSourceNote, randPerLitre, currentPeriodStartIso, isoDay, shortDate, type QuoteWarning } from "@/lib/dieselPrice";
-import { burnInUse, burnDetail, localRatedBurn, noticeWithBurn, pricedOnText, quoteBurnLine, measuredActionFor, ASK_ADMIN, type FuelUseInUse, type RatedBurn } from "@/lib/fleetFuel";
+import { burnInUse, burnDetail, localRatedBurn, noticeWithBurn, pricedOnText, quoteBurnLine, snapshotFuelAmount, measuredActionFor, ASK_ADMIN, type FuelUseInUse, type RatedBurn } from "@/lib/fleetFuel";
 import { compute, computeTonnage, changesSincePriced, fmtNum, suggestTruck, capacityTonnes, vehicleClass, CLASS_OPERATING_DEFAULTS, cents, type CostingInputs, type DieselInput, type Tonnage, type TonnageCosting } from "@/lib/quoteRules";
 import { TonnagePanel, type TonnageChoice, type TonnageMarket } from "@/components/pricing/TonnagePanel";
 import { useTonnageAnalysis } from "@/components/pricing/useTonnageAnalysis";
@@ -423,6 +423,8 @@ export default function QuoteBuilder() {
   const [useConfiguredBurn, setUseConfiguredBurn] = useState(false);
   // What a reopened quote was priced on (costing_snapshot.rated_burn).
   const [savedBurn, setSavedBurn] = useState<RatedBurn | null>(null);
+  // ...and the fuel amount it was priced on (its snapshot's fuel lines).
+  const [savedFuelAmount, setSavedFuelAmount] = useState<number | null>(null);
   // The price in the bar, when the user (or a choice, or a reopened quote)
   // set one; null = the default price (cost floor + target margin).
   const [priceSet, setPriceSet] = useState<number | null>(null);
@@ -1322,6 +1324,7 @@ export default function QuoteBuilder() {
           ? { price, floor, pricedAt: isoDay(q.priced_at), pricedAtRaw: q.priced_at ?? null, fuelPrice: Number(q.fuel_price_used) || null }
           : null;
         setSavedBurn((q.costing_snapshot?.rated_burn as RatedBurn | undefined) ?? null);
+        setSavedFuelAmount(snapshotFuelAmount(q.costing_snapshot));
         // Only the user's own border figure comes back as typed; otherwise the
         // fresh route's border lines stand and the "costs changed" notice says so.
         savedBorderRef.current = savedBorderOverride(ci);
@@ -1434,7 +1437,7 @@ export default function QuoteBuilder() {
     setContractStart(""); setContractEnd(""); setAutoBasis(AUTO_BASIS_START);
     setPickupDate(""); setDeliveryDate(""); setNlText("");
     setEditableTollCost(""); setTollManuallyEdited(false); setDriverAllowanceInput("");
-    setDriverEdited(false); setDriverNightsSet(null); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setAgentFee(null); setAbnormalLoad(false); setDistanceConfirmed(false); setUseOfficialDiesel(false); setUseConfiguredBurn(false); setSavedBurn(null);
+    setDriverEdited(false); setDriverNightsSet(null); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setAgentFee(null); setAbnormalLoad(false); setDistanceConfirmed(false); setUseOfficialDiesel(false); setUseConfiguredBurn(false); setSavedBurn(null); setSavedFuelAmount(null);
     restoreRouteRef.current = null;
     savedFinalPriceRef.current = null; savedPricingRef.current = null; savedBorderRef.current = null; borderRestoreRef.current = null; setReopenNotice(null); setPriceSet(null); setSavedPriceShown(false);
     setRouteError(false);
@@ -2523,8 +2526,8 @@ export default function QuoteBuilder() {
                 <span className="qb-cost__value">{lineAmt("fuel") != null ? money(fuelCost) : "—"}</span>
               {(burnLine || (savedBurn && savedPriceShown)) && (
                 <div className="qb-cost__burn">
-                  {savedBurn && savedPriceShown && pricedOnText(savedBurn) ? (
-                    <span>{pricedOnText(savedBurn)}</span>
+                  {savedBurn && savedPriceShown && pricedOnText(savedBurn, savedFuelAmount) ? (
+                    <span>{pricedOnText(savedBurn, savedFuelAmount)}</span>
                   ) : burnLine && (<>
                     <span title={burnDetail(fuelConsumption)}>{burnLine.label}</span>
                     {burnLine.offerUseMeasured && <button type="button" className="qb-linkbtn" onClick={() => setUseConfiguredBurn(false)}>Use measured</button>}

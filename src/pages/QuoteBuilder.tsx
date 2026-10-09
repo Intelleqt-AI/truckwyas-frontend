@@ -19,6 +19,7 @@ import { toast } from "@/lib/toast";
 import { formatCurrency, formatMoneyWhole, formatNumber, formatDateTime, sentenceCaseLabel } from "@/lib/formatters";
 import { DatePicker } from "@/components/ui/date-picker";
 import { fuelInputFor, fuelKind, dieselSourceNote, randPerLitre, currentPeriodStartIso, isoDay, shortDate, type QuoteWarning } from "@/lib/dieselPrice";
+import { burnInUse, burnDetail, localRatedBurn, noticeWithBurn, pricedOnText, quoteBurnLine, snapshotFuelAmount, measuredActionFor, ASK_ADMIN, type FuelUseInUse, type RatedBurn } from "@/lib/fleetFuel";
 import { compute, computeTonnage, changesSincePriced, fmtNum, suggestTruck, capacityTonnes, vehicleClass, CLASS_OPERATING_DEFAULTS, cents, type CostingInputs, type DieselInput, type Tonnage, type TonnageCosting } from "@/lib/quoteRules";
 import { TonnagePanel, type TonnageChoice, type TonnageMarket } from "@/components/pricing/TonnagePanel";
 import { useTonnageAnalysis } from "@/components/pricing/useTonnageAnalysis";
@@ -63,7 +64,7 @@ import QuoteSendPreview from "@/components/QuoteSendPreview";
  */
 
 /** The vehicle-type fields a tonnage quote reads. */
-type VTLite = { id?: number | string | null; name: string; capacity?: unknown; fuel_consumption_l_per_100km?: unknown };
+type VTLite = { id?: number | string | null; name: string; capacity?: unknown; fuel_consumption_l_per_100km?: unknown; fuel_use_in_use?: FuelUseInUse | null };
 const DRAFT_KEY = "truckwyas_newquote_draft";
 // Market figures applied by the former market price check. Quotes saved with
 // them reopen with them (route_snapshot), and the cost lines offer a way back.
@@ -427,6 +428,13 @@ export default function QuoteBuilder() {
   const [distanceConfirmed, setDistanceConfirmed] = useState(false);
   // diesel_own_off "Use official" for this quote only.
   const [useOfficialDiesel, setUseOfficialDiesel] = useState(false);
+  // Fleet actuals: this quote prices on the typed fuel figure instead of the
+  // one measured by Cartrack (saved in costing_inputs.use_configured_burn).
+  const [useConfiguredBurn, setUseConfiguredBurn] = useState(false);
+  // What a reopened quote was priced on (costing_snapshot.rated_burn).
+  const [savedBurn, setSavedBurn] = useState<RatedBurn | null>(null);
+  // ...and the fuel amount it was priced on (its snapshot's fuel lines).
+  const [savedFuelAmount, setSavedFuelAmount] = useState<number | null>(null);
   // The price in the bar, when the user (or a choice, or a reopened quote)
   // set one; null = the default price (cost floor + target margin).
   const [priceSet, setPriceSet] = useState<number | null>(null);
@@ -603,7 +611,12 @@ export default function QuoteBuilder() {
   const suggestBreakdown = useCostBreakdown(breakdownPayload);
   const serverSuggestedId = suggestBreakdown?.resolution?.suggested_vehicle_type_id ?? null;
   // No truck until there is a load to fit it to.
-  const localSuggestedVT = useMemo(() => (loadT > 0 ? suggestTruck(allVehicleTypes, loadT) : null),
+  // §3 tie-break on the burn quotes use (measured by Cartrack when usable), as the server.
+  const localSuggestedVT = useMemo(() => {
+    if (!(loadT > 0)) return null;
+    const s = suggestTruck(allVehicleTypes.map((v: VTLite) => ({ ...v, fuel_consumption_l_per_100km: burnInUse(v) })), loadT);
+    return s ? allVehicleTypes.find((v: VTLite) => String(v.id) === String(s.id)) ?? null : null;
+  },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [vehicleTypesRaw, loadT]);
   // Up to three trucks that carry the load, smallest first (then lowest burn):
@@ -709,6 +722,7 @@ export default function QuoteBuilder() {
         ...(borderEstimatedBack ? { cross_border_estimate_empty_return_zar: borderEstimatedBack } : {}),
         ...(pickupDate ? { pickup_date: pickupDate } : {}),
         abnormal_load: abnormalLoad,
+        ...(useConfiguredBurn ? { use_configured_burn: true } : {}),
         ...(borderUnknown ? { border_costs_unknown: borderUnknown } : {}), border_cost_is_override: borderCostIsOverride } : null);
   const siRaw = serverBreakdown?.inputs ?? null;
   // The trip runs after the newest published toll schedule (route or server says so).
@@ -742,7 +756,9 @@ export default function QuoteBuilder() {
     distance_estimated: distanceEstimated, distance_confirmed: distanceConfirmed,
     duration_minutes: durationMin,
     load_kg: weightKg > 0 ? weightKg : null,
-    vehicle: selectedVT ? { id: selectedVT.id ?? null, name: selectedVT.name, capacity: selectedVT.capacity, rated_burn_l_per_100km: selectedVT.fuel_consumption_l_per_100km } : null,
+    // The rated burn the server prices with (fuel_use_in_use: measured by
+    // Cartrack when usable, else the typed figure), never the typed field alone.
+    vehicle: selectedVT ? { id: selectedVT.id ?? null, name: selectedVT.name, capacity: selectedVT.capacity, rated_burn_l_per_100km: burnInUse(selectedVT, useConfiguredBurn) } : null,
     diesel: dieselInput,
     operating_cost_per_km: opPerKm,
     operating_cost_source: si?.operating_cost_source ?? localOp?.source ?? null,
@@ -848,13 +864,13 @@ export default function QuoteBuilder() {
     const { vehicle: _v, load_kg: _l, price: _p, operating_cost_per_km: _o, operating_cost_source: _s, ...lane } = costingInputs;
     const trucks = vehicleTypes.map((vt: VTLite) => {
       const op = localOpFor(vt);
-      return { vehicle: { id: vt.id != null ? Number(vt.id) : null, name: vt.name, capacity: vt.capacity, rated_burn_l_per_100km: vt.fuel_consumption_l_per_100km },
+      return { vehicle: { id: vt.id != null ? Number(vt.id) : null, name: vt.name, capacity: vt.capacity, rated_burn_l_per_100km: burnInUse(vt, useConfiguredBurn) },
         operating_cost_per_km: op?.value ?? null, operating_cost_source: op?.source ?? null };
     });
     return computeTonnage({ lane, trucks, tonnes_per_load: loadT, total_tonnes: isContract ? totalTonnes : null,
       min_tonnes_per_load: minTonnes, vehicle_type_id: pricedOnId, rate_per_tonne: ratePerTonne });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [perTonne, loadT, distance, JSON.stringify(costingInputs), vehicleTypesRaw, companyProfile, isContract, totalTonnes, minTonnes, pricedOnId, ratePerTonne]);
+  }, [perTonne, loadT, distance, JSON.stringify(costingInputs), vehicleTypesRaw, companyProfile, isContract, totalTonnes, minTonnes, pricedOnId, ratePerTonne, useConfiguredBurn]);
   const tonnagePayload = perTonne && customerId && pickupCoords && deliveryCoords && loadT > 0 && distance > 0 ? {
     pricing_basis: "per_tonne", customer_id: Number(customerId),
     origin: extractCode(pickup), destination: extractCode(delivery), cargo_description: cargo || null,
@@ -867,6 +883,7 @@ export default function QuoteBuilder() {
     include_empty_return: returnLoadBooked ? false : null,
     distance_estimated: distanceEstimated, distance_confirmed: distanceConfirmed, use_official_fuel: useOfficialDiesel,
     ...(aiFuelActive ? { fuel_price_override: aiFuel!.pricePerL } : {}),
+    ...(useConfiguredBurn ? { use_configured_burn: true } : {}),
     cross_border_cost: Math.round(borderLoaded * 100) / 100,
     ...(driverEdited ? { driver_cost: driverAllowanceInput === "" ? 0 : Number(driverAllowanceInput) || 0, driver_cost_is_override: true } : {}),
     ...(!driverEdited && driverNightsSet != null ? { driver_nights: driverNightsSet } : {}),
@@ -874,6 +891,36 @@ export default function QuoteBuilder() {
   const tonnageServer = useTonnageAnalysis(tonnagePayload);
   const tonnageView: TonnageCosting | null = perTonne ? (tonnageServer?.costing ?? localTonnage) : null;
   const tonnage: Tonnage | null = tonnageView?.tonnage ?? null;
+
+  // ---- truck fuel use (fleet actuals): the figure this quote prices on and
+  // where it comes from (Cartrack measured, your figure, standard estimate).
+  // The server's resolution when in, else the same rule from the type list.
+  const burnVT: VTLite | null = perTonne
+    ? (tonnage?.basis_vehicle_type_id != null ? allVehicleTypes.find((v: VTLite) => String(v.id) === String(tonnage.basis_vehicle_type_id)) ?? null : null)
+    : selectedVT;
+  const serverRatedBurn: RatedBurn | null = (perTonne
+    ? (tonnageServer && !tonnageServer.placeholder ? (tonnageServer.costing as { resolution?: { rated_burn?: RatedBurn | null } }).resolution?.rated_burn : null)
+    : (serverBreakdown && !serverBreakdown.placeholder ? serverBreakdown.resolution?.rated_burn : null)) ?? null;
+  const ratedBurnNow: RatedBurn | null = serverRatedBurn ?? localRatedBurn(burnVT, useConfiguredBurn);
+  const burnLine = quoteBurnLine(ratedBurnNow);
+  const isAdminUser = String(authUser?.role ?? "").toUpperCase() === "ADMIN";
+  // "Use measured figure" (warning action use_measured_burn): drop this
+  // quote's own choice; a type pinned to the typed figure is switched by an
+  // admin (POST burn-mode MEASURED), others are told to ask one.
+  const switchToMeasuredBurn = async () => {
+    const act = measuredActionFor({ quoteUsesConfigured: useConfiguredBurn, typeMode: ratedBurnNow?.mode ?? burnVT?.fuel_use_in_use?.burn_mode, isAdmin: isAdminUser });
+    if (act === "clear_quote_choice") { setUseConfiguredBurn(false); return; }
+    if (act === "ask_admin") { toast.info(ASK_ADMIN); return; }
+    if (act !== "switch_type" || burnVT?.id == null) return;
+    try {
+      await postData({ url: `api/v1/fleet/fuel-actuals/vehicle-types/${burnVT.id}/burn-mode/`, data: { mode: "MEASURED" } });
+      queryClient.invalidateQueries({ queryKey: ["vehicle-types"] });
+      queryClient.invalidateQueries({ queryKey: ["cost-breakdown"] });
+      queryClient.invalidateQueries({ queryKey: ["tonnage-analysis"] });
+    } catch (e) {
+      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Couldn't switch to the measured figure.");
+    }
+  };
   // The rate saved: the user's, else the default (target margin, minimum charge).
   const rateToSave: number | null = ratePerTonne ?? tonnage?.default_rate_per_tonne ?? null;
   const tonnageTotal: number = tonnage?.estimated_revenue ?? 0;
@@ -1304,6 +1351,8 @@ export default function QuoteBuilder() {
         savedPricingRef.current = floor > 0 && price > 0
           ? { price, floor, pricedAt: isoDay(q.priced_at), pricedAtRaw: q.priced_at ?? null, fuelPrice: Number(q.fuel_price_used) || null }
           : null;
+        setSavedBurn((q.costing_snapshot?.rated_burn as RatedBurn | undefined) ?? null);
+        setSavedFuelAmount(snapshotFuelAmount(q.costing_snapshot));
         // Only the user's own border figure comes back as typed; otherwise the
         // fresh route's border lines stand and the "costs changed" notice says so.
         savedBorderRef.current = savedBorderOverride(ci);
@@ -1313,6 +1362,7 @@ export default function QuoteBuilder() {
         setTollsNone(ci.tolls_confirmed_none === true);
         setDistanceConfirmed(ci.distance_confirmed === true);
         setUseOfficialDiesel(ci.use_official_fuel === true);
+        setUseConfiguredBurn(ci.use_configured_burn === true);
         if (Number(ci.fuel_price_override) > 0) setAiFuel({ pricePerL: Number(ci.fuel_price_override), fuelType: sn.fuel_type_used || "Diesel" }); }
       if (q.toll_charges != null) setEditableTollCost(String(q.toll_charges));
       // An applied AI fuel price and a typed/AI toll figure are the user's
@@ -1415,7 +1465,7 @@ export default function QuoteBuilder() {
     setContractStart(""); setContractEnd(""); setAutoBasis(AUTO_BASIS_START);
     setPickupDate(""); setDeliveryDate(""); setNlText("");
     setEditableTollCost(""); setTollManuallyEdited(false); setDriverAllowanceInput("");
-    setDriverEdited(false); setDriverNightsSet(null); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setAgentFee(null); setAbnormalLoad(false); setDistanceConfirmed(false); setUseOfficialDiesel(false);
+    setDriverEdited(false); setDriverNightsSet(null); setReturnLoadBooked(false); setTollsNone(false); setBorderTyped(""); setAgentFee(null); setAbnormalLoad(false); setDistanceConfirmed(false); setUseOfficialDiesel(false); setUseConfiguredBurn(false); setSavedBurn(null); setSavedFuelAmount(null);
     restoreRouteRef.current = null;
     savedFinalPriceRef.current = null; savedPricingRef.current = null; savedBorderRef.current = null; borderRestoreRef.current = null; setReopenNotice(null); setPriceSet(null); setSavedPriceShown(false);
     setRouteError(false);
@@ -1689,7 +1739,9 @@ export default function QuoteBuilder() {
     savedPricingRef.current = null;
     const ch = changesSincePriced(sp.price, sp.floor, floorNow, sp.pricedAtRaw);
     if (!ch.changed || !ch.notice) return;
-    setReopenNotice({ text: ch.notice, since: sp.pricedAt, reprice: ch.repriced_price_keep_margin });
+    // A re-measured truck fuel figure explains the change (as the server's notice).
+    const text = noticeWithBurn(ch.notice, savedBurn, ratedBurnNow) ?? ch.notice;
+    setReopenNotice({ text, since: sp.pricedAt, reprice: ch.repriced_price_keep_margin });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeIsCurrent, floorNow, borderTyped, !!si, !!serverBreakdown?.placeholder]);
 
@@ -1816,6 +1868,7 @@ export default function QuoteBuilder() {
     include_empty_return: emptyReturn.applicable ? emptyReturn.included : null,
     use_official_fuel: useOfficialDiesel,
     fuel_price_override: aiFuelActive ? aiFuel!.pricePerL : null,
+    use_configured_burn: useConfiguredBurn ? true : null,
     vehicle_type_id: selectedVT?.id != null ? Number(selectedVT.id) : null,
     duration_minutes: durationMin != null ? Math.round(Number(durationMin)) : null,
     toll_cost_one_way: tollsOneWay != null ? round2(tollsOneWay) : null,
@@ -2005,6 +2058,7 @@ export default function QuoteBuilder() {
       case "enter_weight": document.getElementById("qb-weight-input")?.focus(); break;
       case "choose_vehicle": document.getElementById("qb-truck-select")?.focus(); break;
       case "edit_vehicle": case "add_vehicle": window.open("/settings/vehicle-types", "_blank", "noopener"); break;
+      case "use_measured_burn": switchToMeasuredBurn(); break;
       case "use_minimum":
         if (perTonne) { if (tonnage?.minimum_charge_rate_per_tonne != null) setRatePerTonne(tonnage.minimum_charge_rate_per_tonne); }
         else if (minimumCharge != null) applyPrice(minimumCharge);
@@ -2526,6 +2580,17 @@ export default function QuoteBuilder() {
                   </>)}
                 </span>
                 <span className="qb-cost__value">{lineAmt("fuel") != null ? money(fuelCost) : "—"}</span>
+              {(burnLine || (savedBurn && savedPriceShown)) && (
+                <div className="qb-cost__burn">
+                  {savedBurn && savedPriceShown && pricedOnText(savedBurn, savedFuelAmount) ? (
+                    <span>{pricedOnText(savedBurn, savedFuelAmount)}</span>
+                  ) : burnLine && (<>
+                    <span title={burnDetail(fuelConsumption)}>{burnLine.label}</span>
+                    {burnLine.offerUseMeasured && <button type="button" className="qb-linkbtn" onClick={() => setUseConfiguredBurn(false)}>Use measured</button>}
+                    {burnLine.offerUseMine && <button type="button" className="qb-linkbtn" onClick={() => setUseConfiguredBurn(true)}>Use my figure for this quote</button>}
+                  </>)}
+                </div>
+              )}
               </div>
               <div className="qb-cost__row">
                 <span className="qb-cost__label">

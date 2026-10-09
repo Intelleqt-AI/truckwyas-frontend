@@ -2,7 +2,7 @@ import '@/pages/table-heading-roles.css';
 import { formatMoney } from '@/lib/formatters';
 import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import '@/pages/settings/settings-brand.css';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmModal } from "@/components/ConfirmModal";
@@ -11,6 +11,10 @@ import { useAuth } from "@/lib/AuthContext";
 import { settingsCardStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsBadgeStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
 import RowActions from '@/components/ui/RowActions';
 import { StatusChip } from '@/components/ui/StatusChip';
+import { FleetFuelStrip, FuelDetail, FuelDrawer, FuelUseCell } from '@/components/fleet/FleetFuel';
+import { useFleetFuel } from '@/components/fleet/useFleetFuel';
+import type { VehicleTypeFuel } from '@/lib/fleetFuel';
+import { toast } from '@/lib/toast';
 
 interface VehicleType {
   id: number;
@@ -33,6 +37,9 @@ interface VehicleType {
   // same name — i.e. the result of editing one. Lets the UI offer "Reset to
   // shared default" instead of "Delete" for these specifically.
   overrides_shared_default?: boolean;
+  // Read-only: the litres per 100 km quotes use now (measured by Cartrack
+  // when there is enough data, else the typed figure).
+  fuel_use_in_use?: { value: number | null; source: string; label?: string | null } | null;
 }
 
 const FUEL_TYPE_OPTIONS = ['Diesel', 'Petrol', 'Electric', 'Hybrid'];
@@ -61,6 +68,28 @@ export function VehicleTypesDirectory() {
   // Shared public demo account — creation/edit/delete controls are fixed off,
   // viewing/filtering/search stay fully live.
   const isDemo = !!authUser?.is_demo;
+  const isAdmin = String(authUser?.role ?? '').toUpperCase() === 'ADMIN' && !isDemo;
+  // Measured fuel use per type (Cartrack), FLEET-ACTUALS-CLIENT-SPEC.md.
+  const fuel = useFleetFuel();
+  const [fuelTypeId, setFuelTypeId] = useState<number | null>(null);
+  const closeFuel = useCallback(() => setFuelTypeId(null), []);
+  const fuelRow = (t: VehicleType): VehicleTypeFuel | undefined => {
+    const r = fuel.data?.vehicle_types.find(x => x.id === t.id);
+    if (r) return r;
+    // Fuel actuals not loaded: what the vehicle types API says is in use.
+    const typed = t.fuel_consumption_l_per_100km != null && t.fuel_consumption_l_per_100km !== '' ? Number(t.fuel_consumption_l_per_100km) : null;
+    const inUse = t.fuel_use_in_use ?? { value: typed, source: typed == null ? 'missing' : t.company == null ? 'standard' : 'configured' };
+    return { id: t.id, name: t.name, in_use: inUse, measured: null };
+  };
+  const replaceFuelRow = (r: VehicleTypeFuel) => fuel.setData(d => d ? { ...d, vehicle_types: d.vehicle_types.map(x => x.id === r.id ? r : x) } : d);
+  const applyMeasured = async (id: number) => {
+    try {
+      replaceFuelRow(await postData({ url: `api/v1/fleet/fuel-actuals/vehicle-types/${id}/burn-mode/`, data: { mode: 'MEASURED' } }));
+    } catch (e) {
+      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Couldn't change the figure.");
+    }
+  };
+  const fuelDetailRow = fuelTypeId != null ? fuel.data?.vehicle_types.find(x => x.id === fuelTypeId) ?? null : null;
   const [types, setTypes] = useState<VehicleType[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -238,6 +267,8 @@ export function VehicleTypesDirectory() {
           </div>
         </div>
 
+        {fuel.data && <FleetFuelStrip data={fuel.data} isAdmin={isAdmin} onQueued={r => fuel.setData(d => d ? { ...d, refresh_queued: r.queued, refresh_next_at: r.next_at } : d)} />}
+
         {loading ? (
           <TableSkeleton rows={6} cols={4} label="Loading truck types" />
         ) : (
@@ -248,14 +279,14 @@ export function VehicleTypesDirectory() {
                 <th style={{ width: 36 }}>
                   <input type="checkbox" aria-label="Select all vehicle types" checked={allSelected} onChange={toggleAll} style={{ cursor: 'pointer' }} />
                 </th>
-                {['Name', 'Description', 'Payload (t)', 'Base rate', 'Status', ''].map(h => (
-                  <th key={h || 'actions'} scope="col" style={{ textAlign: (h === 'Payload (t)' || h === 'Base rate' || h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
+                {['Name', 'Description', 'Payload (t)', 'Fuel use', 'Base rate', 'Status', ''].map(h => (
+                  <th key={h || 'actions'} scope="col" className={h === 'Description' ? 'vt-col-desc' : undefined} style={{ textAlign: (h === 'Payload (t)' || h === 'Base rate' || h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center' as const, padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No vehicle types found</td></tr>
+                <tr><td colSpan={8} style={{ textAlign: 'center' as const, padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No vehicle types found</td></tr>
               ) : filtered.map((t, i) => {
                 // Three states: still on the shared default (editable —
                 // saving clones it into this company's own row), a company's
@@ -289,11 +320,20 @@ export function VehicleTypesDirectory() {
                       <span style={{ ...settingsBadgeStyle, marginLeft: 8, fontWeight: 400 }} title={badgeTitle}>{isShared ? 'Platform default' : 'Customised'}</span>
                     )}
                   </td>
-                  <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', minWidth: 200 }}>
+                  <td className="vt-col-desc" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', minWidth: 200 }}>
                     {t.description || '—'}
                   </td>
                   <td className="num" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                     {t.capacity ? `${t.capacity}t` : '—'}
+                  </td>
+                  <td style={{ minWidth: 150 }}>
+                    <FuelUseCell
+                      row={fuelRow(t)}
+                      isAdmin={isAdmin}
+                      onDetail={() => setFuelTypeId(t.id)}
+                      onSet={() => openEdit(t)}
+                      onUseMeasured={() => applyMeasured(t.id)}
+                    />
                   </td>
                   <td className="num" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                     {formatRate(t.base_rate)}<span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>/km</span>
@@ -306,6 +346,7 @@ export function VehicleTypesDirectory() {
                       label={t.name}
                       items={[
                         { label: 'Edit', onSelect: () => openEdit(t), disabled: editDisabled },
+                        ...(fuelRow(t)?.measured ? [{ label: 'Fuel use', onSelect: () => setFuelTypeId(t.id) }] : []),
                         { label: isOverride ? 'Reset' : 'Delete', danger: !isOverride, onSelect: () => setDeleteTarget({ id: t.id, name: t.name, isReset: isOverride }), disabled: deleteDisabled },
                       ]}
                     />
@@ -432,6 +473,13 @@ export function VehicleTypesDirectory() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Measured fuel use (Cartrack) for one type */}
+      {fuelDetailRow && (
+        <FuelDrawer title={fuelDetailRow.name} onClose={closeFuel}>
+          <FuelDetail row={fuelDetailRow} isAdmin={isAdmin} minKm={fuel.data?.rules?.min_distance_km ?? 2000} onChanged={replaceFuelRow} />
+        </FuelDrawer>
       )}
 
       {/* Edit slide-out */}

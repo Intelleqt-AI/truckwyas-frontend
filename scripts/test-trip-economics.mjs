@@ -4,13 +4,20 @@ import assert from "node:assert/strict";
 import {
   pctText, ptsText, marginText, costBasisLabel, revenueBasisLabel, combinedBasisLabel, emptyReturnNote, missingPrompts, combineLegs,
   bookingRequest, isPending, previewMargin, linkWarnings, linkRefusal, invoiceWhenText, invoiceMismatchText, actualsText,
-  returnHistoryText, candidateFit, candidateSummary, costLabel, costGroupsText,
+  returnHistoryText, candidateFit, candidateSummary, costLabel, costGroupsText, fuelBurnNote,
 } from "../src/lib/tripEconomics.ts";
 
 const sp = (s) => (s == null ? s : s.replace(/ /g, " "));
 let n = 0;
 const eq = (a, b, m) => { assert.equal(a, b, m); n++; };
 
+// Fleet actuals: the fuel figure an estimated fuel cost used.
+eq(fuelBurnNote([{ group: "fuel", basis: "estimate", estimated: 5000, actual: null, used: 5000, rated_burn: { value: 40.2, source: "measured" } }]),
+  "Fuel estimated on 40,2 L/100 km measured by Cartrack");
+eq(fuelBurnNote([{ group: "fuel", basis: "estimate", estimated: 5000, actual: null, used: 5000, rated_burn: { value: 42, source: "configured" } }]),
+  "Fuel estimated on your figure, 42,0 L/100 km");
+eq(fuelBurnNote([{ group: "fuel", basis: "actual", estimated: 5000, actual: 5100, used: 5100, rated_burn: { value: 42, source: "configured" } }]), null);
+eq(fuelBurnNote([{ group: "fuel", basis: "estimate", estimated: 5000, actual: null, used: 5000 }]), null);
 eq(pctText(-18.68), "−19%");
 eq(pctText(8.5), "9%");
 eq(pctText(null), "—");

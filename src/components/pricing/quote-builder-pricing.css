@@ -401,3 +401,12 @@ body:has(.qb-has-pricebar) .Toastify__toast-container--bottom-left {
 /* Per tonne: the rate sits next to its unit ("R 5 551 per tonne"). */
 .qb-pricebar__field--rate .qb-pricebar__input { flex: 0 0 auto !important; }
 .qb-pricebar__unit { font: 500 14px/20px var(--font-sans); color: var(--text-secondary); white-space: nowrap; }
+
+/* Fleet actuals: where the truck's fuel figure comes from, one quiet line
+   under the fuel row ("Measured by Cartrack: 40,2 L/100 km over 18 400 km"). */
+.qb-cost__burn {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px;
+  grid-column: 1 / -1; margin-top: -4px; font-size: 12px; line-height: 18px; color: var(--text-tertiary);
+  overflow-wrap: anywhere; min-width: 0;
+}
+.qb-cost__burn .qb-linkbtn { font-size: 12px; line-height: 18px; }

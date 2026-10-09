@@ -5,7 +5,7 @@ import { toast } from '@/lib/toast';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import SendPreviewDialog from '@/components/SendPreviewDialog';
 import {
-  NOTE_MAX, adjustmentRow, apiMessage, cleanNote, expiresLine, lastReminderLine, promptExample, sentLine, showFollowUp,
+  NOTE_MAX, adjustmentRow, apiMessage, cleanNote, draftClauseLine, expiresLine, lastReminderLine, promptExample, sentLine, showFollowUp,
   type FollowUpState, type ReminderPreview,
 } from '@/lib/followups';
 import { useFollowUp, useFuelAdjustment, useQuoteAutomation } from './useFollowUps';
@@ -14,8 +14,8 @@ import './followups.css';
 /** §2 Draft quote: the clause the PDF will carry, one muted line. */
 export function DraftClauseLine({ quoteId, className = 'fu-clause' }: { quoteId: string | number | null | undefined; className?: string }) {
   const q = useFuelAdjustment('quotes', quoteId);
-  const clause = q.data?.clause;
-  return clause ? <p className={className}>{clause}</p> : null;
+  const line = q.data?.clause ? draftClauseLine(q.data.reference, q.data.clause) : null;
+  return line ? <p className={className}>{line}</p> : null;
 }
 
 /** §2 "Fuel price adjustment" row on a sent quote or a load. */
@@ -89,6 +89,8 @@ function ReminderDialog({ quoteId, customerName, onClose }: { quoteId: string | 
   const [note, setNote] = useState('');
   const debounced = useDebouncedValue(note, 400);
   const [preview, setPreview] = useState<ReminderPreview | null>(null);
+  // The note the shown preview was built from: Send always sends what was previewed.
+  const [previewNote, setPreviewNote] = useState('');
   const [failed, setFailed] = useState(false);
   const [sending, setSending] = useState(false);
 
@@ -96,16 +98,18 @@ function ReminderDialog({ quoteId, customerName, onClose }: { quoteId: string | 
     let live = true;
     const n = cleanNote(debounced);
     fetchData(`/api/v1/quotes/${quoteId}/follow-up/reminder/${n ? `?note=${encodeURIComponent(n)}` : ''}`)
-      .then((d: ReminderPreview) => { if (live) { setPreview(d); setFailed(false); } })
+      .then((d: ReminderPreview) => { if (live) { setPreview(d); setPreviewNote(n); setFailed(false); } })
       .catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
   }, [quoteId, debounced]);
 
   const to = preview ? (preview.preview?.to || null) : (failed ? null : undefined);
+  const stale = cleanNote(note) !== previewNote;
   const send = async () => {
+    if (sending || stale) return;
     setSending(true);
     try {
-      const res = await postData({ url: `/api/v1/quotes/${quoteId}/follow-up/reminder/`, data: { confirm: true, note: cleanNote(note) } });
+      const res = await postData({ url: `/api/v1/quotes/${quoteId}/follow-up/reminder/`, data: { confirm: true, note: previewNote } });
       const { success: _ok, sent_to, ...state } = res as FollowUpState & { success: boolean; sent_to: string };
       qc.setQueryData(['quote-follow-up', String(quoteId)], state);
       // The GET adds reason_text (why it can't be sent again yet).
@@ -141,9 +145,10 @@ function ReminderDialog({ quoteId, customerName, onClose }: { quoteId: string | 
         { label: 'Message', value: preview?.preview?.text ? <div className="fu-preview-text">{preview.preview.text}</div> : <span className="send-preview__muted">Loading…</span> },
       ]}
       note={blocked ? preview?.reason_text : preview?.preview?.reply_to ? `Replies go to ${preview.preview.reply_to}.` : undefined}
-      confirmLabel={to ? `Send to ${to}` : 'Send'}
+      confirmLabel={stale ? 'Updating preview…' : to ? `Send to ${to}` : 'Send'}
       confirmBlocked={blocked}
       sending={sending}
+      confirmDisabled={stale}
       onConfirm={send}
       onCancel={onClose}
     />

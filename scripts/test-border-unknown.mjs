@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { borderCostsUnknown } from '../src/lib/borderUnknown.ts';
+import { borderCostsUnknown, tripBorderUnknown } from '../src/lib/borderUnknown.ts';
 import { compute } from '../src/lib/quoteRules.ts';
 
 const breakdown = [
@@ -29,4 +29,20 @@ const typed = compute({ ...trip, border_cost: 9800, border_cost_is_override: tru
 assert.ok(typed.floor > 0);
 assert.equal(typed.lines.find((l) => l.key === 'border').amount, 9800);
 assert.ok(!typed.warnings.some((x) => x.code === 'border_costs_missing'));
-console.log('borderUnknown: 9 cases passed');
+
+// The way home: a crossing unknown only on the way back still blocks.
+const outKnown = null;
+const back = borderCostsUnknown({ countries: ['ZM'], crossings: ['ZM-ZW'] }, []);
+const merged = tripBorderUnknown(outKnown, back);
+assert.deepEqual(merged.crossings, ['Zambia→Zimbabwe (way home)']);
+assert.deepEqual(merged.countries, ['Zambia']);
+assert.equal(tripBorderUnknown(bu, null), bu, 'no way home: unchanged');
+assert.equal(tripBorderUnknown(null, null), null, 'all known');
+const both = tripBorderUnknown(bu, borderCostsUnknown({ countries: ['AO', 'ZM'], crossings: ['NA-AO', 'ZM-ZW'] }, []));
+assert.deepEqual(both.crossings, ['Namibia→Angola', 'Zambia→Zimbabwe (way home)'], 'a crossing unknown both ways is listed once');
+assert.deepEqual(both.countries, ['Angola', 'Zambia']);
+const homeBlocked = compute({ ...trip, border_costs_unknown: merged, include_empty_return: null });
+assert.equal(homeBlocked.floor, null, 'unknown way-home crossing blocks the floor');
+assert.equal(homeBlocked.warnings.find((x) => x.code === 'border_costs_missing').severity, 'block');
+
+console.log('borderUnknown: 13 cases passed');

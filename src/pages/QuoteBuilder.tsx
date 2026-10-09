@@ -1,7 +1,7 @@
 import "@/components/layout/section-header.css";
 import { isForeignCountry, tripIsInternational } from "@/lib/tripInternational";
 import { savedRouteMatches, savedBorderOverride, reuseSavedRoute } from "@/lib/savedRoute";
-import { borderCostsUnknown } from "@/lib/borderUnknown";
+import { borderCostsUnknown, tripBorderUnknown } from "@/lib/borderUnknown";
 import { routeChipLabel, borderTotalWithAgentFee, tripBorderEstimate, borderEstimate, abnormalLoadRelevant, type TollItem, type BorderItem } from "@/lib/routeTolls";
 import { TollPop, BorderPop } from "@/components/pricing/RouteCostPops";
 import SectionHeader from "@/components/layout/SectionHeader";
@@ -240,6 +240,8 @@ interface ReturnLeg {
   tolls_unavailable_reason?: string | null; toll_breakdown?: TollBreakdownItem[];
   additional_costs?: { border_fees?: number; weighbridge_fees?: number; non_sa_tolls?: number };
   cross_border_breakdown?: BorderItem[];
+  /** Crossings on the way home with no figures on file (server: return_leg.border_costs_unknown). */
+  border_costs_unknown?: { countries?: string[]; crossings?: string[] } | null;
 }
 const formatDuration = (min?: number) => {
   if (!min || min <= 0) return "—";
@@ -586,7 +588,7 @@ export default function QuoteBuilder() {
   // Parts of the route with no border figures on file (e.g. Angola): the
   // costing blocks until the user enters the border costs (their own figure
   // then covers every crossing). Sent on every costing call and saved.
-  const borderUnknown = borderCostsUnknown(routeB?.border_costs_unknown, routeB?.cross_border_breakdown);
+  const borderUnknownOut = borderCostsUnknown(routeB?.border_costs_unknown, routeB?.cross_border_breakdown);
   const borderCostIsOverride = borderTyped !== "";
   // The server prices driver nights at the cross-border allowance on an
   // international trip, so it must be told (every cost-breakdown call).
@@ -671,6 +673,11 @@ export default function QuoteBuilder() {
   // What the border charges assumed about the truck ("Assumed 56 t gross — set your truck's gross mass").
   const borderAssumptions = (routeB?.border_vehicle_profile?.assumptions ?? []).map(a => a.message).filter(Boolean);
   const returnLeg = returnLegRaw?.available ? returnLegRaw : null;
+  // The way home's own unknown crossings count when the quote costs that leg:
+  // a round trip, or a one-way trip with the truck coming back empty.
+  const returnLegCosted = !!returnLeg && (tripType === "ROUND_TRIP" || !returnLoadBooked);
+  const borderUnknown = tripBorderUnknown(borderUnknownOut,
+    returnLegCosted ? borderCostsUnknown(returnLeg?.border_costs_unknown, returnLeg?.cross_border_breakdown) : null);
   const returnTolls: number | null = returnLeg && !returnLeg.tolls_unknown && returnLeg.toll_cost_zar != null ? Number(returnLeg.toll_cost_zar) : null;
   // The route's own toll figure (not a typed or market one) can use the return leg's.
   const routeTollsInUse = !tollManuallyEdited && !aiTollActive;

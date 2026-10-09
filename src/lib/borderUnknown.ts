@@ -48,3 +48,18 @@ export function borderCostsUnknown(raw: Raw, breakdown?: Item[] | null): BorderU
     .map((k) => ({ label: String(k.label ?? "").slice(0, 60), amount: numOrNull(k.amount) as number }));
   return { countries, crossings, known };
 }
+
+/** The trip's unknown border parts: the way out, plus the way home when the
+ *  quote costs it (round trip, or a one-way trip coming back empty). A
+ *  crossing missing only on the way home must block the quote too, never be
+ *  left out of the price. null when every crossing that's costed is known. */
+export function tripBorderUnknown(out: BorderUnknown | null, back: BorderUnknown | null): BorderUnknown | null {
+  if (!back) return out;
+  if (!out) return { countries: back.countries, crossings: back.crossings.map((c) => `${c} (way home)`), known: back.known };
+  const uniq = (xs: string[]) => [...new Set(xs)];
+  return {
+    countries: uniq([...out.countries, ...back.countries]).slice(0, 10),
+    crossings: uniq([...out.crossings, ...back.crossings.filter((c) => !out.crossings.includes(c)).map((c) => `${c} (way home)`)]).slice(0, 10),
+    known: out.known,
+  };
+}

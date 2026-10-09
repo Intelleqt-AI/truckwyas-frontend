@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchData, postData } from '@/lib/Api';
+import { useLiveEvent } from '@/hooks/useLiveEvent';
 import { formatRelativeTime, normaliseFigures, sentenceCaseLabel } from '@/lib/formatters';
 import './notification-brand.css';
 
@@ -21,22 +22,30 @@ export function NotificationBell() {
   const [unread, setUnread] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(() => {
-    fetchData('api/v1/notifications/?limit=20')
-      .then((d: any) => setNotes(Array.isArray(d) ? d : (d?.results || [])))
-      .catch(() => {});
-    fetchData('api/v1/notifications/?unread=true')
-      .then((d: any) => setUnread(typeof d?.count === 'number' ? d.count : (Array.isArray(d) ? d.length : (d?.results?.length || 0))))
-      .catch(() => {});
+  // One refresh = the latest 20 + the unread count (a COUNT query, not every
+  // unread row). Rejects if either failed so the live refresher backs off.
+  const load = useCallback(async () => {
+    const [list, count] = await Promise.allSettled([
+      fetchData('api/v1/notifications/?limit=20'),
+      fetchData('api/v1/notifications/unread_count/'),
+    ]);
+    if (list.status === 'fulfilled') {
+      const d = list.value as Note[] | { results?: Note[] } | null;
+      setNotes(Array.isArray(d) ? d : (d?.results || []));
+    }
+    if (count.status === 'fulfilled') {
+      const d = count.value as { count?: unknown } | null;
+      setUnread(typeof d?.count === 'number' ? d.count : 0);
+    }
+    const failed = [list, count].find((r): r is PromiseRejectedResult => r.status === 'rejected');
+    if (failed) throw failed.reason;
   }, []);
 
-  // Load on mount, and re-load whenever a live WS event arrives.
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    const handler = () => load();
-    window.addEventListener('tw:live-event', handler);
-    return () => window.removeEventListener('tw:live-event', handler);
-  }, [load]);
+  // Load on mount. Live pushes (and a reconnect after a gap) are coalesced:
+  // a burst of events is one reload, a failing API backs off, and nothing is
+  // fetched while the tab is hidden (useLiveEvent / lib/liveRefresh.ts).
+  useEffect(() => { load().catch(() => {}); }, [load]);
+  useLiveEvent(() => true, load, { onReconnect: true });
 
   // Close on outside click
   useEffect(() => {

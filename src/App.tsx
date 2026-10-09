@@ -112,11 +112,14 @@ const PublicInvoice = lazy(() => import('./pages/PublicInvoice'));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Don't retry auth errors — retry everything else up to 4×.
-      // Delays: 3s, 6s, 9s, 12s — enough for a Render free-tier cold start (~20-30s).
+      // Retry network errors and 5xx up to 4× — delays 3s, 6s, 9s, 12s, enough
+      // for a Render free-tier cold start (~20-30s). Never retry a 4xx: auth,
+      // validation and not-found won't change, and a 429 means the read
+      // throttle is already spent — retrying it multiplied every refetch by 5
+      // and kept the throttle exhausted for every other screen.
       retry: (failureCount, error: unknown) => {
         const status = (error as { status?: number })?.status;
-        if (status === 401 || status === 403) return false;
+        if (typeof status === 'number' && status >= 400 && status < 500 && status !== 408) return false;
         return failureCount < 4;
       },
       retryDelay: (attempt) => Math.min(3000 * (attempt + 1), 12000),

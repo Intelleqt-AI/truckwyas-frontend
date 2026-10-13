@@ -27,6 +27,7 @@ import { daysBetween, todayISO } from "@/components/reports/data";
 
 // External Fast Pay application link. The applied-state key is unchanged so
 // invoices already marked "Applied" stay marked.
+const MC_URL = "https://getstarted.merchantcapital.co.za?actiontype=C_C&channel=Part_Trad&who=IA_SP";
 const FAST_PAY_STORAGE_KEY = "mc_applied_invoice_ids";
 
 function loadAppliedIds(): Set<string> {
@@ -39,7 +40,11 @@ function loadAppliedIds(): Set<string> {
 
 function saveAppliedId(id: string, current: Set<string>): Set<string> {
   const next = new Set(current).add(id);
-  localStorage.setItem(FAST_PAY_STORAGE_KEY, JSON.stringify([...next]));
+  try {
+    localStorage.setItem(FAST_PAY_STORAGE_KEY, JSON.stringify([...next]));
+  } catch {
+    // Storage blocked: the mark lasts for this visit only.
+  }
   return next;
 }
 
@@ -503,6 +508,12 @@ export default function Invoices() {
                     ? String(capitalEntry.risk_tier || capitalEntry.tier || "standard").toLowerCase()
                     : null;
                   const applied = appliedIds.has(String(inv.id));
+                  // Until Fast Pay launches in-app, eligible invoices apply on the partner site.
+                  const canApplyExternally = !!capitalEntry && !CAPITAL_LAUNCHED;
+                  const applyForAdvance = () => {
+                    window.open(MC_URL, "_blank", "noopener,noreferrer");
+                    setAppliedIds((prev) => saveAppliedId(String(inv.id), prev));
+                  };
 
                   return (
                     <tr
@@ -553,6 +564,16 @@ export default function Invoices() {
                         )}
                       </td>
                       <td className="actions" onClick={(e) => e.stopPropagation()}>
+                        <span className="fin-inline-list" style={{ flexWrap: "nowrap", justifyContent: "flex-end" }}>
+                        {canApplyExternally && (
+                          <button
+                            type="button"
+                            className="tw-btn tw-btn--sm"
+                            onClick={applyForAdvance}
+                            title={applied ? "You applied before. Click to open the application again." : "Opens the Fast Pay capital application in a new tab"}>
+                            {applied ? "Applied ✓" : "Apply for advance ↗"}
+                          </button>
+                        )}
                         <RowActions
                           label={`Invoice ${invNumber}`}
                           items={[
@@ -586,7 +607,13 @@ export default function Invoices() {
                             ...(invStatus !== "DRAFT"
                               ? [{ label: "Download PDF", onSelect: () => handleDownloadPDF(null, inv.id) }]
                               : []),
-                            ...(capitalEntry
+                            ...(canApplyExternally
+                              ? [{
+                                  label: applied ? "Apply for advance again ↗" : "Apply for advance ↗",
+                                  hint: applied ? "You applied before. Opens the application in a new tab." : "Opens the Fast Pay capital application in a new tab.",
+                                  onSelect: applyForAdvance,
+                                }]
+                              : capitalEntry
                               ? applied
                                 ? [{ label: "Applied for Fast Pay", hint: "Your earlier application is on record.", onSelect: () => {}, disabled: true }]
                                 : [{
@@ -603,6 +630,7 @@ export default function Invoices() {
                             ...(CAPITAL_LAUNCHED ? fastPayMenu(offerById.get(String(inv.id)), navigate) : []),
                           ]}
                         />
+                        </span>
                       </td>
                     </tr>
                   );

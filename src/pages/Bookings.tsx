@@ -194,7 +194,7 @@ export default function Bookings() {
     // A load can't be marked Assigned without a vehicle (driver is optional)
     // — rather than let the PATCH 400, open the assign flow right here so
     // the user can pick one and land on Assigned in one step.
-    if (newStatus === 'ASSIGNED' && !load?.vehicle) {
+    if (newStatus === 'ASSIGNED' && !load?.vehicle && !load?.driver) {
       setAssignDriverId(load?.driver ? String(load.driver) : '');
       setAssignVehicleId(load?.vehicle ? String(load.vehicle) : '');
       setAssignModalOpen(true);
@@ -321,23 +321,22 @@ export default function Bookings() {
 
   const submitAssignAndActivate = async () => {
     if (billingBlocked) return;
-    if (!assignVehicleId) {
-      toast.error('Select a vehicle');
-      return;
-    }
     setAssignSaving(true);
     try {
-      await postData({ url: `api/v1/loads/${id}/assign_driver/`, data: {
-        driver_id: assignDriverId,
-        vehicle_id: assignVehicleId,
-      }});
+      // Both are optional: with nothing picked, only the status changes.
+      if (assignVehicleId || assignDriverId) {
+        await postData({ url: `api/v1/loads/${id}/assign_driver/`, data: {
+          driver_id: assignDriverId || null,
+          vehicle_id: assignVehicleId || null,
+        }});
+      }
       // assign_driver only auto-promotes PENDING -> ASSIGNED; force it
       // explicitly so this also works from LOADING, the other status that
       // can lead to ASSIGNED.
       await patchData({ url: `api/v1/loads/${id}/`, data: { status: 'ASSIGNED' } });
       invalidateLoad();
       setAssignModalOpen(false);
-      toast.success('Driver and vehicle assigned. Status set to Assigned.');
+      toast.success('Assigned. Status set to Assigned.');
     } catch (e: any) {
       toast.error(e?.message || 'Failed to assign driver and vehicle');
     } finally {
@@ -792,7 +791,7 @@ export default function Bookings() {
                 <StatusChip tone="warning" size="sm" label={`${load.status === 'IN_TRANSIT' ? 'In transit' : 'Loading'} · no vehicle${load.driver_name ? '' : ' or driver'} assigned`} />
                 <p className="bk-help">
                   {load.status === 'LOADING'
-                    ? 'To add the vehicle, move it back to Assigned via Change status; that asks for one.'
+                    ? 'To add a vehicle, move it back to Assigned via Change status, then edit the assignment.'
                     : `The vehicle can't be changed once a load is in transit.${staleWork(load) ? '' : ' Mark it delivered or cancel it via Change status.'}`}
                 </p>
               </div>
@@ -813,7 +812,7 @@ export default function Bookings() {
             ) : (
               <>
                 <div className="bk-field">
-                  <span className="bk-field__label" id="bk-assign-vehicle">Vehicle</span>
+                  <span className="bk-field__label" id="bk-assign-vehicle">Vehicle (optional)</span>
                   <Select value={assignVehicleId} onValueChange={setAssignVehicleId}>
                     <SelectTrigger aria-labelledby="bk-assign-vehicle"><SelectValue placeholder="No vehicle" /></SelectTrigger>
                     <SelectContent>
@@ -838,17 +837,12 @@ export default function Bookings() {
                     </SelectContent>
                   </Select>
                 </div>
-                {(!!assignDriverId && !assignVehicleId) && (
-                  <p className="bk-help bk-help--warning" style={{ marginBottom: 8 }}>
-                    A driver needs a vehicle. Select a vehicle too, or clear the driver.
-                  </p>
-                )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button
                     type="button"
                     className="bk-btn bk-btn--primary"
                     style={{ flex: 1 }}
-                    disabled={assignSaving || (!!assignDriverId && !assignVehicleId)}
+                    disabled={assignSaving}
                     onClick={saveAssignment}
                   >
                     {assignSaving ? 'Saving…' : 'Save assignment'}
@@ -924,11 +918,11 @@ export default function Bookings() {
         <div className="bk-dialog" role="dialog" aria-modal="true" aria-labelledby="bk-assign-dialog-title" onClick={e => e.stopPropagation()}>
           <h2 className="bk-dialog__title" id="bk-assign-dialog-title">Assign driver and vehicle</h2>
           <p className="bk-dialog__body">
-            This order needs a vehicle before it can be marked <b>Assigned</b>. A driver is optional.
+            Pick a vehicle and a driver now, or leave them blank and add them later. This marks the order <b>Assigned</b>.
           </p>
 
           <div className="bk-field">
-            <span className="bk-field__label" id="bk-modal-vehicle">Vehicle</span>
+            <span className="bk-field__label" id="bk-modal-vehicle">Vehicle (optional)</span>
             <Select value={assignVehicleId} onValueChange={setAssignVehicleId}>
               <SelectTrigger aria-labelledby="bk-modal-vehicle"><SelectValue placeholder="Select vehicle…" /></SelectTrigger>
               <SelectContent>
@@ -969,7 +963,7 @@ export default function Bookings() {
               type="button"
               className="bk-btn bk-btn--primary"
               onClick={submitAssignAndActivate}
-              disabled={assignSaving || !assignVehicleId}
+              disabled={assignSaving}
             >
               {assignSaving ? 'Assigning…' : 'Assign and mark assigned'}
             </button>

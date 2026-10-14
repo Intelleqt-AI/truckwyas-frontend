@@ -114,7 +114,6 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
   const drivers: { id: number; user_details?: { name?: string; username?: string } }[] = driversData?.results || driversData || [];
 
   const datesBad = !pickup || !delivery || delivery < pickup;
-  const driverWithoutTruck = !!driverId && !vehicleId;
 
   // What booking would give, for these dates (suggestions depend on them).
   const previewQ = useQuery({
@@ -222,7 +221,6 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
         </div>
         {(!qPickup || !qDelivery) && <p className="bk-help">The quote has no {!qPickup && !qDelivery ? 'dates' : !qPickup ? 'collection date' : 'delivery date'}: check the suggested {!qPickup && !qDelivery ? 'ones' : 'date'}.</p>}
         {datesBad && <p className="bk-help bk-help--warning">Delivery can't be before collection.</p>}
-        {driverWithoutTruck && <p className="bk-help bk-help--warning">A driver needs a truck. Pick a truck too, or clear the driver.</p>}
 
         {previewQ.isLoading && !pv ? (
           <p className="bk-help" style={{ marginTop: 16 }}>Preparing the invoice and return loads…</p>
@@ -277,7 +275,7 @@ export function BookJobDialog({ quote, onClose }: { quote: BookableQuote; onClos
           {bookedId ? (
             <button type="button" className="bk-btn bk-btn--primary" onClick={() => { onClose(); navigate(`/bookings/${bookedId}`); }}>Open job</button>
           ) : (
-            <button type="button" className="bk-btn bk-btn--primary" disabled={datesBad || tonnesBad || driverWithoutTruck || book.isPending || !!blockedText} onClick={() => {
+            <button type="button" className="bk-btn bk-btn--primary" disabled={datesBad || tonnesBad || book.isPending || !!blockedText} onClick={() => {
               if (inFlight.current) return;
               inFlight.current = true;
               book.mutate(undefined, { onSettled: () => { inFlight.current = false; } });

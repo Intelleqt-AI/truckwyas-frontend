@@ -4,6 +4,7 @@ import '@/components/finance/finance-ledger.css';
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import SectionHeader, { FINANCE_TABS } from '@/components/layout/SectionHeader';
+import AccessCapitalButton from '@/components/capital/AccessCapitalButton';
 import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
 import { Segmented } from '@/components/ui/Segmented';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -93,6 +94,7 @@ export default function Suppliers() {
       eyebrow="Finance"
       title="Finance"
       tabs={FINANCE_TABS}
+      tabsAside={<AccessCapitalButton />}
       actions={<button type="button" className="tw-btn tw-btn--primary" onClick={() => setEditing('new')}>Add supplier</button>}
     />
   );

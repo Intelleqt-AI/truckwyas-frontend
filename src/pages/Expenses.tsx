@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatCompact, formatCurrency, formatDate, formatPercent } from '@/lib/formatters';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import SectionHeader, { FINANCE_TABS } from '@/components/layout/SectionHeader';
+import AccessCapitalButton from '@/components/capital/AccessCapitalButton';
 import RowActions from '@/components/ui/RowActions';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { wholeRand } from '@/components/finance/FinTile';
@@ -288,6 +289,7 @@ export default function Expenses() {
       eyebrow="Finance"
       title="Finance"
       tabs={FINANCE_TABS}
+      tabsAside={<AccessCapitalButton />}
       actions={
         <>
           <button type="button" className="tw-btn" onClick={handleExportCSV} disabled={loading}>

@@ -33,6 +33,8 @@ interface SectionHeaderProps {
   menuItems?: MenuItem[];
   /** Route-based sub-navigation shared by every page in the section. */
   tabs?: SectionTab[];
+  /** Shown at the right end of the tabs row (e.g. Finance's Access capital). */
+  tabsAside?: ReactNode;
   /** Inline adornment next to the title (e.g. a status chip). */
   titleAdornment?: ReactNode;
   /** Detail pages: a back link shown on the subtitle line, never above the title. */
@@ -248,7 +250,7 @@ export function useTabStrip(activeKey: unknown) {
  * current route, so a page that has its own nav item (Reports) shows no
  * orphan tab row.
  */
-export default function SectionHeader({ eyebrow, title, description, actions, menuItems, tabs, titleAdornment, back }: SectionHeaderProps) {
+export default function SectionHeader({ eyebrow, title, description, actions, menuItems, tabs, tabsAside, titleAdornment, back }: SectionHeaderProps) {
   const { pathname } = useLocation();
   const navLabel = useActiveNavLabel();
   const shownTitle = tabs && navLabel ? navLabel : title;
@@ -295,6 +297,7 @@ export default function SectionHeader({ eyebrow, title, description, actions, me
         ) : null}
       </div>
       {showTabs && (
+        <div className={tabsAside ? 'section-header__tabs-row' : undefined} style={tabsAside ? undefined : { display: 'contents' }}>
         <nav ref={tabsRef} className="section-header__tabs" aria-label={`${eyebrow ?? shownTitle} sections`}>
           {tabs!.map((t) => (
             <NavLink
@@ -309,6 +312,8 @@ export default function SectionHeader({ eyebrow, title, description, actions, me
             </NavLink>
           ))}
         </nav>
+        {tabsAside && <div className="section-header__tabs-aside">{tabsAside}</div>}
+        </div>
       )}
     </header>
   );

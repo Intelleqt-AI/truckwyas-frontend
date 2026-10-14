@@ -138,6 +138,17 @@
   scrollbar-width: none;
 }
 .section-header__tabs::-webkit-scrollbar { display: none; }
+/* Tabs row with an aside on the right (e.g. Finance's Access capital): the
+   row takes the strip's top gap and underline; the tabs scroll, the aside stays. */
+.section-header__tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: var(--head-to-tabs, 16px);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.section-header__tabs-row > .section-header__tabs { flex: 1 1 auto; min-width: 0; margin-top: 0; border-bottom: 0; }
+.section-header__tabs-aside { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
 /* Overflowing strip (phones, R5): fade the clipped edge so the cut-off tab
    reads as "more this way"; useTabStrip() sets data-fade and scrolls the
    active tab clear of the fade. Keyboard focus also stops clear of it. */

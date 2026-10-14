@@ -6,6 +6,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { Link, useNavigate } from 'react-router-dom';
 import SectionHeader, { FINANCE_TABS } from '@/components/layout/SectionHeader';
+import AccessCapitalButton from '@/components/capital/AccessCapitalButton';
 import { Toolbar, SearchInput } from '@/components/ui/Toolbar';
 import { Segmented } from '@/components/ui/Segmented';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -57,7 +58,7 @@ export default function CreditNotes() {
   const count = (s: StatusFilter) => query.data?.status_counts?.[s];
   const searching = search !== debouncedSearch || (query.isFetching && query.isPlaceholderData);
 
-  const header = <SectionHeader eyebrow="Finance" title="Finance" tabs={FINANCE_TABS} />;
+  const header = <SectionHeader eyebrow="Finance" title="Finance" tabs={FINANCE_TABS} tabsAside={<AccessCapitalButton />} />;
 
   if (failed) {
     return (

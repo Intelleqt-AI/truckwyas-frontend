@@ -169,11 +169,14 @@ export function quoteLapsed(q: any, now: Date = new Date()): boolean {
  * Home's pipeline and Customer detail (R8). Accepted also holds the legacy
  * IT/COMPLETED statuses; a Sent quote marked lost sits in Declined. A Draft or
  * Sent quote past its valid-until date is Expired: it is not live work, so it
- * is not counted under Draft or Sent anywhere.
+ * is not counted under Draft or Sent anywhere. A Draft or Sent quote that
+ * already has a load (booked_load) was taken up: it counts as Accepted, like
+ * any converted quote, never Expired or Declined.
  */
 export type BoardStage = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED';
 export function boardStage(q: any, now?: Date): BoardStage | null {
   const st = String(q?.status || '').toUpperCase();
+  if ((st === 'DRAFT' || st === 'SENT') && (q?.booked_load || q?.converted)) return 'ACCEPTED';
   if (st === 'SENT' && q?.outcome === 'rejected') return 'DECLINED';
   if (st === 'DRAFT' || st === 'SENT') return quoteLapsed(q, now) ? 'EXPIRED' : st;
   if (st === 'ACCEPTED' || st === 'IT' || st === 'COMPLETED') return 'ACCEPTED';

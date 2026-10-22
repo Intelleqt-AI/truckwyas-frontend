@@ -53,7 +53,14 @@ function keyFigure(id: ReportId, d: Ledger): KeyFigure {
   const fig = (v: number, caption: string, whole = true): KeyFigure => ({ value: whole ? moneyWhole(v) : String(v), caption });
   switch (id) {
     case 'pl': {
-      if (!paid.length && !costs) return null;
+      // Cash P&L with no cash in or out yet: say where the money is (invoiced
+      // and unpaid, else delivered and not invoiced), so this row doesn't read
+      // "nothing" beside Revenue by lane's delivered total.
+      if (!paid.length && !costs) {
+        if (issued.length) return fig(revenueByMonth(d, 'accrual', p).excl, 'Invoiced, not yet paid');
+        const uninvoiced = d.loads.filter(l => (l.status || '').toUpperCase() === 'DELIVERED' && inPeriod(l.delivery_date, p));
+        return uninvoiced.length ? fig(sum(uninvoiced.map(l => num(l.total_amount))), 'Delivered, not yet invoiced') : null;
+      }
       const rev = revenueByMonth(d, 'cash', p).excl;
       return fig(rev - costs, 'Net profit excl. VAT, cash');
     }

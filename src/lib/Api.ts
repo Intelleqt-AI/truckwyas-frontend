@@ -1,6 +1,7 @@
 import { readBlobError } from './blobError';
 import axios from 'axios';
 import { toast } from './toast';
+import { demoWriteHappened, fromDemoSnapshot, isDemoSession } from './demoSnapshot';
 
 // Resolve the API base URL defensively. The committed dev env files point at
 // http://localhost:8001/, so a PRODUCTION build that forgot to set VITE_API_URL
@@ -34,6 +35,9 @@ api.interceptors.request.use(config => {
     const token = localStorage.getItem('access');
     if (token) config.headers.Authorization = `Token ${token}`;
   }
+  // A demo visitor's first change: stop serving the demo snapshot so what
+  // they add reads back live (lib/demoSnapshot).
+  if ((config.method || 'get').toLowerCase() !== 'get' && isDemoSession()) demoWriteHappened();
   return config;
 });
 
@@ -90,6 +94,11 @@ const GET_TIMEOUT_MS = 45_000;
 
 export const fetchData = async (url: string) => {
   if (!url) throw new Error('No URL provided');
+  // The public demo answers its pages from one pre-built response; a real
+  // login never gets past isDemoSession() inside (lib/demoSnapshot).
+  const cached = await fromDemoSnapshot(url, () =>
+    api.get('api/v1/demo/snapshot/', { timeout: GET_TIMEOUT_MS }).then(r => r.data).catch(() => null));
+  if (cached !== undefined) return cached;
   const response = await api.get(url, { timeout: GET_TIMEOUT_MS });
   return response.data;
 };

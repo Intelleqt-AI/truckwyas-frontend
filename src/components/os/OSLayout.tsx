@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LiveEvents } from '@/components/LiveEvents';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useAuth } from '@/lib/AuthContext';
-import { fetchData, postData } from '@/lib/Api';
+import { fetchData, markSignedOut, postData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { useIdleLogout } from '@/hooks/useIdleLogout';
 import { isSubscriptionBlocked, subscriptionStatusDetail, subscriptionStatusLabel } from '@/lib/subscriptionStatus';
@@ -55,8 +55,17 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
       .slice(0, 2) || 'TW';
 
   const signOut = (message?: string) => {
-    // Best-effort server-side session kill; the local token is cleared regardless.
-    postData({ url: 'api/v1/auth/logout/' }).catch(() => { /* dead/failed token: proceed anyway */ });
+    // Stop every screen's requests first (lib/Api), then end the session on
+    // the server with the token named explicitly: the request interceptor
+    // runs after the token below is cleared, so the logout used to go out
+    // with no login and the session was never ended.
+    const token = localStorage.getItem('access');
+    markSignedOut();
+    queryClient.cancelQueries();
+    if (token) {
+      postData({ url: 'api/v1/auth/logout/', config: { headers: { Authorization: `Token ${token}` } } })
+        .catch(() => { /* dead/failed token: proceed anyway */ });
+    }
     localStorage.removeItem('access');
     localStorage.removeItem('token');
     localStorage.removeItem('user');

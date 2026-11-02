@@ -29,11 +29,25 @@ const api = axios.create({
   baseURL: resolveApiBaseUrl(),
 });
 
+// Set by signOut (markSignedOut): from then until the next sign-in, a request
+// that needs a login is not sent at all. Screens still loading when the user
+// signs out (Home paging through its lists, the bell, the account checks)
+// used to keep firing and get a 401 each. The endpoints that work without a
+// login (sign-in, sign-up, password reset, invites, logout itself) still go.
+let signedOut = false;
+const NO_LOGIN_NEEDED = /api\/v1\/auth\/(login|register|complete-signup|handoff|invite|password-reset|resend-verification|verify-email|retry-signup-payment|logout)\//;
+export function markSignedOut() { signedOut = true; }
+
 // Inject token on every request
 api.interceptors.request.use(config => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('access');
-    if (token) config.headers.Authorization = `Token ${token}`;
+    if (token) {
+      config.headers.Authorization = `Token ${token}`;
+      signedOut = false;
+    } else if (signedOut && !NO_LOGIN_NEEDED.test(config.url || '')) {
+      throw new axios.CanceledError('Signed out');
+    }
   }
   // A demo visitor's first change: stop serving the demo snapshot so what
   // they add reads back live (lib/demoSnapshot).
@@ -51,7 +65,9 @@ api.interceptors.response.use(
     // session is already gone — none of these are an expired-session-mid-use event.
     const isAuthEndpoint = reqUrl.includes('auth/login') || reqUrl.includes('auth/register') || reqUrl.includes('auth/logout');
 
-    if (error.response?.status === 401 && !isAuthEndpoint) {
+    // While signing out, a request that was already on its way can come back
+    // 401 (the session just ended): that is not "Session expired".
+    if (error.response?.status === 401 && !isAuthEndpoint && !signedOut) {
       toast.error('Session expired');
       localStorage.removeItem('access');
       localStorage.removeItem('token');

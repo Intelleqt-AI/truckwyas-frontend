@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useAuth } from '@/lib/AuthContext';
 import { isLiveConnected } from '@/lib/liveData';
 
 /**
@@ -15,12 +16,18 @@ import { isLiveConnected } from '@/lib/liveData';
  *
  * The callback is held in a ref so the interval is never torn down/recreated
  * on every render; pass any function, stable or not.
+ *
+ * The public demo is view-only: nothing a visitor sees can change while they
+ * look, so it never polls (every open demo tab used to hit the API every
+ * 30 seconds whenever live updates were off).
  */
 export function useAutoRefresh(refetch: () => void, intervalMs = 30000) {
   const cb = useRef(refetch);
   useEffect(() => { cb.current = refetch; });
+  const demo = !!useAuth().user?.is_demo;
 
   useEffect(() => {
+    if (demo) return;
     const run = () => {
       if (isLiveConnected()) return;
       if (typeof document === 'undefined' || document.visibilityState === 'visible') {
@@ -35,5 +42,5 @@ export function useAutoRefresh(refetch: () => void, intervalMs = 30000) {
       window.removeEventListener('focus', run);
       document.removeEventListener('visibilitychange', run);
     };
-  }, [intervalMs]);
+  }, [intervalMs, demo]);
 }

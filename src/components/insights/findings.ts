@@ -19,14 +19,26 @@ import { dieselShortRows } from './dieselShort';
 
 // ---------------------------------------------------------------- fetching
 
-/** Loads every page of a DRF list endpoint by following `next` (GET only).
- *  The API ignores page_size and returns 20 rows a page, so a single request
- *  is never the whole list. Stops after `maxPages` and says so. */
-export async function fetchAllPages<T>(path: string, maxPages = 50): Promise<{ rows: T[]; count: number; complete: boolean }> {
+/** Rows asked for per page: the API's maximum (core.pagination, 100). At its
+ *  default of 20 a company with ~900 loads cost Home about 230 requests a
+ *  visit; at 100 it is about 50, for the same rows. */
+export const ALL_PAGES_SIZE = 100;
+
+/** Adds ?page_size= to a list path unless the caller set one. */
+export function withPageSize(path: string, size = ALL_PAGES_SIZE): string {
+  if (/[?&]page_size=/.test(path)) return path;
+  return `${path}${path.includes('?') ? '&' : '?'}page_size=${size}`;
+}
+
+/** Loads every page of a DRF list endpoint by following `next` (GET only),
+ *  ALL_PAGES_SIZE rows a request. Stops after `maxRows` (the 1 000 rows the
+ *  dashboard has always read) and says so. */
+export async function fetchAllPages<T>(path: string, maxRows = 1000): Promise<{ rows: T[]; count: number; complete: boolean }> {
   const rows: T[] = [];
-  let url: string | null = path;
+  let url: string | null = withPageSize(path);
   let count = 0;
   let pages = 0;
+  const maxPages = Math.ceil(maxRows / ALL_PAGES_SIZE);
   while (url && pages < maxPages) {
     const res: any = await fetchData(url);
     pages += 1;

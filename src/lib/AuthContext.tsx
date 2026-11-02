@@ -1,6 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { fetchData } from './Api';
 import { useLiveEvent, eventPrefix } from '@/hooks/useLiveEvent';
+
+const FOCUS_REFRESH_MIN_MS = 60_000;
 
 export interface AuthUser {
   id: number;
@@ -83,10 +85,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // long-lived SPA session where AuthProvider only mounts once, so without
   // this a stale subscription_status can keep billing-gated UI (drag/drop,
   // AI pricing, invoice buttons) blocked long after the account is current.
+  // At most once a minute: returning to a tab fires both focus and
+  // visibilitychange, and switching windows back and forth fired a call each
+  // time.
+  const lastFocusRefresh = useRef(0);
   useEffect(() => {
-    const onFocus = () => refreshUser();
+    const onFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusRefresh.current < FOCUS_REFRESH_MIN_MS) return;
+      lastFocusRefresh.current = now;
+      refreshUser();
+    };
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') refreshUser();
+      if (document.visibilityState === 'visible') onFocus();
     };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibilityChange);

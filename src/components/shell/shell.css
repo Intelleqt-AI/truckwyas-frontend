@@ -196,11 +196,19 @@
 /* Rail (collapsed): icons only, labels in tooltips. Overflow must show tips. */
 .tw-shell.is-railed .tw-side { padding: 0 12px 12px; overflow: visible; }
 .tw-shell.is-railed .tw-side .tw-nav { overflow: visible; }
-.tw-shell.is-railed .tw-side__brand { flex-direction: column; justify-content: center; padding: 0; gap: 0; }
-.tw-shell.is-railed .tw-side__logo { width: 17px; }
-.tw-shell.is-railed .tw-side__toggle { display: none; }
-.tw-shell.is-railed:not([data-rail-forced]) .tw-side__brand:hover .tw-side__logo { display: none; }
-.tw-shell.is-railed .tw-side__brand:hover .tw-side__toggle { display: grid; }
+.tw-shell.is-railed .tw-side__brand { position: relative; flex-direction: column; justify-content: center; padding: 0; gap: 0; }
+/* The wordmark cropped to its icon: 21.5px wide at 20px tall, the "T" starts at 24.7px. */
+.tw-shell.is-railed .tw-side__logo { width: 22px; }
+/* The logo never hides: expand is a small round button on the rail's edge,
+   shown while the brand row is hovered or the button has keyboard focus. */
+.tw-shell.is-railed .tw-side__toggle {
+  position: absolute; top: 50%; right: -24px; transform: translateY(-50%);
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--bg-raised); border: 1px solid var(--border-default);
+  opacity: 0; pointer-events: none; transition: opacity 120ms ease;
+}
+.tw-shell.is-railed .tw-side__brand:hover .tw-side__toggle,
+.tw-shell.is-railed .tw-side__toggle:focus-visible { opacity: 1; pointer-events: auto; }
 .tw-shell.is-railed .tw-side__company { justify-content: center; padding: 6px 0; background: transparent; border-color: transparent; }
 .tw-shell.is-railed .tw-side .tw-side__company-name,
 .tw-shell.is-railed .tw-side .tw-side__company-chev,
@@ -214,8 +222,7 @@
 .tw-shell.is-railed .tw-side .tw-side__status { justify-content: center; padding: 0; }
 @media (max-width: 1100px) {
   /* Tablet: the rail is forced, so the expand control is not offered. */
-  .tw-shell.is-railed .tw-side__brand:hover .tw-side__logo { display: block; }
-  .tw-shell.is-railed .tw-side__brand:hover .tw-side__toggle { display: none; }
+  .tw-shell.is-railed .tw-side__toggle { display: none; }
 }
 
 /* ---------------------------------------------------------------- top bar */
